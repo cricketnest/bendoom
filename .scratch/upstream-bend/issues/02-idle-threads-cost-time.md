@@ -17,6 +17,8 @@
 
 So about 2.5 ms a frame. Ticket 11 of milestone 3 saw the same thing earlier (three frames a second). Without the window, in `bench/frames.bend`, the cost is small (8.4 against 9.1 ms), so most of it comes with the window's loop, which hands control back to the runtime every frame.
 
+A second sign of the same thing, from ticket 11 of milestone 3: freeing each frame's picture with `Image.drop`, which spreads the work over the threads, made the window slower on 12 threads (27 against 31 frames a second) and doubled the memory (312 MB against 165 MB). On one thread without the window it cost nothing.
+
 ## What we do about it
 
 `nix/bendoom.nix` starts the game with `--threads 1`. That is enough for now. This ticket matters the day the game wants real parallel work: that work must first win back these 2.5 ms.
