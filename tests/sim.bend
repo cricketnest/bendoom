@@ -20,7 +20,11 @@
 # in the doorway through the wait, where the door comes down to the
 # player's head at -72 on the 247th tic after the use, is blocked on the
 # 248th and goes back up (ticket 05's hand computation); and the blue
-# key door, which refuses. The heights and tics are the hand
+# key door, which refuses. Then Freedoom's special 23 switch from before it:
+# its tag's three blocks lowered to the floors and on the tics of ticket
+# 06's hand computation (144 on the 120th tic after the use, 136 on the
+# 128th and the 136th, each thinker gone a tic later), and a second use,
+# which starts nothing. The heights and tics are the hand
 # computation's; the positions are regression pins.
 import Base
 import ../src/bytes.bend as B
@@ -45,18 +49,24 @@ def step(tag: String, n: Nat, keys: K.Keys, s: S.State) -> IO(S.State):
     IO.print(line(tag, q))
     return q
 
-# A run of one command in a demo's units, then the clock, the player,
-# the thinkers running, and a sector's floor and ceiling.
-def watch(tag: String, +sector: U32, +s: S.State) -> String:
-  line(tag ++ " tic " ++ U32.show(S.State.clock(s)), s) ++ " thinkers "
-    ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ " sector " ++ U32.show(sector) ++ " "
-    ++ F.Fixed.show(L.Level.floor(S.State.level(s), sector)) ++ " "
-    ++ F.Fixed.show(L.Level.ceil(S.State.level(s), sector))
+def heights(sectors: List<&2, U32>, +level: L.Level) -> String:
+  match sectors:
+    case []:
+      ""
+    case +sector <> rest:
+      " sector " ++ U32.show(sector) ++ " " ++ F.Fixed.show(L.Level.floor(level, sector)) ++ " "
+        ++ F.Fixed.show(L.Level.ceil(level, sector)) ++ heights(rest, level)
 
-def run(tag: String, n: Nat, cmd: K.Cmd, sector: U32, s: S.State) -> IO(S.State):
+# A run of one command in a demo's units, then the clock, the player,
+# the thinkers running, and some sectors' floors and ceilings.
+def watch(tag: String, sectors: List<&2, U32>, +s: S.State) -> String:
+  line(tag ++ " tic " ++ U32.show(S.State.clock(s)), s) ++ " thinkers "
+    ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
+
+def run(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, s: S.State) -> IO(S.State):
   +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   do IO<S.State>:
-    IO.print(watch(tag, sector, q))
+    IO.print(watch(tag, sectors, q))
     return q
 
 def idle() -> K.Cmd:
@@ -69,67 +79,83 @@ def forward() -> K.Cmd:
   K.Cmd.demo(25, 0, 0, False{})
 
 def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
-  S.State.at(level, V.Leaf{0}, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
+  S.State.at(level, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
+
+# Freedoom's special 23 switch, line 753: its tag's three blocks lower
+# at 1 a tic to the lowest floor around each, and it works once.
+def floors(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    f0 : S.State <- run("switch walk", 30n, forward(), [76, 126, 129], at(level, 2064, 65276, 90))
+    f1 : S.State <- run("use", 1n, use(), [76, 126, 129], f0)
+    f2 : S.State <- run("-", 119n, idle(), [76, 126, 129], f1)
+    f3 : S.State <- run("-", 1n, idle(), [76, 126, 129], f2)
+    f4 : S.State <- run("-", 7n, idle(), [76, 126, 129], f3)
+    f5 : S.State <- run("-", 1n, idle(), [76, 126, 129], f4)
+    f6 : S.State <- run("-", 7n, idle(), [76, 126, 129], f5)
+    f7 : S.State <- run("-", 1n, idle(), [76, 126, 129], f6)
+    f8 : S.State <- run("use", 1n, use(), [76, 126, 129], f7)
+    IO.print("-")
 
 # The blue key door, sector 71, refuses.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    b0 : S.State <- run("blue walk", 30n, forward(), 71, at(level, 832, 1400, 90))
-    b1 : S.State <- run("use", 1n, use(), 71, b0)
-    b2 : S.State <- run("-", 10n, idle(), 71, b1)
+    b0 : S.State <- run("blue walk", 30n, forward(), [71], at(level, 832, 1400, 90))
+    b1 : S.State <- run("use", 1n, use(), [71], b0)
+    b2 : S.State <- run("-", 10n, idle(), [71], b1)
     IO.print("end")
 
 # A use while the door closes sends it back up; one while it waits
 # starts it down.
 def turned(+closing: S.State) -> IO(Unit):
   do IO<Unit>:
-    r1 : S.State <- run("closing -", 10n, idle(), 10, closing)
-    r2 : S.State <- run("use", 1n, use(), 10, r1)
-    r3 : S.State <- run("-", 10n, idle(), 10, r2)
-    r4 : S.State <- run("-", 4n, idle(), 10, r3)
-    r5 : S.State <- run("use", 1n, use(), 10, r4)
+    r1 : S.State <- run("closing -", 10n, idle(), [10], closing)
+    r2 : S.State <- run("use", 1n, use(), [10], r1)
+    r3 : S.State <- run("-", 10n, idle(), [10], r2)
+    r4 : S.State <- run("-", 4n, idle(), [10], r3)
+    r5 : S.State <- run("use", 1n, use(), [10], r4)
     IO.print("-")
 
 def closes(+open: S.State) -> IO(S.State):
   do IO<S.State>:
-    d4 : S.State <- run("-", 1n, idle(), 10, open)
-    d5 : S.State <- run("-", 150n, idle(), 10, d4)
-    run("-", 1n, idle(), 10, d5)
+    d4 : S.State <- run("-", 1n, idle(), [10], open)
+    d5 : S.State <- run("-", 150n, idle(), [10], d4)
+    run("-", 1n, idle(), [10], d5)
 
 def shuts(+closing: S.State) -> IO(Unit):
   do IO<Unit>:
-    d7 : S.State <- run("-", 61n, idle(), 10, closing)
-    d8 : S.State <- run("-", 1n, idle(), 10, d7)
+    d7 : S.State <- run("-", 61n, idle(), [10], closing)
+    d8 : S.State <- run("-", 1n, idle(), [10], d7)
     turned(closing)
 
 def opens(+open: S.State) -> IO(Unit):
   do IO<Unit>:
     closing : S.State <- closes(open)
     shuts(closing)
-    w1 : S.State <- run("through walk", 40n, forward(), 10, open)
-    c1 : S.State <- run("doorway walk", 6n, forward(), 10, open)
-    c2 : S.State <- run("-", 179n, idle(), 10, c1)
-    c3 : S.State <- run("-", 1n, idle(), 10, c2)
-    c4 : S.State <- run("-", 1n, idle(), 10, c3)
-    c5 : S.State <- run("-", 34n, idle(), 10, c4)
+    w1 : S.State <- run("through walk", 40n, forward(), [10], open)
+    c1 : S.State <- run("doorway walk", 6n, forward(), [10], open)
+    c2 : S.State <- run("-", 179n, idle(), [10], c1)
+    c3 : S.State <- run("-", 1n, idle(), [10], c2)
+    c4 : S.State <- run("-", 1n, idle(), [10], c3)
+    c5 : S.State <- run("-", 34n, idle(), [10], c4)
     IO.print("-")
 
 # The first door, sector 10, from the pit south of it: used, held open,
 # shut; turned twice; use held down all the while; walked through.
 def used(+before: S.State) -> IO(Unit):
   do IO<Unit>:
-    d1 : S.State <- run("use", 1n, use(), 10, before)
-    d2 : S.State <- run("-", 20n, idle(), 10, d1)
-    d3 : S.State <- run("-", 41n, idle(), 10, d2)
+    d1 : S.State <- run("use", 1n, use(), [10], before)
+    d2 : S.State <- run("-", 20n, idle(), [10], d1)
+    d3 : S.State <- run("-", 41n, idle(), [10], d2)
     opens(d3)
-    h1 : S.State <- run("held use", 100n, use(), 10, before)
-    h2 : S.State <- run("use", 200n, use(), 10, h1)
+    h1 : S.State <- run("held use", 100n, use(), [10], before)
+    h2 : S.State <- run("use", 200n, use(), [10], h1)
     IO.print("-")
 
 def door(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    d0 : S.State <- run("door walk", 40n, forward(), 10, at(level, 832, 384, 90))
+    d0 : S.State <- run("door walk", 40n, forward(), [10], at(level, 832, 384, 90))
     used(d0)
+    floors(level)
     blue(level)
 
 def free(+s: S.State) -> IO(S.State):
@@ -141,7 +167,7 @@ def free(+s: S.State) -> IO(S.State):
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
-    s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level, V.Leaf{0}))
+    s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level))
     p0 : S.State <- free(s)
     p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
     p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p1)
@@ -157,7 +183,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p11)
     p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p12)
     p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, p13)
-    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.State.start(level, V.Leaf{0}))
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.State.start(level))
     q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q1)
     q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q2)
     q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
@@ -217,6 +243,16 @@ def main() -> IO(Unit):
 #|-
 #|held use tic 140 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -4.000000
 #|use tic 340 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 10 -128.000000 -128.000000
+#|-
+#|switch walk tic 30 2063.945510 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.024505 thinkers 0 sector 76 272.000000 272.000000 sector 126 264.000000 264.000000 sector 129 264.000000 264.000000
+#|use tic 31 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 3 sector 76 271.000000 272.000000 sector 126 263.000000 264.000000 sector 129 263.000000 264.000000
+#|- tic 150 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 3 sector 76 152.000000 272.000000 sector 126 144.000000 264.000000 sector 129 144.000000 264.000000
+#|- tic 151 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 2 sector 76 151.000000 272.000000 sector 126 144.000000 264.000000 sector 129 143.000000 264.000000
+#|- tic 158 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 2 sector 76 144.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
+#|- tic 159 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 1 sector 76 143.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
+#|- tic 166 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 1 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
+#|- tic 167 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 0 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
+#|use tic 168 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 0 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
 #|-
 #|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 0 sector 71 -128.000000 -128.000000
 #|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 71 -128.000000 -128.000000

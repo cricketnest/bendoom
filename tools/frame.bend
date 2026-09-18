@@ -52,7 +52,7 @@ def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, g
   IO(Unit):
   (+gfx, +level) = gl
   Frame.rows(200n, 0, R.Render.frame(P.Project.tables(level), gfx,
-    S.Sim.replay(script, S.State.at(level, G.Gfx.sidetex(gfx), place)), mem))
+    S.Sim.replay(script, S.State.at(level, place)), mem))
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w

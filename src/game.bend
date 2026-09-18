@@ -105,7 +105,7 @@ def Game.start.go(frames: Nat, input: K.Input, now: Nat, mem: Array<U32>, gl: G.
   do IO<Unit>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
     Game.loop(frames, window, Game{level, gfx, P.Project.tables(level),
-      S.State.start(level, G.Gfx.sidetex(gfx)), input, now, 0n, mem})
+      S.State.start(level), input, now, 0n, mem})
 
 # The window opened and the loop run from the player 1 start for at most
 # so many frames, with the given input at first.

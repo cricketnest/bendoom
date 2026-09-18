@@ -296,6 +296,27 @@ def Laws.use_fires_once(forward, side, turn, next, player, level, sidetex, think
     case K.Cmd{f, s, t, False{}} L.Level{geo, sectors, specials}:
       {==}
 
+# A tree read where it was just written answers what was written: both
+# walk the same path, by the same bits of the index.
+def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
+  {x == V.Vec.get.go(V.Vec.set.go(v, odd, i, x), odd, i) : U32}:
+  match v odd:
+    case V.Leaf{y} True{}:
+      {==}
+    case V.Leaf{y} False{}:
+      {==}
+    case V.Node{l, r} False{}:
+      vec_get_set(l, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32), x)
+    case V.Node{l, r} True{}:
+      vec_get_set(r, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32), x)
+
+def Laws.once_clears(line, s):
+  match s:
+    case S.State{player, L.Level{geo, sectors, specials}, sidetex, thinkers, rnd, clock, ended, usedown}:
+      Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
+        L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
+        vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
+
 def Laws.replay_append(a, b, s):
   match a:
     case []:
@@ -754,7 +775,7 @@ def line_ok_eq(+level: L.Level, +x: U32, +y: U32, +i: U32, +f: S.Sim.Fit) ->
 def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +i: U32) ->
   {S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, i) == S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, i) : Bool}:
   match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
       {==}
 
 def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +i: U32,
@@ -783,25 +804,31 @@ def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb
       go_same(rest, geo, sa, pa, sb, pb, x, y, S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, i, fa),
         S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, i, fb), line_same(geo, sa, pa, sb, pb, x, y, i, fa, fb, e))
 
+# The lines gathered for a box are the blockmap's, which two levels of
+# one geometry share.
+def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x0: U32, +y0: U32, +x1: U32,
+  +y1: U32) ->
+  {S.Sim.lines(L.Level{geo, sa, pa}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb}, x0, y0, x1, y1)
+    : List<&2, U32>}:
+  match geo:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
+      {==}
+
 # Free is the same in two levels of one geometry: the lines gathered
 # are the blockmap's, and each one's condition is the geometry's.
-def free_geo(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
+def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
   {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.free(L.Level{geo, sb, pb}, x, y) : Bool}:
-  match geo:
-    case L.Geo{+lines, +sides, +verts, +segs, +subs, +nodes, +root, +blockmap, +start, +texnames, +flatnames, +sine, +tanto, +boxes, +nlines, +nsectors}:
-      go_same(S.Sim.lines.at(blockmap, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-        (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)),
-        L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
-        sa, pa, sb, pb, x, y,
-        S.Fit{True{}, L.Level.floor(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa},
-            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa}, x, y)),
-          L.Level.ceil(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa},
-            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa}, x, y))},
-        S.Fit{True{}, L.Level.floor(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb},
-            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb}, x, y)),
-          L.Level.ceil(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb},
-            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb}, x, y))},
-        {==})
+  %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
+    : {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y,
+      S.Fit{True{}, L.Level.floor(L.Level{geo, sb, pb}, L.Level.sector_at(L.Level{geo, sb, pb}, x, y)),
+        L.Level.ceil(L.Level{geo, sb, pb}, L.Level.sector_at(L.Level{geo, sb, pb}, x, y))})) : Bool}
+  go_same(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, sb, pb, x, y,
+    S.Fit{True{}, L.Level.floor(L.Level{geo, sa, pa}, L.Level.sector_at(L.Level{geo, sa, pa}, x, y)),
+      L.Level.ceil(L.Level{geo, sa, pa}, L.Level.sector_at(L.Level{geo, sa, pa}, x, y))},
+    S.Fit{True{}, L.Level.floor(L.Level{geo, sb, pb}, L.Level.sector_at(L.Level{geo, sb, pb}, x, y)),
+      L.Level.ceil(L.Level{geo, sb, pb}, L.Level.sector_at(L.Level{geo, sb, pb}, x, y))}, {==})
 
 # A mover's re-clip moves the player up and down alone.
 def stood_x(moved: S.Player, +q: S.Player) -> {S.Player.x(moved) == S.Player.x(S.Player.stood(moved, q)) : U32}:

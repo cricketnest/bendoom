@@ -50,7 +50,7 @@ def Walk.go(runs: List<&2, List<&2, K.Cmd>>, +which: List<&2, String>, +s: S.Sta
 def Walk.start(place: L.Level.Start, runs: List<&2, List<&2, K.Cmd>>, which: List<&2, String>,
   p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
-  Walk.go(runs, which, S.State.at(level, V.Leaf{0}, place))
+  Walk.go(runs, which, S.State.at(level, place))
 
 def main() -> IO(Unit):
   do IO<Unit>:

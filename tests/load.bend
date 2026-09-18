@@ -5,7 +5,11 @@
 # composed there by vanilla's rule, patches pasted in order; the lines'
 # specials were counted there, and the two sectors' block boxes worked
 # out by P_GroupLines' rule from their lines' ends and the blockmap's
-# origin (-712, -1072, 32 columns by 27 rows).
+# origin (-712, -1072, 32 columns by 27 rows). The two switches the
+# map names (SW1BRN1 on side 1166, SW1GRAY on side 615) have partners
+# the map does not name, composed all the same: SW2BRN1 is 64 by 128 of
+# 5 patches and SW2GRAY 64 by 128 of 3 in TEXTURE1; a switch's partner's
+# partner is itself, and COMPUTE1 has none.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -130,6 +134,10 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(texture(gfx, "SKY1", G.Gfx.skytex(gfx)))
     IO.print("side 526 textures " ++ U32.show(G.Gfx.top(gfx, 526)) ++ " " ++ U32.show(G.Gfx.bottom(gfx, 526))
       ++ " " ++ U32.show(G.Gfx.mid(gfx, 526)))
+    IO.print(texture(gfx, "SW2BRN1", L.Level.switch(level, G.Gfx.mid(gfx, 1166))))
+    IO.print(texture(gfx, "SW2GRAY", L.Level.switch(level, G.Gfx.mid(gfx, 615))))
+    IO.print("switches " ++ show([G.Gfx.mid(gfx, 1166), L.Level.switch(level, G.Gfx.mid(gfx, 1166)),
+      L.Level.switch(level, L.Level.switch(level, G.Gfx.mid(gfx, 1166))), L.Level.switch(level, G.Gfx.mid(gfx, 1386))]))
     IO.print("palette colormap flats texels " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
       B.Bytes.each(~U32, ~B.Bytes.at, List.append(&2, U32, peeks(gfx), texels(gfx)), mem))))
 
@@ -158,4 +166,7 @@ def main() -> IO(Unit):
 #|texture DOOR1 64x72.000000 patches 1 mask 63
 #|texture SKY1 256x128.000000 patches 1 mask 255
 #|side 526 textures 60 61 0
+#|texture SW2BRN1 64x128.000000 patches 5 mask 63
+#|texture SW2GRAY 64x128.000000 patches 3 mask 63
+#|switches 99 115 99 0
 #|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106

@@ -269,7 +269,8 @@ def Closed.doors() -> L.Level:
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
     V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
     L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), 0, 0, 1, 1}, L.Start{0, 0, 0}, [], [],
-    V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3},
+    V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
+    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
 
 # A player at rest on the floor at 0, under a ceiling.
@@ -389,6 +390,13 @@ law use_fires_once:
   for usedown: Bool
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
     S.State{player, level, sidetex, thinkers, rnd, clock, False{}, usedown}))) == False{} : Bool}
+
+# LAW: once means once: a line fired for good has no special afterwards,
+# whatever the state and the line.
+law once_clears:
+  for +line: U32
+  for s: S.State
+  {L.Level.special(S.State.level(S.Sim.once(line, s)), line) == 0 : U32}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.

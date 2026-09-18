@@ -98,6 +98,55 @@ def Gfx.Names.number(n: Gfx.Names, name: String) -> U32:
   Names{seen, next, numbers, distinct} = n
   Pair.snd(Map<&2, U32>, U32, Map.get(U32, Gfx.none(), seen, name))
 
+def Gfx.Names.next(n: Gfx.Names) -> U32:
+  Names{seen, next, numbers, distinct} = n
+  next
+
+# Switches
+# --------
+
+# Doom's alphSwitchList for episode 1, each switch before its partner.
+def Gfx.switch.pairs() -> List<&2, String>:
+  ["SW1BRCOM", "SW2BRCOM", "SW1BRN1", "SW2BRN1", "SW1BRN2", "SW2BRN2", "SW1BRNGN", "SW2BRNGN",
+    "SW1BROWN", "SW2BROWN", "SW1COMM", "SW2COMM", "SW1COMP", "SW2COMP", "SW1DIRT", "SW2DIRT",
+    "SW1EXIT", "SW2EXIT", "SW1GRAY", "SW2GRAY", "SW1GRAY1", "SW2GRAY1", "SW1METAL", "SW2METAL",
+    "SW1PIPE", "SW2PIPE", "SW1SLAD", "SW2SLAD", "SW1STARG", "SW2STARG", "SW1STON1", "SW2STON1",
+    "SW1STON2", "SW2STON2", "SW1STONE", "SW2STONE", "SW1STRTN", "SW2STRTN"]
+
+def Gfx.switch.if(named: Bool, partner: String, rest: List<&2, String>) -> List<&2, String>:
+  match named:
+    case False{}:
+      rest
+    case True{}:
+      partner <> rest
+
+# The partner of each switch among the names numbered so far, so that a
+# swap never names a texture that was not composed.
+def Gfx.switch.wanted(pairs: List<&2, String>, +tn: Gfx.Names) -> List<&2, String>:
+  match pairs:
+    case +a <> +b <> rest:
+      Gfx.switch.if(Bool.not(U32.is_eq(Gfx.Names.number(tn, a), Gfx.none())), b,
+        Gfx.switch.if(Bool.not(U32.is_eq(Gfx.Names.number(tn, b), Gfx.none())), a,
+          Gfx.switch.wanted(rest, tn)))
+    case _:
+      []
+
+def Gfx.switch.pair(named: Bool, +a: U32, +b: U32, table: V.Vec) -> V.Vec:
+  match named:
+    case False{}:
+      table
+    case True{}:
+      V.Vec.set(V.Vec.set(table, a, b), b, a)
+
+# Each numbered switch's partner by texture number, 0 elsewhere.
+def Gfx.switch.table(pairs: List<&2, String>, +tn: Gfx.Names, table: V.Vec) -> V.Vec:
+  match pairs:
+    case +a <> b <> rest:
+      Gfx.switch.table(rest, tn, Gfx.switch.pair(Bool.not(U32.is_eq(Gfx.Names.number(tn, a), Gfx.none())),
+        Gfx.Names.number(tn, a), Gfx.Names.number(tn, b), table))
+    case _:
+      table
+
 # Lumps by name
 # -------------
 
@@ -473,7 +522,8 @@ def Gfx.build(a: Array<U32>, base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U
     Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
       Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), V.Vec.of(Gfx.Names.numbers(tn)),
       Gfx.Names.number(tn, "SKY1")},
-    level)
+    L.Level.textured(level, V.Vec.of(Gfx.Names.numbers(tn)),
+      Gfx.switch.table(Gfx.switch.pairs(), tn, V.Vec.of_list([], Gfx.Names.next(tn)))))
 
 # The flats end where the patches start, the patches where the composed
 # columns do; texture 0 is none, five zero words.
@@ -596,14 +646,16 @@ def Gfx.first(names: List<&2, String>) -> String:
     case name <> rest:
       name
 
-# The textures the sides name and the sky numbered from 1, none being 0.
+# The textures the sides name, the sky and the switches' partners
+# numbered from 1, none being 0.
 def Gfx.load.names(+base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, pnames: W.Wad.Lump,
   +offs: List<&2, U32>, p: Array<U32> & List<&2, String>) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   Base{+level, fl, pal, cmap, flats} = base
   (a, +names) = p
-  +tn = Gfx.names(Gfx.rename(List.append(&2, String, L.Level.texnames(level), ["SKY1"]),
+  +named = Gfx.names(Gfx.rename(List.append(&2, String, L.Level.texnames(level), ["SKY1"]),
     Gfx.first(names)), Names{Map.set(&2, U32, Map.new(&2, U32), "-", 0), 1, [], ["-"]})
+  +tn = Gfx.names(Gfx.switch.wanted(Gfx.switch.pairs(), named), named)
   Result.bind(&1, &1, U32 & String, List<&2, W.Wad.Lump>, Array<U32> & Gfx & L.Level,
     Gfx.lookup(List.drop(&2, String, Gfx.Names.distinct(tn), 1n), Gfx.defs(names, offs),
       "R_TextureNumForName"),
@@ -741,11 +793,6 @@ def Gfx.column.at(+g: Gfx, first: U32, mask: U32, col: U32) -> U32:
 
 def Gfx.column(+g: Gfx, +t: U32, col: U32) -> U32:
   Gfx.column.at(g, Gfx.tex.first(g, t), Gfx.tex.mask(g, t), col)
-
-# The sides' texture numbers as loaded, which a state starts from.
-def Gfx.sidetex(g: Gfx) -> V.Vec:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex} = g
-  sidetex
 
 # The graphics with a state's side textures where the renderer looks.
 def Gfx.sided(g: Gfx, sidetex: V.Vec) -> Gfx:

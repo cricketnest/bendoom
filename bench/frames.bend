@@ -31,7 +31,7 @@ def Bench.peek(p: Array<U32> & U32) -> U32:
 def Bench.frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   IO.print("centre " ++ U32.show(Bench.peek(B.Bytes.at(Bench.go(100n, P.Project.tables(level), gfx,
-    S.State.start(level, G.Gfx.sidetex(gfx)), mem), (84 * 320 + 160 : U32)))))
+    S.State.start(level), mem), (84 * 320 + 160 : U32)))))
 
 def Bench.start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w

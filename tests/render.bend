@@ -16,7 +16,9 @@
 # and just landed with the view dipping. Then frames the movers
 # make, each after a script from a place, the oracle's zero recorded in
 # milestone 4's tickets: the first door half open, 21 tics after its use
-# (832 384 90, "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0"). Each frame is drawn twice, over
+# (832 384 90, "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0"); the special 23
+# switch pressed, 28 tics after its use (2064 -260 90, "20,0,0,0,0
+# 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0"). Each frame is drawn twice, over
 # a view blanked to 0 and to 255: equal hashes mean every pixel of the
 # view was written. Pinned to Freedoom.
 import Base
@@ -83,8 +85,8 @@ def frame(tag: String, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem:
 # The level's first state with the player at rest on the floor at a
 # place: x and y in map units, west and south given as negatives, the
 # angle in degrees.
-def at(gfx: G.Gfx, +level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
-  S.State.at(level, G.Gfx.sidetex(gfx), L.Start{x, y, A.Angle.of_thing(degrees)})
+def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
+  S.State.at(level, L.Start{x, y, A.Angle.of_thing(degrees)})
 
 def east(units: U32) -> U32:
   F.Fixed.of_map(units)
@@ -93,9 +95,9 @@ def west(units: U32) -> U32:
   F.Fixed.neg(F.Fixed.of_map(units))
 
 # The state after running east from the start for some tics.
-def ran(gfx: G.Gfx, +level: L.Level, tics: Nat) -> S.State:
+def ran(+level: L.Level, tics: Nat) -> S.State:
   S.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, False{})),
-    S.State.start(level, G.Gfx.sidetex(gfx)))
+    S.State.start(level))
 
 # The state after runs of commands in a demo's units from a place: the
 # scripts the oracle plays.
@@ -109,20 +111,23 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
   do IO<Unit>:
-    m1 : Array<U32> <- frame("start", tables, gfx, S.State.start(level, G.Gfx.sidetex(gfx)), mem)
-    m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, at(gfx, level, east(736), east(464), 135), m1)
-    m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, at(gfx, level, west(416), east(256), 90), m2)
-    m4 : Array<U32> <- frame("step 137 256 45", tables, gfx, at(gfx, level, east(137), east(256), 45), m3)
-    m5 : Array<U32> <- frame("grate -416 256 180", tables, gfx, at(gfx, level, west(416), east(256), 180), m4)
-    m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, at(gfx, level, east(3), east(256), 0), m5)
-    m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, at(gfx, level, west(640), east(256), 90), m6)
-    m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, at(gfx, level, east(488), east(256), 0), m7)
-    m9 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(gfx, level, 34n), m8)
-    m10 : Array<U32> <- frame("air U!:56", tables, gfx, ran(gfx, level, 56n), m9)
-    m11 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(gfx, level, 66n), m10)
+    m1 : Array<U32> <- frame("start", tables, gfx, S.State.start(level), mem)
+    m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, at(level, east(736), east(464), 135), m1)
+    m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, at(level, west(416), east(256), 90), m2)
+    m4 : Array<U32> <- frame("step 137 256 45", tables, gfx, at(level, east(137), east(256), 45), m3)
+    m5 : Array<U32> <- frame("grate -416 256 180", tables, gfx, at(level, west(416), east(256), 180), m4)
+    m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, at(level, east(3), east(256), 0), m5)
+    m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, at(level, west(640), east(256), 90), m6)
+    m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, at(level, east(488), east(256), 0), m7)
+    m9 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), m8)
+    m10 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m9)
+    m11 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m10)
     m12 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
       List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
-      at(gfx, level, east(832), east(384), 90)), m11)
+      at(level, east(832), east(384), 90)), m11)
+    m13 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n),
+      List.replicate(K.Cmd, 10n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
+      at(level, east(2064), west(260), 90)), m12)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -146,4 +151,5 @@ def main() -> IO(Unit):
 #|air U!:56 hash 1020890737 pixels 6 0 8 6 covered True
 #|landed U!:66 hash 577452768 pixels 79 110 111 6 covered True
 #|door half open hash 1284933713 pixels 107 6 74 111 covered True
+#|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
 #|end

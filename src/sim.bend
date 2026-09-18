@@ -774,13 +774,13 @@ type State is Data:
   State{player: Player, level: L.Level, sidetex: V.Vec, thinkers: List<&2, Thinker>, rnd: U32,
     clock: U32, ended: Bool, usedown: Bool}
 
-# The state a level starts in, from the map as loaded.
-def State.start(+level: L.Level, sidetex: V.Vec) -> State:
-  State{Player.start(level), level, sidetex, [], 0, 0, False{}, False{}}
+# The state a level starts in, from the map as loaded, with the player
+# at rest at a place.
+def State.at(+level: L.Level, place: L.Level.Start) -> State:
+  State{Player.at(level, place), level, L.Level.sidetex(level), [], 0, 0, False{}, False{}}
 
-# The starting state with the player at rest at a place instead.
-def State.at(+level: L.Level, sidetex: V.Vec, place: L.Level.Start) -> State:
-  State{Player.at(level, place), level, sidetex, [], 0, 0, False{}, False{}}
+def State.start(+level: L.Level) -> State:
+  State.at(level, L.Level.start_of(level))
 
 def State.player(s: State) -> Player:
   State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
@@ -912,16 +912,16 @@ def Sim.thinkers(s: State) -> State:
 # The sectors across a sector's two-sided lines, as Doom's getNextSector
 # answers them line by line: the back of a line whose front is the
 # sector, else the front.
-def Sim.around.line(mine: Bool, other: U32, rest: List<&2, U32>) -> List<&2, U32>:
-  match mine:
+def Sim.keep(keep: Bool, x: U32, rest: List<&2, U32>) -> List<&2, U32>:
+  match keep:
     case False{}:
       rest
     case True{}:
-      other <> rest
+      x <> rest
 
 def Sim.around.of(+sector: U32, line: L.Level.Line, rest: List<&2, U32>) -> List<&2, U32>:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
-  Sim.around.line(Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
+  Sim.keep(Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
     Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
       Bool.or(U32.is_eq(front, sector), U32.is_eq(back, sector)))),
     Bool.pick(U32, U32.is_eq(front, sector), back, front), rest)
@@ -952,6 +952,10 @@ def Sim.moving(thinkers: List<&2, Thinker>, +sector: U32) -> Bool:
       False{}
     case Mover{s, ceiling, speed, steps, plan} <> rest:
       Bool.or(U32.is_eq(s, sector), Sim.moving(rest, sector))
+
+# A mover at the start of its plan.
+def Sim.mover.new(sector: U32, ceiling: Bool, speed: U32, +plan: List<&2, Sim.Step>) -> Thinker:
+  Mover{sector, ceiling, speed, plan, plan}
 
 # Doors
 # -----
@@ -996,28 +1000,104 @@ def Sim.door.on(moving: Bool, +sector: U32, speed: U32, s: State) -> State:
         clock, ended, usedown}
     case False{}:
       State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
-      +plan = Sim.door.plan(level, sector)
-      State{player, level, sidetex,
-        List.append(&2, Thinker, thinkers, [Mover{sector, True{}, speed, plan, plan}]), rnd, clock,
-        ended, usedown}
+      State{player, level, sidetex, List.append(&2, Thinker, thinkers,
+        [Sim.mover.new(sector, True{}, speed, Sim.door.plan(level, sector))]), rnd, clock, ended, usedown}
 
 # Doom's EV_VerticalDoor: the door is the sector behind the line.
 def Sim.door(line: L.Level.Line, speed: U32, +s: State) -> State:
   L.Line{x1, y1, x2, y2, flags, front, +back} = line
   Sim.door.on(Sim.moving(State.thinkers(s), back), back, speed, s)
 
+# Switches and tagged movers
+# --------------------------
+
+def State.thinking(s: State, t: Thinker) -> State:
+  State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, sidetex, List.append(&2, Thinker, thinkers, [t]), rnd, clock, ended, usedown}
+
+# The sectors of a tag with no mover, in sector order: the ones a tagged
+# special starts, as Doom passes over a sector whose specialdata is set.
+def Sim.tagged.go(n: Nat, +level: L.Level, +thinkers: List<&2, Thinker>, +tag: U32, +s: U32) ->
+  List<&2, U32>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      Sim.keep(Bool.and(U32.is_eq(L.Level.sector.tag(level, s), tag), Bool.not(Sim.moving(thinkers, s))), s,
+        Sim.tagged.go(m, level, thinkers, tag, (s + 1 : U32)))
+
+def Sim.tagged(+s: State, line: U32) -> List<&2, U32>:
+  Sim.tagged.go(U32.to_nat(L.Level.nsectors(State.level(s))), State.level(s), State.thinkers(s),
+    L.Level.tag(State.level(s), line), 0)
+
+# A mover made for each sector, all against the level as it stood.
+def Sim.start(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, +s: State) ->
+  State:
+  match sectors:
+    case []:
+      s
+    case sector <> rest:
+      Sim.start(~make, rest, State.thinking(s, make(State.level(s), sector)))
+
+# Doom's lowerFloorToLowest: 1 a tic down to the lowest floor around,
+# its own included.
+def Sim.floor.low(+level: L.Level, +sector: U32) -> Thinker:
+  Sim.mover.new(sector, False{}, 65536, [Travel{True{}, Sim.extreme(~F.Fixed.min,
+    Sim.around(level, sector), level, False{}, L.Level.floor(level, sector))}])
+
+def Sim.switch.put(found: Bool, sidetex: V.Vec, at: U32, partner: U32) -> V.Vec:
+  match found:
+    case False{}:
+      sidetex
+    case True{}:
+      V.Vec.set(sidetex, at, partner)
+
+# The front side's switch texture swapped for its partner: the top if it
+# is a switch, else the middle, else the bottom.
+def Sim.switch.side(+level: L.Level, +sidetex: V.Vec, +at: U32) -> V.Vec:
+  +top = L.Level.switch(level, V.Vec.get(sidetex, at))
+  +mid = L.Level.switch(level, V.Vec.get(sidetex, (at + 2 : U32)))
+  +bottom = L.Level.switch(level, V.Vec.get(sidetex, (at + 1 : U32)))
+  Sim.switch.put(Bool.not(U32.is_zero((top .|. mid .|. bottom : U32))), sidetex,
+    Bool.pick(U32, U32.is_zero(top), Bool.pick(U32, U32.is_zero(mid), (at + 1 : U32), (at + 2 : U32)), at),
+    Bool.pick(U32, U32.is_zero(top), Bool.pick(U32, U32.is_zero(mid), bottom, mid), top))
+
+# Doom's P_ChangeSwitchTexture.
+def Sim.switch(+line: U32, s: State) -> State:
+  State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, Sim.switch.side(level, sidetex, (L.Level.line.side(level, line, 0) * 3 : U32)), thinkers,
+    rnd, clock, ended, usedown}
+
+# A line that works once has no special afterwards.
+def Sim.once(line: U32, s: State) -> State:
+  State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, L.Level.special.put(level, line, 0), sidetex, thinkers, rnd, clock, ended, usedown}
+
+# A switch that works once: when its tag starts a mover, its texture is
+# swapped and its special cleared.
+def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, +line: U32,
+  s: State) -> State:
+  match sectors:
+    case []:
+      s
+    case sector <> rest:
+      Sim.once(line, Sim.switch(line, Sim.start(~make, sector <> rest, s)))
+
 # Use
 # ---
 
 # Doom's P_UseSpecialLine for the specials E1M1 carries: the manual door
-# and its blazing twin. The blue key door is not among them until keys
-# exist, so it refuses, as any special Doom does not know does nothing.
-def Sim.use.special(special: U32, line: L.Level.Line, s: State) -> State:
+# and its blazing twin, and the switch that lowers floors. The blue key
+# door is not among them until keys exist, so it refuses, as any special
+# Doom does not know does nothing.
+def Sim.use.special(special: U32, +i: U32, +s: State) -> State:
   match special:
     case 1:
-      Sim.door(line, 131072, s)
+      Sim.door(L.Level.line(State.level(s), i), 131072, s)
     case 117:
-      Sim.door(line, 524288, s)
+      Sim.door(L.Level.line(State.level(s), i), 524288, s)
+    case 23:
+      Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
     case _:
       s
 
@@ -1027,7 +1107,7 @@ def Sim.use.line(back: Bool, +level: L.Level, +i: U32, s: State) -> State:
     case True{}:
       s
     case False{}:
-      Sim.use.special(L.Level.special(level, i), L.Level.line(level, i), s)
+      Sim.use.special(L.Level.special(level, i), i, s)
 
 def Sim.use.hit(hit: Maybe<&2, U32>, +p: Player, +s: State) -> State:
   match hit:
