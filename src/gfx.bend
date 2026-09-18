@@ -437,10 +437,6 @@ def Gfx.flat.lumps(flats: List<&2, W.Wad.Lump>) -> List<&2, W.Wad.Lump>:
 def Gfx.last(xs: List<&2, U32>) -> U32:
   Maybe.default(&2, U32, List.last(&2, U32, xs), 0)
 
-def Gfx.vec(xs: List<&2, U32>) -> V.Vec:
-  +ys = xs
-  V.Vec.of_list(ys, U32.from_nat(List.length(&2, U32, ys)))
-
 def Gfx.Asm.comp(asm: Gfx.Asm) -> U32:
   Asm{cols, texs, pastes, comp, ncols} = asm
   comp
@@ -451,24 +447,24 @@ def Gfx.Asm.pastes(asm: Gfx.Asm) -> List<&2, Gfx.Paste>:
 
 def Gfx.Asm.texs(asm: Gfx.Asm) -> V.Vec:
   Asm{cols, texs, pastes, comp, ncols} = asm
-  Gfx.vec(List.reverse(&2, U32, texs))
+  V.Vec.of(List.reverse(&2, U32, texs))
 
 def Gfx.Asm.cols(asm: Gfx.Asm) -> V.Vec:
   Asm{cols, texs, pastes, comp, ncols} = asm
-  Gfx.vec(List.reverse(&2, U32, cols))
+  V.Vec.of(List.reverse(&2, U32, cols))
 
 # The array sized for everything; the first palette, the colormaps, the
 # flats and the patches copied in; the composed columns pasted.
 def Gfx.build(a: Array<U32>, base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>,
-  +pbases: List<&2, U32>, plumps: List<&2, W.Wad.Lump>, +asm: Gfx.Asm) -> Array<U32> & Gfx & L.Level:
+  plumps: List<&2, W.Wad.Lump>, +asm: Gfx.Asm) -> Array<U32> & Gfx & L.Level:
   Base{level, +fl, pal, cmap, flats} = base
   (Gfx.pastes(Gfx.Asm.pastes(asm), Gfx.Copy.dst(Gfx.copies(
       Job{Gfx.lump.pos(cmap), Gfx.colormap(), 8704} <> List.append(&2, Gfx.Job,
         Gfx.jobs(Gfx.flat.lumps(flats), Gfx.lumps()), Gfx.jobs(plumps, Gfx.last(fbases))),
       Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, 256n, 3, Gfx.lump.pos(pal), Gfx.palette(),
         Copy{a, Array.new(U32, V.Vec.depth((Gfx.Asm.comp(asm) + 128 : U32)), 0)})))),
-    Gfx{Gfx.vec(fbases), Gfx.vec(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
-      Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), Gfx.vec(Gfx.Names.numbers(tn)),
+    Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
+      Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), V.Vec.of(Gfx.Names.numbers(tn)),
       Gfx.Names.number(tn, "SKY1")},
     level)
 
@@ -481,10 +477,10 @@ def Gfx.layout(a: Array<U32>, +base: Gfx.Base, tn: Gfx.Names, headers: List<&2, 
   +fbases = Gfx.starts(Gfx.sizes(Gfx.flat.lumps(flats)), Gfx.lumps())
   +pbases = Gfx.starts(Gfx.sizes(plumps), Gfx.last(fbases))
   +ws = widths
-  Gfx.build(a, base, tn, fbases, pbases, plumps,
+  Gfx.build(a, base, tn, fbases, plumps,
     Gfx.textures(headers, words, indices,
-      Patches{Gfx.vec(pbases), Gfx.vec(ws), Gfx.vec(Gfx.starts(ws, 0)),
-        Gfx.vec(List.concat(&2, U32, colofs))},
+      Patches{V.Vec.of(pbases), V.Vec.of(ws), V.Vec.of(Gfx.starts(ws, 0)),
+        V.Vec.of(List.concat(&2, U32, colofs))},
       Asm{[], [0, 0, 0, 0, 0], [], Gfx.last(pbases), 0}))
 
 # The offsets of the given fields from each lump's position.

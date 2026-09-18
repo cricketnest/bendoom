@@ -606,8 +606,8 @@ def Sim.xy(+level: L.Level, cmd: K.Cmd, +p: Player) -> Player:
   Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, turnheld, tic} = p
   Sim.xy.moving(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, cmd, p)
 
-# The tic
-# -------
+# The move
+# --------
 
 # Doom's P_Thrust: momentum along an angle.
 def Sim.thrust(+level: L.Level, p: Player, +angle: U32, +move: U32) -> Player:

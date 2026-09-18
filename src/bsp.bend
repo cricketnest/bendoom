@@ -4,7 +4,6 @@
 # the last one left, and a far child's box is tested only once the near
 # side is drawn.
 import Base
-import ./vec.bend as V
 import ./fixed.bend as F
 import ./clip.bend as C
 import ./level.bend as L
@@ -69,28 +68,26 @@ def Bsp.coord(box: L.Level.Box, +i: U32) -> U32:
   Bool.pick(U32, U32.is_eq(i, 0), top, Bool.pick(U32, U32.is_eq(i, 1), bottom,
     Bool.pick(U32, U32.is_eq(i, 2), left, right)))
 
-def Bsp.corner(+coords: V.Vec, +box: L.Level.Box, +pos: U32, +k: U32) -> U32:
-  Bsp.coord(box, V.Vec.get(coords, (pos * 4 + k : U32)))
+def Bsp.corner(+view: P.View, box: L.Level.Box, pos: U32, k: U32) -> U32:
+  Bsp.coord(box, P.View.coord(view, pos, k))
 
 def Bsp.shows.span(span: P.View.Span, solid: List<&2, C.Clip.Range>) -> Bool:
   P.Span{behind, seen, +x1, +x2} = span
   Bool.or(behind, Bool.and(seen,
     Bool.not(C.Clip.covers(U32.to_nat(x1), U32.to_nat((x2 - 1 : U32)), solid))))
 
-def Bsp.shows.at(+view: P.View, +coords: V.Vec, +box: L.Level.Box, +pos: U32,
-  solid: List<&2, C.Clip.Range>) -> Bool:
+def Bsp.shows.at(+view: P.View, +box: L.Level.Box, +pos: U32, solid: List<&2, C.Clip.Range>) -> Bool:
   Bool.or(U32.is_eq(pos, 5), Bsp.shows.span(P.View.span(view,
-    P.View.angle_to(view, Bsp.corner(coords, box, pos, 0), Bsp.corner(coords, box, pos, 1)),
-    P.View.angle_to(view, Bsp.corner(coords, box, pos, 2), Bsp.corner(coords, box, pos, 3))), solid))
+    P.View.angle_to(view, Bsp.corner(view, box, pos, 0), Bsp.corner(view, box, pos, 1)),
+    P.View.angle_to(view, Bsp.corner(view, box, pos, 2), Bsp.corner(view, box, pos, 3))), solid))
 
 # Doom's R_CheckBBox: whether some column of the box's span, seen from
 # the eye's position about it, is not yet solid. Inside the box, or with
 # the span facing away, it might be.
 def Bsp.shows(+view: P.View, +box: L.Level.Box, solid: List<&2, C.Clip.Range>) -> Bool:
   P.View{+x, +y, z, angle, sin, cos, tables} = view
-  P.Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   L.Box{+top, +bottom, +left, +right} = box
-  Bsp.shows.at(view, coords, box,
+  Bsp.shows.at(view, box,
     ((Bool.pick(U32, F.Fixed.ge(y, top), 0, Bool.pick(U32, F.Fixed.gt(y, bottom), 1, 2)) << 2n)
       + Bool.pick(U32, F.Fixed.le(x, left), 0, Bool.pick(U32, F.Fixed.lt(x, right), 1, 2)) : U32), solid)
 

@@ -192,6 +192,13 @@ def View.distscale(+v: View, x: U32) -> U32:
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   V.Vec.get(distscale, x)
 
+# Doom's checkcoord: which of a box's top, bottom, left and right is
+# corner coordinate k for the eye's position pos about it.
+def View.coord(+v: View, pos: U32, k: U32) -> U32:
+  View{vx, y, z, angle, sin, cos, tables} = v
+  Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
+  V.Vec.get(coords, (pos * 4 + k : U32))
+
 # Doom's R_PointToAngle: the angle of a point from the eye.
 def View.angle_to(+v: View, x: U32, y: U32) -> U32:
   View{vx, vy, z, angle, sin, cos, tables} = v
@@ -253,16 +260,17 @@ def View.span(+v: View, +a1: U32, +a2: U32) -> View.Span:
 # Light
 # -----
 
-def Project.level(+startmap: U32, fade: U32) -> U32:
+# A colormap number: the light's start less the fade, held to 0 and 31.
+def Project.shade(+startmap: U32, fade: U32) -> U32:
   F.Fixed.max(0, F.Fixed.min(31, (startmap - fade : U32)))
 
 # Doom's scalelight: the colormap of a wall column from its light
 # number, 0 to 15, and its scale index, 0 to 47: brighter when nearer.
 def Project.scalelight(lightnum: U32, index: U32) -> U32:
-  Project.level(((15 - lightnum : U32) * 4 : U32), (index >> 1n : U32))
+  Project.shade(((15 - lightnum : U32) * 4 : U32), (index >> 1n : U32))
 
 # Doom's zlight: the colormap of a span from its light number and its
 # distance index, 0 to 127.
 def Project.zlight(lightnum: U32, index: U32) -> U32:
-  Project.level(((15 - lightnum : U32) * 4 : U32),
+  Project.shade(((15 - lightnum : U32) * 4 : U32),
     ((F.Fixed.div(Project.centerx(), ((index + 1 : U32) << 20n : U32)) >> 12n : U32) >> 1n : U32))

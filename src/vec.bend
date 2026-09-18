@@ -71,10 +71,6 @@ def Vec.depth(+n: U32) -> Nat:
 def Vec.of_list(xs: List<&2, U32>, n: U32) -> Vec:
   Vec.of.go(Vec.depth(n), Vec.split(xs))
 
-# Every element shifted left by sixteen: a map coordinate as fixed point.
-def Vec.fixed(v: Vec) -> Vec:
-  match v:
-    case Leaf{x}:
-      Leaf{(x << 16n : U32)}
-    case Node{l, r}:
-      Node{Vec.fixed(l), Vec.fixed(r)}
+# A list as a tree of just its length.
+def Vec.of(+xs: List<&2, U32>) -> Vec:
+  Vec.of_list(xs, U32.from_nat(List.length(&2, U32, xs)))

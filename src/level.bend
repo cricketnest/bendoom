@@ -117,8 +117,8 @@ def Level.vecs(lists: List<&2, List<&2, U32>>) -> List<&2, V.Vec>:
   match lists:
     case []:
       []
-    case +words <> rest:
-      V.Vec.of_list(words, U32.from_nat(List.length(&2, U32, words))) <> Level.vecs(rest)
+    case words <> rest:
+      V.Vec.of(words) <> Level.vecs(rest)
 
 def Level.start.go(k: Nat, +things: V.Vec, +i: U32, hit: Bool) -> Level.Start:
   match k hit:
@@ -230,10 +230,10 @@ def Level.seg(+l: Level, +i: U32) -> Level.Seg:
   +line = Level.word(segs, i, 6, 3)
   +side = Level.word(segs, i, 6, 4)
   +flags = Level.word(lines, line, 5, 2)
-  +front = Level.line.side(l, line, side)
+  +sidedef = Level.line.side(l, line, side)
   Seg{Level.vertex.x(l, a), Level.vertex.y(l, a), Level.vertex.x(l, b), Level.vertex.y(l, b),
     F.Fixed.of_map(Level.word(segs, i, 6, 2)), F.Fixed.of_map(Level.word(segs, i, 6, 5)), flags,
-    front, Level.side.sector(l, front),
+    sidedef, Level.side.sector(l, sidedef),
     Bool.pick(U32, U32.is_zero((flags .&. 4 : U32)), Level.none(),
       Level.side.sector(l, Level.line.side(l, line, (side .^. 1 : U32))))}
 

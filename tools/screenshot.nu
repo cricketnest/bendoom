@@ -4,7 +4,7 @@
 # holds each key in turn, screenshots the window, quits the game and
 # prints the PNG's path.
 #
-# Keys are xdotool key names (nix shell nixpkgs#xdotool) sent to the X
+# Keys are xdotool key names (xdotool is in the dev shell) sent to the X
 # window, each held for half a second:
 #
 #   tools/screenshot.nu Right Right Up
@@ -19,17 +19,17 @@ def main [
   $env.DISPLAY = ($env.DISPLAY? | default ":1")
   job spawn { ^$binary }
   sleep $wait
-  let window = niri msg --json windows | from json | where title == "Bendoom" | first
+  let window = ^niri msg --json windows | from json | where title == "Bendoom" | first
   if ($keys | is-not-empty) {
-    let x = xdotool search --name Bendoom | lines | first
+    let x = ^xdotool search --name Bendoom | lines | first
     for key in $keys {
-      xdotool keydown --window $x $key
+      ^xdotool keydown --window $x $key
       sleep 500ms
-      xdotool keyup --window $x $key
+      ^xdotool keyup --window $x $key
     }
     sleep 300ms
   }
-  niri msg action screenshot-window --id $window.id --write-to-disk true
+  ^niri msg action screenshot-window --id $window.id --write-to-disk true
   sleep 500ms
   kill $window.pid
   ls ~/Pictures/Screenshots/*.png | sort-by modified | last | get name

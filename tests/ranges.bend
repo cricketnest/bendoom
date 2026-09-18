@@ -15,6 +15,7 @@ import ../src/sim.bend as S
 import ../src/project.bend as P
 import ../src/draw.bend as D
 import ../src/bsp.bend as R
+import ../src/render.bend as N
 
 def wall(w: D.Draw.Wall) -> String:
   D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms} = w
@@ -43,12 +44,9 @@ def report(st: D.Draw) -> IO(Unit):
     walls(List.reverse(&2, D.Draw.Wall, ws))
     IO.print("solid" ++ ranges(solid))
 
-def eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
-  P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p))
-
 def start.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
-  report(R.Bsp.walk(eye(P.Project.tables(level), S.Player.start(level)), level, gfx, mem))
+  report(R.Bsp.walk(N.Render.eye(P.Project.tables(level), S.Player.start(level)), level, gfx, mem))
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
