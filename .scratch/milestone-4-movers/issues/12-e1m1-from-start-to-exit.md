@@ -46,3 +46,5 @@ Oracle, one shot each. Freedoom's three landmarks idle first so that the water a
 | | route to tic 650 | after the exit | 48331: vanilla has left the level |
 
 So both routes are vanilla's to the tic over their whole length: a desync anywhere before the end would show at the tic before the exit.
+
+With ticket 11 merged the idle prefixes are no longer needed: the route cut at tics 75, 243 and 455, with no idle first, reports 0 differing at each.
