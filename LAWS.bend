@@ -11,6 +11,7 @@ import ./src/keys.bend as K
 import ./src/sim.bend as S
 import ./src/clip.bend as C
 import ./src/project.bend as P
+import ./src/draw.bend as D
 
 # Bytes and the WAD
 # -----------------
@@ -383,3 +384,23 @@ law light_tables:
     P.Project.zlight(8, 0), P.Project.zlight(8, 7), P.Project.zlight(8, 127))
     == (31, 31, 0, 0, 28, 5, 0, 18, 28)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# A checker to ride the draw's loop: whether every index so far was the
+# one expected, and the one expected next.
+type Seq is Data:
+  Seq{ok: Bool, next: Nat}
+
+def Seq.see(i: Nat, st: Seq) -> Seq:
+  Seq{ok, +next} = st
+  Seq{Bool.and(ok, Nat.is_eq(i, next)), 1n+next}
+
+# LAW: the loop under every column and span reaches the indices from its
+# first, in order, as many as it is asked and no other: the checker
+# riding it from i sees each index be the one expected and ends
+# expecting n + i, for all n and i. So a column draw, which writes only
+# the row its index names, changes no pixel outside its top and bottom
+# rows.
+law each_in_order:
+  for n: Nat
+  for +i: Nat
+  {D.Draw.each(~Seq, ~Seq.see, n, i, Seq{True{}, i}) == Seq{True{}, Nat.add(n, i)} : Seq}

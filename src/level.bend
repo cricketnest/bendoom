@@ -266,6 +266,10 @@ def Level.sector(+l: Level, +s: U32) -> Level.Sector:
   Sector{F.Fixed.of_map(Level.word(sectors, s, 3, 0)), F.Fixed.of_map(Level.word(sectors, s, 3, 1)),
     Level.word(sectors, s, 3, 2)}
 
+def Level.sector.light(+l: Level, s: U32) -> U32:
+  Level{lines, nlines, sides, sectors, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto} = l
+  Level.word(sectors, s, 3, 2)
+
 def Level.side(+l: Level, +i: U32) -> Level.Side:
   Level{lines, nlines, +sides, sectors, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto} = l
   Side{F.Fixed.of_map(Level.word(sides, i, 3, 0)), F.Fixed.of_map(Level.word(sides, i, 3, 1)),

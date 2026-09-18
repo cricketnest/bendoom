@@ -12,6 +12,7 @@ import ./src/keys.bend as K
 import ./src/sim.bend as S
 import ./src/clip.bend as C
 import ./src/project.bend as P
+import ./src/draw.bend as D
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -898,3 +899,32 @@ def add_sorted(rs: List<&2, C.Clip.Range>, behind: Bool, ahead: Bool, +first: Na
 
 def Laws.solid_sorted(first, last, rs, ordered, sorted):
   add_sorted(rs, C.Clip.behind(rs, first), C.Clip.ahead(rs, last), first, last, {==}, {==}, ordered, sorted)
+
+# The draw's loop reaches its indices in order
+# --------------------------------------------
+
+def nat_eq_refl(i: Nat) -> {True{} == Nat.is_eq(i, i) : Bool}:
+  match i:
+    case 0n:
+      {==}
+    case 1n+p:
+      nat_eq_refl(p)
+
+def add_succ(m: Nat, +i: Nat) -> {Nat.add(m, 1n+i) == 1n+Nat.add(m, i) : Nat}:
+  match m:
+    case 0n:
+      {==}
+    case 1n++p:
+      %add_succ(p, i) : {1n+Nat.add(p, 1n+i) == 1n+_ : Nat}
+      {==}
+
+def Laws.each_in_order(n, i):
+  match n:
+    case 0n:
+      {==}
+    case 1n++m:
+      %nat_eq_refl(i)
+        : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{_, 1n+i}) == Laws.Seq{True{}, 1n+Nat.add(m, i)} : Laws.Seq}
+      %add_succ(m, i)
+        : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{True{}, 1n+i}) == Laws.Seq{True{}, _} : Laws.Seq}
+      Laws.each_in_order(m, 1n+i)
