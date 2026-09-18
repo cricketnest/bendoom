@@ -3,27 +3,26 @@
 # view's 320 by 168 palette indices and the indices at four pixels (the
 # view's centre, near its top left, near its bottom right, and high on
 # its centre column). The start, then hand-chosen places with the eye at
-# rest on the floor and the angle a multiple of 45 degrees: a bright
-# metal wall, the dim bench room north of the start, the hazard-striped
-# step under the computer panels, the lowered opening west of the start
-# with a masked grate across it, the hall under a ceiling of water, the
-# yard under the open sky, the railed pit, and the dead former sergeant
-# on its bench. Then frames after scripts, which the oracle plays too: a
-# stride, riding the lift down, off its east edge, the first door half
-# open, the special 23 switch pressed, the exit switch pressed, a
-# blinking wall at its dark level, and the water on a later frame of its
-# cycle; each script is beside its frame below. Every frame holds the
-# things E1M1 spawns on Hurt Me Plenty. tools/oracle.nu finds no pixel
-# off vanilla's in the dark, water, sky, stride, switch and blink frames.
-# The others differ where a thing animates or is full-bright, which
-# ticket 05 brings, or where the big trees behind the grate overlap
-# unsorted, ticket 03's: with the animated and full-bright things taken
-# out of both games every count but the grate's is 0, and sorting the
-# sprites makes that 0 too. Until those tickets their hashes are
-# regression pins. The exit is not compared: vanilla never stands in it
-# (milestone 4's ticket 09 compares it another way). Each frame is drawn
-# twice, over a view blanked to 0 and to 255: equal hashes mean every
-# pixel of the view was written. Pinned to Freedoom.
+# rest on the floor and the angle a multiple of 45 degrees, each after
+# the oracle's 20 idle tics: a bright metal wall, the dim bench room
+# north of the start, the hazard-striped step under the computer panels,
+# the lowered opening west of the start with a masked grate across it,
+# the hall under a ceiling of water, the yard under the open sky, the
+# railed pit, and the dead former sergeant on its bench. Then frames
+# after scripts, which the oracle plays too: a stride, riding the lift
+# down, off its east edge, the first door half open, the special 23
+# switch pressed, the exit switch pressed, a blinking wall at its dark
+# level, and the blue key on the last tic of its dim state, 22, and the
+# first of its full-bright one, 23; each script is beside its frame
+# below. Every frame holds the things E1M1 spawns on Hurt Me Plenty,
+# each in its state on that tic. tools/oracle.nu finds no pixel off
+# vanilla's in any but the grate and the door, where trees overlap
+# other sprites unsorted, ticket 03's: sorting the sprites makes both 0.
+# Until that ticket their hashes are regression pins. The exit is not
+# compared: vanilla never stands in it (milestone 4's ticket 09 compares
+# it another way). Each frame is drawn twice, over a view blanked to 0
+# and to 255: equal hashes mean every pixel of the view was written.
+# Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -110,19 +109,23 @@ def after(runs: List<&2, List<&2, K.Cmd>>, s: S.State) -> S.State:
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
 
+# A place after the oracle's 20 idle tics.
+def rested(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
+  S.Sim.replay(idle(20n), at(level, x, y, degrees))
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
   do IO<Unit>:
-    m1 : Array<U32> <- frame("start", tables, gfx, S.State.start(level), mem)
-    m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, at(level, east(736), east(464), 135), m1)
-    m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, at(level, west(416), east(256), 90), m2)
-    m4 : Array<U32> <- frame("step 137 256 45", tables, gfx, at(level, east(137), east(256), 45), m3)
-    m5 : Array<U32> <- frame("grate -416 256 180", tables, gfx, at(level, west(416), east(256), 180), m4)
-    m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, at(level, east(3), east(256), 0), m5)
-    m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, at(level, west(640), east(256), 90), m6)
-    m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, at(level, east(488), east(256), 0), m7)
-    m9 : Array<U32> <- frame("sergeant 1144 259 315", tables, gfx, at(level, east(1144), east(259), 315), m8)
+    m1 : Array<U32> <- frame("start", tables, gfx, S.Sim.replay(idle(20n), S.State.start(level)), mem)
+    m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, rested(level, east(736), east(464), 135), m1)
+    m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, rested(level, west(416), east(256), 90), m2)
+    m4 : Array<U32> <- frame("step 137 256 45", tables, gfx, rested(level, east(137), east(256), 45), m3)
+    m5 : Array<U32> <- frame("grate -416 256 180", tables, gfx, rested(level, west(416), east(256), 180), m4)
+    m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, rested(level, east(3), east(256), 0), m5)
+    m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, rested(level, west(640), east(256), 90), m6)
+    m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, rested(level, east(488), east(256), 0), m7)
+    m9 : Array<U32> <- frame("sergeant 1144 259 315", tables, gfx, rested(level, east(1144), east(259), 315), m8)
     m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), m9)
     m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
     m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
@@ -136,7 +139,10 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       idle(10n)], at(level, west(352), east(1296), 180)), m14)
     m16 : Array<U32> <- frame("blink dark", tables, gfx, after([idle(66n)], at(level, east(640), east(712), 180)),
       m15)
-    m17 : Array<U32> <- frame("water moving", tables, gfx, after([idle(20n)], at(level, east(3), east(256), 0)), m16)
+    m17 : Array<U32> <- frame("key 2380 600 180 22", tables, gfx, after([idle(22n)],
+      at(level, east(2380), east(600), 180)), m16)
+    m18 : Array<U32> <- frame("key bright 23", tables, gfx, after([idle(23n)], at(level, east(2380), east(600), 180)),
+      m17)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -148,21 +154,22 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start hash 3582478214 pixels 1 1 7 5 covered True
-#|lit 736 464 135 hash 3223437629 pixels 104 7 95 103 covered True
+#|start hash 1543519747 pixels 1 1 7 5 covered True
+#|lit 736 464 135 hash 1228497073 pixels 106 8 95 105 covered True
 #|dark -416 256 90 hash 3549150205 pixels 110 107 0 238 covered True
-#|step 137 256 45 hash 912470422 pixels 7 0 79 111 covered True
+#|step 137 256 45 hash 3275562588 pixels 8 0 79 6 covered True
 #|grate -416 256 180 hash 2556056556 pixels 3 111 106 93 covered True
-#|water 3 256 0 hash 2875924069 pixels 2 111 76 6 covered True
+#|water 3 256 0 hash 1934760231 pixels 2 6 77 6 covered True
 #|sky -640 256 90 hash 4166025265 pixels 239 14 239 105 covered True
-#|pit 488 256 0 hash 4118378470 pixels 8 6 111 1 covered True
-#|sergeant 1144 259 315 hash 3133938681 pixels 111 108 0 1 covered True
+#|pit 488 256 0 hash 3106922490 pixels 8 6 111 1 covered True
+#|sergeant 1144 259 315 hash 3535195528 pixels 111 108 0 1 covered True
 #|stride U!:34 hash 2845586337 pixels 2 5 164 6 covered True
-#|air U!:56 hash 2977300388 pixels 5 110 15 6 covered True
-#|landed U!:66 hash 4031325049 pixels 6 110 14 79 covered True
-#|door half open hash 4026928401 pixels 107 6 74 111 covered True
+#|air U!:56 hash 855601571 pixels 5 110 15 6 covered True
+#|landed U!:66 hash 1101752164 pixels 6 110 14 79 covered True
+#|door half open hash 2082441665 pixels 107 6 74 111 covered True
 #|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
 #|exit pressed hash 847822191 pixels 102 95 102 3 covered True
 #|blink dark hash 568518560 pixels 94 73 73 101 covered True
-#|water moving hash 1934760231 pixels 2 6 77 6 covered True
+#|key 2380 600 180 22 hash 2254628260 pixels 5 1 6 110 covered True
+#|key bright 23 hash 2616277943 pixels 5 1 6 110 covered True
 #|end

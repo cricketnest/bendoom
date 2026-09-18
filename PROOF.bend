@@ -915,6 +915,17 @@ def Laws.replay_keeps_free(script, s, free):
     case +cmd <> rest:
       Laws.replay_keeps_free(rest, S.Sim.tic(cmd, s), Laws.tic_keeps_free(cmd, s, free))
 
+# Things compute.
+
+def Laws.spawn_phase():
+  {==}
+
+def Laws.bonus_cycle():
+  {==}
+
+def Laws.lasting_stays(id, kind, x, y, z, sector, state):
+  {==}
+
 # The solid columns stay sorted
 # -----------------------------
 

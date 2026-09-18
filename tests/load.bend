@@ -22,7 +22,11 @@
 # Hurt Me Plenty, and a record west of the origin. Its sprite, SPOSL0
 # between S_START and S_END, is 52 wide with offsets 26 and 20; column
 # 0 is one post at row 16, one texel long, and column 26's first post
-# starts at row 1, 17 long, its column offsets being 216 and 659.
+# starts at row 1, 17 long, its column offsets being 216 and 659. The
+# twitching impaled body's second state, S_LIVESTICK2, is reached only by
+# animation; its POL6B0 is 28 wide with offsets 15 and 62, where POL6A0's
+# left offset is 14. Of info.c's frames, S_ARM1A's is full-bright and
+# the sergeant's is not.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -138,13 +142,17 @@ def thing(+i: U32, t: L.Level.Thing) -> String:
   "thing " ++ U32.show(i) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y) ++ " angle " ++ U32.show(angle)
     ++ " type " ++ U32.show(kind) ++ " options " ++ U32.show(options)
 
-# The sprite of state row 6, the dead former sergeant's: its width and
+# The sprite of state row 3, the dead former sergeant's: its width and
 # offsets, then the header and first texel of column 0's post, the end
 # marker after it, and column 26's first post's header and first texel.
 def sprite(+gfx: G.Gfx) -> List<&2, U32>:
-  +patch = G.Gfx.sprite(gfx, 6, 0)
+  +patch = G.Gfx.sprite(gfx, 3, 0)
   [(patch + 216 : U32), (patch + 217 : U32), (patch + 219 : U32), (patch + 221 : U32), (patch + 659 : U32),
     (patch + 660 : U32), (patch + 662 : U32)]
+
+def sprite.head(+gfx: G.Gfx, +state: U32) -> String:
+  "sprite of state " ++ U32.show(state) ++ " width " ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 1)) ++ " offset "
+    ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 3))
 
 def blocks(b: L.Level.Box) -> String:
   L.Box{top, bottom, left, right} = b
@@ -168,8 +176,10 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(thing(157, L.Level.thing(level, 157)))
     IO.print(thing(245, L.Level.thing(level, 245)))
     IO.print(thing(42, L.Level.thing(level, 42)))
-    IO.print("sprite of state 6 width " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 1)) ++ " offset "
-      ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 3)))
+    IO.print(sprite.head(gfx, 3))
+    IO.print(sprite.head(gfx, 52))
+    IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 4)) ++ " "
+      ++ U32.show(G.Gfx.sprite(gfx, 7, 4)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -210,7 +220,9 @@ def main() -> IO(Unit):
 #|thing 157 at -416.000000 256.000000 angle 0 type 1 options 7
 #|thing 245 at 1248.000000 224.000000 angle 90 type 19 options 15
 #|thing 42 at -160.000000 1328.000000 angle 225 type 2048 options 23
-#|sprite of state 6 width 52.000000 offset 26.000000 top 20.000000
+#|sprite of state 3 width 52.000000 offset 26.000000 top 20.000000
+#|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
+#|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127

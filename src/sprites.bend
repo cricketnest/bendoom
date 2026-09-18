@@ -43,8 +43,8 @@ def Sprites.project.if(shows: Bool, vis: Sprites.Vis, rest: List<&2, Sprites.Vis
 # 4 units, farther aside than four times its depth, or its patch's edges,
 # placed by its offsets and scaled, fall wholly off the screen. The
 # columns are held to the screen, and the patch's fraction starts that
-# far in. Its sector's light, with no fake contrast, and its scale pick
-# the colormap.
+# far in. A full-bright frame takes the first colormap; another's is
+# picked by its sector's light, with no fake contrast, and its scale.
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing, rest: List<&2, Sprites.Vis>) ->
   List<&2, Sprites.Vis>:
   P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
@@ -64,7 +64,8 @@ def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing,
   Sprites.project.if(Bool.and(F.Fixed.ge(tz, 262144), Bool.and(F.Fixed.le(F.Fixed.abs(tx), (tz << 2n : U32)),
       Bool.and(F.Fixed.le(x1, 320), F.Fixed.ge(x2, 0)))),
     Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32), (step * (first - x1) : U32), step,
-      G.Gfx.sprite(gfx, state, 0), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale)},
+      G.Gfx.sprite(gfx, state, 0), Bool.pick(U32, U32.is_eq(G.Gfx.sprite(gfx, state, 4), 1), G.Gfx.colormap(),
+        S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale))},
     rest)
 
 def Sprites.gather.if(seen: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing,

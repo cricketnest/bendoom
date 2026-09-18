@@ -5,10 +5,10 @@
 # palette as RGB words, the colormaps, and the lumps: the flats the
 # sectors name, then the patches of the textures the sides name, then
 # the composed columns, then the sprites of the states the map's things
-# spawn in; with the map's names go every frame of the animations they
-# touch and the partners of their switches. Gfx is the directory into
-# it: Data, so the draw takes it by copy. Every other flat, texture and
-# sprite stays a name in the WAD.
+# spawn in or reach; with the map's names go every frame of the
+# animations they touch and the partners of their switches. Gfx is the
+# directory into it: Data, so the draw takes it by copy. Every other
+# flat, texture and sprite stays a name in the WAD.
 import Base
 import ./vec.bend as V
 import ./bytes.bend as B
@@ -34,10 +34,10 @@ type Gfx.Anims is Data:
 # column), texture 0 being none. cols: every texture's columns, each the
 # index of its texels in the array. sidetex: a side's top, bottom and
 # middle texture numbers, three a side. skytex: the sky's texture.
-# sprites: four words a state row, for the rows the map's things spawn
-# in: the index of its sprite's patch, and the patch's width, left
+# sprites: five words a state row, for the rows the map's things spawn
+# in or reach: the index of its sprite's patch, the patch's width, left
 # offset and top offset in fixed point (Doom's spritewidth, spriteoffset
-# and spritetopoffset).
+# and spritetopoffset), and 1 for a full-bright frame.
 type Gfx is Data:
   Gfx{flats: V.Vec, pics: V.Vec, sky: U32, texs: V.Vec, cols: V.Vec, sidetex: V.Vec, skytex: U32,
     sprites: V.Vec, anims: Gfx.Anims}
@@ -638,20 +638,30 @@ def Gfx.sprite.space(lumps: List<&2, W.Wad.Lump>, inside: Bool) -> List<&2, W.Wa
 # The lump of a state row's frame, seen from every side: the sprite's
 # name, the frame's letter and rotation 0.
 def Gfx.sprite.name(r: H.Thing.Row) -> String:
-  H.Row{sprite, frame, tics} = r
+  H.Row{sprite, frame, bright, tics, next} = r
   sprite ++ String.from_list([Char.from_u32((65 + frame : U32)), Char.from_u32(48)])
 
-def Gfx.sprite.states.go(things: List<&2, H.Thing>) -> List<&2, U32>:
+# A state row and each one after it in turn, until the next is the first
+# again.
+def Gfx.sprite.chase(fuel: Nat, back: Bool, +first: U32, +state: U32) -> List<&2, U32>:
+  match fuel back:
+    case 1n+f False{}:
+      +next = H.Thing.Row.next(H.Thing.row(state))
+      state <> Gfx.sprite.chase(f, U32.is_eq(next, first), first, next)
+    case _ _:
+      []
+
+def Gfx.sprite.states.go(things: List<&2, H.Thing>, +rows: Nat) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
-      state <> Gfx.sprite.states.go(rest)
+    case H.Thing{id, kind, x, y, z, sector, +state, tics} <> rest:
+      List.append(&2, U32, Gfx.sprite.chase(rows, False{}, state, state), Gfx.sprite.states.go(rest, rows))
 
-# The state rows the level's things spawn in.
+# The state rows the level's things spawn in and those they lead to.
 def Gfx.sprite.states(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd} = s
-  Gfx.sprite.states.go(things)
+  Gfx.sprite.states.go(things, List.length(&2, H.Thing.Row, H.Thing.rows()))
 
 def Gfx.sprite.names(states: List<&2, U32>) -> List<&2, String>:
   match states:
@@ -660,23 +670,25 @@ def Gfx.sprite.names(states: List<&2, U32>) -> List<&2, String>:
     case state <> rest:
       Gfx.sprite.name(H.Thing.row(state)) <> Gfx.sprite.names(rest)
 
-# The sprite lumps to copy, each once, and each spawned thing's state
-# row and the number of its lump among them.
+# The sprite lumps to copy, each once, and each state row the things
+# reach and the number of its lump among them.
 type Gfx.Sprites is Data:
   Sprites{lumps: List<&2, W.Wad.Lump>, states: List<&2, U32>, numbers: List<&2, U32>}
 
-# Doom's R_InitSpriteLumps for the lumps copied: each spawned thing's
-# state row gets its lump's index in the array and the lump's width,
-# left offset and top offset (three words a lump in heads).
+# Doom's R_InitSpriteLumps for the lumps copied: each state row the
+# things reach gets its lump's index in the array and the lump's width,
+# left offset and top offset (three words a lump in heads), and its
+# frame's full-bright bit.
 def Gfx.sprite.table(states: List<&2, U32>, numbers: List<&2, U32>, +bases: V.Vec, +heads: V.Vec,
   table: V.Vec) -> V.Vec:
   match states numbers:
     case +s <> ss +n <> ns:
-      Gfx.sprite.table(ss, ns, bases, heads, V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(table,
-        (s * 4 : U32), V.Vec.get(bases, n)),
-        (s * 4 + 1 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 : U32)))),
-        (s * 4 + 2 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 1 : U32)))),
-        (s * 4 + 3 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 2 : U32)))))
+      Gfx.sprite.table(ss, ns, bases, heads, V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(table,
+        (s * 5 : U32), V.Vec.get(bases, n)),
+        (s * 5 + 1 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 : U32)))),
+        (s * 5 + 2 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 1 : U32)))),
+        (s * 5 + 3 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 2 : U32)))),
+        (s * 5 + 4 : U32), Bool.pick(U32, H.Thing.Row.bright(H.Thing.row(s)), 1, 0)))
     case _ _:
       table
 
@@ -769,7 +781,7 @@ def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: Li
     Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
       Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"),
       Gfx.sprite.table(states, numbers, V.Vec.of(sbases), V.Vec.of(heads),
-        V.Vec.of_list([], (U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())) * 4 : U32))), anims},
+        V.Vec.of_list([], (U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())) * 5 : U32))), anims},
     L.Level.textured(level, sidetex,
       Gfx.switch.table(Gfx.switch.pairs(), tn, V.Vec.of_list([], Gfx.Names.next(tn)))))
 
@@ -1068,7 +1080,7 @@ def Gfx.of_state(g: Gfx, sidetex: V.Vec, +clock: U32) -> Gfx:
     Anims{Gfx.Anim.at(flatanim, clock), Gfx.Anim.at(texanim, clock), clock}}
 
 # Word k of a state row's sprite: 0 its patch's index, 1 its width, 2
-# its left offset, 3 its top offset.
+# its left offset, 3 its top offset, 4 1 when its frame is full-bright.
 def Gfx.sprite(+g: Gfx, state: U32, k: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
-  V.Vec.get(sprites, (state * 4 + k : U32))
+  V.Vec.get(sprites, (state * 5 + k : U32))
