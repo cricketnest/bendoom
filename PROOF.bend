@@ -326,6 +326,18 @@ def Laws.once_clears(line, s):
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
 
+def Laws.random_table():
+  {==}
+
+def Laws.blink_counts():
+  {==}
+
+def Laws.strobe_timeline():
+  {==}
+
+def Laws.glow_turns():
+  {==}
+
 def Laws.replay_append(a, b, s):
   match a:
     case []:
