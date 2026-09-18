@@ -154,10 +154,6 @@ def View.z(+v: View) -> U32:
   View{x, y, z, angle, sin, cos, tables} = v
   z
 
-def View.tables(+v: View) -> Project.Tables:
-  View{x, y, z, angle, sin, cos, tables} = v
-  tables
-
 def View.sine(+v: View) -> V.Vec:
   View{x, y, z, angle, sin, cos, tables} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables

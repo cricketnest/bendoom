@@ -1,6 +1,6 @@
 # Milestone 3: walls, floors, ceilings and the sky
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

@@ -16,7 +16,8 @@ Bend itself is built from its source in the flake, pinned to one commit,
 with no self-updating launcher and no telemetry.
 
 Tests are `.bend` files under `tests/` whose trailing `#|` lines are the
-expected output, run natively and on the JS lane. Specs live under
+expected output, run natively and on the JS lane. `tools/oracle.nu`
+diffs a frame against Chocolate Doom's from the same spot. Specs live under
 `.scratch/`; the Bend constraints the code lives by are in `docs/bend.md`.
 
 ## Milestones
@@ -28,7 +29,7 @@ for bug.
 
 1. WAD loads, directory parses, a window opens. Done.
 2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law. Done.
-3. Walls, then floors, ceilings and sky.
+3. Walls, floors, ceilings and the sky: vanilla's renderer, its frames Chocolate Doom's pixel for pixel. Done.
 4. Doors, the lift, switches, the exit: E1M1 completable, no enemies.
 5. Things: decorations, items, pickups, sprites.
 6. Monsters, weapons, damage, the status bar.

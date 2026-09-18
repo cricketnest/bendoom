@@ -94,10 +94,6 @@ def Gfx.Names.distinct(n: Gfx.Names) -> List<&2, String>:
   Names{seen, next, numbers, distinct} = n
   List.reverse(&2, String, distinct)
 
-def Gfx.Names.count(n: Gfx.Names) -> U32:
-  Names{seen, next, numbers, distinct} = n
-  next
-
 def Gfx.Names.number(n: Gfx.Names, name: String) -> U32:
   Names{seen, next, numbers, distinct} = n
   Pair.snd(Map<&2, U32>, U32, Map.get(U32, Gfx.none(), seen, name))
