@@ -319,6 +319,59 @@ law blazing_door_timeline:
     == (524288, 4194304, 4456448, 4456448, 3932160, 262144, 0, [])
     : U32 & U32 & U32 & U32 & U32 & U32 & U32 & List<&2, S.Thinker>}
 
+# A state of the literal level with one mover running and a player at
+# rest at a place under a ceiling.
+def Closed.moving(level: L.Level, t: S.Thinker, x: U32, y: U32, ceilz: U32) -> S.State:
+  S.State{Closed.player(x, y, 0, ceilz), level, V.Leaf{0}, [t], 0, 0, False{}, False{}}
+
+def Closed.idled(n: Nat, s: S.State) -> S.State:
+  S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
+
+# LAW: a moving floor carries the player standing on it, vanilla's
+# P_ThingHeightClip. The west room's floor goes down 4 a tic. A player at
+# (32, 64) is in the one cell of the sector's block box: after a tic the
+# floor, the player's height and the player's floor are -4, the view
+# height is still 41 with no delta, so no dip, and the eye, worked out
+# when the tic began, follows a tic later. A player at (200, 64) is a
+# cell outside the box, and is left where it was (sanity).
+law floor_carries:
+  {(S.State.player(Closed.idled(1n, Closed.moving(Closed.doors(),
+      S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}]},
+      2097152, 4194304, 8388608))),
+    S.State.player(Closed.idled(2n, Closed.moving(Closed.doors(),
+      S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}]},
+      2097152, 4194304, 8388608))),
+    S.State.player(Closed.idled(1n, Closed.moving(Closed.doors(),
+      S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}]},
+      13107200, 4194304, 8388608))))
+    == (S.Player{2097152, 4194304, 4294705152, 0, 0, 0, 0, 4294705152, 8388608, 2686976, 0, 2686976},
+      S.Player{2097152, 4194304, 4294443008, 0, 0, 0, 0, 4294443008, 8388608, 2686976, 0, 2424832},
+      S.Player{13107200, 4194304, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976})
+    : S.Player & S.Player & S.Player}
+
+# LAW: a door that closes on the player goes back up. From 68, 2 a tic,
+# over a player 56 tall standing across both its faces at (72, 64): 56
+# after 6 tics; the 7th would be 54, which the player does not fit, so
+# the step is undone and the door is back on its plan; 58 after the 8th
+# (sanity).
+law door_crushed:
+  {(Closed.ceil(Closed.idled(6n, Closed.moving(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
+      S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]},
+      4718592, 4194304, 4456448)), 1),
+    Closed.ceil(Closed.idled(7n, Closed.moving(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
+      S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]},
+      4718592, 4194304, 4456448)), 1),
+    S.State.thinkers(Closed.idled(7n, Closed.moving(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
+      S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]},
+      4718592, 4194304, 4456448))),
+    Closed.ceil(Closed.idled(8n, Closed.moving(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
+      S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]},
+      4718592, 4194304, 4456448)), 1))
+    == (3670016, 3670016,
+      [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
+        [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]}], 3801088)
+    : U32 & U32 & List<&2, S.Thinker> & U32}
+
 # LAW: use held across two tics fires on the first alone: after a live
 # tic whose command holds use, no command is a press, whatever the
 # state was.

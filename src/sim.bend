@@ -84,6 +84,10 @@ def Player.floorz(+p: Player) -> U32:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
   floorz
 
+def Player.ceilz(+p: Player) -> U32:
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  ceilz
+
 def Player.viewz(+p: Player) -> U32:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
   viewz
@@ -813,6 +817,19 @@ def State.usedown(s: State) -> Bool:
 # Movers
 # ------
 
+# Doom's P_ThingHeightClip: the floor and ceiling under the player again,
+# a player who stood on the floor kept on it, a head in the ceiling
+# lowered under it, and whether the player still fits.
+def Sim.reclip.fit(p: Player, f: Sim.Fit) -> Sim.Try:
+  Player{x, y, +z, angle, momx, momy, momz, +floorz, ceilz, viewheight, deltaview, viewz} = p
+  Fit{ok, +floor, +ceil} = f
+  Try{F.Fixed.ge((ceil - floor : U32), Sim.height()), Player{x, y,
+    Bool.pick(U32, U32.is_eq(z, floorz), floor, F.Fixed.min(z, (ceil - Sim.height() : U32))), angle, momx,
+    momy, momz, floor, ceil, viewheight, deltaview, viewz}}
+
+def Sim.reclip(+level: L.Level, +p: Player) -> Sim.Try:
+  Sim.reclip.fit(p, Sim.fit(level, Player.x(p), Player.y(p)))
+
 # A mover with steps left runs again next tic, after those kept so far;
 # one with none has ended.
 def Sim.mover.kept(sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>,
@@ -826,16 +843,44 @@ def Sim.mover.kept(sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.S
         List.append(&2, Thinker, thinkers, [Mover{sector, ceiling, speed, step <> rest, plan}]), rnd,
         clock, ended, usedown}
 
+# A step the player does not fit is undone, the player clipped again,
+# and the mover crushed: it starts its plan again, unless the step was
+# its travel's last, which Doom ends all the same.
+def Sim.mover.fitted(t: Sim.Try, +sector: U32, +ceiling: Bool, speed: U32, was: U32, past: Bool,
+  +rest: List<&2, Sim.Step>, going: List<&2, Sim.Step>, +plan: List<&2, Sim.Step>, s: State) -> State:
+  match t:
+    case Try{True{}, p}:
+      State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+      Sim.mover.kept(sector, ceiling, speed, going, plan,
+        State{p, level, sidetex, thinkers, rnd, clock, ended, usedown})
+    case Try{False{}, +p}:
+      State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+      +undone = L.Level.plane.put(level, sector, ceiling, was)
+      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, Sim.Step>, past, rest, plan), plan,
+        State{Sim.Try.player(Sim.reclip(undone, p)), undone, sidetex, thinkers, rnd, clock, ended, usedown})
+
+# Doom's P_ChangeSector for the one thing there is: the player is
+# clipped again when in a cell of the sector's block box, touching the
+# sector or not.
+def Sim.mover.changed(near: Bool, +sector: U32, +ceiling: Bool, speed: U32, was: U32, past: Bool,
+  rest: List<&2, Sim.Step>, going: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, +s: State) -> State:
+  match near:
+    case False{}:
+      Sim.mover.kept(sector, ceiling, speed, going, plan, s)
+    case True{}:
+      Sim.mover.fitted(Sim.reclip(State.level(s), State.player(s)), sector, ceiling, speed, was, past, rest,
+        going, plan, s)
+
 # Doom's T_MovePlane: a step that would pass the destination lands on it
-# and ends the move.
+# and ends the travel.
 def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest: U32,
   +rest: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, s: State) -> State:
-  State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  +next = Bool.pick(U32, down, (L.Level.plane(level, sector, ceiling) - speed : U32),
-    (L.Level.plane(level, sector, ceiling) + speed : U32))
+  State{+player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  +was = L.Level.plane(level, sector, ceiling)
+  +next = Bool.pick(U32, down, (was - speed : U32), (was + speed : U32))
   +past = Bool.pick(Bool, down, F.Fixed.lt(next, dest), F.Fixed.gt(next, dest))
-  Sim.mover.kept(sector, ceiling, speed,
-    Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan,
+  Sim.mover.changed(L.Level.blocked(level, sector, Player.x(player), Player.y(player)), sector, ceiling,
+    speed, was, past, rest, Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan,
     State{player, L.Level.plane.put(level, sector, ceiling, Bool.pick(U32, past, dest, next)), sidetex,
       thinkers, rnd, clock, ended, usedown})
 
@@ -1059,10 +1104,17 @@ def Sim.use(press: Bool, +p: Player, +s: State) -> State:
 def Sim.pressed(cmd: K.Cmd, usedown: Bool) -> Bool:
   Bool.and(K.Cmd.use(cmd), Bool.not(usedown))
 
+# The player as moved, at the height, floor and ceiling a mover left.
+def Player.stood(moved: Player, +q: Player) -> Player:
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = moved
+  Player{x, y, Player.z(q), angle, momx, momy, momz, Player.floorz(q), Player.ceilz(q), viewheight,
+    deltaview, viewz}
+
 # What a live tic keeps of the state it began with, whatever the
-# thinkers did: the geometry, so no tic writes a wall.
+# thinkers did: the geometry, so no tic writes a wall, and the place the
+# movement left the player, so no mover pushes the player sideways.
 def Sim.tic.kept(geo: L.Level.Geo, moved: Player, clock: U32, use: Bool, +after: State) -> State:
-  State{moved, L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after))},
+  State{Player.stood(moved, State.player(after)), L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after))},
     State.sidetex(after), State.thinkers(after), State.rnd(after), (clock + 1 : U32), State.ended(after),
     use}
 

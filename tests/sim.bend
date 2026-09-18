@@ -16,8 +16,11 @@
 # use, -4 61 tics on, the wait, -6 on the 214th, shut on the 275th, its
 # thinker gone on the 276th); a use while it closes and one while it
 # waits; use held down for 300 tics, which opens it once; a walk through
-# it while open, where the first walk stopped at its shut face; and the
-# blue key door, which refuses. The heights and tics are the hand
+# it while open, where the first walk stopped at its shut face; a stand
+# in the doorway through the wait, where the door comes down to the
+# player's head at -72 on the 247th tic after the use, is blocked on the
+# 248th and goes back up (ticket 05's hand computation); and the blue
+# key door, which refuses. The heights and tics are the hand
 # computation's; the positions are regression pins.
 import Base
 import ../src/bytes.bend as B
@@ -104,6 +107,11 @@ def opens(+open: S.State) -> IO(Unit):
     closing : S.State <- closes(open)
     shuts(closing)
     w1 : S.State <- run("through walk", 40n, forward(), 10, open)
+    c1 : S.State <- run("doorway walk", 6n, forward(), 10, open)
+    c2 : S.State <- run("-", 179n, idle(), 10, c1)
+    c3 : S.State <- run("-", 1n, idle(), 10, c2)
+    c4 : S.State <- run("-", 1n, idle(), 10, c3)
+    c5 : S.State <- run("-", 34n, idle(), 10, c4)
     IO.print("-")
 
 # The first door, sector 10, from the pit south of it: used, held open,
@@ -201,6 +209,11 @@ def main() -> IO(Unit):
 #|use tic 280 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -6.000000
 #|-
 #|through walk tic 142 831.822738 750.318176 90.000 z -128.000000 floor -128.000000 eye 42.976440 thinkers 1 sector 10 -128.000000 -4.000000
+#|doorway walk tic 108 831.918884 510.046890 90.000 z -128.000000 floor -128.000000 eye 42.444900 thinkers 1 sector 10 -128.000000 -4.000000
+#|- tic 287 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -72.000000
+#|- tic 288 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -72.000000
+#|- tic 289 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -70.000000
+#|- tic 323 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -4.000000
 #|-
 #|held use tic 140 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -4.000000
 #|use tic 340 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 10 -128.000000 -128.000000

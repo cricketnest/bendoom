@@ -283,6 +283,12 @@ def Laws.door_timeline():
 def Laws.blazing_door_timeline():
   {==}
 
+def Laws.floor_carries():
+  {==}
+
+def Laws.door_crushed():
+  {==}
+
 def Laws.use_fires_once(forward, side, turn, next, player, level, sidetex, thinkers, rnd, clock, usedown):
   match next level:
     case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
@@ -797,11 +803,30 @@ def free_geo(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +
             L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb}, x, y))},
         {==})
 
+# A mover's re-clip moves the player up and down alone.
+def stood_x(moved: S.Player, +q: S.Player) -> {S.Player.x(moved) == S.Player.x(S.Player.stood(moved, q)) : U32}:
+  match moved:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz}:
+      {==}
+
+def stood_y(moved: S.Player, +q: S.Player) -> {S.Player.y(moved) == S.Player.y(S.Player.stood(moved, q)) : U32}:
+  match moved:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz}:
+      {==}
+
 # What the tic keeps is free where the player it moved was: the level
-# it packs has the geometry the move was checked against.
+# it packs has the geometry the move was checked against, and the
+# player it packs the place.
 def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Player, clock: U32, use: Bool,
   +after: S.State, h: Free(L.Level{geo, sectors, specials}, moved)) ->
   Laws.Free(S.Sim.tic.kept(geo, moved, clock, use, after)):
+  %stood_x(moved, S.State.player(after))
+    : {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(after)),
+      L.Level.specials(S.State.level(after))}, _,
+      S.Player.y(S.Player.stood(moved, S.State.player(after)))) : Bool}
+  %stood_y(moved, S.State.player(after))
+    : {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(after)),
+      L.Level.specials(S.State.level(after))}, S.Player.x(moved), _) : Bool}
   %free_geo(geo, sectors, specials, L.Level.sectors(S.State.level(after)),
     L.Level.specials(S.State.level(after)), S.Player.x(moved), S.Player.y(moved))
     : {True{} == _ : Bool}

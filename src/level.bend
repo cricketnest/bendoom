@@ -264,6 +264,20 @@ def Level.root(+l: Level) -> U32:
     sectors, specials} = l
   root
 
+def Level.blocked.in(b: Level.Box, +bx: U32, +by: U32) -> Bool:
+  Box{top, bottom, left, right} = b
+  Bool.and(F.Fixed.le(left, bx), Bool.and(F.Fixed.le(bx, right),
+    Bool.and(F.Fixed.le(bottom, by), F.Fixed.le(by, top))))
+
+def Level.blocked.at(+bm: Level.Blockmap, b: Level.Box, x: U32, y: U32) -> Bool:
+  Blockmap{words, ox, oy, cols, rows} = bm
+  Level.blocked.in(b, F.Fixed.sarn((x - ox : U32), 23n), F.Fixed.sarn((y - oy : U32), 23n))
+
+# Whether a thing at (x, y) is in a blockmap cell of a sector's block
+# box: the things Doom's P_ChangeSector looks at when the sector moves.
+def Level.blocked(+l: Level, s: U32, x: U32, y: U32) -> Bool:
+  Level.blocked.at(Level.blockmap_of(l), Level.blockbox(l, s), x, y)
+
 # The lines listed in a blockmap cell (none outside the map): the words
 # after the cell's offset, past its leading zero, up to the 65535.
 def Level.cell.go(k: Nat, end: Bool, +words: V.Vec, +i: U32, +w: U32) ->
