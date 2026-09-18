@@ -2,7 +2,7 @@
 # from the player's eye, and the keyboard walks the player at Doom's 35
 # tics a second whatever the frame rate; Esc or Close quits. RECORD names
 # a demo to record, as vanilla's -record does, until the level ends or
-# the game quits.
+# the game quits; film.bend makes a video of it.
 import Base
 import ./src/level.bend as L
 import ./src/gfx.bend as G

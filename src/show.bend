@@ -27,16 +27,18 @@ def Show.leaf.rgb(tasks: List<&2, Show.Task>, images: List<&2, Image>, p: Array<
   (mem, rgb) = p
   State{mem, tasks, Pix{rgb} <> images}
 
-def Show.leaf.index(tasks: List<&2, Show.Task>, images: List<&2, Image>, p: Array<U32> & U32) ->
-  Show.State:
+def Show.colour.of(p: Array<U32> & U32) -> Array<U32> & U32:
   (mem, index) = p
-  Show.leaf.rgb(tasks, images, B.Bytes.at(mem, (G.Gfx.palette() + index : U32)))
+  B.Bytes.at(mem, (G.Gfx.palette() + index : U32))
+
+# Frame pixel i's colour, 0xRRGGBB.
+def Show.colour(mem: Array<U32>, +i: U32) -> Array<U32> & U32:
+  Show.colour.of(B.Bytes.at(mem, (G.Gfx.frame() + i : U32)))
 
 # The cell at window pixel x, y: its frame pixel's colour.
 def Show.leaf(mem: Array<U32>, x: U32, y: U32, tasks: List<&2, Show.Task>, images: List<&2, Image>) ->
   Show.State:
-  Show.leaf.index(tasks, images, B.Bytes.at(mem,
-    (G.Gfx.frame() + ((y >> 2n) * 5 / 6) * 320 + (x >> 2n) : U32)))
+  Show.leaf.rgb(tasks, images, Show.colour(mem, (((y >> 2n) * 5 / 6) * 320 + (x >> 2n) : U32)))
 
 def Show.quad.if(same: Bool, tl: Image, tr: Image, bl: Image, br: Image) -> Image:
   match same:

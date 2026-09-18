@@ -12,6 +12,14 @@ check` refuses a build with an open or broken law.
     nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#bendoom-shareware
 
+`RECORD` names a vanilla demo to record until the level ends or the game
+quits, which Chocolate Doom also plays; `film` encodes one as a 1600 by
+1200 MP4 at Doom's 35 tics a second (`film-shareware` for the shareware
+WAD):
+
+    RECORD=run.lmp nix run github:eliesgalvira/bendoom
+    nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
+
 Bend itself is built from its source in the flake, pinned to one commit,
 with no self-updating launcher and no telemetry.
 

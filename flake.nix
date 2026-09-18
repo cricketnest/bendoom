@@ -24,18 +24,17 @@
           };
           bend = pkgs.callPackage ./nix/bend.nix { src = inputs.bend-src; };
           wads = pkgs.callPackage ./nix/wads.nix { };
-          bendoom = pkgs.callPackage ./nix/bendoom.nix {
-            inherit bend;
-            iwad = "${wads.freedoom}/share/games/doom/freedoom1.wad";
-          };
+          freedoom = "${wads.freedoom}/share/games/doom/freedoom1.wad";
+          shareware = "${wads.doom1}/share/games/doom/doom1.wad";
+          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend; iwad = freedoom; };
+          film = pkgs.callPackage ./nix/film.nix { inherit bend; iwad = freedoom; };
         in {
           packages = {
-            inherit bend bendoom;
+            inherit bend bendoom film;
             default = bendoom;
             doom1-wad = wads.doom1;
-            bendoom-shareware = bendoom.override {
-              iwad = "${wads.doom1}/share/games/doom/doom1.wad";
-            };
+            bendoom-shareware = bendoom.override { iwad = shareware; };
+            film-shareware = film.override { iwad = shareware; };
           };
 
           checks = {
@@ -61,7 +60,7 @@
               pkgs.xdotool
             ];
             buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
-            BENDOOM_IWAD = "${wads.freedoom}/share/games/doom/freedoom1.wad";
+            BENDOOM_IWAD = freedoom;
             BEND_NO_TELEMETRY = "1";
           };
         };
