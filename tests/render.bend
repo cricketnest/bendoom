@@ -13,11 +13,18 @@
 # open, the special 23 switch pressed, the exit switch pressed, a
 # blinking wall at its dark level, the water on a later frame of its
 # cycle, and the blue key on the tic before the player strafing past it
-# takes it and on the tic it does; each script is beside its frame
-# below. Every frame holds the things E1M1 spawns on Hurt Me Plenty.
-# tools/oracle.nu finds no pixel off vanilla's in the dark, water, sky,
-# stride, switch, blink and key frames; the key is 44 compared pixels of
-# the first and would be 347 of the second.
+# takes it and on the tic it does; the rocket in its nook strafed past
+# facing 112.5 degrees on the tic before it is taken and the tic it is,
+# and on that tic with every ammo type at its cap, where it stays; the
+# chainsaw on the key's script on the tic it is taken and, owned, on the
+# tic it stays. Each script is beside its frame below. Every frame holds
+# the things E1M1 spawns on Hurt Me Plenty. tools/oracle.nu finds no
+# pixel off vanilla's in the dark, water, sky, stride, switch, blink,
+# key, rocket and taken chainsaw frames; the key is 44 compared pixels
+# of the first and would be 347 of the second. A refused frame differs
+# from its taken twin only in the pickup's sprite, 762 pixels of the
+# rocket and 5092 of the chainsaw; vanilla cannot be given the full
+# inventory, so those two are not compared.
 # The others differ where a thing animates or is full-bright, which
 # ticket 05 brings, or where the big trees behind the grate overlap
 # unsorted, ticket 03's: with the animated and full-bright things taken
@@ -38,6 +45,8 @@ import ../src/sim.bend as S
 import ../src/project.bend as P
 import ../src/draw.bend as D
 import ../src/render.bend as R
+import ../src/inventory.bend as I
+import ../src/vec.bend as V
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32}
@@ -116,6 +125,23 @@ def strafe(n: Nat) -> List<&2, K.Cmd>:
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
 
+# The state with the player holding every weapon and every ammo type at
+# its cap, so that no ammo or weapon pickup can be taken.
+def full(s: S.State) -> S.State:
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  S.State{S.Player.holding(p, I.Inventory{100, 0, 0, 0, V.Vec.of_list([200, 50, 300, 50], 4),
+    V.Vec.of_list([200, 50, 300, 50], 4), False{}, 511, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0}), level, things,
+    sidetex, thinkers, rnd, clock, ended, usedown}
+
+# The rocket strafed past facing 112.5 degrees, after the idle tics and
+# the turn.
+def rocket(n: Nat, s: S.State) -> S.State:
+  after([idle(20n), [K.Cmd.demo(0, 0, 16, False{})], strafe(n)], s)
+
+# The chainsaw strafed past on the key's script.
+def saw(n: Nat, s: S.State) -> S.State:
+  after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})], strafe(n)], s)
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
@@ -147,6 +173,11 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       strafe(12n)], at(level, east(2246), east(592), 180)), m17)
     m19 : Array<U32> <- frame("key after", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
       strafe(13n)], at(level, east(2246), east(592), 180)), m18)
+    m20 : Array<U32> <- frame("rocket before", tables, gfx, rocket(11n, at(level, east(714), west(1011), 90)), m19)
+    m21 : Array<U32> <- frame("rocket after", tables, gfx, rocket(12n, at(level, east(714), west(1011), 90)), m20)
+    m22 : Array<U32> <- frame("rocket refused", tables, gfx, rocket(12n, full(at(level, east(714), west(1011), 90))), m21)
+    m23 : Array<U32> <- frame("chainsaw after", tables, gfx, saw(13n, at(level, east(3158), east(2176), 180)), m22)
+    m24 : Array<U32> <- frame("chainsaw refused", tables, gfx, saw(13n, full(at(level, east(3158), east(2176), 180))), m23)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -177,4 +208,9 @@ def main() -> IO(Unit):
 #|water moving hash 1934760231 pixels 2 6 77 6 covered True
 #|key before hash 331051703 pixels 6 10 5 89 covered True
 #|key after hash 1474234797 pixels 105 10 2 89 covered True
+#|rocket before hash 1385688744 pixels 105 109 105 77 covered True
+#|rocket after hash 2195675567 pixels 106 109 105 77 covered True
+#|rocket refused hash 330851925 pixels 106 109 105 77 covered True
+#|chainsaw after hash 3701006664 pixels 5 5 137 141 covered True
+#|chainsaw refused hash 4000560599 pixels 5 5 137 141 covered True
 #|end

@@ -619,10 +619,11 @@ law blue_door_locked:
     Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, I.Inventory.start()))), 1))
     == (0, 0, 131072, 131072) : U32 & U32 & U32 & U32}
 
-# The west room's player at (x, 64), on the floor under a ceiling at
-# 128, moving by a momentum a tic, among things, on the literal level.
-def Closed.among(x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
-  S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
+# The west room's player holding an inventory at (x, 64), on the floor
+# under a ceiling at 128, moving by a momentum a tic, among things, on
+# the literal level.
+def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
+  S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], inv},
     Closed.doors(), things, V.Leaf{0}, [], 0, 0, False{}, False{}}
 
 # A blue card named id at (x, y) and z, as spawned.
@@ -638,7 +639,7 @@ def Closed.held(+s: S.State) -> List<&2, H.Thing> & U32 & U32:
 # and a blue card (record 87), both at (32, 112), toward another blue
 # card (record 90) at (32, 400).
 def Closed.passing() -> S.State:
-  Closed.among(2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 2, 4294967295},
+  Closed.among(I.Inventory.start(), 2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 2, 4294967295},
     Closed.key(87, 2097152, 7340032, 0), Closed.key(90, 2097152, 26214400, 0)])
 
 # LAW: P_TouchSpecialThing for the blue card. Tic 1 moves the player to
@@ -661,17 +662,17 @@ law key_taken:
 # blue card at (32, 100) is in reach of both: the first takes it, the
 # second finds it gone, so the flash is 12 and not 18 (sanity).
 law key_taken_once:
-  {Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 1310720, [Closed.key(87, 2097152, 6553600, 0)])))
+  {Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 1310720, [Closed.key(87, 2097152, 6553600, 0)])))
     == ([], 1, 12) : List<&2, H.Thing> & U32 & U32}
 
 # LAW: vertical reach. A tic moves the player to 72, 8 from a blue card
 # at (32, 80); the card is taken with its bottom 56 over the player's
 # feet and not 57, and 8 under them and not 9 (sanity).
 law key_reach:
-  {(Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3670016)]))),
-    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3735552)]))),
-    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294443008)]))),
-    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294377472)]))))
+  {(Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3670016)]))),
+    Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3735552)]))),
+    Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294443008)]))),
+    Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294377472)]))))
     == (([], 1, 12), ([Closed.key(87, 2097152, 5242880, 3735552)], 0, 0), ([], 1, 12),
       ([Closed.key(87, 2097152, 5242880, 4294377472)], 0, 0))
     : (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32)
@@ -680,7 +681,7 @@ law key_reach:
 # The player at (40, 64) moving east at 12 a tic into the shut door,
 # with a blue card at (86, 64) past it.
 def Closed.shut_out() -> S.State:
-  Closed.idled(1n, Closed.among(2621440, 786432, 0, [Closed.key(87, 5636096, 4194304, 0)]))
+  Closed.idled(1n, Closed.among(I.Inventory.start(), 2621440, 786432, 0, [Closed.key(87, 5636096, 4194304, 0)]))
 
 # LAW: P_CheckPosition touches things before it checks lines. The move
 # to 52 puts the box across the shut door, whose opening refuses it,
@@ -690,6 +691,135 @@ def Closed.shut_out() -> S.State:
 law key_through_door:
   {(Closed.held(Closed.shut_out()), F.Fixed.le(S.Player.x(S.State.player(Closed.shut_out())), 3145728))
     == (([], 1, 12), True{}) : (List<&2, H.Thing> & U32 & U32) & Bool}
+
+# An inventory as G_PlayerReborn leaves it but for the ammo and caps, in
+# ammotype_t order (bullets, shells, cells, rockets), the backpack, the
+# weapons owned and the pickup flash.
+def Closed.stock(ammo: List<&2, U32>, caps: List<&2, U32>, backpack: Bool, weapons: U32, bonus: U32) ->
+  I.Inventory:
+  I.Inventory{100, 0, 0, 0, V.Vec.of_list(ammo, 4), V.Vec.of_list(caps, 4), backpack, weapons,
+    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, bonus}
+
+def Closed.caps() -> List<&2, U32>:
+  [200, 50, 300, 50]
+
+def Closed.bag() -> List<&2, U32>:
+  [400, 100, 600, 100]
+
+# A thing of a type, record 1, at (32, 80).
+def Closed.item(kind: U32) -> H.Thing:
+  H.Thing{1, kind, 2097152, 5242880, 0, 0, 0, 4294967295}
+
+# What a pickup leaves: the things and the inventory.
+type Closed.Got is Data:
+  Got{things: List<&2, H.Thing>, inv: I.Inventory}
+
+def Closed.kept(+s: S.State) -> Closed.Got:
+  Got{S.State.things(s), S.Player.inv(S.State.player(s))}
+
+# The things left and the inventory after the tic that brings the west
+# room's player, holding an inventory, 8 from a thing of a type, in its
+# reach.
+def Closed.offer(inv: I.Inventory, kind: U32) -> Closed.Got:
+  Closed.kept(Closed.idled(1n, Closed.among(inv, 2097152, 0, 524288, [Closed.item(kind)])))
+
+# LAW: P_GiveAmmo's clipammo on Hurt Me Plenty, which doubles nothing,
+# from G_PlayerReborn's inventory: a clip gives 10 bullets, shells 4, a
+# cell 20, a rocket 1; the boxes give five clips, 50 bullets, 20 shells,
+# 100 cells and 5 rockets. Each is taken, and flashes 6 (sanity).
+law ammo_amounts:
+  {[Closed.offer(I.Inventory.start(), 2007), Closed.offer(I.Inventory.start(), 2008),
+    Closed.offer(I.Inventory.start(), 2047), Closed.offer(I.Inventory.start(), 2010),
+    Closed.offer(I.Inventory.start(), 2048), Closed.offer(I.Inventory.start(), 2049),
+    Closed.offer(I.Inventory.start(), 17), Closed.offer(I.Inventory.start(), 2046)]
+    == [Got{[], Closed.stock([60, 0, 0, 0], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([50, 4, 0, 0], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([50, 0, 20, 0], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([50, 0, 0, 1], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([100, 0, 0, 0], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([50, 20, 0, 0], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([50, 0, 100, 0], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([50, 0, 0, 5], Closed.caps(), False{}, 3, 6)}]
+    : List<&2, Closed.Got>}
+
+# LAW: maxammo's caps, 200 bullets, 50 shells, 300 cells and 50 rockets.
+# At each, the loose round and the box are refused, stay, and change
+# nothing; one short of each, the box is taken and fills it to the cap
+# (sanity).
+law ammo_caps:
+  {[Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2007),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2048),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2008),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2049),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2047),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 17),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2010),
+    Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 2046),
+    Closed.offer(Closed.stock([199, 49, 299, 49], Closed.caps(), False{}, 3, 0), 2048),
+    Closed.offer(Closed.stock([199, 49, 299, 49], Closed.caps(), False{}, 3, 0), 2049),
+    Closed.offer(Closed.stock([199, 49, 299, 49], Closed.caps(), False{}, 3, 0), 17),
+    Closed.offer(Closed.stock([199, 49, 299, 49], Closed.caps(), False{}, 3, 0), 2046)]
+    == [Got{[Closed.item(2007)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(2048)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(2008)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(2049)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(2047)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(17)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(2010)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[Closed.item(2046)], Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0)},
+      Got{[], Closed.stock([200, 49, 299, 49], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([199, 50, 299, 49], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([199, 49, 300, 49], Closed.caps(), False{}, 3, 6)},
+      Got{[], Closed.stock([199, 49, 299, 50], Closed.caps(), False{}, 3, 6)}]
+    : List<&2, Closed.Got>}
+
+# LAW: the first backpack doubles every cap, to 400 100 600 100, before
+# it gives a clip of each ammo type: from the start 60 4 20 1, and from
+# ammo at the old caps 210 54 320 51. Either way it is taken (sanity).
+law backpack_first:
+  {[Closed.offer(I.Inventory.start(), 8), Closed.offer(Closed.stock(Closed.caps(), Closed.caps(), False{}, 3, 0), 8)]
+    == [Got{[], Closed.stock([60, 4, 20, 1], Closed.bag(), True{}, 3, 6)},
+      Got{[], Closed.stock([210, 54, 320, 51], Closed.bag(), True{}, 3, 6)}]
+    : List<&2, Closed.Got>}
+
+# LAW: a later backpack leaves the doubled caps as they are and gives the
+# clips again, 60 4 20 1 to 70 8 40 2; at the doubled caps it gives
+# nothing, and it is still taken (sanity).
+law backpack_later:
+  {[Closed.offer(Closed.stock([60, 4, 20, 1], Closed.bag(), True{}, 3, 0), 8),
+    Closed.offer(Closed.stock(Closed.bag(), Closed.bag(), True{}, 3, 0), 8)]
+    == [Got{[], Closed.stock([70, 8, 40, 2], Closed.bag(), True{}, 3, 6)},
+      Got{[], Closed.stock(Closed.bag(), Closed.bag(), True{}, 3, 6)}]
+    : List<&2, Closed.Got>}
+
+# LAW: P_GiveWeapon for a weapon found, which brings two clips. The
+# shotgun, not owned, is owned (weapons 3 to 7) with 8 shells; owned, its
+# 8 shells alone take it; owned at 50 shells it stays; not owned at 50
+# shells the weapon alone takes it. The chaingun brings 20 bullets and
+# stays when owned at 200, the rocket launcher 2 rockets, the plasma
+# rifle 40 cells. The chainsaw has no ammo: taken when not owned, left
+# when owned (sanity).
+law weapon_taken:
+  {[Closed.offer(I.Inventory.start(), 2001),
+    Closed.offer(Closed.stock([50, 8, 0, 0], Closed.caps(), False{}, 7, 0), 2001),
+    Closed.offer(Closed.stock([50, 50, 0, 0], Closed.caps(), False{}, 7, 0), 2001),
+    Closed.offer(Closed.stock([50, 50, 0, 0], Closed.caps(), False{}, 3, 0), 2001),
+    Closed.offer(I.Inventory.start(), 2002),
+    Closed.offer(Closed.stock([200, 0, 0, 0], Closed.caps(), False{}, 11, 0), 2002),
+    Closed.offer(I.Inventory.start(), 2003), Closed.offer(I.Inventory.start(), 2004),
+    Closed.offer(I.Inventory.start(), 2005),
+    Closed.offer(Closed.stock([50, 0, 0, 0], Closed.caps(), False{}, 131, 0), 2005)]
+    == [Got{[], Closed.stock([50, 8, 0, 0], Closed.caps(), False{}, 7, 6)},
+      Got{[], Closed.stock([50, 16, 0, 0], Closed.caps(), False{}, 7, 6)},
+      Got{[Closed.item(2001)], Closed.stock([50, 50, 0, 0], Closed.caps(), False{}, 7, 0)},
+      Got{[], Closed.stock([50, 50, 0, 0], Closed.caps(), False{}, 7, 6)},
+      Got{[], Closed.stock([70, 0, 0, 0], Closed.caps(), False{}, 11, 6)},
+      Got{[Closed.item(2002)], Closed.stock([200, 0, 0, 0], Closed.caps(), False{}, 11, 0)},
+      Got{[], Closed.stock([50, 0, 0, 2], Closed.caps(), False{}, 19, 6)},
+      Got{[], Closed.stock([50, 0, 40, 0], Closed.caps(), False{}, 35, 6)},
+      Got{[], Closed.stock([50, 0, 0, 0], Closed.caps(), False{}, 131, 6)},
+      Got{[Closed.item(2005)], Closed.stock([50, 0, 0, 0], Closed.caps(), False{}, 131, 0)}]
+    : List<&2, Closed.Got>}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.

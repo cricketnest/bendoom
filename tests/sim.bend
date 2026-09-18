@@ -35,6 +35,21 @@
 # and the pickup's 6 make 12, one less a tic after. Door 71's top is 4
 # under the ceilings of 0 beside it in the WAD, reached at 2 a tic on
 # tic 92.
+# The pickups, each run printed with the tic, the records taken since it
+# began, the things left, the ammo and caps in ammotype_t order, the
+# backpack, the weapons owned and the pickup flash: a clip, three shells
+# in a row and the rocket walked into, with room and at the cap; the
+# shell box behind the closet door west of the clips, with room, one
+# clip short of the cap and at it; the backpack (record 288) and the
+# shotgun (record 256), which Freedoom places for the easier skills
+# alone, spawned after the level's things: the backpack first, again
+# with the first's inventory and again at every doubled cap; the shotgun
+# not owned, owned with room, owned at the cap and not owned at the cap;
+# the chainsaw on its step, strafed past on the key's script, not owned
+# and owned. The amounts are p_inter.c's on Hurt Me Plenty: clipammo
+# 10 4 20 1, five clips in a box, two with a weapon found, maxammo 200
+# 50 300 50 doubled by the first backpack, a flash of 6. The contact
+# tics, where the reach of 36 is first met, are regression pins.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -363,6 +378,124 @@ def free(+s: S.State) -> IO(S.State):
     things([2, 6, 29, 87, 245, 291], s)
     return s
 
+
+def missing(hit: Bool, +id: U32, rest: String) -> String:
+  match hit:
+    case True{}:
+      rest
+    case False{}:
+      " " ++ U32.show(id) ++ rest
+
+# The names of the things of before no longer in after.
+def gone(before: List<&2, H.Thing>, +after: List<&2, H.Thing>) -> String:
+  match before:
+    case []:
+      ""
+    case H.Thing{+i, kind, x, y, z, sector, state, tics} <> rest:
+      missing(present(after, i), i, gone(rest, after))
+
+def ammo(inv: I.Inventory) -> String:
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  " ammo" ++ words(ammo, 4n, 0) ++ " caps" ++ words(caps, 4n, 0) ++ " backpack " ++ Bool.show(backpack)
+    ++ " weapons " ++ U32.show(weapons) ++ " flash " ++ U32.show(bonus)
+
+# A run, then the names of the things taken since the case's first state,
+# how many things are left, and the ammo, caps, backpack and weapons.
+def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  do IO<S.State>:
+    IO.print(tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " taken" ++ gone(S.State.things(first), S.State.things(q))
+      ++ " things " ++ Nat.show(List.length(&2, H.Thing, S.State.things(q))) ++ ammo(S.Player.inv(S.State.player(q))))
+    return q
+
+# An inventory as G_PlayerReborn's but for the ammo in ammotype_t order
+# and the weapons owned.
+def stocked(bullets: U32, shells: U32, cells: U32, rockets: U32, weapons: U32) -> I.Inventory:
+  I.Inventory{100, 0, 0, 0, V.Vec.of_list([bullets, shells, cells, rockets], 4), V.Vec.of_list([200, 50, 300, 50], 4),
+    False{}, weapons, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0}
+
+def spawn.things(s: H.Thing.Spawn) -> List<&2, H.Thing>:
+  H.Spawn{things, rnd} = s
+  things
+
+def spawned(r: L.Level.Thing, +level: L.Level, id: U32) -> List<&2, H.Thing>:
+  L.Thing{+x, +y, angle, +kind, options} = r
+  spawn.things(H.Thing.spawn.mobj(H.Thing.info(kind), level, id, x, y, H.Spawn{[], 0}))
+
+# The state with a record the easier skills alone spawn put after its
+# things, as P_SpawnMobj places it.
+def adding(+level: L.Level, +id: U32, s: S.State) -> S.State:
+  S.State{p, lv, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  S.State{p, lv, List.append(&2, H.Thing, things, spawned(L.Level.thing(level, id), level, id)), sidetex, thinkers,
+    rnd, clock, ended, usedown}
+
+def walked(tag: String, n: Nat, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    a : S.State <- picked(tag, n, forward(), s, s)
+    picked("-", 1n, forward(), s, a)
+
+# Loose rounds: a clip walked into from the east, and Freedoom's row of
+# three shells walked along from the west, the rocket from the east,
+# with room and at the cap.
+def loose(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    c : S.State <- walked("clip walk", 9n, at(level, 672, 992, 180))
+    h : S.State <- walked("shells walk", 8n, at(level, 1060, 65312, 0))
+    h2 : S.State <- picked("-", 17n, forward(), at(level, 1060, 65312, 0), h)
+    f : S.State <- walked("shells walk at the cap", 8n, holding(stocked(50, 50, 0, 0, 3), at(level, 1060, 65312, 0)))
+    f2 : S.State <- picked("-", 17n, forward(), at(level, 1060, 65312, 0), f)
+    r : S.State <- walked("rocket walk", 8n, at(level, 700, 64536, 180))
+    r2 : S.State <- walked("rocket walk at the cap", 8n, holding(stocked(50, 0, 0, 50, 3), at(level, 700, 64536, 180)))
+    IO.print("-")
+
+# The shell box behind the closet door west of the clips, with room,
+# one clip short of the cap, and at it: an idle tic, since the player
+# starts with use held, the use, the door rising, the walk.
+def box(tag: String, +s: S.State) -> IO(Unit):
+  +opened = S.Sim.replay(List.concat(&2, K.Cmd, [[idle(), use()], List.replicate(K.Cmd, 30n, idle())]), s)
+  do IO<Unit>:
+    b : S.State <- walked(tag, 19n, opened)
+    IO.print("-")
+
+# The backpack, record 288, walked into from the east along the south
+# wall, out of the rocket's reach: the first, and later ones with the
+# first's inventory and with every doubled cap full.
+def backpack(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
+  walked(tag, 11n, adding(level, 288, holding(inv, at(level, 720, 64496, 180))))
+
+# The shotgun, record 256, walked into from the north: not owned, owned
+# with room for its shells, owned at the cap, and not owned at the cap.
+def shotgun(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
+  walked(tag, 11n, adding(level, 256, holding(inv, at(level, 816, 700, 270))))
+
+# The chainsaw on its step, strafed past on the key's script: not owned,
+# then owned.
+def chainsaw(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
+  +s = holding(inv, at(level, 3158, 2176, 180))
+  do IO<S.State>:
+    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), s,
+      S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
+        [K.Cmd.demo(0, 0, 4294967280, False{})]), s))
+    picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, False{}), s, a)
+
+def pickups(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    loose(level)
+    box("shell box walk", at(level, 600, 712, 180))
+    box("shell box walk short of the cap", holding(stocked(50, 45, 0, 0, 3), at(level, 600, 712, 180)))
+    box("shell box walk at the cap", holding(stocked(50, 50, 0, 0, 3), at(level, 600, 712, 180)))
+    p : S.State <- backpack("backpack walk", I.Inventory.start(), level)
+    p2 : S.State <- backpack("later backpack walk", S.Player.inv(S.State.player(p)), level)
+    p3 : S.State <- backpack("later backpack walk at the doubled caps", I.Inventory{100, 0, 0, 0,
+      V.Vec.of_list([400, 100, 600, 100], 4), V.Vec.of_list([400, 100, 600, 100], 4), True{}, 3,
+      V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0}, level)
+    g : S.State <- shotgun("shotgun walk", I.Inventory.start(), level)
+    g2 : S.State <- shotgun("owned shotgun walk", S.Player.inv(S.State.player(g)), level)
+    g3 : S.State <- shotgun("owned shotgun walk at the cap", stocked(50, 50, 0, 0, 7), level)
+    g4 : S.State <- shotgun("shotgun walk at the cap", stocked(50, 50, 0, 0, 3), level)
+    w : S.State <- chainsaw("chainsaw strafe", I.Inventory.start(), level)
+    w2 : S.State <- chainsaw("owned chainsaw strafe", S.Player.inv(S.State.player(w)), level)
+    IO.print("-")
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
@@ -388,6 +521,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
+    pickups(level)
     door(level)
 
 def main() -> IO(Unit):
@@ -428,6 +562,47 @@ def main() -> IO(Unit):
 #|U!:15 492.898864 256.341476 0.000 z -128.000000 floor -128.000000 eye 42.834960
 #|-:1 509.055541 256.347518 0.000 z -128.000000 floor -128.000000 eye 43.033325
 #|-:40 662.189941 256.402572 0.000 z -128.000000 floor -128.000000 eye 41.011581
+#|clip walk tic 9 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 10 taken 140 things 179 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 6
+#|shells walk tic 8 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 9 taken 276 things 179 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 flash 6
+#|- tic 26 taken 207 208 276 things 177 ammo 50 12 0 0 caps 200 50 300 50 backpack False weapons 3 flash 6
+#|shells walk at the cap tic 8 taken things 180 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 9 taken things 180 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 26 taken things 180 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|rocket walk tic 8 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 9 taken 279 things 179 ammo 50 0 0 1 caps 200 50 300 50 backpack False weapons 3 flash 6
+#|rocket walk at the cap tic 8 taken things 180 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 9 taken things 180 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|-
+#|shell box walk tic 51 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 52 taken 137 things 179 ammo 50 20 0 0 caps 200 50 300 50 backpack False weapons 3 flash 6
+#|-
+#|shell box walk short of the cap tic 51 taken things 180 ammo 50 45 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 52 taken 137 things 179 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 6
+#|-
+#|shell box walk at the cap tic 51 taken things 180 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 52 taken things 180 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|-
+#|backpack walk tic 11 taken things 181 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 12 taken 288 things 180 ammo 60 4 20 1 caps 400 100 600 100 backpack True weapons 3 flash 6
+#|later backpack walk tic 11 taken things 181 ammo 60 4 20 1 caps 400 100 600 100 backpack True weapons 3 flash 0
+#|- tic 12 taken 288 things 180 ammo 70 8 40 2 caps 400 100 600 100 backpack True weapons 3 flash 6
+#|later backpack walk at the doubled caps tic 11 taken things 181 ammo 400 100 600 100 caps 400 100 600 100 backpack True weapons 3 flash 0
+#|- tic 12 taken 288 things 180 ammo 400 100 600 100 caps 400 100 600 100 backpack True weapons 3 flash 6
+#|shotgun walk tic 11 taken things 181 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 12 taken 256 things 180 ammo 50 8 0 0 caps 200 50 300 50 backpack False weapons 7 flash 6
+#|owned shotgun walk tic 11 taken things 181 ammo 50 8 0 0 caps 200 50 300 50 backpack False weapons 7 flash 0
+#|- tic 12 taken 256 things 180 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 7 flash 6
+#|owned shotgun walk at the cap tic 11 taken things 181 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 7 flash 0
+#|- tic 12 taken things 181 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 7 flash 0
+#|shotgun walk at the cap tic 11 taken things 181 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 12 taken 256 things 180 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 7 flash 6
+#|chainsaw strafe tic 33 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 flash 0
+#|- tic 34 taken 2 things 179 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 flash 6
+#|owned chainsaw strafe tic 33 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 flash 0
+#|- tic 34 taken things 180 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 flash 0
+#|-
 #|door walk tic 40 831.926605 495.977203 90.000 z -128.000000 floor -128.000000 eye 40.975143 thinkers 9 sector 10 -128.000000 -128.000000
 #|use tic 41 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -126.000000
 #|- tic 61 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000

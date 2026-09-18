@@ -1206,3 +1206,18 @@ def Laws.key_reach():
 
 def Laws.key_through_door():
   {==}
+
+def Laws.ammo_amounts():
+  {==}
+
+def Laws.ammo_caps():
+  {==}
+
+def Laws.backpack_first():
+  {==}
+
+def Laws.backpack_later():
+  {==}
+
+def Laws.weapon_taken():
+  {==}
