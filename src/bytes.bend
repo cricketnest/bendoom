@@ -3,7 +3,6 @@
 # A read hands the array back beside the byte, and a pair from a call can
 # only be taken apart by a helper, so each reader is a chain of them.
 import Base
-import ./vec.bend as V
 
 # The bytes, sized up to a power of two, zero past the end.
 def Bytes.read(path: String) -> IO(Result<&1, &1, U32 & String, Array<U32>>):
@@ -91,32 +90,47 @@ def Bytes.text.pack(p: Array<U32> & List<&2, Char>) -> Array<U32> & String:
 def Bytes.text(a: Array<U32>, +i: U32, n: Nat) -> Array<U32> & String:
   Bytes.text.pack(Bytes.text.go(n, a, i))
 
-def Bytes.u16s.join(rest: List<&2, U32>, q: Array<U32> & U32) ->
-  Array<U32> & List<&2, U32>:
-  (a, w) = q
-  (a, w <> rest)
+def Bytes.name.up(p: Array<U32> & String) -> Array<U32> & String:
+  (a, s) = p
+  (a, String.to_upper(s))
 
-def Bytes.u16s.cons(+i: U32, p: Array<U32> & List<&2, U32>) ->
-  Array<U32> & List<&2, U32>:
+# A lump, texture or flat name: eight bytes, matched without case as
+# Doom matches them, so read in upper case.
+def Bytes.name(a: Array<U32>, +i: U32) -> Array<U32> & String:
+  Bytes.name.up(Bytes.text(a, i, 8n))
+
+def Bytes.each.join(~T: Data, rest: List<&2, T>, q: Array<U32> & T) ->
+  Array<U32> & List<&2, T>:
+  (a, x) = q
+  (a, x <> rest)
+
+def Bytes.each.cons(~T: Data, ~read: Array<U32> -> @+i: U32 -> Array<U32> & T, i: U32,
+  p: Array<U32> & List<&2, T>) -> Array<U32> & List<&2, T>:
   (a, rest) = p
-  Bytes.u16s.join(rest, Bytes.u16(a, i))
+  Bytes.each.join(~T, rest, read(a, i))
 
-# n 16-bit fields, one every stride bytes from i: one field of every
-# record of a lump.
-def Bytes.u16s(n: Nat, a: Array<U32>, +i: U32, +stride: U32) ->
-  Array<U32> & List<&2, U32>:
+# One read at each offset, the later offsets first so the list comes
+# out in order: every lump is read by planning its offsets, then this.
+def Bytes.each(~T: Data, ~read: Array<U32> -> @+i: U32 -> Array<U32> & T, offs: List<&2, U32>,
+  a: Array<U32>) -> Array<U32> & List<&2, T>:
+  match offs:
+    case []:
+      (a, [])
+    case i <> rest:
+      Bytes.each.cons(~T, ~read, i, Bytes.each(~T, ~read, rest, a))
+
+def Bytes.fields.one(fields: List<&2, U32>, +i: U32, tail: List<&2, U32>) -> List<&2, U32>:
+  match fields:
+    case []:
+      tail
+    case f <> rest:
+      (i + f : U32) <> Bytes.fields.one(rest, i, tail)
+
+# The offsets of the given fields in each of n records of stride bytes
+# from i, record by record.
+def Bytes.fields(n: Nat, +i: U32, +stride: U32, +fields: List<&2, U32>) -> List<&2, U32>:
   match n:
     case 0n:
-      (a, [])
+      []
     case 1n+m:
-      Bytes.u16s.cons(i, Bytes.u16s(m, a, (i + stride : U32), stride))
-
-def Bytes.vec.fin(count: U32, p: Array<U32> & List<&2, U32>) ->
-  Array<U32> & V.Vec:
-  (a, xs) = p
-  (a, V.Vec.of_list(xs, count))
-
-# The same fields as a tree indexed by record number.
-def Bytes.vec(n: Nat, +count: U32, a: Array<U32>, i: U32, stride: U32) ->
-  Array<U32> & V.Vec:
-  Bytes.vec.fin(count, Bytes.u16s(n, a, i, stride))
+      Bytes.fields.one(fields, i, Bytes.fields(m, (i + stride : U32), stride, fields))

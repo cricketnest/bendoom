@@ -163,7 +163,7 @@ law tic_rest:
     == (x, y) : U32 & U32}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
-# floor at 0 and the ceiling at 128. Every number is computed by hand
+# floor at 0 and the ceiling at 128 map units. Every number is computed by hand
 # from vanilla's formulas.
 
 # LAW: one tic forward from rest at angle zero thrusts 25 * 2048 along
@@ -174,7 +174,7 @@ law tic_rest:
 # momentum over four is 9999, and half of it times the clock's sine 25
 # is 1 (sanity).
 law tic_from_rest:
-  {S.Sim.tic(L.Level.room(0, 8388608),
+  {S.Sim.tic(L.Level.room(0, 128),
     K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}},
     S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})
     == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, 0, 1} : S.Player}
@@ -184,16 +184,16 @@ law tic_from_rest:
 law eye_rest:
   for x: U32
   for y: U32
-  {S.Player.viewz(S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+  {S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
     S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0})) == 2686976 : U32}
 
 # LAW: 64 above the floor, the first airborne tic sets the fall to twice
 # gravity without moving, the second moves by it and adds gravity once;
 # the eye sits 41 above the height the tic began at (sanity).
 law fall_gravity:
-  {(S.Sim.run(1n, L.Level.room(0, 8388608), K.Keys.none(),
+  {(S.Sim.run(1n, L.Level.room(0, 128), K.Keys.none(),
       S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0}),
-    S.Sim.run(2n, L.Level.room(0, 8388608), K.Keys.none(),
+    S.Sim.run(2n, L.Level.room(0, 128), K.Keys.none(),
       S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0}))
     == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, 0, 1},
       S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, 0, 2})
@@ -202,9 +202,9 @@ law fall_gravity:
 # LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
 # landing at 8 a tic does not (sanity).
 law landing_dip:
-  {(S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+  {(S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
       S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, 0, 0}),
-    S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+    S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
       S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, 0, 0}))
     == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, 0, 1},
       S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, 0, 1})
@@ -216,10 +216,10 @@ law landing_dip:
 # over four is 14745600, capped at 16 units, and half of it bobs the eye
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
-  {(S.Player.viewz(S.Sim.tic(L.Level.room(0, 8388608),
+  {(S.Player.viewz(S.Sim.tic(L.Level.room(0, 128),
       K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}},
       S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 5})),
-    S.Player.viewz(S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+    S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
       S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 5})))
     == (2706974, 3211256) : U32 & U32}
 
@@ -227,7 +227,7 @@ law bob_run_and_cap:
 # the view height by the 16 to 25, and sets it recovering by an eighth
 # of the gap, 2 a tic (sanity).
 law step_up_dip:
-  {S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+  {S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
     S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, 0, 0})
     == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, 0, 1}
     : S.Player}
