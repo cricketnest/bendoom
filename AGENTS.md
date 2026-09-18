@@ -38,6 +38,10 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 
 Read `docs/bend.md` before writing Bend code or proofs: what the checker refuses, and the shapes that pass.
 
-### Seeing the game
+### Checking the game
 
-`tools/screenshot.nu [keys...] [--binary path] [--wait duration]` runs the game, holds keys, and screenshots its window through niri; the X root is black under Xwayland, so X capture tools show nothing.
+Vanilla is the oracle. A frame is right when `tools/oracle.nu x y degrees` reports no differing pixel against Chocolate Doom at that spot; it runs headless (Xvfb) and needs `bend tools/frame.bend -o frame` first. Every rest position in `tests/render.bend` must stay at zero.
+
+Expected values come from outside the code under test: read the WAD in nushell, or compute by hand from vanilla's source, before the Bend code answers. Values with no oracle are regression pins, and the ticket says so.
+
+Automated checks never open a window or move focus on the desktop. A program that needs a display runs on Xvfb. `tools/screenshot.nu [keys...] [--binary path] [--wait duration]` and the game's window are for mechanics and gameplay QA only: it runs the game, holds keys, and screenshots its window through niri; the X root is black under Xwayland, so X capture tools show nothing.
