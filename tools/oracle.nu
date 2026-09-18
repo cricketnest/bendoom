@@ -16,13 +16,13 @@
 # 16 units to either side and below for one that moves. The pistol
 # rises for the level's first 16 tics, so a script is at least 18.
 #
-# Until Bendoom lights sectors and scrolls walls (milestone 4's tickets
-# 10 and 11) the copy zeroes sector specials and line special 48. Until
-# it animates (ticket 11) the default script idles 57 tics, where
-# Freedoom's water and nukage show the frame the map names: vanilla
-# shows frame (t + n) mod count of an animation whose first frame is
-# flat or texture number n, t being the tics run less one, over 8. Its
-# two waterfall textures are then a frame off; a view of them wants 81.
+# Until Bendoom scrolls walls (milestone 4's ticket 11) the copy zeroes
+# line special 48. Until it animates (ticket 11) the default script
+# idles 57 tics, where Freedoom's water and nukage show the frame the
+# map names: vanilla shows frame (t + n) mod count of an animation whose
+# first frame is flat or texture number n, t being the tics run less
+# one, over 8. Its two waterfall textures are then a frame off; a view
+# of them wants 81.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
@@ -60,23 +60,20 @@ def patched [pieces: table<at: int, data: binary>]: binary -> binary {
   | bytes collect
 }
 
-# The IWAD with E1M1's things one player 1 start on every skill, no
-# sector specials and no line special 48: its LINEDEFS and SECTORS edited
-# where they lie, the thing added after the directory, and the THINGS
-# entry pointed at it. A whole IWAD and not a PWAD, since Doom refuses
-# -file with the shareware one.
+# The IWAD with E1M1's things one player 1 start on every skill and no
+# line special 48: its LINEDEFS edited where they lie, the thing added
+# after the directory, and the THINGS entry pointed at it. A whole IWAD
+# and not a PWAD, since Doom refuses -file with the shareware one.
 def start-iwad [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
   let all = $wad | lumps | enumerate | flatten
   let marker = $all | where name == "E1M1" | first | get index
   let map = $all | where index > $marker | first 10
   let things = $map | where name == "THINGS" | first
   let lines = $map | where name == "LINEDEFS" | first
-  let sectors = $map | where name == "SECTORS" | first
   let dir = $wad | bytes at 8..11 | into int --endian little
   let thing = [($x | le 2) ($y | le 2) ($angle | le 2) (1 | le 2) (7 | le 2)] | bytes collect
   $wad | patched [
     {at: $lines.pos, data: ($wad | bytes at $lines.pos..<($lines.pos + $lines.size) | zeroed 14 6 {|special| $special == 48 })}
-    {at: $sectors.pos, data: ($wad | bytes at $sectors.pos..<($sectors.pos + $sectors.size) | zeroed 26 22 {|special| true })}
     {at: ($dir + $things.index * 16), data: ([($wad | bytes length | le 4) (10 | le 4)] | bytes collect)}
   ] | [$in $thing] | bytes collect
 }

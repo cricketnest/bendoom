@@ -329,6 +329,18 @@ def Laws.once_clears(line, s):
 def Laws.exit_ends(cmd):
   {==}
 
+def Laws.random_table():
+  {==}
+
+def Laws.blink_counts():
+  {==}
+
+def Laws.strobe_timeline():
+  {==}
+
+def Laws.glow_turns():
+  {==}
+
 def Laws.replay_append(a, b, s):
   match a:
     case []:

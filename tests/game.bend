@@ -94,12 +94,12 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 0 sector 64 -128.000000 -128.000000 special 11 pressed False
-#|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 1 sector 64 -128.000000 -60.000000 special 11 pressed False
+#|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False
+#|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False
 #|Time 0:01
-#|space tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 1 sector 64 -128.000000 -60.000000 special 0 pressed True
-#|repeat tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 1 sector 64 -128.000000 -60.000000 special 0 pressed True
-#|release tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 1 sector 64 -128.000000 -60.000000 special 0 pressed True
-#|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 0 sector 64 -128.000000 -128.000000 special 11 pressed False
+#|space tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True
+#|repeat tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True
+#|release tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True
+#|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False
 #|esc quit
 #|Time 0:00, Time 0:59, Time 1:00, Time 2:03

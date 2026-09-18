@@ -10,6 +10,7 @@ import ./fixed.bend as F
 import ./angle.bend as A
 import ./level.bend as L
 import ./keys.bend as K
+import ./tables.bend as T
 
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
@@ -810,10 +811,16 @@ type Sim.Step is Data:
 # in one: a sector's ceiling or floor, a speed, the steps left, and the
 # whole plan, which a crushed mover starts again. A button is a pressed
 # switch waiting to pop back: the side, which of its three textures, the
-# texture it showed, and the tics left.
+# texture it showed, and the tics left. A blink is T_LightFlash
+# and T_StrobeFlash in one: the tics left at the sector's light, its dark
+# and bright levels, the time at each, and whether a time is the count
+# or the mask of a random one. A glow is T_Glow: the two levels and the
+# way it is going.
 type Thinker is Data:
   Mover{sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>}
   Button{side: U32, slot: U32, texture: U32, tics: U32}
+  Blink{sector: U32, count: U32, dark: U32, bright: U32, darktime: U32, brighttime: U32, random: Bool}
+  Glow{sector: U32, dark: U32, bright: U32, down: Bool}
 
 # Everything a tic changes, in one value: the player, the level (its
 # sectors' words and its lines' specials), the sides' texture numbers
@@ -824,15 +831,6 @@ type Thinker is Data:
 type State is Data:
   State{player: Player, level: L.Level, sidetex: V.Vec, thinkers: List<&2, Thinker>, rnd: U32,
     clock: U32, ended: Bool, usedown: Bool}
-
-# The state a level starts in, from the map as loaded, with the player
-# at rest at a place and use counted as down, as Doom's G_PlayerReborn
-# leaves it, so a key held since before the level does nothing.
-def State.at(+level: L.Level, place: L.Level.Start) -> State:
-  State{Player.at(level, place), level, L.Level.sidetex(level), [], 0, 0, False{}, True{}}
-
-def State.start(+level: L.Level) -> State:
-  State.at(level, L.Level.start_of(level))
 
 def State.player(s: State) -> Player:
   State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
@@ -870,6 +868,49 @@ def State.usedown(s: State) -> Bool:
 def State.thinking(s: State, t: Thinker) -> State:
   State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
   State{player, level, sidetex, List.append(&2, Thinker, thinkers, [t]), rnd, clock, ended, usedown}
+
+# Lights
+# ------
+
+# Doom's P_Random steps its index, then answers the table's entry there.
+def Sim.random.next(rnd: U32) -> U32:
+  ((rnd + 1 : U32) .&. 255 : U32)
+
+def Sim.random(i: U32) -> U32:
+  V.Vec.get(V.Vec.of_list(T.Tables.rndtable(), 256), i)
+
+def Sim.light(s: State, sector: U32) -> U32:
+  L.Level.sector.light(State.level(s), sector)
+
+# A blink goes dark from its bright level, else bright, for that level's
+# time, or for a random count under it.
+def Sim.blink.to(+lit: Bool, +sector: U32, +dark: U32, +bright: U32, +darktime: U32, +brighttime: U32,
+  +random: Bool, s: State) -> State:
+  State{player, level, sidetex, thinkers, +rnd, clock, ended, usedown} = s
+  +time = Bool.pick(U32, lit, darktime, brighttime)
+  +i = Bool.pick(U32, random, Sim.random.next(rnd), rnd)
+  State.thinking(State{player, L.Level.light.put(level, sector, Bool.pick(U32, lit, dark, bright)), sidetex,
+    thinkers, i, clock, ended, usedown}, Blink{sector, Bool.pick(U32, random,
+    ((Sim.random(i) .&. time : U32) + 1 : U32), time), dark, bright, darktime, brighttime, random})
+
+def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, darktime: U32, brighttime: U32,
+  random: Bool, +s: State) -> State:
+  match turn:
+    case False{}:
+      State.thinking(s, Blink{sector, count, dark, bright, darktime, brighttime, random})
+    case True{}:
+      Sim.blink.to(U32.is_eq(Sim.light(s, sector), bright), sector, dark, bright, darktime, brighttime,
+        random, s)
+
+# Doom's T_Glow: 8 a tic, and a step that would reach an end is undone
+# and turns the glow.
+def Sim.glow(+sector: U32, +dark: U32, +bright: U32, +down: Bool, s: State) -> State:
+  State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  +light = L.Level.sector.light(level, sector)
+  +next = Bool.pick(U32, down, (light - 8 : U32), (light + 8 : U32))
+  +turn = Bool.pick(Bool, down, F.Fixed.le(next, dark), F.Fixed.ge(next, bright))
+  State.thinking(State{player, L.Level.light.put(level, sector, Bool.pick(U32, turn, light, next)), sidetex,
+    thinkers, rnd, clock, ended, usedown}, Glow{sector, dark, bright, Bool.xor(down, turn)})
 
 # Movers
 # ------
@@ -950,7 +991,8 @@ def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: Sta
       State.thinking(s, Button{side, slot, texture, (tics - 1 : U32)})
 
 # A thinker's tic. A wait counts down, and the tic it reaches zero does
-# nothing else, as Doom's doors and lifts turn.
+# nothing else, as Doom's doors and lifts turn. A blink turns on the tic
+# its count runs out.
 def Sim.think(t: Thinker, s: State) -> State:
   match t:
     case Mover{sector, ceiling, speed, [], plan}:
@@ -962,6 +1004,10 @@ def Sim.think(t: Thinker, s: State) -> State:
       Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, s)
     case Button{side, slot, texture, +tics}:
       Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
+    case Blink{sector, +count, dark, bright, darktime, brighttime, random}:
+      Sim.blink(U32.is_eq(count, 1), sector, (count - 1 : U32), dark, bright, darktime, brighttime, random, s)
+    case Glow{sector, dark, bright, down}:
+      Sim.glow(sector, dark, bright, down, s)
 
 # Doom's P_RunThinkers: each in turn, in the order they were started,
 # the state's list being those kept so far.
@@ -996,28 +1042,77 @@ def Sim.around.go(n: Nat, +level: L.Level, +sector: U32, +i: U32) -> List<&2, U3
 def Sim.around(+level: L.Level, sector: U32) -> List<&2, U32>:
   Sim.around.go(U32.to_nat(L.Level.nlines(level)), level, sector, 0)
 
-# The least or the most of a plane over some sectors, from a first
-# value: Doom's P_FindLowestCeilingSurrounding and its kin.
-def Sim.extreme(~pick: @+a: U32 -> @+b: U32 -> U32, sectors: List<&2, U32>, +level: L.Level,
-  +ceiling: Bool, acc: U32) -> U32:
+# The least or the most of a sector's word over some sectors, from a
+# first value: Doom's P_FindLowestCeilingSurrounding and its kin.
+def Sim.extreme(~pick: @+a: U32 -> @+b: U32 -> U32, ~read: @+level: L.Level -> @s: U32 -> U32,
+  sectors: List<&2, U32>, +level: L.Level, acc: U32) -> U32:
   match sectors:
     case []:
       acc
     case s <> rest:
-      Sim.extreme(~pick, rest, level, ceiling, pick(acc, L.Level.plane(level, s, ceiling)))
+      Sim.extreme(~pick, ~read, rest, level, pick(acc, read(level, s)))
 
+# Whether a sector has a mover, Doom's specialdata.
 def Sim.moving(thinkers: List<&2, Thinker>, +sector: U32) -> Bool:
   match thinkers:
     case []:
       False{}
     case Mover{s, ceiling, speed, steps, plan} <> rest:
       Bool.or(U32.is_eq(s, sector), Sim.moving(rest, sector))
-    case Button{side, slot, texture, tics} <> rest:
+    case _ <> rest:
       Sim.moving(rest, sector)
 
 # A mover at the start of its plan.
 def Sim.mover.new(sector: U32, ceiling: Bool, speed: U32, +plan: List<&2, Sim.Step>) -> Thinker:
   Mover{sector, ceiling, speed, plan, plan}
+
+# The level's start
+# -----------------
+
+# Doom's P_FindMinSurroundingLight, from the sector's own light.
+def Sim.light.low(+s: State, +sector: U32) -> U32:
+  Sim.extreme(~F.Fixed.min, ~L.Level.sector.light, Sim.around(State.level(s), sector), State.level(s),
+    Sim.light(s, sector))
+
+# The slow strobe's dark level is 0 when no sector around is darker.
+def Sim.strobe.dark(+low: U32, light: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(low, light), 0, low)
+
+# Doom's P_SpawnSpecials for the sector specials E1M1 carries: 1 blinks
+# at random, bright for 1 or 65 tics (the mask is 64) and dark for 1 to
+# 8, its first count drawn here; 8 glows; 12 strobes in step with its
+# kind, 35 tics dark and 5 bright, dark from its first tic.
+def Sim.light.spawn(special: U32, +sector: U32, +s: State) -> State:
+  match special:
+    case 1:
+      Sim.blink.to(False{}, sector, Sim.light.low(s, sector), Sim.light(s, sector), 7, 64, True{}, s)
+    case 8:
+      State.thinking(s, Glow{sector, Sim.light.low(s, sector), Sim.light(s, sector), True{}})
+    case 12:
+      State.thinking(s, Blink{sector, 1, Sim.strobe.dark(Sim.light.low(s, sector), Sim.light(s, sector)),
+        Sim.light(s, sector), 35, 5, False{}})
+    case _:
+      s
+
+def Sim.lights(n: Nat, +sector: U32, +s: State) -> State:
+  match n:
+    case 0n:
+      s
+    case 1n+m:
+      Sim.lights(m, (sector + 1 : U32),
+        Sim.light.spawn(L.Level.sector.special(State.level(s), sector), sector, s))
+
+# The state a level starts in, from the map as loaded, with the player
+# at rest at a place and the lights spawned in sector order. The random
+# index is 1, where Doom's is once it has spawned the player, the one
+# thing there is. Use counts as down, as Doom's G_PlayerReborn leaves it,
+# so a key held since before the level does nothing.
+def State.at(+level: L.Level, place: L.Level.Start) -> State:
+  Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
+    State{Player.at(level, place), level, L.Level.sidetex(level), [], 1, 0, False{}, True{}})
+
+def State.start(+level: L.Level) -> State:
+  State.at(level, L.Level.start_of(level))
 
 # Doors
 # -----
@@ -1039,12 +1134,12 @@ def Sim.door.turn(thinkers: List<&2, Thinker>, +sector: U32, +floor: U32) -> Lis
     case Mover{+s, ceiling, speed, +steps, +plan} <> rest:
       Mover{s, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(s, sector),
         Sim.door.turned(steps, plan, floor), steps), plan} <> Sim.door.turn(rest, sector, floor)
-    case Button{side, slot, texture, tics} <> rest:
-      Button{side, slot, texture, tics} <> Sim.door.turn(rest, sector, floor)
+    case other <> rest:
+      other <> Sim.door.turn(rest, sector, floor)
 
 # A door's top: 4 under the lowest ceiling around it.
 def Sim.door.top(+level: L.Level, sector: U32) -> U32:
-  (Sim.extreme(~F.Fixed.min, Sim.around(level, sector), level, True{}, 2147483647) - 262144 : U32)
+  (Sim.extreme(~F.Fixed.min, ~L.Level.ceil, Sim.around(level, sector), level, 2147483647) - 262144 : U32)
 
 # A door's plan: up to its top, 150 tics open, down to its floor.
 def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, Sim.Step>:
@@ -1095,7 +1190,7 @@ def Sim.start(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List
 # its own included.
 def Sim.floor.low(+level: L.Level, +sector: U32) -> Thinker:
   Sim.mover.new(sector, False{}, 65536, [Travel{True{}, Sim.extreme(~F.Fixed.min,
-    Sim.around(level, sector), level, False{}, L.Level.floor(level, sector))}])
+    ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}])
 
 # Which of a side's three textures is a switch: the top, else the
 # middle, else the bottom; 3 when none is.
@@ -1110,7 +1205,7 @@ def Sim.pressed.side(thinkers: List<&2, Thinker>, +side: U32) -> Bool:
       False{}
     case Button{pressed, slot, texture, tics} <> rest:
       Bool.or(U32.is_eq(pressed, side), Sim.pressed.side(rest, side))
-    case Mover{sector, ceiling, speed, steps, plan} <> rest:
+    case _ <> rest:
       Sim.pressed.side(rest, side)
 
 # A switch that works again starts a button of 35 tics for the texture
@@ -1174,7 +1269,7 @@ def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: 
 # its own included, 105 tics there, and back up to where it was.
 def Sim.lift(+level: L.Level, +sector: U32) -> Thinker:
   Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.extreme(~F.Fixed.min,
-    Sim.around(level, sector), level, False{}, L.Level.floor(level, sector))}, Hold{105},
+    ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}, Hold{105},
     Travel{False{}, L.Level.floor(level, sector)}])
 
 # Walk-over lines
@@ -1192,7 +1287,7 @@ def Sim.floor.turbo.to(+highest: U32, own: U32) -> U32:
 
 def Sim.floor.turbo(+level: L.Level, +sector: U32) -> Thinker:
   Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.floor.turbo.to(Sim.extreme(~F.Fixed.max,
-    Sim.around(level, sector), level, False{}, 4262199296), L.Level.floor(level, sector))}])
+    ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}])
 
 # Doom's P_CrossSpecialLine for the specials E1M1 carries. The two that
 # work once lose their special whether or not a sector started; the

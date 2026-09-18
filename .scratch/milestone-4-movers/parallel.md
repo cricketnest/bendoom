@@ -30,9 +30,9 @@ A script is runs of `count,forward,side,turn,use` in a demo's units; the place i
 
 ## The shape of the sim
 
-- `S.State{player, level, sidetex, thinkers, rnd, clock, ended, usedown}`. `L.Level{geo, sectors, specials}`: `Level.Geo` is what no tic writes. A tic writes through `Level.plane.put`, `Level.special.put` and `V.Vec.set` on `sidetex`.
+- `S.State{player, level, sidetex, thinkers, rnd, clock, ended, usedown}`. `L.Level{geo, sectors, specials}`: `Level.Geo` is what no tic writes. A tic writes through `Level.plane.put`, `Level.light.put`, `Level.special.put` and `V.Vec.set` on `sidetex`.
 - `Sim.tic` runs the player (`Sim.move`, `Sim.eye`, `Sim.xy`, `Sim.z`), then `Sim.use` on the press, then `Sim.thinkers`, and packs its answer in `Sim.tic.kept` from the geometry it began with. Whatever a thinker does, only the sectors, the specials, the side textures, the thinkers, the random index and the ended flag come back, and of the player only its height, floor and ceiling. That is what keeps `tic_keeps_geometry` and the wall law one-line proofs: do not return anything else through it, and do not make `Sim.tic.kept` destructure the state it is given.
-- `Thinker` has one constructor so far, `Mover`. `Sim.think`, `Sim.moving` and `Sim.door.turn` match on it; a new constructor needs a case in each.
+- `Thinker` is `Mover`, `Blink` or `Glow`. `Sim.think` has a case for each; `Sim.moving` and `Sim.door.turn` pass over whatever is no mover. `State.at` spawns the level's lights, so a Freedoom state starts with nine thinkers and the random index at 1.
 - Use specials dispatch in `Sim.use.special`; tagged movers start through `Sim.tagged`, `Sim.start(~maker, ..)` and `Sim.use.once`.
 - The closed laws' literal level is `Closed.doors()` in `LAWS.bend`, with `Closed.used`, `Closed.idled`, `Closed.moving`. A law that re-clips the player each tic is slow in the checker; keep such replays short.
 

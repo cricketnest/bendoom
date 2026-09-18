@@ -182,6 +182,11 @@ def Level.nsectors(+l: Level) -> U32:
     sectors, specials} = l
   nsectors
 
+def Level.sector.special(+l: Level, s: U32) -> U32:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+    sectors, specials} = l
+  Level.word(sectags, s, 2, 0)
+
 def Level.sector.tag(+l: Level, s: U32) -> U32:
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
@@ -212,10 +217,14 @@ def Level.plane(+l: Level, s: U32, ceiling: Bool) -> U32:
   Level.word(sectors, s, 3, Bool.to_u32(ceiling))
 
 # The writes a tic makes, each a new tree sharing all but one path with
-# the old: a sector's plane, and a line's special.
+# the old: a sector's plane, its light, and a line's special.
 def Level.plane.put(l: Level, s: U32, ceiling: Bool, height: U32) -> Level:
   Level{geo, sectors, specials} = l
   Level{geo, V.Vec.set(sectors, Level.at(s, 3, Bool.to_u32(ceiling)), height), specials}
+
+def Level.light.put(l: Level, s: U32, light: U32) -> Level:
+  Level{geo, sectors, specials} = l
+  Level{geo, V.Vec.set(sectors, Level.at(s, 3, 2), light), specials}
 
 def Level.special.put(l: Level, line: U32, special: U32) -> Level:
   Level{geo, sectors, specials} = l

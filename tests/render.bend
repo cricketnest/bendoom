@@ -22,7 +22,9 @@
 # level ended, which vanilla never stands in: the frame is pixel for
 # pixel ours of a map whose side names the pressed switch, which the
 # oracle finds no pixel off (ticket 09; -352 1296 180, "20,0,0,0,0
-# 1,0,0,0,1 10,0,0,0,0"). Each frame is drawn twice, over
+# 1,0,0,0,1 10,0,0,0,0"); the wall of sector 33, which blinks
+# at random, at its dark level on tic 66 (640 712 180, "66,0,0,0,0").
+# Each frame is drawn twice, over
 # a view blanked to 0 and to 255: equal hashes mean every pixel of the
 # view was written. Pinned to Freedoom.
 import Base
@@ -134,6 +136,8 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(2064), west(260), 90)), m12)
     m14 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
       idle(10n)], at(level, west(352), east(1296), 180)), m13)
+    m15 : Array<U32> <- frame("blink dark", tables, gfx, after([idle(66n)], at(level, east(640), east(712), 180)),
+      m14)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -153,10 +157,11 @@ def main() -> IO(Unit):
 #|water 3 256 0 hash 2231310396 pixels 2 111 76 6 covered True
 #|sky -640 256 90 hash 3006348923 pixels 8 89 105 105 covered True
 #|pit 488 256 0 hash 2052822416 pixels 8 6 111 1 covered True
-#|stride U!:34 hash 4182473275 pixels 2 109 164 6 covered True
-#|air U!:56 hash 2868816107 pixels 5 110 15 6 covered True
+#|stride U!:34 hash 2635319027 pixels 2 5 164 6 covered True
+#|air U!:56 hash 935961567 pixels 5 110 15 6 covered True
 #|landed U!:66 hash 2581086416 pixels 6 110 14 79 covered True
 #|door half open hash 1284933713 pixels 107 6 74 111 covered True
 #|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
 #|exit pressed hash 847822191 pixels 102 95 102 3 covered True
+#|blink dark hash 4167308477 pixels 99 73 73 3 covered True
 #|end

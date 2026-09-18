@@ -519,6 +519,60 @@ law exit_ends:
     S.Sim.tic(cmd, Closed.exited()))
     == (True{}, 3, 0, 2, Closed.exited()) : Bool & U32 & U32 & U32 & S.State}
 
+# LAW: vanilla's random table, its first entries and its last, and the
+# index wrapping at 256 (sanity).
+law random_table:
+  {(S.Sim.random(0), S.Sim.random(1), S.Sim.random(2), S.Sim.random(3), S.Sim.random(255),
+    S.Sim.random.next(0), S.Sim.random.next(255))
+    == (0, 8, 109, 220, 249, 1, 0) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# The lights' closed laws stand on the literal level with the west room
+# at a light and the door sector, light 160, given the light Doom spawns
+# for a sector special, the random index at 1 as it is once Doom has
+# spawned the player.
+def Closed.lit(special: U32, west: U32) -> S.State:
+  S.Sim.light.spawn(special, 1, S.State{Closed.player(2097152, 4194304, 0, 8388608),
+    L.Level.light.put(Closed.doors(), 0, west), V.Leaf{0}, [], 1, 0, False{}, False{}})
+
+def Closed.light(s: S.State) -> U32:
+  L.Level.sector.light(S.State.level(s), 1)
+
+# LAW: the random blink, vanilla's T_LightFlash, between 160 and the 96
+# beside it. Its first count is the table's entry 2, 109, masked with 64,
+# plus 1: 65. On tic 65 it goes dark for entry 3, 220, masked with 7,
+# plus 1: 5 tics. On tic 70 it is bright again for entry 4, 222, masked
+# with 64, plus 1 (sanity).
+law blink_counts:
+  {(S.State.thinkers(Closed.lit(1, 96)), Closed.light(Closed.idled(64n, Closed.lit(1, 96))),
+    Closed.light(Closed.idled(65n, Closed.lit(1, 96))), S.State.thinkers(Closed.idled(65n, Closed.lit(1, 96))),
+    Closed.light(Closed.idled(69n, Closed.lit(1, 96))), Closed.light(Closed.idled(70n, Closed.lit(1, 96))),
+    S.State.thinkers(Closed.idled(70n, Closed.lit(1, 96))), S.State.rnd(Closed.idled(70n, Closed.lit(1, 96))))
+    == ([S.Blink{1, 65, 96, 160, 7, 64, True{}}], 160, 96, [S.Blink{1, 5, 96, 160, 7, 64, True{}}], 96, 160,
+      [S.Blink{1, 65, 96, 160, 7, 64, True{}}], 4)
+    : List<&2, S.Thinker> & U32 & U32 & List<&2, S.Thinker> & U32 & U32 & List<&2, S.Thinker> & U32}
+
+# LAW: the slow strobe in step, vanilla's T_StrobeFlash: dark from the
+# first tic for 35, bright for 5. Beside a room at 96 its dark level is
+# 96; beside rooms no darker than its own 160 it is 0 (sanity).
+law strobe_timeline:
+  {(Closed.light(Closed.lit(12, 96)), Closed.light(Closed.idled(1n, Closed.lit(12, 96))),
+    Closed.light(Closed.idled(35n, Closed.lit(12, 96))), Closed.light(Closed.idled(36n, Closed.lit(12, 96))),
+    Closed.light(Closed.idled(40n, Closed.lit(12, 96))), Closed.light(Closed.idled(41n, Closed.lit(12, 96))),
+    Closed.light(Closed.idled(1n, Closed.lit(12, 160))), Closed.light(Closed.idled(36n, Closed.lit(12, 160))),
+    Closed.light(Closed.idled(41n, Closed.lit(12, 160))))
+    == (160, 96, 96, 160, 160, 96, 0, 160, 0) : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# LAW: the glow, vanilla's T_Glow, 8 a tic between 160 and the 96 beside
+# it: 104 after tic 7; tic 8 would reach 96, so it is undone and the glow
+# turns; 112 after tic 9, 152 after tic 14; tic 15 would reach 160, is
+# undone and turns it; 144 after tic 16 (sanity).
+law glow_turns:
+  {(Closed.light(Closed.idled(1n, Closed.lit(8, 96))), Closed.light(Closed.idled(7n, Closed.lit(8, 96))),
+    Closed.light(Closed.idled(8n, Closed.lit(8, 96))), Closed.light(Closed.idled(9n, Closed.lit(8, 96))),
+    Closed.light(Closed.idled(14n, Closed.lit(8, 96))), Closed.light(Closed.idled(15n, Closed.lit(8, 96))),
+    Closed.light(Closed.idled(16n, Closed.lit(8, 96))))
+    == (152, 104, 104, 112, 152, 152, 144) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
 law replay_append:
