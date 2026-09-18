@@ -2,10 +2,17 @@
 # the function the game draws with: for each, a 32-bit FNV-1a hash of the
 # view's 320 by 168 palette indices and the indices at four pixels (the
 # view's centre, near its top left, near its bottom right, and high on
-# its centre column). Pinned to Freedoom.
+# its centre column). The start, then hand-chosen places with the eye at
+# rest on the floor and the angle a multiple of 45 degrees, so that
+# Chocolate Doom can stand in the same spot: a bright metal wall, the
+# dim bench room north of the start, the hazard-striped step under the
+# computer panels, and the lowered opening west of the start. Pinned to
+# Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
+import ../src/fixed.bend as F
+import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/sim.bend as S
@@ -53,11 +60,26 @@ def frame(tag: String, tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, p
   print(tag, line(D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n,
     Hash{R.Render.frame(tables, level, gfx, p, mem), 2166136261})))
 
+# The player at rest on the floor at a place: x and y in map units,
+# west and south given as negatives, the angle in degrees.
+def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.Player:
+  S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)})
+
+def east(units: U32) -> U32:
+  F.Fixed.of_map(units)
+
+def west(units: U32) -> U32:
+  F.Fixed.neg(F.Fixed.of_map(units))
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
   do IO<Unit>:
     m1 : Array<U32> <- frame("start", tables, level, gfx, S.Player.start(level), mem)
+    m2 : Array<U32> <- frame("lit 736 464 135", tables, level, gfx, at(level, east(736), east(464), 135), m1)
+    m3 : Array<U32> <- frame("dark -416 256 90", tables, level, gfx, at(level, west(416), east(256), 90), m2)
+    m4 : Array<U32> <- frame("step 137 256 45", tables, level, gfx, at(level, east(137), east(256), 45), m3)
+    m5 : Array<U32> <- frame("opening -416 256 180", tables, level, gfx, at(level, west(416), east(256), 180), m4)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -72,4 +94,8 @@ def main() -> IO(Unit):
     start(world)
 
 #|start hash 1193745378 pixels 1 1 0 0
+#|lit 736 464 135 hash 3239989101 pixels 104 7 95 103
+#|dark -416 256 90 hash 2815920355 pixels 110 107 0 238
+#|step 137 256 45 hash 504408341 pixels 7 0 0 0
+#|opening -416 256 180 hash 4103479514 pixels 3 111 106 0
 #|end

@@ -4,17 +4,15 @@
 
 **Blocked by:** 04 (Textures compose from patches), 06 (Walls drawn in perspective)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] One-sided walls, upper and lower textures draw with vanilla's pegging and offsets, seen in the window against Chocolate Doom by eye
-- [ ] Walls dim with distance through the scaled-light table, sectors' light levels apply, and axis-aligned walls carry fake contrast
-- [ ] Closed laws pin the texture column, the reciprocal scale and the light index cap at known inputs
-- [ ] The render test's frames at the start and the chosen positions are pinned to Freedoom, pass on both lanes, and the flake check stays green
+- [x] One-sided walls, upper and lower textures draw with vanilla's pegging and offsets, seen in the window against Chocolate Doom by eye
+- [x] Walls dim with distance through the scaled-light table, sectors' light levels apply, and axis-aligned walls carry fake contrast
+- [x] Closed laws pin the texture column, the reciprocal scale and the light index cap at known inputs
+- [x] The render test's frames at the start and the chosen positions are pinned to Freedoom, pass on both lanes, and the flake check stays green
 
 ## Comments
 
-In progress; paused mid-ticket with the tree green (all tests on both lanes, all terms check).
+Done. `Draw.column` is `R_DrawColumn` (the texel at the fraction's whole part wrapped to 128 rows, through the colormap, the fraction stepped a row), on `Draw.each`. `Segs.geo` works out a range's normal, distance, texture offset (the first vertex's distance along the wall plus the side's and the seg's offsets) and centre angle; `Segs.rw` pegs the three textures by the line's flags and the side's row offset and carries the light number with fake contrast; `Segs.col.draw` derives each column's texture column, colormap (the scale's light index capped at 47) and reciprocal scale, and draws the one-sided, upper and lower walls through `Gfx.column`. The closed law `wall_column` pins the texture column at the centre and at column 0's angle (63 and -97, the shift flooring the negative), the reciprocal scale at 1, 64 and 1/256, and the colormap at light 8 for scale 1 and the capped scale 64; each number computed by hand, and the checker agreed. In the window the start matches Chocolate Doom's by eye: the bookshelves, the hazard-striped gate, the crates, the grid wall. `tools/frame.bend` (ticket 10's frame dump, written early to choose positions) prints a frame as hex rows from `FRAME="x y degrees"`. The render test's start frame is re-pinned.
 
-Built so far: `Draw.column` is `R_DrawColumn` (the texel at the fraction's whole part wrapped to 128 rows, through the colormap, the fraction stepped a row), on `Draw.each`. `Segs.geo` works out a range's normal, distance, texture offset (the first vertex's distance along the wall plus the side's and the seg's offsets) and centre angle; `Segs.rw` pegs the three textures by the line's flags and the side's row offset and carries the light number with fake contrast; `Segs.col.draw` derives each column's texture column, colormap (the scale's light index capped at 47) and reciprocal scale, and draws the one-sided, upper and lower walls through `Gfx.column`. The closed law `wall_column` pins the texture column at the centre and at column 0's angle (63 and -97, the shift flooring the negative), the reciprocal scale at 1, 64 and 1/256, and the colormap at light 8 for scale 1 and the capped scale 64; each number computed by hand, and the checker agreed. In the window the start matches Chocolate Doom's by eye: the bookshelves, the hazard-striped gate, the crates, the grid wall. `tools/frame.bend` (ticket 10's frame dump, written early to choose positions) prints a frame as hex rows from `FRAME="x y degrees"`. The render test's start frame is re-pinned.
-
-Left to do: add the render test's hand-chosen frames and pin them. Candidates already rendered and looked at: `137 256 45` (computer panels over the hazard-striped step), `488 256 0` (the railed pit under the ledge, a lower and darker sector), `-416 256 180` (the start looking west at a wall with a lowered opening). A lit against a dark sector still wants choosing from the sectors' light levels. Then tick the boxes and resolve.
+The render test gained four hand-chosen frames, each with the eye at rest on the floor and the angle a multiple of 45 degrees so Chocolate Doom can stand in the same spot: a bright metal wall (`736 464 135`), the dim bench room north of the start (`-416 256 90`), the hazard-striped step under the computer panels (`137 256 45`) and the lowered opening west of the start (`-416 256 180`). Each was rendered through `tools/frame.bend` and looked at before it was pinned, and the step frame's hash was recomputed from the dump by an independent script, which agreed. Pinned to Freedoom, passing on both lanes.
