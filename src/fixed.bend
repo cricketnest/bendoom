@@ -107,6 +107,10 @@ def Fixed.div.if(sat: Bool, +a: U32, +b: U32) -> U32:
 def Fixed.div(+a: U32, +b: U32) -> U32:
   Fixed.div.if(U32.is_ge((Fixed.abs(a) >> 14n : U32), Fixed.abs(b)), a, b)
 
+# C's a / n for a signed a and a positive n: truncated toward zero.
+def Fixed.quot(+a: U32, n: U32) -> U32:
+  Fixed.div.sign(Fixed.is_neg(a), (Fixed.abs(a) / n : U32))
+
 def Fixed.show.pad(+f: U32) -> String:
   Bool.pick(String, U32.is_lt(f, 10), "00000",
     Bool.pick(String, U32.is_lt(f, 100), "0000",

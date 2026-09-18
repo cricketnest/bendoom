@@ -9,6 +9,8 @@ import ./src/tables.bend as T
 import ./src/level.bend as L
 import ./src/keys.bend as K
 import ./src/sim.bend as S
+import ./src/clip.bend as C
+import ./src/project.bend as P
 
 # Bytes and the WAD
 # -----------------
@@ -291,3 +293,93 @@ law replay_keeps_free:
   for free: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
   {True{} == S.Sim.free(level, S.Player.x(S.Sim.replay(script, level, p)),
     S.Player.y(S.Sim.replay(script, level, p))) : Bool}
+
+# The renderer
+# ------------
+
+# LAW: the solid columns stay sorted: clipping any wall range into a
+# sorted list of solid ranges, each from a first column to a last no
+# less with at least one open column before the next, leaves such a
+# list, for all lists and ranges.
+law solid_sorted:
+  for +first: Nat
+  for +last: Nat
+  for +rs: List<&2, C.Clip.Range>
+  for ordered: {True{} == Nat.is_le(first, last) : Bool}
+  for sorted: {True{} == C.Clip.sorted(rs) : Bool}
+  {True{} == C.Clip.sorted(C.Clip.add(first, last, rs)) : Bool}
+
+# LAW: a range touching its neighbours joins them, and the fragments a
+# wall leaves between solid ranges come out left to right (sanity).
+law solid_clips:
+  {(C.Clip.add(21n, 29n, [C.Range{10n, 20n}, C.Range{30n, 40n}, C.Range{50n, 60n}]),
+    C.Clip.gaps(5n, 45n, [C.Range{10n, 20n}, C.Range{30n, 40n}, C.Range{50n, 60n}]),
+    C.Clip.covers(12n, 18n, [C.Range{10n, 20n}]), C.Clip.covers(12n, 25n, [C.Range{10n, 20n}]))
+    == ([C.Range{10n, 40n}, C.Range{50n, 60n}],
+      [C.Range{5n, 9n}, C.Range{21n, 29n}, C.Range{41n, 45n}], True{}, False{})
+    : List<&2, C.Clip.Range> & List<&2, C.Clip.Range> & Bool & Bool}
+
+# LAW: the view's edges are vanilla's at width 320. The focal length is
+# 160 over the tangent 65586 of fine angle 3072, 10477766; through it
+# the tangent at 3072 lands on column 1 and the next on column 0, so
+# column 0's angle is fine angle 3073, Doom's clipangle 0x20080000; on
+# the other side 1023 lands on 320 and 1022 past it; the tangent 25 at
+# the view's centre lands on column 160 (sanity).
+law view_edges:
+  {(P.Project.focal(V.Vec.of_list(T.Tables.finetangent(), 4096)),
+    P.Project.tox(65586, 10477766), P.Project.tox(65686, 10477766),
+    P.Project.tox(4294901710, 10477766), P.Project.tox(4294901610, 10477766),
+    P.Project.tox(25, 10477766))
+    == (10477766, 1, 0, 320, 321, 160) : U32 & U32 & U32 & U32 & U32 & U32}
+
+# LAW: the sweep gives each column the least fine angle whose column is
+# not past it: over the columns 321, 320, 2, 0, -1 of fine angles 0 to
+# 4, columns 320 down to 2 take angles 1 and 2, columns 1 and 0 take 3;
+# as binary angles less a quarter turn (sanity).
+law view_sweep:
+  {(List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 0n),
+    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 1n),
+    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 2n),
+    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 319n),
+    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 320n))
+    == (Some{3222798336}, Some{3222798336}, Some{3222274048}, Some{3222274048}, Some{3221749760})
+    : Maybe<&2, U32> & Maybe<&2, U32> & Maybe<&2, U32> & Maybe<&2, U32> & Maybe<&2, U32>}
+
+# LAW: a row's slope is 160 over its distance from the centre row's top
+# edge plus a half: 320 at rows 83 and 84, 160 / 83.5 at rows 0 and 167
+# (sanity).
+law view_rows:
+  {(P.Project.yslope(0), P.Project.yslope(83), P.Project.yslope(84), P.Project.yslope(167))
+    == (125577, 20971520, 20971520, 125577) : U32 & U32 & U32 & U32}
+
+# LAW: the wall scale from the global angle, looking east at a wall
+# whose normal faces the eye. At distance 160 it is 1, at the centre and
+# at column 0's angle alike; at 100/65536 the division would overflow,
+# so it is 64; at distance 2 it is 80, capped at 64; seen edge on, the
+# sine 25 makes it 25/65536, raised to 256 (sanity).
+law wall_scale:
+  {(P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 0, 10485760),
+    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 537395200, 0,
+      10485760),
+    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 0, 100),
+    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 0, 131072),
+    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 1073741824,
+      10485760))
+    == (65536, 65536, 4194304, 4194304, 256) : U32 & U32 & U32 & U32 & U32}
+
+# LAW: the light tables' ends. A wall's colormap is 60 less four a light
+# number less half the scale index, held to 0 and 31: the darkest light
+# is 31 at both ends of the scale, the brightest 0, light 8 runs from 28
+# to 5. A span's is the same start less half of 160 over the distance
+# index plus one: light 8 is 0 at index 0, 18 at 7, 28 at 127 (sanity).
+law light_tables:
+  {(P.Project.scalelight(0, 0), P.Project.scalelight(0, 47), P.Project.scalelight(15, 0),
+    P.Project.scalelight(15, 47), P.Project.scalelight(8, 0), P.Project.scalelight(8, 47),
+    P.Project.zlight(8, 0), P.Project.zlight(8, 7), P.Project.zlight(8, 127))
+    == (31, 31, 0, 0, 28, 5, 0, 18, 28)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}

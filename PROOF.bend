@@ -10,6 +10,8 @@ import ./src/tables.bend as T
 import ./src/level.bend as L
 import ./src/keys.bend as K
 import ./src/sim.bend as S
+import ./src/clip.bend as C
+import ./src/project.bend as P
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -60,6 +62,24 @@ def Laws.cmd_tables():
   {==}
 
 def Laws.line_geometry():
+  {==}
+
+def Laws.solid_clips():
+  {==}
+
+def Laws.view_edges():
+  {==}
+
+def Laws.view_sweep():
+  {==}
+
+def Laws.view_rows():
+  {==}
+
+def Laws.wall_scale():
+  {==}
+
+def Laws.light_tables():
   {==}
 
 # A comparison of a value with itself answers EQ, from a bit up to a
@@ -669,3 +689,212 @@ def Laws.replay_keeps_free(script, level, p, free):
     case +keys <> rest:
       Laws.replay_keeps_free(rest, level, S.Sim.tic(level, keys, p),
         Laws.tic_keeps_free(level, keys, p, free))
+
+# The solid columns stay sorted
+# -----------------------------
+
+# The order on Nat, through Base's comparison: each fact by induction on
+# the numbers, the impossible cases refuted through BD.
+def LE(a: Nat, b: Nat) -> Type:
+  {True{} == Nat.is_le(a, b) : Bool}
+
+def LT(a: Nat, b: Nat) -> Type:
+  {True{} == Nat.is_lt(a, b) : Bool}
+
+def le_trans(a: Nat, b: Nat, c: Nat, h1: LE(a, b), h2: LE(b, c)) -> LE(a, c):
+  match a b c:
+    case 0n _ 0n:
+      {==}
+    case 0n _ 1n+r:
+      {==}
+    case 1n+p 0n _:
+      %h1 : BD(_, Unit, LE(1n+p, c))
+      Unit{}
+    case 1n+p 1n+q 0n:
+      %h2 : BD(_, Unit, LE(1n+p, 0n))
+      Unit{}
+    case 1n+p 1n+q 1n+r:
+      le_trans(p, q, r, h1, h2)
+
+def le_lt_le(a: Nat, b: Nat, c: Nat, h1: LE(a, b), h2: LT(b, c)) -> LE(a, c):
+  match a b c:
+    case 0n _ 0n:
+      {==}
+    case 0n _ 1n+r:
+      {==}
+    case 1n+p 0n _:
+      %h1 : BD(_, Unit, LE(1n+p, c))
+      Unit{}
+    case 1n+p 1n+q 0n:
+      %h2 : BD(_, Unit, LE(1n+p, 0n))
+      Unit{}
+    case 1n+p 1n+q 1n+r:
+      le_lt_le(p, q, r, h1, h2)
+
+def not_lt_le(a: Nat, b: Nat, h: {False{} == Nat.is_lt(a, b) : Bool}) -> LE(b, a):
+  match a b:
+    case 0n 0n:
+      {==}
+    case 0n 1n+q:
+      %h : BD(_, LE(1n+q, 0n), Unit)
+      Unit{}
+    case 1n+p 0n:
+      {==}
+    case 1n+p 1n+q:
+      not_lt_le(p, q, h)
+
+# The larger of hi and another is no less than what hi is no less than;
+# the flag is the comparison Nat.max picks by.
+def le_max(lo: Nat, hi: Nat, other: Nat, c: Bool, e: {c == Nat.is_lt(hi, other) : Bool},
+  h: LE(lo, hi)) -> LE(lo, Bool.pick(Nat, c, other, hi)):
+  match c:
+    case True{}:
+      le_lt_le(lo, hi, other, h, e)
+    case False{}:
+      h
+
+# The smaller of first and rf is no more than the larger of last and rl
+# when first is no more than last.
+def min_le_max(+first: Nat, +last: Nat, +rf: Nat, +rl: Nat, c: Bool,
+  e: {c == Nat.is_lt(first, rf) : Bool}, h: LE(first, last)) ->
+  LE(Bool.pick(Nat, c, first, rf), Nat.max(last, rl)):
+  match c:
+    case True{}:
+      le_max(first, last, rl, Nat.is_lt(last, rl), {==}, h)
+    case False{}:
+      le_max(rf, last, rl, Nat.is_lt(last, rl), {==},
+        le_trans(rf, first, last, not_lt_le(first, rf, e), h))
+
+def lt_pick(x: Nat, b: Nat, c: Nat, flag: Bool, hb: LT(x, b), hc: LT(x, c)) ->
+  LT(x, Bool.pick(Nat, flag, b, c)):
+  match flag:
+    case True{}:
+      hb
+    case False{}:
+      hc
+
+# Three true conjuncts make the sorted conjunction of a head range.
+def and3(a: Bool, b: Bool, c: Bool, ha: {True{} == a : Bool}, hb: {True{} == b : Bool},
+  hc: {True{} == c : Bool}) -> {True{} == Bool.and(a, Bool.and(b, c)) : Bool}:
+  %ha : {True{} == Bool.and(_, Bool.and(b, c)) : Bool}
+  %hb : {True{} == Bool.and(_, c) : Bool}
+  hc
+
+# absorb's head starts at lo, whatever it swallows, so a column two
+# before lo stays apart from it.
+def absorb_head(rs: List<&2, C.Clip.Range>, ahead: Bool, +lo: Nat, +hi: Nat, +x: Nat,
+  h: LT(1n+x, lo)) -> {True{} == C.Clip.apart(C.Clip.absorb(rs, ahead, lo, hi), x) : Bool}:
+  match rs ahead:
+    case [] True{}:
+      h
+    case [] False{}:
+      h
+    case C.Range{rf, rl} <> rest True{}:
+      h
+    case C.Range{+rf, +rl} <> +rest False{}:
+      absorb_head(rest, C.Clip.ahead(rest, Nat.max(hi, rl)), lo, Nat.max(hi, rl), x, h)
+
+def absorb_sorted(rs: List<&2, C.Clip.Range>, ahead: Bool, +lo: Nat, +hi: Nat,
+  e: {ahead == C.Clip.ahead(rs, hi) : Bool}, ho: LE(lo, hi),
+  hs: {True{} == C.Clip.sorted(rs) : Bool}) ->
+  {True{} == C.Clip.sorted(C.Clip.absorb(rs, ahead, lo, hi)) : Bool}:
+  match rs ahead:
+    case [] True{}:
+      and3(Nat.is_le(lo, hi), True{}, True{}, ho, {==}, {==})
+    case [] False{}:
+      and3(Nat.is_le(lo, hi), True{}, True{}, ho, {==}, {==})
+    case C.Range{+rf, +rl} <> +rest True{}:
+      and3(Nat.is_le(lo, hi), Nat.is_lt(1n+hi, rf), C.Clip.sorted(C.Range{rf, rl} <> rest), ho, e, hs)
+    case C.Range{+rf, +rl} <> +rest False{}:
+      absorb_sorted(rest, C.Clip.ahead(rest, Nat.max(hi, rl)), lo, Nat.max(hi, rl), {==},
+        le_max(lo, hi, rl, Nat.is_lt(hi, rl), {==}, ho),
+        and_true_right(C.Clip.apart(rest, rl), C.Clip.sorted(rest),
+          and_true_right(Nat.is_le(rf, rl), Bool.and(C.Clip.apart(rest, rl), C.Clip.sorted(rest)), hs)))
+
+# add's head is a range of the list, the new range, or absorb's: a
+# column apart from the list's head and two before first stays apart.
+def add_head(rs: List<&2, C.Clip.Range>, behind: Bool, ahead: Bool, +first: Nat, +last: Nat, +x: Nat,
+  hf: LT(1n+x, first), hr: {True{} == C.Clip.apart(rs, x) : Bool}) ->
+  {True{} == C.Clip.apart(C.Clip.add.go(rs, behind, ahead, first, last), x) : Bool}:
+  match rs behind ahead:
+    case [] True{} True{}:
+      hf
+    case [] True{} False{}:
+      hf
+    case [] False{} True{}:
+      hf
+    case [] False{} False{}:
+      hf
+    case C.Range{+rf, +rl} <> +rest True{} True{}:
+      hr
+    case C.Range{+rf, +rl} <> +rest True{} False{}:
+      hr
+    case C.Range{+rf, +rl} <> +rest False{} True{}:
+      hf
+    case C.Range{+rf, +rl} <> +rest False{} False{}:
+      absorb_head(rest, C.Clip.ahead(rest, Nat.max(last, rl)), Nat.min(first, rf), Nat.max(last, rl), x,
+        lt_pick(1n+x, first, rf, Nat.is_lt(first, rf), hf, hr))
+
+# A proof is used once, so the three conjuncts of a sorted list come
+# out of its one hypothesis together.
+def and3_split(a: Bool, b: Bool, c: Bool, e: {True{} == Bool.and(a, Bool.and(b, c)) : Bool}) ->
+  {True{} == a : Bool} & {True{} == b : Bool} & {True{} == c : Bool}:
+  match a b c:
+    case True{} True{} True{}:
+      ({==}, {==}, {==})
+    case True{} True{} False{}:
+      %e : BD(_, Unit, {True{} == True{} : Bool} & {True{} == True{} : Bool} & {True{} == False{} : Bool})
+      Unit{}
+    case True{} False{} _:
+      %e : BD(_, Unit, {True{} == True{} : Bool} & {True{} == False{} : Bool} & {True{} == c : Bool})
+      Unit{}
+    case False{} _ _:
+      %e : BD(_, Unit, {True{} == False{} : Bool} & {True{} == b : Bool} & {True{} == c : Bool})
+      Unit{}
+
+# A range behind the new one stays the head: it is a range, the rest's
+# head stays apart from it, and the rest stays sorted, which the caller
+# proves by its own induction, handed in as next.
+def behind_sorted(+rf: Nat, +rl: Nat, +rest: List<&2, C.Clip.Range>, +first: Nat, +last: Nat,
+  parts: {True{} == Nat.is_le(rf, rl) : Bool} & {True{} == C.Clip.apart(rest, rl) : Bool}
+    & {True{} == C.Clip.sorted(rest) : Bool},
+  eb: LT(1n+rl, first),
+  next: {True{} == C.Clip.sorted(rest) : Bool} -> {True{} == C.Clip.sorted(C.Clip.add.go(rest,
+    C.Clip.behind(rest, first), C.Clip.ahead(rest, last), first, last)) : Bool}) ->
+  {True{} == C.Clip.sorted(C.Range{rf, rl} <> C.Clip.add.go(rest, C.Clip.behind(rest, first),
+    C.Clip.ahead(rest, last), first, last)) : Bool}:
+  (p1, p2, p3) = parts
+  and3(Nat.is_le(rf, rl),
+    C.Clip.apart(C.Clip.add.go(rest, C.Clip.behind(rest, first), C.Clip.ahead(rest, last), first, last), rl),
+    C.Clip.sorted(C.Clip.add.go(rest, C.Clip.behind(rest, first), C.Clip.ahead(rest, last), first, last)),
+    p1, add_head(rest, C.Clip.behind(rest, first), C.Clip.ahead(rest, last), first, last, rl, eb, p2),
+    next(p3))
+
+def add_sorted(rs: List<&2, C.Clip.Range>, behind: Bool, ahead: Bool, +first: Nat, +last: Nat,
+  eb: {behind == C.Clip.behind(rs, first) : Bool}, ea: {ahead == C.Clip.ahead(rs, last) : Bool},
+  ho: LE(first, last), hs: {True{} == C.Clip.sorted(rs) : Bool}) ->
+  {True{} == C.Clip.sorted(C.Clip.add.go(rs, behind, ahead, first, last)) : Bool}:
+  match rs behind ahead:
+    case [] True{} True{}:
+      and3(Nat.is_le(first, last), True{}, True{}, ho, {==}, {==})
+    case [] True{} False{}:
+      and3(Nat.is_le(first, last), True{}, True{}, ho, {==}, {==})
+    case [] False{} True{}:
+      and3(Nat.is_le(first, last), True{}, True{}, ho, {==}, {==})
+    case [] False{} False{}:
+      and3(Nat.is_le(first, last), True{}, True{}, ho, {==}, {==})
+    case C.Range{+rf, +rl} <> +rest True{} _:
+      behind_sorted(rf, rl, rest, first, last,
+        and3_split(Nat.is_le(rf, rl), C.Clip.apart(rest, rl), C.Clip.sorted(rest), hs), eb,
+        h => add_sorted(rest, C.Clip.behind(rest, first), C.Clip.ahead(rest, last), first, last, {==}, {==},
+          ho, h))
+    case C.Range{+rf, +rl} <> +rest False{} True{}:
+      and3(Nat.is_le(first, last), Nat.is_lt(1n+last, rf), C.Clip.sorted(C.Range{rf, rl} <> rest), ho, ea, hs)
+    case C.Range{+rf, +rl} <> +rest False{} False{}:
+      absorb_sorted(rest, C.Clip.ahead(rest, Nat.max(last, rl)), Nat.min(first, rf), Nat.max(last, rl),
+        {==}, min_le_max(first, last, rf, rl, Nat.is_lt(first, rf), {==}, ho),
+        and_true_right(C.Clip.apart(rest, rl), C.Clip.sorted(rest),
+          and_true_right(Nat.is_le(rf, rl), Bool.and(C.Clip.apart(rest, rl), C.Clip.sorted(rest)), hs)))
+
+def Laws.solid_sorted(first, last, rs, ordered, sorted):
+  add_sorted(rs, C.Clip.behind(rs, first), C.Clip.ahead(rs, last), first, last, {==}, {==}, ordered, sorted)
