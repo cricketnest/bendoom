@@ -3,6 +3,7 @@
 # walk, since every step reads what the last wrote.
 import Base
 import ./bytes.bend as B
+import ./fixed.bend as F
 import ./clip.bend as C
 import ./gfx.bend as G
 
@@ -18,12 +19,26 @@ type Draw.Task is Data:
 type Draw.Wall is Data:
   Wall{seg: U32, x1: U32, x2: U32, scale1: U32, scale2: U32, step: U32}
 
+# A visplane's head: its height, flat and light, and the columns it
+# spans so far (from 320 to -1 while it spans none).
+type Draw.Plane is Data:
+  Plane{height: U32, pic: U32, light: U32, minx: U32, maxx: U32}
+
+# Doom's visplanes, with no limit: the heads in the order they were
+# made, which Doom's search and its drawing follow; how many; their
+# columns, 1024 slots a plane (the top row of column x at x + 1, the
+# bottom at x + 513, a top of 255 for a column not marked) in an array
+# of 2^depth slots that doubles when it fills; and the floor and ceiling
+# planes of the subsector being drawn, 4294967295 for none.
+type Draw.Planes is Type:
+  Planes{heads: List<&2, Draw.Plane>, count: U32, cols: Array<U32>, depth: Nat, floor: U32, ceil: U32}
+
 # mem: the frame, the clip arrays and the graphics. solid: the solid
 # columns. walls: the stored ranges, newest first. tasks: the walk's
-# stack.
+# stack. planes: the visplanes.
 type Draw is Type:
   Draw{mem: Array<U32>, solid: List<&2, C.Clip.Range>, walls: List<&2, Draw.Wall>,
-    tasks: List<&2, Draw.Task>}
+    tasks: List<&2, Draw.Task>, planes: Draw.Planes}
 
 # Drawing
 # -------
@@ -39,10 +54,10 @@ def Draw.each(~S: Type, ~f: Nat -> S -> S, n: Nat, +i: Nat, st: S) -> S:
     case 1n+m:
       Draw.each(~S, ~f, m, 1n+i, f(i, st))
 
-# The rows from yl to yh, none when yh is above yl, as Doom's column
-# loop counts them.
-def Draw.rows(+yl: U32, +yh: U32) -> Nat:
-  U32.to_nat(Bool.pick(U32, U32.is_gt((yh - yl + 1 : U32), 200), 0, (yh - yl + 1 : U32)))
+# How many rows or columns from lo to hi, both signed: none when hi is
+# before lo.
+def Draw.rows(+lo: U32, +hi: U32) -> Nat:
+  U32.to_nat(Bool.pick(U32, F.Fixed.lt(hi, lo), 0, (hi - lo + 1 : U32)))
 
 # A pixel's index in the frame.
 def Draw.at(x: U32, row: Nat) -> U32:
@@ -80,6 +95,40 @@ def Draw.column(mem: Array<U32>, x: U32, +yl: U32, yh: U32, src: U32, mid: U32, 
   cmap: U32) -> Array<U32>:
   Draw.Col.mem(Draw.each(~Draw.Col, ~Draw.col.px, Draw.rows(yl, yh), U32.to_nat(yl),
     Col{mem, x, (mid + (yl - 84) * iscale : U32), iscale, src, cmap}))
+
+# A span's state: the array, the index of its row's first pixel, the
+# flat's x and y fractions at the next column with their steps, and the
+# indices of the flat and the colormap.
+type Draw.Span is Type:
+  Span{mem: Array<U32>, row: U32, xfrac: U32, yfrac: U32, xstep: U32, ystep: U32, src: U32, cmap: U32}
+
+def Draw.span.lit(x: U32, +row: U32, +xfrac: U32, +yfrac: U32, +xstep: U32, +ystep: U32, src: U32,
+  cmap: U32, p: Array<U32> & U32) -> Draw.Span:
+  (mem, c) = p
+  Span{Array.set(U32, mem, (row + x : U32), c), row, (xfrac + xstep : U32), (yfrac + ystep : U32), xstep,
+    ystep, src, cmap}
+
+def Draw.span.texel(x: U32, row: U32, xfrac: U32, yfrac: U32, xstep: U32, ystep: U32, src: U32,
+  +cmap: U32, p: Array<U32> & U32) -> Draw.Span:
+  (mem, t) = p
+  Draw.span.lit(x, row, xfrac, yfrac, xstep, ystep, src, cmap, B.Bytes.at(mem, (cmap + t : U32)))
+
+# Doom's R_DrawSpan for one column: the flat's texel at the fractions'
+# whole parts, wrapped to 64 by 64, through the colormap.
+def Draw.span.px(i: Nat, st: Draw.Span) -> Draw.Span:
+  Span{mem, row, +xfrac, +yfrac, xstep, ystep, +src, cmap} = st
+  Draw.span.texel(U32.from_nat(i), row, xfrac, yfrac, xstep, ystep, src, cmap, B.Bytes.at(mem,
+    (src + ((yfrac >> 10n) .&. 4032) + ((xfrac >> 16n) .&. 63) : U32)))
+
+def Draw.Span.mem(st: Draw.Span) -> Array<U32>:
+  Span{mem, row, xfrac, yfrac, xstep, ystep, src, cmap} = st
+  mem
+
+# Row y from column x1 to x2 of a flat.
+def Draw.span(mem: Array<U32>, y: U32, +x1: U32, x2: U32, xfrac: U32, yfrac: U32, xstep: U32,
+  ystep: U32, src: U32, cmap: U32) -> Array<U32>:
+  Draw.Span.mem(Draw.each(~Draw.Span, ~Draw.span.px, Draw.rows(x1, x2), U32.to_nat(x1),
+    Span{mem, (G.Gfx.frame() + y * 320 : U32), xfrac, yfrac, xstep, ystep, src, cmap}))
 
 # n slots from i set to v.
 def Draw.set(n: Nat, mem: Array<U32>, +i: U32, +v: U32) -> Array<U32>:

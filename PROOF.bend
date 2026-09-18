@@ -14,6 +14,7 @@ import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
 import ./src/segs.bend as R
+import ./src/planes.bend as N
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -85,6 +86,9 @@ def Laws.light_tables():
   {==}
 
 def Laws.wall_column():
+  {==}
+
+def Laws.plane_span():
   {==}
 
 # A comparison of a value with itself answers EQ, from a bit up to a

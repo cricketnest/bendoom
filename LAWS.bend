@@ -13,6 +13,7 @@ import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
 import ./src/segs.bend as R
+import ./src/planes.bend as N
 
 # Bytes and the WAD
 # -----------------
@@ -405,6 +406,31 @@ law wall_column:
     R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
     == (63, 4294967199, 65535, 1023, 16777215, 70912, 67072)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# LAW: a plane's arithmetic, looking east from the origin. The sky turns
+# a column every 2^22 of angle: column 0's view angle is column 128 of
+# the sky, and a quarter turn on it is 256 more. At light 8 a span 200
+# away has light index 12, colormap 22; one 13120 away has index 820,
+# capped at 127, colormap 28. The centre row's slope 320 puts a plane 41
+# under the eye 13120 away; the frame's scales are 0 along x and 409
+# along y, so a span there steps 0 and 13120 * 409 a column, and with a
+# distance scale of 65537 it starts 13120.2 further along x through the
+# cosine 65535, and the sine 25 of that to the south (sanity).
+law plane_span:
+  {(N.Planes.skycol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
+      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0),
+    N.Planes.skycol(P.View{0, 0, 0, 1073741824, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
+      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0),
+    N.Planes.colormap(8, 13107200), N.Planes.colormap(8, 859832320),
+    N.Planes.xscale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0},
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}),
+    N.Planes.yscale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0},
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}),
+    N.Planes.step(N.Flat{P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{20971520}, V.Leaf{65537}, V.Leaf{0}, 0}},
+      0, 409, 2686976, 8, 0}, 84, 0))
+    == (128, 384, 71424, 72960, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 72960})
+    : U32 & U32 & U32 & U32 & U32 & U32 & N.Planes.Step}
 
 # A checker to ride the draw's loop: whether every index so far was the
 # one expected, and the one expected next.

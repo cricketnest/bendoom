@@ -6,8 +6,10 @@
 # rest on the floor and the angle a multiple of 45 degrees, so that
 # Chocolate Doom can stand in the same spot: a bright metal wall, the
 # dim bench room north of the start, the hazard-striped step under the
-# computer panels, and the lowered opening west of the start. Pinned to
-# Freedoom.
+# computer panels, the lowered opening west of the start, and the hall
+# under a strip of sky. Each frame is drawn twice, over a view blanked
+# to 0 and to 255: equal hashes mean every pixel of the view was
+# written. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -38,13 +40,14 @@ def shows(xs: List<&2, U32>) -> List<&2, String>:
     case x <> rest:
       U32.show(x) <> shows(rest)
 
-def pixels(h: U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
+def pixels(covered: Bool, h: U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
   (mem, xs) = p
-  (mem, "hash " ++ U32.show(h) ++ " pixels " ++ String.join(shows(xs), " "))
+  (mem, "hash " ++ U32.show(h) ++ " pixels " ++ String.join(shows(xs), " ") ++ " covered "
+    ++ Bool.show(covered))
 
-def line(st: Hash) -> Array<U32> & String:
-  Hash{mem, h} = st
-  pixels(h, B.Bytes.each(~U32, ~B.Bytes.at, [(G.Gfx.frame() + 84 * 320 + 160 : U32),
+def line(+over0: U32, st: Hash) -> Array<U32> & String:
+  Hash{mem, +h} = st
+  pixels(U32.is_eq(h, over0), h, B.Bytes.each(~U32, ~B.Bytes.at, [(G.Gfx.frame() + 84 * 320 + 160 : U32),
     (G.Gfx.frame() + 10 * 320 + 10 : U32), (G.Gfx.frame() + 150 * 320 + 300 : U32),
     (G.Gfx.frame() + 20 * 320 + 160 : U32)], mem))
 
@@ -54,11 +57,20 @@ def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
     IO.print(tag ++ " " ++ text)
     return mem
 
+# A frame's hash, drawn over a view blanked to an index.
+def hashed(+tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, +p: S.Player, blank: U32,
+  mem: Array<U32>) -> Hash:
+  D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, level, gfx, p,
+    D.Draw.set(U32.to_nat(53760), mem, G.Gfx.frame(), blank)), 2166136261})
+
+def again(tables: P.Project.Tables, level: L.Level, gfx: G.Gfx, p: S.Player, st: Hash) -> Array<U32> & String:
+  Hash{mem, h} = st
+  line(h, hashed(tables, level, gfx, p, 255, mem))
+
 # A frame from the player, its line printed, and the array back.
-def frame(tag: String, tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, p: S.Player,
+def frame(tag: String, +tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, +p: S.Player,
   mem: Array<U32>) -> IO(Array<U32>):
-  print(tag, line(D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n,
-    Hash{R.Render.frame(tables, level, gfx, p, mem), 2166136261})))
+  print(tag, again(tables, level, gfx, p, hashed(tables, level, gfx, p, 0, mem)))
 
 # The player at rest on the floor at a place: x and y in map units,
 # west and south given as negatives, the angle in degrees.
@@ -80,6 +92,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m3 : Array<U32> <- frame("dark -416 256 90", tables, level, gfx, at(level, west(416), east(256), 90), m2)
     m4 : Array<U32> <- frame("step 137 256 45", tables, level, gfx, at(level, east(137), east(256), 45), m3)
     m5 : Array<U32> <- frame("opening -416 256 180", tables, level, gfx, at(level, west(416), east(256), 180), m4)
+    m6 : Array<U32> <- frame("sky 3 256 0", tables, level, gfx, at(level, east(3), east(256), 0), m5)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -93,9 +106,10 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
     start(world)
 
-#|start hash 1193745378 pixels 1 1 0 0
-#|lit 736 464 135 hash 3239989101 pixels 104 7 95 103
-#|dark -416 256 90 hash 2815920355 pixels 110 107 0 238
-#|step 137 256 45 hash 504408341 pixels 7 0 0 0
-#|opening -416 256 180 hash 4103479514 pixels 3 111 106 0
+#|start hash 3888461448 pixels 1 1 7 5 covered True
+#|lit 736 464 135 hash 3246659701 pixels 104 7 95 103 covered True
+#|dark -416 256 90 hash 3735729281 pixels 110 107 0 238 covered True
+#|step 137 256 45 hash 663928821 pixels 7 0 79 111 covered True
+#|opening -416 256 180 hash 2081440828 pixels 3 111 106 93 covered True
+#|sky 3 256 0 hash 3632819632 pixels 2 111 76 6 covered True
 #|end

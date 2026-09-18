@@ -12,6 +12,7 @@ import ./level.bend as L
 import ./gfx.bend as G
 import ./project.bend as P
 import ./draw.bend as D
+import ./planes.bend as N
 
 # Storing
 # -------
@@ -145,11 +146,54 @@ def Segs.rw(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, wall
 # The seg loop
 # ------------
 
+# The seg loop's state: the frame's array, the planes' columns, the
+# range, the view, the graphics, and the floor and ceiling planes.
 type Segs.Cols is Type:
-  Cols{mem: Array<U32>, rw: Segs.Rw, view: P.View, gfx: G.Gfx}
+  Cols{mem: Array<U32>, cols: Array<U32>, rw: Segs.Rw, view: P.View, gfx: G.Gfx, floor: U32, ceil: U32}
 
 def Segs.row(frac: U32) -> U32:
   F.Fixed.sarn(frac, 12n)
+
+# A column's wall rows, held inside its ceiling clip cc and floor clip
+# fc: Doom's yl and yh.
+def Segs.yl(rw: Segs.Rw, x: U32, cc: U32) -> U32:
+  Rw{start, scale, step, topfrac, topstep, bottomfrac, bottomstep, pixhigh, pixhighstep, pixlow,
+    pixlowstep, mid, top, bottom, midmid, topmid, bottommid, markfloor, markceiling, lightnum, geo} = rw
+  F.Fixed.max(Segs.row((topfrac + (x - start) * topstep + 4095 : U32)), (cc + 1 : U32))
+
+def Segs.yh(rw: Segs.Rw, x: U32, fc: U32) -> U32:
+  Rw{start, scale, step, topfrac, topstep, bottomfrac, bottomstep, pixhigh, pixhighstep, pixlow,
+    pixlowstep, mid, top, bottom, midmid, topmid, bottommid, markfloor, markceiling, lightnum, geo} = rw
+  F.Fixed.min(Segs.row((bottomfrac + (x - start) * bottomstep : U32)), (fc - 1 : U32))
+
+def Segs.Rw.markfloor(rw: Segs.Rw) -> Bool:
+  Rw{start, scale, step, topfrac, topstep, bottomfrac, bottomstep, pixhigh, pixhighstep, pixlow,
+    pixlowstep, mid, top, bottom, midmid, topmid, bottommid, markfloor, markceiling, lightnum, geo} = rw
+  markfloor
+
+def Segs.Rw.markceiling(rw: Segs.Rw) -> Bool:
+  Rw{start, scale, step, topfrac, topstep, bottomfrac, bottomstep, pixhigh, pixhighstep, pixlow,
+    pixlowstep, mid, top, bottom, midmid, topmid, bottommid, markfloor, markceiling, lightnum, geo} = rw
+  markceiling
+
+# A mark is written to its plane's slot, or to a slot no plane uses.
+def Segs.mark.at(on: Bool, slot: U32) -> U32:
+  Bool.pick(U32, on, slot, 1023)
+
+# Doom's marks for one column: the ceiling plane holds the rows from the
+# ceiling clip down to the wall's top, the floor plane those from the
+# wall's bottom down to the floor clip, each where marked and not empty.
+def Segs.col.mark(+x: U32, +rw: Segs.Rw, +cc: U32, +fc: U32, +floor: U32, +ceil: U32, cols: Array<U32>) ->
+  Array<U32>:
+  +cbottom = F.Fixed.min((Segs.yl(rw, x, cc) - 1 : U32), (fc - 1 : U32))
+  +ftop = F.Fixed.max((Segs.yh(rw, x, fc) + 1 : U32), (cc + 1 : U32))
+  +con = Bool.and(Segs.Rw.markceiling(rw), F.Fixed.le((cc + 1 : U32), cbottom))
+  +fon = Bool.and(Segs.Rw.markfloor(rw), F.Fixed.le(ftop, (fc - 1 : U32)))
+  Array.set(U32, Array.set(U32, Array.set(U32, Array.set(U32, cols,
+    Segs.mark.at(con, ((ceil << 10n) + x + 1 : U32)), (cc + 1 : U32)),
+    Segs.mark.at(con, ((ceil << 10n) + x + 513 : U32)), cbottom),
+    Segs.mark.at(fon, ((floor << 10n) + x + 1 : U32)), ftop),
+    Segs.mark.at(fon, ((floor << 10n) + x + 513 : U32)), (fc - 1 : U32))
 
 # A column's texture column: the range's offset less the tangent of the
 # column's angle from the wall's normal times the wall's distance.
@@ -206,32 +250,50 @@ def Segs.col.draw(+x: U32, rw: Segs.Rw, +view: P.View, +gfx: G.Gfx, +cc: U32, +f
       cmap),
     (G.Gfx.ceilclip() + x : U32), cc2), (G.Gfx.floorclip() + x : U32), fc2)
 
-def Segs.col.floor(+x: U32, +rw: Segs.Rw, +view: P.View, +gfx: G.Gfx, cc: U32, p: Array<U32> & U32) ->
-  Segs.Cols:
-  (mem, fc) = p
-  Cols{Segs.col.draw(x, rw, view, gfx, cc, fc, mem), rw, view, gfx}
+def Segs.col.floor(+x: U32, +rw: Segs.Rw, +view: P.View, +gfx: G.Gfx, +cc: U32, cols: Array<U32>,
+  +floor: U32, +ceil: U32, p: Array<U32> & U32) -> Segs.Cols:
+  (mem, +fc) = p
+  Cols{Segs.col.draw(x, rw, view, gfx, cc, fc, mem), Segs.col.mark(x, rw, cc, fc, floor, ceil, cols), rw,
+    view, gfx, floor, ceil}
 
-def Segs.col.ceil(+x: U32, rw: Segs.Rw, view: P.View, gfx: G.Gfx, p: Array<U32> & U32) -> Segs.Cols:
+def Segs.col.ceil(+x: U32, rw: Segs.Rw, view: P.View, gfx: G.Gfx, cols: Array<U32>, floor: U32, ceil: U32,
+  p: Array<U32> & U32) -> Segs.Cols:
   (mem, cc) = p
-  Segs.col.floor(x, rw, view, gfx, cc, B.Bytes.at(mem, (G.Gfx.floorclip() + x : U32)))
+  Segs.col.floor(x, rw, view, gfx, cc, cols, floor, ceil, B.Bytes.at(mem, (G.Gfx.floorclip() + x : U32)))
 
 def Segs.col(i: Nat, st: Segs.Cols) -> Segs.Cols:
-  Cols{mem, rw, view, gfx} = st
+  Cols{mem, cols, rw, view, gfx, floor, ceil} = st
   +x = U32.from_nat(i)
-  Segs.col.ceil(x, rw, view, gfx, B.Bytes.at(mem, (G.Gfx.ceilclip() + x : U32)))
+  Segs.col.ceil(x, rw, view, gfx, cols, floor, ceil, B.Bytes.at(mem, (G.Gfx.ceilclip() + x : U32)))
 
-def Segs.Cols.mem(st: Segs.Cols) -> Array<U32>:
-  Cols{mem, rw, view, gfx} = st
-  mem
+def Segs.store.done(wall: D.Draw.Wall, solid: List<&2, C.Clip.Range>, walls: List<&2, D.Draw.Wall>,
+  tasks: List<&2, D.Draw.Task>, heads: List<&2, D.Draw.Plane>, count: U32, depth: Nat, st: Segs.Cols) ->
+  D.Draw:
+  Cols{mem, cols, rw, view, gfx, floor, ceil} = st
+  D.Draw{mem, solid, wall <> walls, tasks, D.Planes{heads, count, cols, depth, floor, ceil}}
+
+def Segs.store.loop(+wall: D.Draw.Wall, rw: Segs.Rw, view: P.View, gfx: G.Gfx, solid: List<&2, C.Clip.Range>,
+  walls: List<&2, D.Draw.Wall>, tasks: List<&2, D.Draw.Task>, mem: Array<U32>, ps: D.Draw.Planes) ->
+  D.Draw:
+  D.Wall{index, +x1, x2, scale1, scale2, step} = wall
+  D.Planes{heads, count, cols, depth, floor, ceil} = ps
+  Segs.store.done(wall, solid, walls, tasks, heads, count, depth,
+    D.Draw.each(~Segs.Cols, ~Segs.col, U32.to_nat((x2 - x1 + 1 : U32)), U32.to_nat(x1),
+      Cols{mem, cols, rw, view, gfx, floor, ceil}))
+
+def Segs.store.rw(+wall: D.Draw.Wall, +rw: Segs.Rw, view: P.View, gfx: G.Gfx, st: D.Draw) -> D.Draw:
+  D.Wall{index, +x1, +x2, scale1, scale2, step} = wall
+  D.Draw{mem, solid, walls, tasks, planes} = st
+  Segs.store.loop(wall, rw, view, gfx, solid, walls, tasks, mem,
+    N.Planes.check(Segs.Rw.markfloor(rw), True{}, x1, x2,
+      N.Planes.check(Segs.Rw.markceiling(rw), False{}, x1, x2, planes)))
 
 # Doom's R_StoreWallRange for the columns of one gap: the range stored,
-# and its columns drawn.
+# a plane it is about to mark checked, the ceiling's first, and its
+# columns drawn.
 def Segs.store.wall(+view: P.View, +level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg, +wall: D.Draw.Wall,
   geo: Segs.Geo, st: D.Draw) -> D.Draw:
-  D.Wall{index, +x1, x2, scale1, scale2, step} = wall
-  D.Draw{mem, solid, walls, tasks} = st
-  D.Draw{Segs.Cols.mem(D.Draw.each(~Segs.Cols, ~Segs.col, U32.to_nat((x2 - x1 + 1 : U32)), U32.to_nat(x1),
-    Cols{mem, Segs.rw(view, level, gfx, seg, wall, geo), view, gfx})), solid, wall <> walls, tasks}
+  Segs.store.rw(wall, Segs.rw(view, level, gfx, seg, wall, geo), view, gfx, st)
 
 def Segs.store.geo(+view: P.View, +level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg, index: U32,
   gap: C.Clip.Range, +geo: Segs.Geo, st: D.Draw) -> D.Draw:
@@ -284,10 +346,10 @@ def Segs.clip(draws: Bool, solid: Bool, +view: P.View, +level: L.Level, +gfx: G.
     case False{}:
       st
     case True{}:
-      D.Draw{mem, +cols, walls, tasks} = st
+      D.Draw{mem, +cols, walls, tasks, planes} = st
       Segs.stores(C.Clip.gaps(first, last, cols), view, level, gfx, seg, index, angle1,
         D.Draw{mem, Bool.pick(List<&2, C.Clip.Range>, solid, C.Clip.add(first, last, cols), cols), walls,
-          tasks})
+          tasks, planes})
 
 def Segs.add.span(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, index: U32,
   angle1: U32, span: P.View.Span, st: D.Draw) -> D.Draw:

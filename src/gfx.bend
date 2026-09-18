@@ -33,6 +33,10 @@ def Gfx.ceilclip() -> U32:
 def Gfx.floorclip() -> U32:
   64320
 
+# Where each row's open span starts, while a plane is drawn.
+def Gfx.spanstart() -> U32:
+  64640
+
 def Gfx.palette() -> U32:
   65536
 

@@ -11,11 +11,12 @@ import ./level.bend as L
 import ./gfx.bend as G
 import ./project.bend as P
 import ./draw.bend as D
+import ./planes.bend as N
 import ./segs.bend as S
 
 def Bsp.push(tasks: List<&2, D.Draw.Task>, st: D.Draw) -> D.Draw:
-  D.Draw{mem, solid, walls, rest} = st
-  D.Draw{mem, solid, walls, List.append(&2, D.Draw.Task, tasks, rest)}
+  D.Draw{mem, solid, walls, rest, planes} = st
+  D.Draw{mem, solid, walls, List.append(&2, D.Draw.Task, tasks, rest), planes}
 
 def Bsp.lines(n: Nat, +seg: U32) -> List<&2, D.Draw.Task>:
   match n:
@@ -24,24 +25,44 @@ def Bsp.lines(n: Nat, +seg: U32) -> List<&2, D.Draw.Task>:
     case 1n+m:
       D.Line{seg} <> Bsp.lines(m, (seg + 1 : U32))
 
-# Doom's R_Subsector: its segs, in order.
-def Bsp.sub(sub: L.Level.Sub, st: D.Draw) -> D.Draw:
+# Doom's R_FindPlane's sky rule: all sky planes are one, whatever their
+# height and light.
+def Bsp.plane(wanted: Bool, isfloor: Bool, height: U32, +pic: U32, light: U32, +gfx: G.Gfx,
+  ps: D.Draw.Planes) -> D.Draw.Planes:
+  +sky = U32.is_eq(pic, G.Gfx.sky(gfx))
+  N.Planes.claim(wanted, isfloor, Bool.pick(U32, sky, 0, height), pic, Bool.pick(U32, sky, 0, light), ps)
+
+# The floor's plane when the eye is above it, the ceiling's when the eye
+# is below it or it is the sky, then the segs, in order.
+def Bsp.sub.planes(+view: P.View, +gfx: G.Gfx, sector: L.Level.Sector, floorpic: U32, +ceilpic: U32,
+  sub: L.Level.Sub, st: D.Draw) -> D.Draw:
+  L.Sector{+floor, +ceil, +light} = sector
   L.Sub{count, first} = sub
-  Bsp.push(Bsp.lines(U32.to_nat(count), first), st)
+  D.Draw{mem, solid, walls, tasks, planes} = st
+  D.Draw{mem, solid, walls, List.append(&2, D.Draw.Task, Bsp.lines(U32.to_nat(count), first), tasks),
+    Bsp.plane(Bool.or(F.Fixed.gt(ceil, P.View.z(view)), U32.is_eq(ceilpic, G.Gfx.sky(gfx))), False{}, ceil,
+      ceilpic, light, gfx,
+      Bsp.plane(F.Fixed.lt(floor, P.View.z(view)), True{}, floor, floorpic, light, gfx, planes))}
+
+# Doom's R_Subsector.
+def Bsp.sub(+view: P.View, +level: L.Level, +gfx: G.Gfx, +ss: U32, st: D.Draw) -> D.Draw:
+  +sector = L.Level.leaf_sector(level, ss)
+  Bsp.sub.planes(view, gfx, L.Level.sector(level, sector), G.Gfx.floorpic(gfx, sector),
+    G.Gfx.ceilpic(gfx, sector), L.Level.sub(level, ss), st)
 
 # A node's near child, then its far one if its box might show. Child
 # 65535 is Doom's -1, subsector 0 of a map with no nodes.
-def Bsp.visit.if(leaf: Bool, +view: P.View, +level: L.Level, +n: U32, st: D.Draw) -> D.Draw:
+def Bsp.visit.if(leaf: Bool, +view: P.View, +level: L.Level, gfx: G.Gfx, +n: U32, st: D.Draw) -> D.Draw:
   match leaf:
     case True{}:
-      Bsp.sub(L.Level.sub(level, Bool.pick(U32, U32.is_eq(n, 65535), 0, (n .&. 32767 : U32))), st)
+      Bsp.sub(view, level, gfx, Bool.pick(U32, U32.is_eq(n, 65535), 0, (n .&. 32767 : U32)), st)
     case False{}:
       P.View{+x, +y, z, angle, sin, cos, tables} = view
       +side = L.Level.side_of(level, n, x, y)
       Bsp.push([D.Visit{L.Level.node.child(level, n, side)}, D.Check{n, (side .^. 1 : U32)}], st)
 
-def Bsp.visit(+view: P.View, +level: L.Level, +n: U32, st: D.Draw) -> D.Draw:
-  Bsp.visit.if(L.Level.is_leaf(n), view, level, n, st)
+def Bsp.visit(+view: P.View, +level: L.Level, gfx: G.Gfx, +n: U32, st: D.Draw) -> D.Draw:
+  Bsp.visit.if(L.Level.is_leaf(n), view, level, gfx, n, st)
 
 def Bsp.coord(box: L.Level.Box, +i: U32) -> U32:
   L.Box{top, bottom, left, right} = box
@@ -81,24 +102,25 @@ def Bsp.check.if(shows: Bool, child: U32, st: D.Draw) -> D.Draw:
       st
 
 def Bsp.check(+view: P.View, +level: L.Level, +n: U32, +side: U32, st: D.Draw) -> D.Draw:
-  D.Draw{mem, +solid, walls, tasks} = st
+  D.Draw{mem, +solid, walls, tasks, planes} = st
   Bsp.check.if(Bsp.shows(view, L.Level.box(level, n, side), solid), L.Level.node.child(level, n, side),
-    D.Draw{mem, solid, walls, tasks})
+    D.Draw{mem, solid, walls, tasks, planes})
 
 def Bsp.go(fuel: Nat, st: D.Draw, +view: P.View, +level: L.Level, +gfx: G.Gfx) -> D.Draw:
   match fuel st:
     case 0n st:
       st
-    case 1n+f D.Draw{mem, solid, walls, []}:
-      D.Draw{mem, solid, walls, []}
-    case 1n+f D.Draw{mem, solid, walls, D.Visit{n} <> rest}:
-      Bsp.go(f, Bsp.visit(view, level, n, D.Draw{mem, solid, walls, rest}), view, level, gfx)
-    case 1n+f D.Draw{mem, solid, walls, D.Check{n, side} <> rest}:
-      Bsp.go(f, Bsp.check(view, level, n, side, D.Draw{mem, solid, walls, rest}), view, level, gfx)
-    case 1n+f D.Draw{mem, solid, walls, D.Line{seg} <> rest}:
-      Bsp.go(f, S.Segs.add(view, level, gfx, seg, D.Draw{mem, solid, walls, rest}), view, level, gfx)
+    case 1n+f D.Draw{mem, solid, walls, [], planes}:
+      D.Draw{mem, solid, walls, [], planes}
+    case 1n+f D.Draw{mem, solid, walls, D.Visit{n} <> rest, planes}:
+      Bsp.go(f, Bsp.visit(view, level, gfx, n, D.Draw{mem, solid, walls, rest, planes}), view, level, gfx)
+    case 1n+f D.Draw{mem, solid, walls, D.Check{n, side} <> rest, planes}:
+      Bsp.go(f, Bsp.check(view, level, n, side, D.Draw{mem, solid, walls, rest, planes}), view, level, gfx)
+    case 1n+f D.Draw{mem, solid, walls, D.Line{seg} <> rest, planes}:
+      Bsp.go(f, S.Segs.add(view, level, gfx, seg, D.Draw{mem, solid, walls, rest, planes}), view, level, gfx)
 
 # The walk from the root: every task done, or the fuel (far past any
 # map's nodes and segs) spent.
 def Bsp.walk(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) -> D.Draw:
-  Bsp.go(U32.to_nat(16777216), D.Draw{mem, [], [], [D.Visit{L.Level.root(level)}]}, view, level, gfx)
+  Bsp.go(U32.to_nat(16777216), D.Draw{mem, [], [], [D.Visit{L.Level.root(level)}], N.Planes.start()}, view,
+    level, gfx)
