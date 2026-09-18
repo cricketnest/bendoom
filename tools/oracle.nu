@@ -31,20 +31,7 @@
 #   tools/oracle.nu -416 256 0
 #   tools/oracle.nu -416 256 0 "63,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 
-# A WAD's directory.
-def lumps []: binary -> table<name: string, pos: int, size: int> {
-  let wad = $in
-  let count = $wad | bytes at 4..7 | into int --endian little
-  let dir = $wad | bytes at 8..11 | into int --endian little
-  0..<$count | each {|i|
-    let at = $dir + $i * 16
-    {
-      name: ($wad | bytes at ($at + 8)..($at + 15) | decode utf-8 | str trim --char (char nul))
-      pos: ($wad | bytes at $at..($at + 3) | into int --endian little)
-      size: ($wad | bytes at ($at + 4)..($at + 7) | into int --endian little)
-    }
-  }
-}
+source wad.nu
 
 # An integer's low bytes, little-endian.
 def le [width: int]: int -> binary {
