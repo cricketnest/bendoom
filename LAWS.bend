@@ -9,6 +9,7 @@ import ./src/tables.bend as T
 import ./src/level.bend as L
 import ./src/keys.bend as K
 import ./src/sim.bend as S
+import ./src/things.bend as H
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
@@ -168,7 +169,7 @@ law turn_script:
 
 # A level's first state with the player as given, at a clock.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
-  S.State{p, level, V.Leaf{0}, [], 0, clock, False{}, False{}}
+  S.State{p, level, [], V.Leaf{0}, [], 0, clock, False{}, False{}}
 
 # LAW: one tic of the idle command from rest leaves the player where it
 # was, on any level, at any position.
@@ -190,8 +191,8 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, V.Leaf{0}, [], 0, clock, True{}, False{}}))
-    == ((clock + 1 : U32), S.State{p, level, V.Leaf{0}, [], 0, clock, True{}, False{}}) : U32 & S.State}
+    S.Sim.tic(cmd, S.State{p, level, [], V.Leaf{0}, [], 0, clock, True{}, False{}}))
+    == ((clock + 1 : U32), S.State{p, level, [], V.Leaf{0}, [], 0, clock, True{}, False{}}) : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
 # floor at 0 and the ceiling at 128 map units. Every number is computed
@@ -273,7 +274,7 @@ def Closed.level(ox: U32) -> L.Level:
   L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
     V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
-    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Start{0, 0, 0}, [], [],
+    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Things{V.Leaf{0}, 0}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
@@ -331,7 +332,7 @@ law blazing_door_timeline:
 # A state of the literal level with one mover running and a player at
 # rest at a place under a ceiling.
 def Closed.moving(level: L.Level, t: S.Thinker, x: U32, y: U32, ceilz: U32) -> S.State:
-  S.State{Closed.player(x, y, 0, ceilz), level, V.Leaf{0}, [t], 0, 0, False{}, False{}}
+  S.State{Closed.player(x, y, 0, ceilz), level, [], V.Leaf{0}, [t], 0, 0, False{}, False{}}
 
 def Closed.idled(n: Nat, s: S.State) -> S.State:
   S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
@@ -387,7 +388,7 @@ law door_crushed:
 def Closed.turbo(x: U32, momx: U32) -> S.State:
   S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, []},
     L.Level.special.put(L.Level.plane.put(L.Level.plane.put(L.Level.plane.put(Closed.doors(), 1, False{},
-      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), V.Leaf{0}, [], 0, 0, False{}, False{}}
+      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), [], V.Leaf{0}, [], 0, 0, False{}, False{}}
 
 def Closed.floors(+s: S.State) -> U32 & U32 & U32:
   (L.Level.floor(S.State.level(s), 0), L.Level.floor(S.State.level(s), 1), L.Level.floor(S.State.level(s), 2))
@@ -422,7 +423,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728), 1, False{},
       4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
+    [], V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -503,13 +504,14 @@ law use_fires_once:
   for +next: K.Cmd
   for player: S.Player
   for level: L.Level
+  for things: List<&2, H.Thing>
   for sidetex: V.Vec
   for thinkers: List<&2, S.Thinker>
   for rnd: U32
   for clock: U32
   for usedown: Bool
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
-    S.State{player, level, sidetex, thinkers, rnd, clock, False{}, usedown}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -528,7 +530,7 @@ def Closed.exit() -> L.Level:
 # The west room's player after two idle tics and then a tic of use.
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    Closed.exit(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}})
+    Closed.exit(), [], L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}})
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -554,7 +556,7 @@ law random_table:
 # spawned the player.
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    L.Level.light.put(Closed.doors(), 0, west), V.Leaf{0}, [], 1, 0, False{}, False{}})
+    L.Level.light.put(Closed.doors(), 0, west), [], V.Leaf{0}, [], 1, 0, False{}, False{}})
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)

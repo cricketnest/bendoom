@@ -2,6 +2,7 @@
 # static arrays, here with no limit. One value threaded through the BSP
 # walk, since every step reads what the last wrote.
 import Base
+import ./vec.bend as V
 import ./bytes.bend as B
 import ./fixed.bend as F
 import ./clip.bend as C
@@ -41,10 +42,11 @@ type Draw.Planes is Type:
 
 # mem: the frame, the clip arrays and the graphics. solid: the solid
 # columns. walls: the stored ranges, newest first. tasks: the walk's
-# stack. planes: the visplanes.
+# stack. planes: the visplanes. seen: 1 for each sector the walk has
+# visited, Doom's validcount.
 type Draw is Type:
   Draw{mem: Array<U32>, solid: List<&2, C.Clip.Range>, walls: List<&2, Draw.Wall>,
-    tasks: List<&2, Draw.Task>, planes: Draw.Planes}
+    tasks: List<&2, Draw.Task>, planes: Draw.Planes, seen: V.Vec}
 
 # Drawing
 # -------

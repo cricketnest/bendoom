@@ -1,0 +1,200 @@
+# Doom's R_AddSprites, R_ProjectSprite, R_DrawSprite and
+# R_DrawVisSprite: the things in the sectors the walk saw, projected
+# from the eye, clipped by the stored ranges in front of them, and drawn
+# post by post, so the gaps between posts leave the frame as it was.
+# They are drawn in the order of the things.
+import Base
+import ./bytes.bend as B
+import ./vec.bend as V
+import ./fixed.bend as F
+import ./level.bend as L
+import ./gfx.bend as G
+import ./things.bend as H
+import ./project.bend as P
+import ./draw.bend as D
+import ./segs.bend as S
+import ./masked.bend as M
+
+# A thing as the eye sees it, Doom's vissprite: its first and last
+# columns, its scale, its origin's x, y and z and its top's z, its
+# patch's row at the eye's height, the patch's column at the first
+# column as a fraction with its step a column (the reciprocal scale),
+# the patch's index in the array, and the colormap.
+type Sprites.Vis is Data:
+  Vis{x1: U32, x2: U32, scale: U32, gx: U32, gy: U32, gz: U32, gzt: U32, mid: U32, frac: U32, step: U32,
+    patch: U32, cmap: U32}
+
+# Doom's -2 in the sprite's clips: a column no range has clipped yet.
+def Sprites.unclipped() -> U32:
+  4294967294
+
+# Projecting
+# ----------
+
+def Sprites.project.if(shows: Bool, vis: Sprites.Vis, rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
+  match shows:
+    case True{}:
+      vis <> rest
+    case False{}:
+      rest
+
+# Doom's R_ProjectSprite: the thing's origin turned into the view, its
+# depth tz and its offset tx across it. It shows unless it is nearer than
+# 4 units, farther aside than four times its depth, or its patch's edges,
+# placed by its offsets and scaled, fall wholly off the screen. The
+# columns are held to the screen, and the patch's fraction starts that
+# far in. Its sector's light, with no fake contrast, and its scale pick
+# the colormap.
+def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing, rest: List<&2, Sprites.Vis>) ->
+  List<&2, Sprites.Vis>:
+  P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
+  H.Thing{id, kind, +x, +y, +z, sector, +state} = thing
+  +trx = (x - vx : U32)
+  +try = (y - vy : U32)
+  +tz = (F.Fixed.mul(trx, cos) + F.Fixed.mul(try, sin) : U32)
+  +tx = (F.Fixed.mul(trx, sin) - F.Fixed.mul(try, cos) : U32)
+  +xscale = F.Fixed.div(P.Project.centerx(), tz)
+  +left = (tx - G.Gfx.sprite(gfx, state, 2) : U32)
+  +x1 = F.Fixed.sarn((P.Project.centerx() + F.Fixed.mul(left, xscale) : U32), 16n)
+  +x2 = (F.Fixed.sarn((P.Project.centerx() + F.Fixed.mul((left + G.Gfx.sprite(gfx, state, 1) : U32), xscale)
+    : U32), 16n) - 1 : U32)
+  +gzt = (z + G.Gfx.sprite(gfx, state, 3) : U32)
+  +step = F.Fixed.div(65536, xscale)
+  +first = F.Fixed.max(x1, 0)
+  Sprites.project.if(Bool.and(F.Fixed.ge(tz, 262144), Bool.and(F.Fixed.le(F.Fixed.abs(tx), (tz << 2n : U32)),
+      Bool.and(F.Fixed.le(x1, 320), F.Fixed.ge(x2, 0)))),
+    Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32), (step * (first - x1) : U32), step,
+      G.Gfx.sprite(gfx, state, 0), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale)},
+    rest)
+
+def Sprites.gather.if(seen: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing,
+  rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
+  match seen:
+    case True{}:
+      Sprites.project(view, level, gfx, thing, rest)
+    case False{}:
+      rest
+
+# Doom's R_AddSprites: the things of each sector the walk saw.
+def Sprites.gather(things: List<&2, H.Thing>, +seen: V.Vec, +view: P.View, +level: L.Level, +gfx: G.Gfx) ->
+  List<&2, Sprites.Vis>:
+  match things:
+    case []:
+      []
+    case H.Thing{id, kind, x, y, z, +sector, state} <> rest:
+      Sprites.gather.if(U32.is_eq(V.Vec.get(seen, sector), 1), view, level, gfx,
+        H.Thing{id, kind, x, y, z, sector, state}, Sprites.gather(rest, seen, view, level, gfx))
+
+# Clipping
+# --------
+
+# A clip taken when on and the column's is still unclipped.
+def Sprites.clip.put(on: Bool, +at: U32, +v: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, +was) = p
+  Array.set(U32, mem, at, Bool.pick(U32, Bool.and(on, U32.is_eq(was, Sprites.unclipped())), v, was))
+
+def Sprites.clip.cols(n: Nat, tops: List<&2, U32>, bottoms: List<&2, U32>, +top: Bool, +bottom: Bool, +x: U32,
+  mem: Array<U32>) -> Array<U32>:
+  match n tops bottoms:
+    case 1n+m t <> ts b <> bs:
+      Sprites.clip.cols(m, ts, bs, top, bottom, (x + 1 : U32),
+        Sprites.clip.put(top, (G.Gfx.cliptop() + x : U32), t, B.Bytes.at(
+          Sprites.clip.put(bottom, (G.Gfx.clipbot() + x : U32), b, B.Bytes.at(mem, (G.Gfx.clipbot() + x : U32))),
+          (G.Gfx.cliptop() + x : U32))))
+    case _ _ _:
+      mem
+
+def Sprites.clip.if(clips: Bool, +top: Bool, +bottom: Bool, +r1: U32, +r2: U32, +x1: U32, tops: List<&2, U32>,
+  bottoms: List<&2, U32>, mem: Array<U32>) -> Array<U32>:
+  match clips:
+    case False{}:
+      mem
+    case True{}:
+      Sprites.clip.cols(D.Draw.rows(r1, r2), List.drop(&2, U32, tops, U32.to_nat((r1 - x1 : U32))),
+        List.drop(&2, U32, bottoms, U32.to_nat((r1 - x1 : U32))), top, bottom, r1, mem)
+
+# Doom's R_PointOnSegSide: whether a point is behind the seg.
+def Sprites.behind(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
+  L.Seg{+x1, +y1, x2, y2, angle, offset, flags, side, front, back} = s
+  L.Level.node_side(x, y, x1, y1, (x2 - x1 : U32), (y2 - y1 : U32))
+
+# Doom's R_DrawSprite for one stored range: a range over some of the
+# sprite's columns, not behind it (it is behind when all of it is
+# smaller than the sprite, or some of it is and the sprite is in front
+# of its seg), clips the columns no newer range clipped, below unless the
+# sprite stands at or over the height it clips below, above unless the
+# sprite's top is at or under the height it clips above.
+def Sprites.clip.wall(+level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) -> Array<U32>:
+  Vis{+sx1, +sx2, +scale, +gx, +gy, +gz, +gzt, mid, frac, step, patch, cmap} = vis
+  D.Wall{seg, +x1, +x2, +scale1, +scale2, wstep, +sil, +bsil, +tsil, texcols, tops, bottoms} = wall
+  +bottom = Bool.and(Bool.not(U32.is_zero((sil .&. 1 : U32))), F.Fixed.lt(gz, bsil))
+  +top = Bool.and(Bool.not(U32.is_zero((sil .&. 2 : U32))), F.Fixed.gt(gzt, tsil))
+  Sprites.clip.if(Bool.and(Bool.or(top, bottom), Bool.and(Bool.and(U32.is_le(x1, sx2), U32.is_ge(x2, sx1)),
+      Bool.not(Bool.or(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale), Bool.and(
+        F.Fixed.lt(F.Fixed.min(scale1, scale2), scale), Bool.not(Sprites.behind(L.Level.seg(level, seg), gx, gy))))))),
+    top, bottom, U32.max(x1, sx1), U32.min(x2, sx2), x1, tops, bottoms, mem)
+
+# The stored ranges, newest first.
+def Sprites.clip.walls(walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Sprites.Vis, mem: Array<U32>) ->
+  Array<U32>:
+  match walls:
+    case []:
+      mem
+    case wall <> rest:
+      Sprites.clip.walls(rest, level, vis, Sprites.clip.wall(level, vis, wall, mem))
+
+# Drawing
+# -------
+
+# A sprite's column loop: the array, the sprite, and the patch's column
+# as a fraction.
+type Sprites.Col is Type:
+  Col{mem: Array<U32>, vis: Sprites.Vis, frac: U32}
+
+def Sprites.Col.mem(st: Sprites.Col) -> Array<U32>:
+  Col{mem, vis, frac} = st
+  mem
+
+# Doom's R_DrawVisSprite for one column: the posts of the patch's column
+# drawn through the clips, those no range set being the screen's edges.
+def Sprites.col.draw(+x: U32, +vis: Sprites.Vis, frac: U32, +cc: U32, +fc: U32, p: Array<U32> & U32) ->
+  Sprites.Col:
+  Vis{x1, x2, +scale, gx, gy, gz, gzt, +mid, f, +step, +patch, cmap} = vis
+  (mem, offset) = p
+  Col{G.Gfx.posts(~M.Masked.Col, ~M.Masked.post, 256n, G.Post{False{}, mem, (patch + offset : U32)},
+      M.Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, step, cmap,
+        Bool.pick(U32, U32.is_eq(cc, Sprites.unclipped()), 4294967295, cc),
+        Bool.pick(U32, U32.is_eq(fc, Sprites.unclipped()), 168, fc)}),
+    vis, (frac + step : U32)}
+
+def Sprites.col.bottom(+x: U32, +vis: Sprites.Vis, +frac: U32, cc: U32, p: Array<U32> & U32) -> Sprites.Col:
+  Vis{x1, x2, scale, gx, gy, gz, gzt, mid, f, step, +patch, cmap} = vis
+  (mem, fc) = p
+  Sprites.col.draw(x, vis, frac, cc, fc, B.Bytes.u32(mem, (patch + 8 + (frac >> 16n) * 4 : U32)))
+
+def Sprites.col.top(+x: U32, vis: Sprites.Vis, frac: U32, p: Array<U32> & U32) -> Sprites.Col:
+  (mem, cc) = p
+  Sprites.col.bottom(x, vis, frac, cc, B.Bytes.at(mem, (G.Gfx.clipbot() + x : U32)))
+
+def Sprites.col(i: Nat, st: Sprites.Col) -> Sprites.Col:
+  Col{mem, vis, frac} = st
+  +x = U32.from_nat(i)
+  Sprites.col.top(x, vis, frac, B.Bytes.at(mem, (G.Gfx.cliptop() + x : U32)))
+
+# Doom's R_DrawSprite: the sprite's columns unclipped, clipped by every
+# stored range, then drawn.
+def Sprites.sprite(+walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Sprites.Vis, mem: Array<U32>) ->
+  Array<U32>:
+  Vis{+x1, +x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap} = vis
+  +n = D.Draw.rows(x1, x2)
+  Sprites.Col.mem(D.Draw.each(~Sprites.Col, ~Sprites.col, n, U32.to_nat(x1),
+    Col{Sprites.clip.walls(walls, level, vis, D.Draw.set(n, D.Draw.set(n, mem, (G.Gfx.cliptop() + x1 : U32),
+      Sprites.unclipped()), (G.Gfx.clipbot() + x1 : U32), Sprites.unclipped())), vis, frac}))
+
+def Sprites.draw(sprites: List<&2, Sprites.Vis>, +walls: List<&2, D.Draw.Wall>, +level: L.Level,
+  mem: Array<U32>) -> Array<U32>:
+  match sprites:
+    case []:
+      mem
+    case vis <> rest:
+      Sprites.draw(rest, walls, level, Sprites.sprite(walls, level, vis, mem))

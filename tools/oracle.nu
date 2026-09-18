@@ -1,21 +1,20 @@
 #!/usr/bin/env nu
 # Diffs a frame of ours against vanilla's after the same commands from
-# the same place. Writes a copy of the IWAD whose E1M1 has one thing, a
-# player 1 start at x, y facing angle, and the command script as a
-# vanilla demo: version 109, no monsters, four bytes a tic, then a tic
-# whose buttons press pause, then a minute of idle tics, then the end
-# marker. Chocolate
-# Doom plays the demo in real time in a scratch directory, at screen
-# size 10, on a headless X server of its own; a paused game runs no
-# playsim tic but keeps reading the demo, so the tail holds the frame of
-# the script's last tic for a minute, and one paletted screenshot is
-# taken inside it. A shot counts once it shows the pause graphic. It is
-# compared with the frame tools/frame.bend dumps after the same script,
-# outside the status bar rows, the pause graphic, and the pistol: at
-# rest where a script that never moves leaves it, widened by the bob's
-# 16 units to either side and below for one that moves. The pistol
-# rises for the level's first 16 tics, so a script is at least 18; the
-# default idles 20.
+# the same place. Writes a copy of the IWAD whose E1M1 keeps the things
+# Bendoom spawns and has player 1 start at x, y facing angle, and the
+# command script as a vanilla demo: version 109, Hurt Me Plenty, no
+# monsters, four bytes a tic, then a tic whose buttons press pause, then
+# a minute of idle tics, then the end marker. Chocolate Doom plays the
+# demo in real time in a scratch directory, at screen size 10, on a
+# headless X server of its own; a paused game runs no playsim tic but
+# keeps reading the demo, so the tail holds the frame of the script's
+# last tic for a minute, and one paletted screenshot is taken inside it.
+# A shot counts once it shows the pause graphic. It is compared with the
+# frame tools/frame.bend dumps after the same script, outside the status
+# bar rows, the pause graphic, and the pistol: at rest where a script
+# that never moves leaves it, widened by the bob's 16 units to either
+# side and below for one that moves. The pistol rises for the level's
+# first 16 tics, so a script is at least 18; the default idles 20.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
@@ -32,18 +31,29 @@ def le [width: int]: int -> binary {
   $in | into binary | bytes at 0..<$width
 }
 
-# The IWAD with E1M1's things one player 1 start on every skill: the
-# thing added after the directory, and the THINGS entry's position and
-# size pointed at it. A whole IWAD and not a PWAD, since Doom refuses
-# -file with the shareware one.
+# The DoomEd types Bendoom spawns: those src/things.bend gives a spawn
+# state.
+const spawned = [19]
+
+# The IWAD with E1M1's things cut to the records of the types Bendoom
+# spawns, options and all, and player 1's start, replaced in place by
+# one at x, y facing angle on every skill: the lump added after the
+# directory, and the THINGS entry's position and size pointed at it. A
+# whole IWAD and not a PWAD, since Doom refuses -file with the shareware
+# one.
 def start-iwad [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
   let all = $wad | lumps | enumerate | flatten
   let marker = $all | where name == "E1M1" | first | get index
   let map = $all | where index > $marker | first 10
   let things = $map | where name == "THINGS" | first
   let entry = ($wad | bytes at 8..11 | into int --endian little) + $things.index * 16
-  let thing = [($x | le 2) ($y | le 2) ($angle | le 2) (1 | le 2) (7 | le 2)] | bytes collect
-  [($wad | bytes at 0..<$entry) ($wad | bytes length | le 4) (10 | le 4) ($wad | bytes at ($entry + 8)..) $thing]
+  let start = [($x | le 2) ($y | le 2) ($angle | le 2) (1 | le 2) (7 | le 2)] | bytes collect
+  let lump = 0..<($things.size // 10)
+    | each {|i| $wad | bytes at ($things.pos + $i * 10)..<($things.pos + $i * 10 + 10) }
+    | each {|record| let type = $record | bytes at 6..7 | into int --endian little
+      if $type == 1 { $start } else if $type in $spawned { $record } }
+    | bytes collect
+  [($wad | bytes at 0..<$entry) ($wad | bytes length | le 4) ($lump | bytes length | le 4) ($wad | bytes at ($entry + 8)..) $lump]
   | bytes collect
 }
 
@@ -57,13 +67,14 @@ def runs []: string -> table<tics: int, bytes: binary> {
   }
 }
 
-# The script as a version 109 demo: the 13-byte header (skill 1, E1M1,
-# no deathmatch, respawn or fast, no monsters, console player 0, player
-# 1 alone in the game), the tics, a tic pressing pause (BT_SPECIAL with
-# BTS_PAUSE), 2100 idle tics, and the 0x80 that ends a demo.
+# The script as a version 109 demo: the 13-byte header (Hurt Me Plenty,
+# E1M1, no deathmatch, respawn or fast, no monsters, console player 0,
+# player 1 alone in the game), the tics, a tic pressing pause
+# (BT_SPECIAL with BTS_PAUSE), 2100 idle tics, and the 0x80 that ends a
+# demo.
 def demo []: table<tics: int, bytes: binary> -> binary {
   let tics = $in | each {|run| 0..<$run.tics | each { $run.bytes } } | flatten
-  [0x[6d 00 01 01 00 00 00 01 00 01 00 00 00]]
+  [0x[6d 02 01 01 00 00 00 01 00 01 00 00 00]]
   | append $tics
   | append 0x[00 00 00 81]
   | append (0..<2100 | each { 0x[00 00 00 00] })

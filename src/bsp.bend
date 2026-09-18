@@ -4,6 +4,7 @@
 # the last one left, and a far child's box is tested only once the near
 # side is drawn.
 import Base
+import ./vec.bend as V
 import ./fixed.bend as F
 import ./clip.bend as C
 import ./level.bend as L
@@ -14,8 +15,8 @@ import ./planes.bend as N
 import ./segs.bend as S
 
 def Bsp.push(tasks: List<&2, D.Draw.Task>, st: D.Draw) -> D.Draw:
-  D.Draw{mem, solid, walls, rest, planes} = st
-  D.Draw{mem, solid, walls, List.append(&2, D.Draw.Task, tasks, rest), planes}
+  D.Draw{mem, solid, walls, rest, planes, seen} = st
+  D.Draw{mem, solid, walls, List.append(&2, D.Draw.Task, tasks, rest), planes, seen}
 
 def Bsp.lines(n: Nat, +seg: U32) -> List<&2, D.Draw.Task>:
   match n:
@@ -32,21 +33,24 @@ def Bsp.plane(wanted: Bool, isfloor: Bool, height: U32, +pic: U32, light: U32, +
   N.Planes.claim(wanted, isfloor, Bool.pick(U32, sky, 0, height), pic, Bool.pick(U32, sky, 0, light), ps)
 
 # The floor's plane when the eye is above it, the ceiling's when the eye
-# is below it or it is the sky, then the segs, in order.
-def Bsp.sub.planes(+view: P.View, +gfx: G.Gfx, sector: L.Level.Sector, floorpic: U32, +ceilpic: U32,
+# is below it or it is the sky, then the segs, in order; and the sector
+# seen, whose things Doom's R_AddSprites gathers once however many
+# subsectors it is split into.
+def Bsp.sub.planes(+view: P.View, +gfx: G.Gfx, s: U32, sector: L.Level.Sector, floorpic: U32, +ceilpic: U32,
   sub: L.Level.Sub, st: D.Draw) -> D.Draw:
   L.Sector{+floor, +ceil, +light} = sector
   L.Sub{count, first} = sub
-  D.Draw{mem, solid, walls, tasks, planes} = st
+  D.Draw{mem, solid, walls, tasks, planes, seen} = st
   D.Draw{mem, solid, walls, List.append(&2, D.Draw.Task, Bsp.lines(U32.to_nat(count), first), tasks),
     Bsp.plane(Bool.or(F.Fixed.gt(ceil, P.View.z(view)), U32.is_eq(ceilpic, G.Gfx.sky(gfx))), False{}, ceil,
       ceilpic, light, gfx,
-      Bsp.plane(F.Fixed.lt(floor, P.View.z(view)), True{}, floor, floorpic, light, gfx, planes))}
+      Bsp.plane(F.Fixed.lt(floor, P.View.z(view)), True{}, floor, floorpic, light, gfx, planes)),
+    V.Vec.set(seen, s, 1)}
 
 # Doom's R_Subsector.
 def Bsp.sub(+view: P.View, +level: L.Level, +gfx: G.Gfx, +ss: U32, st: D.Draw) -> D.Draw:
   +sector = L.Level.leaf_sector(level, ss)
-  Bsp.sub.planes(view, gfx, L.Level.sector(level, sector), G.Gfx.floorpic(gfx, sector),
+  Bsp.sub.planes(view, gfx, sector, L.Level.sector(level, sector), G.Gfx.floorpic(gfx, sector),
     G.Gfx.ceilpic(gfx, sector), L.Level.sub(level, ss), st)
 
 # A node's near child, then its far one if its box might show. Child
@@ -99,25 +103,28 @@ def Bsp.check.if(shows: Bool, child: U32, st: D.Draw) -> D.Draw:
       st
 
 def Bsp.check(+view: P.View, +level: L.Level, +n: U32, +side: U32, st: D.Draw) -> D.Draw:
-  D.Draw{mem, +solid, walls, tasks, planes} = st
+  D.Draw{mem, +solid, walls, tasks, planes, seen} = st
   Bsp.check.if(Bsp.shows(view, L.Level.box(level, n, side), solid), L.Level.node.child(level, n, side),
-    D.Draw{mem, solid, walls, tasks, planes})
+    D.Draw{mem, solid, walls, tasks, planes, seen})
 
 def Bsp.go(fuel: Nat, st: D.Draw, +view: P.View, +level: L.Level, +gfx: G.Gfx) -> D.Draw:
   match fuel st:
     case 0n st:
       st
-    case 1n+f D.Draw{mem, solid, walls, [], planes}:
-      D.Draw{mem, solid, walls, [], planes}
-    case 1n+f D.Draw{mem, solid, walls, D.Visit{n} <> rest, planes}:
-      Bsp.go(f, Bsp.visit(view, level, gfx, n, D.Draw{mem, solid, walls, rest, planes}), view, level, gfx)
-    case 1n+f D.Draw{mem, solid, walls, D.Check{n, side} <> rest, planes}:
-      Bsp.go(f, Bsp.check(view, level, n, side, D.Draw{mem, solid, walls, rest, planes}), view, level, gfx)
-    case 1n+f D.Draw{mem, solid, walls, D.Line{seg} <> rest, planes}:
-      Bsp.go(f, S.Segs.add(view, level, gfx, seg, D.Draw{mem, solid, walls, rest, planes}), view, level, gfx)
+    case 1n+f D.Draw{mem, solid, walls, [], planes, seen}:
+      D.Draw{mem, solid, walls, [], planes, seen}
+    case 1n+f D.Draw{mem, solid, walls, D.Visit{n} <> rest, planes, seen}:
+      Bsp.go(f, Bsp.visit(view, level, gfx, n, D.Draw{mem, solid, walls, rest, planes, seen}), view, level,
+        gfx)
+    case 1n+f D.Draw{mem, solid, walls, D.Check{n, side} <> rest, planes, seen}:
+      Bsp.go(f, Bsp.check(view, level, n, side, D.Draw{mem, solid, walls, rest, planes, seen}), view, level,
+        gfx)
+    case 1n+f D.Draw{mem, solid, walls, D.Line{seg} <> rest, planes, seen}:
+      Bsp.go(f, S.Segs.add(view, level, gfx, seg, D.Draw{mem, solid, walls, rest, planes, seen}), view, level,
+        gfx)
 
 # The walk from the root: every task done, or the fuel (far past any
 # map's nodes and segs) spent.
 def Bsp.walk(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) -> D.Draw:
-  Bsp.go(U32.to_nat(16777216), D.Draw{mem, [], [], [D.Visit{L.Level.root(level)}], N.Planes.start()}, view,
-    level, gfx)
+  Bsp.go(U32.to_nat(16777216), D.Draw{mem, [], [], [D.Visit{L.Level.root(level)}], N.Planes.start(),
+    V.Vec.of_list([], L.Level.nsectors(level))}, view, level, gfx)

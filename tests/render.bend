@@ -7,16 +7,19 @@
 # metal wall, the dim bench room north of the start, the hazard-striped
 # step under the computer panels, the lowered opening west of the start
 # with a masked grate across it, the hall under a ceiling of water, the
-# yard under the open sky, and the railed pit. Then frames after
-# scripts, which the oracle plays too: a stride, riding the lift down,
-# off its east edge, the first door half open, the special 23 switch
-# pressed, the exit switch pressed, a blinking wall at its dark level,
-# and the water on a later frame of its cycle. tools/oracle.nu finds no
-# pixel of any of them off vanilla's, bar the exit, which vanilla never
-# stands in (milestone 4's ticket 09 compares it another way); each
-# script is beside its frame below. Each frame is drawn twice, over a
-# view blanked to 0 and to 255: equal hashes mean every pixel of the
-# view was written. Pinned to Freedoom.
+# yard under the open sky, the railed pit, and the dead former sergeant
+# whole on its bench, the one thing Bendoom spawns yet; the start, the
+# water and the stride see a few of its pixels past the walls between,
+# and the pit sees none. Then frames after scripts, which the oracle
+# plays too: a stride, riding the lift down, off its east edge, the
+# first door half open, the special 23 switch pressed, the exit switch
+# pressed, a blinking wall at its dark level, and the water on a later
+# frame of its cycle. tools/oracle.nu finds no pixel of any of them off
+# vanilla's, bar the exit, which vanilla never stands in (milestone 4's
+# ticket 09 compares it another way); each script is beside its frame
+# below. Each frame is drawn twice, over a view blanked to 0 and to 255:
+# equal hashes mean every pixel of the view was written. Pinned to
+# Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -115,20 +118,21 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, at(level, east(3), east(256), 0), m5)
     m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, at(level, west(640), east(256), 90), m6)
     m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, at(level, east(488), east(256), 0), m7)
-    m9 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), m8)
-    m10 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m9)
-    m11 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m10)
-    m12 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
+    m9 : Array<U32> <- frame("sergeant 1144 259 315", tables, gfx, at(level, east(1144), east(259), 315), m8)
+    m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), m9)
+    m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
+    m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
+    m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
       List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
-      at(level, east(832), east(384), 90)), m11)
-    m13 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n),
+      at(level, east(832), east(384), 90)), m12)
+    m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n),
       List.replicate(K.Cmd, 10n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
-      at(level, east(2064), west(260), 90)), m12)
-    m14 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
-      idle(10n)], at(level, west(352), east(1296), 180)), m13)
-    m15 : Array<U32> <- frame("blink dark", tables, gfx, after([idle(66n)], at(level, east(640), east(712), 180)),
-      m14)
-    m16 : Array<U32> <- frame("water moving", tables, gfx, after([idle(20n)], at(level, east(3), east(256), 0)), m15)
+      at(level, east(2064), west(260), 90)), m13)
+    m15 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
+      idle(10n)], at(level, west(352), east(1296), 180)), m14)
+    m16 : Array<U32> <- frame("blink dark", tables, gfx, after([idle(66n)], at(level, east(640), east(712), 180)),
+      m15)
+    m17 : Array<U32> <- frame("water moving", tables, gfx, after([idle(20n)], at(level, east(3), east(256), 0)), m16)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -140,20 +144,21 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start hash 2160814949 pixels 1 1 7 5 covered True
+#|start hash 309742466 pixels 1 1 7 5 covered True
 #|lit 736 464 135 hash 3300301580 pixels 104 7 95 103 covered True
 #|dark -416 256 90 hash 3488594130 pixels 110 107 0 238 covered True
 #|step 137 256 45 hash 3958655367 pixels 7 0 79 111 covered True
 #|grate -416 256 180 hash 2863794005 pixels 3 111 106 93 covered True
-#|water 3 256 0 hash 2231310396 pixels 2 111 76 6 covered True
+#|water 3 256 0 hash 233320077 pixels 2 111 76 6 covered True
 #|sky -640 256 90 hash 3006348923 pixels 8 89 105 105 covered True
 #|pit 488 256 0 hash 2052822416 pixels 8 6 111 1 covered True
-#|stride U!:34 hash 3365973614 pixels 2 5 164 6 covered True
+#|sergeant 1144 259 315 hash 1178944882 pixels 111 108 0 1 covered True
+#|stride U!:34 hash 1320634075 pixels 2 5 164 6 covered True
 #|air U!:56 hash 2556132464 pixels 5 110 15 6 covered True
 #|landed U!:66 hash 1207877047 pixels 6 110 14 79 covered True
 #|door half open hash 1284933713 pixels 107 6 74 111 covered True
 #|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
 #|exit pressed hash 847822191 pixels 102 95 102 3 covered True
 #|blink dark hash 4167308477 pixels 99 73 73 3 covered True
-#|water moving hash 3418963837 pixels 2 6 77 6 covered True
+#|water moving hash 4092342880 pixels 2 6 77 6 covered True
 #|end

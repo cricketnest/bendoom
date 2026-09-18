@@ -4,16 +4,18 @@
 # holds the frame and the draw's per-column scratch first, then the
 # palette as RGB words, the colormaps, and the lumps: the flats the
 # sectors name, then the patches of the textures the sides name, then
-# the composed columns; with the map's names go every frame of the
-# animations they touch and the partners of their switches. Gfx is the
-# directory into it: Data, so the draw takes it by copy. Every other
-# flat and texture stays a name in the WAD.
+# the composed columns, then the sprites of the states the map's things
+# spawn in; with the map's names go every frame of the animations they
+# touch and the partners of their switches. Gfx is the directory into
+# it: Data, so the draw takes it by copy. Every other flat, texture and
+# sprite stays a name in the WAD.
 import Base
 import ./vec.bend as V
 import ./bytes.bend as B
 import ./wad.bend as W
 import ./fixed.bend as F
 import ./level.bend as L
+import ./things.bend as H
 
 # The animations of the flats or of the textures: three words a frame
 # (its animation's count, the WAD's number for it, its place in the
@@ -32,9 +34,13 @@ type Gfx.Anims is Data:
 # column), texture 0 being none. cols: every texture's columns, each the
 # index of its texels in the array. sidetex: a side's top, bottom and
 # middle texture numbers, three a side. skytex: the sky's texture.
+# sprites: four words a state row, for the rows the map's things spawn
+# in: the index of its sprite's patch, and the patch's width, left
+# offset and top offset in fixed point (Doom's spritewidth, spriteoffset
+# and spritetopoffset).
 type Gfx is Data:
   Gfx{flats: V.Vec, pics: V.Vec, sky: U32, texs: V.Vec, cols: V.Vec, sidetex: V.Vec, skytex: U32,
-    anims: Gfx.Anims}
+    sprites: V.Vec, anims: Gfx.Anims}
 
 # The frame: 320 by 200 palette indices, row by row.
 def Gfx.frame() -> U32:
@@ -50,6 +56,14 @@ def Gfx.floorclip() -> U32:
 # Where each row's open span starts, while a plane is drawn.
 def Gfx.spanstart() -> U32:
   64640
+
+# The clips of the sprite being drawn, one slot a column: Doom's
+# cliptop and clipbot.
+def Gfx.cliptop() -> U32:
+  64832
+
+def Gfx.clipbot() -> U32:
+  65152
 
 def Gfx.palette() -> U32:
   65536
@@ -441,8 +455,8 @@ def Gfx.posts.top(~C: Data, ~act: Array<U32> -> @+src: U32 -> @+delta: U32 -> @+
 
 # A patch column's posts walked from the first's header, in the array:
 # act on each, given the post's header index, its first row in the patch
-# and its length; the composer pastes them, the masked pass draws them.
-# The fuel outlasts any column.
+# and its length; the composer pastes them, the masked pass and the
+# sprites draw them. The fuel outlasts any column.
 def Gfx.posts(~C: Data, ~act: Array<U32> -> @+src: U32 -> @+delta: U32 -> @+len: U32 -> @+ctx: C -> Array<U32>,
   fuel: Nat, st: Gfx.Post, +ctx: C) -> Array<U32>:
   match fuel st:
@@ -607,14 +621,68 @@ def Gfx.textures(headers: List<&2, U32>, +words: List<&2, U32>, +indices: List<&
     case _:
       asm
 
+# Sprites
+# -------
+
+# The lumps after S_START up to S_END: the sprite namespace, where
+# Doom's R_InitSpriteDefs looks.
+def Gfx.sprite.space(lumps: List<&2, W.Wad.Lump>, inside: Bool) -> List<&2, W.Wad.Lump>:
+  match lumps inside:
+    case [] _:
+      []
+    case W.Lump{pos, size, name} <> rest False{}:
+      Gfx.sprite.space(rest, String.eq(name, "S_START"))
+    case W.Lump{pos, size, +name} <> rest True{}:
+      W.Lump{pos, size, name} <> Gfx.sprite.space(rest, Bool.not(String.eq(name, "S_END")))
+
+# The lump of a state row's frame, seen from every side: the sprite's
+# name, the frame's letter and rotation 0.
+def Gfx.sprite.name(r: H.Thing.Row) -> String:
+  H.Row{sprite, frame} = r
+  sprite ++ String.from_list([Char.from_u32((65 + frame : U32)), Char.from_u32(48)])
+
+def Gfx.sprite.states(things: List<&2, H.Thing>) -> List<&2, U32>:
+  match things:
+    case []:
+      []
+    case H.Thing{id, kind, x, y, z, sector, state} <> rest:
+      state <> Gfx.sprite.states(rest)
+
+def Gfx.sprite.names(states: List<&2, U32>) -> List<&2, String>:
+  match states:
+    case []:
+      []
+    case state <> rest:
+      Gfx.sprite.name(H.Thing.row(state)) <> Gfx.sprite.names(rest)
+
+# The sprite lumps to copy, each once, and each spawned thing's state
+# row and the number of its lump among them.
+type Gfx.Sprites is Data:
+  Sprites{lumps: List<&2, W.Wad.Lump>, states: List<&2, U32>, numbers: List<&2, U32>}
+
+# Doom's R_InitSpriteLumps for the lumps copied: each spawned thing's
+# state row gets its lump's index in the array and the lump's width,
+# left offset and top offset (three words a lump in heads).
+def Gfx.sprite.table(states: List<&2, U32>, numbers: List<&2, U32>, +bases: V.Vec, +heads: V.Vec,
+  table: V.Vec) -> V.Vec:
+  match states numbers:
+    case +s <> ss +n <> ns:
+      Gfx.sprite.table(ss, ns, bases, heads, V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(table,
+        (s * 4 : U32), V.Vec.get(bases, n)),
+        (s * 4 + 1 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 : U32)))),
+        (s * 4 + 2 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 1 : U32)))),
+        (s * 4 + 3 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 2 : U32)))))
+    case _ _:
+      table
+
 # Loading
 # -------
 
-# What the flats' half of the load found, for the textures' half, which
-# adds the textures' animations.
+# What the first half of the load found (the flats, the sprites), for
+# the textures' half, which adds the textures' animations.
 type Gfx.Base is Data:
   Base{level: L.Level, fl: Gfx.Names, pal: W.Wad.Lump, cmap: W.Wad.Lump, flats: List<&2, W.Wad.Lump>,
-    anims: Gfx.Anims}
+    sprites: Gfx.Sprites, anims: Gfx.Anims}
 
 def Gfx.lump.size(l: W.Wad.Lump) -> U32:
   W.Lump{pos, size, name} = l
@@ -670,37 +738,6 @@ def Gfx.Asm.cols(asm: Gfx.Asm) -> V.Vec:
   Asm{cols, texs, pastes, comp, ncols} = asm
   V.Vec.of(List.reverse(&2, U32, cols))
 
-# The array sized for everything; the first palette, the colormaps, the
-# flats and the patches copied in; the composed columns pasted.
-def Gfx.build(a: Array<U32>, base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>,
-  plumps: List<&2, W.Wad.Lump>, +asm: Gfx.Asm) -> Array<U32> & Gfx & L.Level:
-  Base{level, +fl, pal, cmap, flats, anims} = base
-  +sidetex = V.Vec.of(Gfx.Names.numbers(tn))
-  (Gfx.pastes(Gfx.Asm.pastes(asm), Gfx.Copy.dst(Gfx.copies(
-      Job{Gfx.lump.pos(cmap), Gfx.colormap(), 8704} <> List.append(&2, Gfx.Job,
-        Gfx.jobs(Gfx.flat.lumps(flats), Gfx.lumps()), Gfx.jobs(plumps, Gfx.last(fbases))),
-      Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, 256n, 3, Gfx.lump.pos(pal), Gfx.palette(),
-        Copy{a, Array.new(U32, V.Vec.depth((Gfx.Asm.comp(asm) + 128 : U32)), 0)})))),
-    Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
-      Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"), anims},
-    L.Level.textured(level, sidetex,
-      Gfx.switch.table(Gfx.switch.pairs(), tn, V.Vec.of_list([], Gfx.Names.next(tn)))))
-
-# The flats end where the patches start, the patches where the composed
-# columns do; texture 0 is none, five zero words.
-def Gfx.layout(a: Array<U32>, +base: Gfx.Base, tn: Gfx.Names, headers: List<&2, U32>,
-  words: List<&2, U32>, indices: List<&2, U32>, +plumps: List<&2, W.Wad.Lump>, widths: List<&2, U32>,
-  +colofs: List<&2, List<&2, U32>>) -> Array<U32> & Gfx & L.Level:
-  Base{level, +fl, pal, cmap, flats, anims} = base
-  +fbases = Gfx.starts(Gfx.sizes(Gfx.flat.lumps(flats)), Gfx.lumps())
-  +pbases = Gfx.starts(Gfx.sizes(plumps), Gfx.last(fbases))
-  +ws = widths
-  Gfx.build(a, base, tn, fbases, plumps,
-    Gfx.textures(headers, words, indices,
-      Patches{V.Vec.of(pbases), V.Vec.of(ws), V.Vec.of(Gfx.starts(ws, 0)),
-        V.Vec.of(List.concat(&2, U32, colofs))},
-      Asm{[], [0, 0, 0, 0, 0], [], Gfx.last(pbases), 0}))
-
 # The offsets of the given fields from each lump's position.
 def Gfx.plan(lumps: List<&2, W.Wad.Lump>, +fields: List<&2, U32>) -> List<&2, U32>:
   match lumps:
@@ -708,6 +745,45 @@ def Gfx.plan(lumps: List<&2, W.Wad.Lump>, +fields: List<&2, U32>) -> List<&2, U3
       []
     case l <> rest:
       B.Bytes.fields.one(fields, Gfx.lump.pos(l), Gfx.plan(rest, fields))
+
+# The array sized for everything; the first palette, the colormaps, the
+# flats, the patches and the sprites copied in; the composed columns
+# pasted. heads: each sprite lump's width, left and top offsets.
+def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: List<&2, W.Wad.Lump>,
+  +asm: Gfx.Asm, p: Array<U32> & List<&2, U32>) -> Array<U32> & Gfx & L.Level:
+  Base{level, +fl, pal, cmap, flats, Sprites{+slumps, states, numbers}, anims} = base
+  (a, heads) = p
+  +sidetex = V.Vec.of(Gfx.Names.numbers(tn))
+  +sbases = Gfx.starts(Gfx.sizes(slumps), Gfx.Asm.comp(asm))
+  (Gfx.pastes(Gfx.Asm.pastes(asm), Gfx.Copy.dst(Gfx.copies(
+      Job{Gfx.lump.pos(cmap), Gfx.colormap(), 8704} <> List.concat(&2, Gfx.Job,
+        [Gfx.jobs(Gfx.flat.lumps(flats), Gfx.lumps()), Gfx.jobs(plumps, Gfx.last(fbases)),
+          Gfx.jobs(slumps, Gfx.Asm.comp(asm))]),
+      Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, 256n, 3, Gfx.lump.pos(pal), Gfx.palette(),
+        Copy{a, Array.new(U32, V.Vec.depth((Gfx.last(sbases) + 128 : U32)), 0)})))),
+    Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
+      Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"),
+      Gfx.sprite.table(states, numbers, V.Vec.of(sbases), V.Vec.of(heads),
+        V.Vec.of_list([], (U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())) * 4 : U32))), anims},
+    L.Level.textured(level, sidetex,
+      Gfx.switch.table(Gfx.switch.pairs(), tn, V.Vec.of_list([], Gfx.Names.next(tn)))))
+
+# The flats end where the patches start, the patches where the composed
+# columns do, and those where the sprites do; texture 0 is none, five
+# zero words.
+def Gfx.layout(a: Array<U32>, +base: Gfx.Base, tn: Gfx.Names, headers: List<&2, U32>,
+  words: List<&2, U32>, indices: List<&2, U32>, +plumps: List<&2, W.Wad.Lump>, widths: List<&2, U32>,
+  +colofs: List<&2, List<&2, U32>>) -> Array<U32> & Gfx & L.Level:
+  Base{level, +fl, pal, cmap, flats, Sprites{slumps, states, numbers}, anims} = base
+  +fbases = Gfx.starts(Gfx.sizes(Gfx.flat.lumps(flats)), Gfx.lumps())
+  +pbases = Gfx.starts(Gfx.sizes(plumps), Gfx.last(fbases))
+  +ws = widths
+  Gfx.build(base, tn, fbases, plumps,
+    Gfx.textures(headers, words, indices,
+      Patches{V.Vec.of(pbases), V.Vec.of(ws), V.Vec.of(Gfx.starts(ws, 0)),
+        V.Vec.of(List.concat(&2, U32, colofs))},
+      Asm{[], [0, 0, 0, 0, 0], [], Gfx.last(pbases), 0}),
+    B.Bytes.each(~U32, ~B.Bytes.u16, Gfx.plan(slumps, [0, 4, 6]), a))
 
 # A run of count records of stride bytes from each lump's position plus
 # skip, the counts given lump by lump.
@@ -813,7 +889,7 @@ def Gfx.first(names: List<&2, String>) -> String:
 def Gfx.load.names(base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, pnames: W.Wad.Lump,
   +offs: List<&2, U32>, p: Array<U32> & List<&2, String>) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
-  Base{+level, fl, pal, cmap, flats, Anims{flatanim, none, clock}} = base
+  Base{+level, fl, pal, cmap, flats, sprites, Anims{flatanim, none, clock}} = base
   (a, +names) = p
   +unnamed = {Names{Map.set(&2, U32, Map.new(&2, U32), "-", 0), 1, [], ["-"]} : Gfx.Names}
   +sides = Gfx.rename(List.append(&2, String, L.Level.texnames(level), ["SKY1"]), Gfx.first(names))
@@ -823,7 +899,7 @@ def Gfx.load.names(base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, pnames: W.Wad.Lump
   Result.bind(&1, &1, U32 & String, List<&2, W.Wad.Lump>, Array<U32> & Gfx & L.Level,
     Gfx.lookup(List.drop(&2, String, Gfx.Names.distinct(tn), 1n), Gfx.defs(names, offs),
       "R_TextureNumForName"),
-    +defs => Gfx.load.headers(Base{level, fl, pal, cmap, flats, Anims{flatanim,
+    +defs => Gfx.load.headers(Base{level, fl, pal, cmap, flats, sprites, Anims{flatanim,
         Gfx.anim.of(frames, 1, Gfx.Names.next(tn)), clock}},
       dir, tn, defs, pnames, B.Bytes.each(~U32, ~B.Bytes.u16, Gfx.plan(defs, [12, 14, 20]), a)))
 
@@ -871,14 +947,18 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
   +frames = Gfx.anim.wanted(Gfx.anim.flats(), Gfx.flats.wad(lumps, False{}),
     Gfx.names(L.Level.flatnames(level), unnamed))
   +fl = Gfx.names.after(frames, L.Level.flatnames(level), unnamed)
+  +states = Gfx.sprite.states(H.Thing.spawn(level))
+  +sn = Gfx.names(Gfx.sprite.names(states), unnamed)
   do Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
     pal : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PLAYPAL")
     cmap : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "COLORMAP")
     flats : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.Names.distinct(fl), dir, "R_FlatNumForName")
     pnames : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PNAMES")
     texture1 : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "TEXTURE1")
-    Gfx.load.textures(Base{level, fl, pal, cmap, flats, Anims{Gfx.anim.of(frames, 0, Gfx.Names.next(fl)),
-      Gfx.anim.of([], 1, 0), 0}}, dir, a, pnames, texture1)
+    sprites : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.Names.distinct(sn),
+      Gfx.dir(Gfx.sprite.space(lumps, False{}), Map.new(&2, W.Wad.Lump)), "R_InitSprites")
+    Gfx.load.textures(Base{level, fl, pal, cmap, flats, Sprites{sprites, states, Gfx.Names.numbers(sn)},
+      Anims{Gfx.anim.of(frames, 0, Gfx.Names.next(fl)), Gfx.anim.of([], 1, 0), 0}}, dir, a, pnames, texture1)
 
 # The level and its graphics from the WAD's bytes and directory, or
 # Doom's error for a name the WAD lacks. The WAD's bytes are dropped.
@@ -899,12 +979,12 @@ def Gfx.open() -> IO(Array<U32> & Gfx & L.Level):
 # -------
 
 def Gfx.flat(+g: Gfx, pic: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   V.Vec.get(flats, pic)
 
 # The flat a sector's floor or ceiling shows.
 def Gfx.pic(+g: Gfx, at: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, Anims{Anim{rows, first, shown}, texanim, clock}} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, Anims{Anim{rows, first, shown}, texanim, clock}} = g
   V.Vec.get(shown, V.Vec.get(pics, at))
 
 def Gfx.floorpic(+g: Gfx, sector: U32) -> U32:
@@ -914,16 +994,16 @@ def Gfx.ceilpic(+g: Gfx, sector: U32) -> U32:
   Gfx.pic(g, (sector * 2 + 1 : U32))
 
 def Gfx.sky(+g: Gfx) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   sky
 
 def Gfx.skytex(+g: Gfx) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   skytex
 
 # The texture a side shows, 0 for none.
 def Gfx.sidetex(+g: Gfx, at: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, Anims{flatanim, Anim{rows, first, shown}, clock}} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, Anims{flatanim, Anim{rows, first, shown}, clock}} = g
   V.Vec.get(shown, V.Vec.get(sidetex, at))
 
 def Gfx.top(+g: Gfx, side: U32) -> U32:
@@ -936,39 +1016,39 @@ def Gfx.mid(+g: Gfx, side: U32) -> U32:
   Gfx.sidetex(g, (side * 3 + 2 : U32))
 
 def Gfx.tex.width(+g: Gfx, t: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   V.Vec.get(texs, (t * 5 : U32))
 
 # A texture's height in fixed point, as pegging uses it.
 def Gfx.tex.height(+g: Gfx, t: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   F.Fixed.of_map(V.Vec.get(texs, (t * 5 + 1 : U32)))
 
 def Gfx.tex.patches(+g: Gfx, t: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   V.Vec.get(texs, (t * 5 + 2 : U32))
 
 def Gfx.tex.mask(+g: Gfx, t: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   V.Vec.get(texs, (t * 5 + 3 : U32))
 
 # Where a texture's columns start in the column table.
 def Gfx.tex.first(+g: Gfx, t: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   V.Vec.get(texs, (t * 5 + 4 : U32))
 
 # Doom's R_GetColumn, the texture's part looked up beforehand: the index
 # of a texture column's texels, the column wrapped by the width mask. A
 # patch column's first post header sits three before it.
 def Gfx.column.at(+g: Gfx, first: U32, mask: U32, col: U32) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, anims} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
   V.Vec.get(cols, (first + (col .&. mask) : U32))
 
 def Gfx.column(+g: Gfx, +t: U32, col: U32) -> U32:
   Gfx.column.at(g, Gfx.tex.first(g, t), Gfx.tex.mask(g, t), col)
 
 def Gfx.clock(g: Gfx) -> U32:
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, Anims{flatanim, texanim, clock}} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, Anims{flatanim, texanim, clock}} = g
   clock
 
 def Gfx.Anim.at(a: Gfx.Anim, clock: U32) -> Gfx.Anim:
@@ -978,6 +1058,12 @@ def Gfx.Anim.at(a: Gfx.Anim, clock: U32) -> Gfx.Anim:
 # The graphics with a state's side textures and clock where the renderer
 # looks, the animations shown as they are at that clock.
 def Gfx.of_state(g: Gfx, sidetex: V.Vec, +clock: U32) -> Gfx:
-  Gfx{flats, pics, sky, texs, cols, loaded, skytex, Anims{flatanim, texanim, was}} = g
-  Gfx{flats, pics, sky, texs, cols, sidetex, skytex,
+  Gfx{flats, pics, sky, texs, cols, loaded, skytex, sprites, Anims{flatanim, texanim, was}} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites,
     Anims{Gfx.Anim.at(flatanim, clock), Gfx.Anim.at(texanim, clock), clock}}
+
+# Word k of a state row's sprite: 0 its patch's index, 1 its width, 2
+# its left offset, 3 its top offset.
+def Gfx.sprite(+g: Gfx, state: U32, k: U32) -> U32:
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
+  V.Vec.get(sprites, (state * 4 + k : U32))

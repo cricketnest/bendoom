@@ -17,7 +17,12 @@
 # numbered first, flats from 0 and textures from 1, and what each shows
 # at a clock is worked out by P_UpdateSpecials' rule; the flats' texels
 # 0 and 2077 are NUKAGE1's and FWATER1's at clock 0, NUKAGE3's and
-# FWATER2's at clock 1.
+# FWATER2's at clock 1. THINGS has 292 records, kept as the lump stores
+# them: player 1's start, the dead former sergeant (type 19) spawned on
+# Hurt Me Plenty, and a record west of the origin. Its sprite, SPOSL0
+# between S_START and S_END, is 52 wide with offsets 26 and 20; column
+# 0 is one post at row 16, one texel long, and column 26's first post
+# starts at row 1, 17 long, its column offsets being 216 and 659.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -128,6 +133,19 @@ def specials(+level: L.Level, which: List<&2, U32>) -> List<&2, String>:
     case +k <> rest:
       (U32.show(k) ++ ":" ++ U32.show(carrying(U32.to_nat(1175), level, k, 0))) <> specials(level, rest)
 
+def thing(+i: U32, t: L.Level.Thing) -> String:
+  L.Thing{x, y, angle, kind, options} = t
+  "thing " ++ U32.show(i) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y) ++ " angle " ++ U32.show(angle)
+    ++ " type " ++ U32.show(kind) ++ " options " ++ U32.show(options)
+
+# The sprite of state row 0: its width and offsets, then the header and
+# first texel of column 0's post, the end marker after it, and column
+# 26's first post's header and first texel.
+def sprite(+gfx: G.Gfx) -> List<&2, U32>:
+  +patch = G.Gfx.sprite(gfx, 0, 0)
+  [(patch + 216 : U32), (patch + 217 : U32), (patch + 219 : U32), (patch + 221 : U32), (patch + 659 : U32),
+    (patch + 660 : U32), (patch + 662 : U32)]
+
 def blocks(b: L.Level.Box) -> String:
   L.Box{top, bottom, left, right} = b
   "top " ++ U32.show(top) ++ " bottom " ++ U32.show(bottom) ++ " left " ++ U32.show(left) ++ " right "
@@ -146,6 +164,12 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(side(level, 5, L.Level.side(level, 5)))
     IO.print("specials " ++ names(specials(level, [1, 2, 11, 23, 26, 62, 88, 117, 48, 36])))
     IO.print("line 528 special " ++ U32.show(L.Level.special(level, 528)) ++ " tag " ++ U32.show(L.Level.tag(level, 528)))
+    IO.print("things " ++ U32.show(L.Level.nthings(level)))
+    IO.print(thing(157, L.Level.thing(level, 157)))
+    IO.print(thing(245, L.Level.thing(level, 245)))
+    IO.print(thing(42, L.Level.thing(level, 42)))
+    IO.print("sprite of state 0 width " ++ F.Fixed.show(G.Gfx.sprite(gfx, 0, 1)) ++ " offset "
+      ++ F.Fixed.show(G.Gfx.sprite(gfx, 0, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, 0, 3)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -161,7 +185,7 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       animated(at(gfx, level, 8)), animated(at(gfx, level, 9)), animated(at(gfx, level, 41))], ", "))
     IO.print("palette colormap flats texels " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
       B.Bytes.each(~U32, ~B.Bytes.at, List.concat(&2, U32, [peeks(gfx), texels(gfx), moving(at(gfx, level, 0)),
-        moving(at(gfx, level, 1))]), mem))))
+        moving(at(gfx, level, 1)), sprite(gfx)]), mem))))
 
 def report(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -182,6 +206,11 @@ def main() -> IO(Unit):
 #|side 5 offset 94.000000 0.000000 sector 46 textures - MC18 -
 #|specials 1:20 2:6 11:1 23:1 26:4 62:4 88:5 117:1 48:0 36:0
 #|line 528 special 2 tag 5
+#|things 292
+#|thing 157 at -416.000000 256.000000 angle 0 type 1 options 7
+#|thing 245 at 1248.000000 224.000000 angle 90 type 19 options 15
+#|thing 42 at -160.000000 1328.000000 angle 225 type 2048 options 23
+#|sprite of state 0 width 52.000000 offset 26.000000 top 20.000000
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127
@@ -192,4 +221,4 @@ def main() -> IO(Unit):
 #|texture SW2GRAY 64x128.000000 patches 3 mask 63
 #|switches 105 121 105 0
 #|animations 0 3 1 5, 2 4 3 7, 2 4 3 7, 0 5 4 8, 1 5 4 8
-#|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207
+#|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207 16 1 64 255 1 17 8

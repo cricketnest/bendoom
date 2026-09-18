@@ -6,14 +6,21 @@
 # run called and rides it into the pit; the second runs across that
 # lift and off its east edge into the fall and the landing. Freedoom's
 # first map is not id's: the shareware start is 1056, -3616 facing 90.
+# The start's things: on Hurt Me Plenty THINGS record 245 alone, the
+# dead former sergeant (record 281, the other of type 19, is for the
+# easy skills), on sector 170's floor 16 units up, as a nushell walk of
+# the WAD's nodes finds it; the random index is 5 once P_SpawnMobj has
+# drawn for the player and for it and the three flashes have spawned.
 # Then the movers and the lights, as runs of one command in a demo's
 # units from a place, each line with the clock, the thinkers running
 # and chosen sectors' floors and ceilings: the first door used, turned
 # twice, held, walked through and closed on the player; the special 23
 # switch; a special 2 line crossed both ways; the lift called by its
 # line and by its switch; the blue key door refusing; the exit switch;
-# the blinks and the strobe from the start. The heights, lights and
-# tics are the hand computations in milestone 4's tickets 04 to 10; the
+# the blinks and the strobe from the start. The heights and tics are
+# the hand computations in milestone 4's tickets 04 to 10; the blinks'
+# lights, a nushell replay of T_LightFlash over Chocolate Doom's random
+# table from index 2, which from index 1 gives milestone 4's; the
 # positions are regression pins.
 import Base
 import ../src/bytes.bend as B
@@ -23,6 +30,7 @@ import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/things.bend as H
 
 def line(tag: String, s: S.State) -> String:
   +p = S.State.player(s)
@@ -217,10 +225,19 @@ def door(+level: L.Level) -> IO(Unit):
     exits(level)
     lights([1n, 34n, 1n, 4n, 1n, 23n, 1n, 1n, 1n, 2n, 2n, 60n, 1n, 2n, 1n, 1n, 1n, 1n, 4n, 1n, 0n], S.State.start(level))
 
+def spawned(things: List<&2, H.Thing>) -> String:
+  match things:
+    case []:
+      ""
+    case H.Thing{id, kind, x, y, z, sector, state} <> rest:
+      " thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
+        ++ " z " ++ F.Fixed.show(z) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ spawned(rest)
+
 def free(+s: S.State) -> IO(S.State):
   +p = S.State.player(s)
   do IO<S.State>:
     IO.print("free at start " ++ Bool.show(S.Sim.free(S.State.level(s), S.Player.x(p), S.Player.y(p))))
+    IO.print("things at start" ++ spawned(S.State.things(s)) ++ " random " ++ U32.show(S.State.rnd(s)))
     return s
 
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
@@ -258,6 +275,7 @@ def main() -> IO(Unit):
 
 #|start -416.000000 256.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000
 #|free at start True
+#|things at start thing 245 type 19 at 1248.000000 224.000000 z 16.000000 sector 170 state 0 random 5
 #|U:1 -415.218765 256.000289 0.000 z 0.000000 floor 0.000000 eye 41.000015
 #|U!:34 3.282882 256.157440 0.000 z 0.000000 floor 0.000000 eye 33.430175
 #|L:20 137.245544 256.206893 61.523 z -48.000000 floor -48.000000 eye 44.403701
@@ -354,16 +372,16 @@ def main() -> IO(Unit):
 #|lights tic 64 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 65 sector 32 144 sector 33 140 sector 48 120 sector 90 160
 #|lights tic 66 sector 32 144 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 67 sector 32 176 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 69 sector 32 176 sector 33 140 sector 48 140 sector 90 160
+#|lights tic 67 sector 32 144 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 69 sector 32 144 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 71 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 131 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 132 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 134 sector 32 144 sector 33 176 sector 48 120 sector 90 160
-#|lights tic 135 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 136 sector 32 144 sector 33 140 sector 48 140 sector 90 160
-#|lights tic 137 sector 32 176 sector 33 140 sector 48 140 sector 90 160
-#|lights tic 138 sector 32 144 sector 33 140 sector 48 140 sector 90 160
-#|lights tic 142 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 132 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 134 sector 32 176 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 135 sector 32 176 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 136 sector 32 176 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 137 sector 32 176 sector 33 176 sector 48 120 sector 90 160
+#|lights tic 138 sector 32 144 sector 33 176 sector 48 120 sector 90 160
+#|lights tic 142 sector 32 144 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 143 sector 32 144 sector 33 176 sector 48 140 sector 90 160
 #|end

@@ -1,8 +1,7 @@
 # Doom's R_DrawMasked, the walls' half: after the planes, the stored
 # ranges walked newest first, nearest first stored so farthest first
 # drawn, and each two-sided middle texture drawn column by column through
-# its posts, so its gaps show what is behind it. Milestone 5's sprites
-# join this pass.
+# its posts, so its gaps show what is behind it.
 import Base
 import ./fixed.bend as F
 import ./level.bend as L
