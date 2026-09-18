@@ -154,27 +154,83 @@ law cmd_tables:
 # any level, at any position.
 law tic_rest:
   for +level: L.Level
+  for +x: U32
+  for +y: U32
+  {(S.Player.x(S.Sim.tic(level, K.Keys.none(),
+      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})),
+    S.Player.y(S.Sim.tic(level, K.Keys.none(),
+      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})))
+    == (x, y) : U32 & U32}
+
+# The closed laws below stand on Level.room: one sector, no lines, the
+# floor at 0 and the ceiling at 128. Every number is computed by hand
+# from vanilla's formulas.
+
+# LAW: one tic forward from rest at angle zero thrusts 25 * 2048 along
+# the facing (51199 along x through the cosine 65535, 19 along y through
+# the sine 25) and then decays it by 0.90625: momentum 46399, 17,
+# position 0.78125, 0.000290 (the numbers of milestone 2's ticket 08
+# hand check). The eye is the rest height plus the bob: the squared
+# momentum over four is 9999, and half of it times the clock's sine 25
+# is 1 (sanity).
+law tic_from_rest:
+  {S.Sim.tic(L.Level.room(0, 8388608),
+    K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}},
+    S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})
+    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, 0, 1} : S.Player}
+
+# LAW: standing still on the floor puts the eye 41 above it, at any
+# position, whatever the eye was.
+law eye_rest:
   for x: U32
   for y: U32
-  for floorz: U32
-  {S.Sim.tic(level, K.Keys.none(), S.Player{x, y, 0, 0, 0, floorz, 0})
-    == S.Player{x, y, 0, 0, 0, floorz, 0} : S.Player}
+  {S.Player.viewz(S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+    S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0})) == 2686976 : U32}
 
-# LAW: one tic forward from rest at angle zero, on a level with no lines
-# and room to stand, thrusts 25 * 2048 along the facing (51199 along x
-# through the cosine 65535, 19 along y through the sine 25) and then
-# decays it by 0.90625: momentum 46399, 17, position 0.78125, 0.000290
-# (sanity; the numbers of milestone 2's ticket 08 hand check).
-law tic_from_rest:
-  {S.Sim.tic(L.Level{L.Lines{0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}}, V.Leaf{0},
-    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{8388608},
-    L.Bsp{32768, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-      V.Leaf{0}, V.Leaf{0}},
-    L.Blockmap{V.Leaf{0}, 0, 0, 0, 0}, L.Start{0, 0, 0},
-    V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0}},
-    K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}},
-    S.Player{0, 0, 0, 0, 0, 0, 0})
-    == S.Player{51199, 19, 0, 46399, 17, 0, 0} : S.Player}
+# LAW: 64 above the floor, the first airborne tic sets the fall to twice
+# gravity without moving, the second moves by it and adds gravity once;
+# the eye sits 41 above the height the tic began at (sanity).
+law fall_gravity:
+  {(S.Sim.run(1n, L.Level.room(0, 8388608), K.Keys.none(),
+      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0}),
+    S.Sim.run(2n, L.Level.room(0, 8388608), K.Keys.none(),
+      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0}))
+    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, 0, 1},
+      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, 0, 2})
+    : S.Player & S.Player}
+
+# LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
+# landing at 8 a tic does not (sanity).
+law landing_dip:
+  {(S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+      S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, 0, 0}),
+    S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+      S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, 0, 0}))
+    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, 0, 1},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, 0, 1})
+    : S.Player & S.Player}
+
+# LAW: the bob at the clock's peak (tic 5, sine 65535). The first tic of
+# a run from rest has momentum 102398, 39, whose square over four is
+# 39998, and half of it bobs the eye by 19998. At 30 a tic the square
+# over four is 14745600, capped at 16 units, and half of it bobs the eye
+# by 524280, a hair under 8 units (sanity).
+law bob_run_and_cap:
+  {(S.Player.viewz(S.Sim.tic(L.Level.room(0, 8388608),
+      K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 5})),
+    S.Player.viewz(S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 5})))
+    == (2706974, 3211256) : U32 & U32}
+
+# LAW: a floor 16 above the player's feet lifts the player onto it, cuts
+# the view height by the 16 to 25, and sets it recovering by an eighth
+# of the gap, 2 a tic (sanity).
+law step_up_dip:
+  {S.Sim.tic(L.Level.room(0, 8388608), K.Keys.none(),
+    S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, 0, 0})
+    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, 0, 1}
+    : S.Player}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts, levels and players.

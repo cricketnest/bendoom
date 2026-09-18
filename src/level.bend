@@ -96,6 +96,17 @@ def Level.map.drop(lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) ->
 def Level.map(+lumps: List<&2, W.Wad.Lump>) -> List<&2, W.Wad.Lump>:
   Level.map.drop(lumps, W.Wad.index("E1M1", lumps))
 
+# One sector with no lines, its floor and ceiling as given, and Doom's
+# tables: the level of the closed laws, and what a malformed WAD loads
+# as. A Leaf answers every index, so one is a whole table.
+def Level.room(floor: U32, ceil: U32) -> Level:
+  Level{Lines{0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}}, V.Leaf{0}, V.Leaf{0},
+    V.Leaf{0}, V.Leaf{floor}, V.Leaf{ceil},
+    Bsp{32768, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
+      V.Leaf{0}, V.Leaf{0}},
+    Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Start{0, 0, 0},
+    V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049)}
+
 # Every field the level keeps, in the order Level.pack takes them.
 def Level.reqs(+map: List<&2, W.Wad.Lump>) -> List<&2, Level.Req>:
   List.concat(&2, Level.Req, [
@@ -170,10 +181,7 @@ def Level.pack.go(a: Array<U32>, +map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>
         V.Vec.of_list(T.Tables.finesine(), 10240),
         V.Vec.of_list(T.Tables.tantoangle(), 2049)})
     case _:
-      (a, Level{Lines{0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}}, V.Leaf{0}, V.Leaf{0},
-        V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-        Bsp{0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
-        Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Start{0, 0, 0}, V.Leaf{0}, V.Leaf{0}})
+      (a, Level.room(0, 0))
 
 def Level.pack(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, V.Vec>) ->
   Array<U32> & Level:
