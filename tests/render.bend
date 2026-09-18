@@ -18,7 +18,11 @@
 # milestone 4's tickets: the first door half open, 21 tics after its use
 # (832 384 90, "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0"); the special 23
 # switch pressed, 28 tics after its use (2064 -260 90, "20,0,0,0,0
-# 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0"). Each frame is drawn twice, over
+# 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0"); the exit switch pressed and the
+# level ended, which vanilla never stands in: the frame is pixel for
+# pixel ours of a map whose side names the pressed switch, which the
+# oracle finds no pixel off (ticket 09; -352 1296 180, "20,0,0,0,0
+# 1,0,0,0,1 10,0,0,0,0"). Each frame is drawn twice, over
 # a view blanked to 0 and to 255: equal hashes mean every pixel of the
 # view was written. Pinned to Freedoom.
 import Base
@@ -128,6 +132,8 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m13 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n),
       List.replicate(K.Cmd, 10n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
       at(level, east(2064), west(260), 90)), m12)
+    m14 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
+      idle(10n)], at(level, west(352), east(1296), 180)), m13)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -152,4 +158,5 @@ def main() -> IO(Unit):
 #|landed U!:66 hash 2581086416 pixels 6 110 14 79 covered True
 #|door half open hash 1284933713 pixels 107 6 74 111 covered True
 #|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
+#|exit pressed hash 847822191 pixels 102 95 102 3 covered True
 #|end

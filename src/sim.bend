@@ -826,9 +826,10 @@ type State is Data:
     clock: U32, ended: Bool, usedown: Bool}
 
 # The state a level starts in, from the map as loaded, with the player
-# at rest at a place.
+# at rest at a place and use counted as down, as Doom's G_PlayerReborn
+# leaves it, so a key held since before the level does nothing.
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
-  State{Player.at(level, place), level, L.Level.sidetex(level), [], 0, 0, False{}, False{}}
+  State{Player.at(level, place), level, L.Level.sidetex(level), [], 0, 0, False{}, True{}}
 
 def State.start(+level: L.Level) -> State:
   State.at(level, L.Level.start_of(level))
@@ -1144,6 +1145,11 @@ def Sim.once(line: U32, s: State) -> State:
   State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
   State{player, L.Level.special.put(level, line, 0), sidetex, thinkers, rnd, clock, ended, usedown}
 
+# Doom's G_ExitLevel: the level ends, and the tic it ends on runs on.
+def State.end(s: State) -> State:
+  State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, sidetex, thinkers, rnd, clock, True{}, usedown}
+
 # A switch that works once: when its tag starts a mover, its texture is
 # swapped and its special cleared.
 def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, +line: U32,
@@ -1215,9 +1221,9 @@ def Sim.cross(lines: List<&2, U32>, +s: State) -> State:
 # ---
 
 # Doom's P_UseSpecialLine for the specials E1M1 carries: the manual door
-# and its blazing twin, the switch that lowers floors, and the lift's. The blue key
-# door is not among them until keys exist, so it refuses, as any special
-# Doom does not know does nothing.
+# and its blazing twin, the switch that lowers floors, the lift's, and
+# the exit. The blue key door is not among them until keys exist, so it
+# refuses, as any special Doom does not know does nothing.
 def Sim.use.special(special: U32, +i: U32, +s: State) -> State:
   match special:
     case 1:
@@ -1228,6 +1234,8 @@ def Sim.use.special(special: U32, +i: U32, +s: State) -> State:
       Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
     case 62:
       Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
+    case 11:
+      State.end(Sim.once(i, Sim.switch(False{}, i, s)))
     case _:
       s
 

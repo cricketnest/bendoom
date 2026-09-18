@@ -36,8 +36,13 @@
 # computation), the eye 45 over the floor going down and 37 going up,
 # a tic behind it; then called by its switch from the pit, a use while
 # it runs, which starts nothing, and one once it is back, which calls it
-# again. The heights and tics are the hand
-# computation's; the positions are regression pins.
+# again. Then the exit switch,
+# line 407, from before it (ticket 09's hand computation): use on a
+# level's first tic does nothing, as Doom starts a player with use counted
+# as down; the use on tic 21 ends the level, the clock counted and the
+# line's special gone; ten tics of walking with use held change nothing.
+# The heights and tics are the hand computation's; the positions are
+# regression pins.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -148,6 +153,22 @@ def blue(+level: L.Level) -> IO(Unit):
     b0 : S.State <- run("blue walk", 30n, forward(), [71], at(level, 832, 1400, 90))
     b1 : S.State <- run("use", 1n, use(), [71], b0)
     b2 : S.State <- run("-", 10n, idle(), [71], b1)
+    IO.print("-")
+
+# A run, then whether the level has ended and the exit line's special.
+def ending(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  do IO<S.State>:
+    IO.print(watch(tag, [], q) ++ " ended " ++ Bool.show(S.State.ended(q)) ++ " special "
+      ++ U32.show(L.Level.special(S.State.level(q), 407)))
+    return q
+
+def exit(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    x0 : S.State <- ending("exit first tic use", 1n, use(), at(level, 65184, 1296, 180))
+    x1 : S.State <- ending("-", 19n, idle(), x0)
+    x2 : S.State <- ending("use", 1n, use(), x1)
+    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, True{}), x2)
     IO.print("end")
 
 # A use while the door closes sends it back up; one while it waits
@@ -205,6 +226,7 @@ def door(+level: L.Level) -> IO(Unit):
     crossed(level)
     lift(level)
     blue(level)
+    exit(level)
 
 def free(+s: S.State) -> IO(S.State):
   +p = S.State.player(s)
@@ -328,4 +350,9 @@ def main() -> IO(Unit):
 #|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 0 sector 71 -128.000000 -128.000000
 #|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 71 -128.000000 -128.000000
 #|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 71 -128.000000 -128.000000
+#|-
+#|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 ended False special 11
+#|- tic 20 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 ended False special 11
+#|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 ended True special 0
+#|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 ended True special 0
 #|end
