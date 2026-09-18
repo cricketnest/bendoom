@@ -1,7 +1,7 @@
-# Doom's R_DrawMasked, the walls' half: after the planes, the stored
-# ranges walked newest first, nearest first stored so farthest first
-# drawn, and each two-sided middle texture drawn column by column through
-# its posts, so its gaps show what is behind it.
+# Doom's R_RenderMaskedSegRange: a stored range's two-sided middle
+# texture drawn column by column through its posts, so its gaps show
+# what is behind it, over the columns the sprites' pass asks for, each
+# column once.
 import Base
 import ./fixed.bend as F
 import ./level.bend as L
@@ -43,13 +43,32 @@ def Masked.column(mem: Array<U32>, +x: U32, texcol: U32, cc: U32, fc: U32, range
     Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, S.Segs.iscale(scale),
       S.Segs.colormap(lightnum, scale), cc, fc})
 
-def Masked.columns(texcols: List<&2, U32>, tops: List<&2, U32>, bottoms: List<&2, U32>, +x: U32,
-  +range: Masked.Range, mem: Array<U32>) -> Array<U32>:
+# The texture column left in a column once drawn: Doom's SHRT_MAX, here
+# a value no texture column takes.
+def Masked.drawn() -> U32:
+  2147483647
+
+# A column the pass asks for and still pending is drawn and left drawn;
+# any other is left as it was. The texture columns gather last first.
+def Masked.step(asked: Bool, +x: U32, +texcol: U32, cc: U32, fc: U32, +range: Masked.Range,
+  st: Array<U32> & List<&2, U32>) -> Array<U32> & List<&2, U32>:
+  match asked:
+    case True{}:
+      (mem, left) = st
+      (Masked.column(mem, x, texcol, cc, fc, range), Masked.drawn() <> left)
+    case False{}:
+      (mem, left) = st
+      (mem, texcol <> left)
+
+def Masked.columns(texcols: List<&2, U32>, tops: List<&2, U32>, bottoms: List<&2, U32>, +x: U32, +r1: U32,
+  +r2: U32, +range: Masked.Range, st: Array<U32> & List<&2, U32>) -> Array<U32> & List<&2, U32>:
   match texcols tops bottoms:
-    case texcol <> cs cc <> ts fc <> bs:
-      Masked.columns(cs, ts, bs, (x + 1 : U32), range, Masked.column(mem, x, texcol, cc, fc, range))
+    case +texcol <> cs cc <> ts fc <> bs:
+      Masked.columns(cs, ts, bs, (x + 1 : U32), r1, r2, range,
+        Masked.step(Bool.and(U32.is_le(r1, x), Bool.and(U32.is_le(x, r2),
+          Bool.not(U32.is_eq(texcol, Masked.drawn())))), x, texcol, cc, fc, range, st))
     case _ _ _:
-      mem
+      st
 
 # The texture stands on the higher floor when the line is pegged to the
 # bottom, else hangs from the lower ceiling; then moves by the side's
@@ -70,22 +89,33 @@ def Masked.range(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg,
       G.Gfx.tex.height(gfx, G.Gfx.mid(gfx, side)), P.View.z(view)),
     S.Segs.lightnum(seg, L.Level.sector.light(level, front))}
 
-def Masked.wall(+view: P.View, +level: L.Level, +gfx: G.Gfx, wall: D.Draw.Wall, mem: Array<U32>) ->
-  Array<U32>:
+def Masked.wall.left(wall: D.Draw.Wall, st: Array<U32> & List<&2, U32>) -> Array<U32> & D.Draw.Wall:
+  D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms} = wall
+  (mem, left) = st
+  (mem, D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, List.reverse(&2, U32, left), tops, bottoms})
+
+# The range's columns from r1 to r2 still pending drawn, and the range
+# left with them drawn. One with no middle texture has no texture
+# columns, and is passed over before anything is worked out for it.
+def Masked.wall(+view: P.View, +level: L.Level, +gfx: G.Gfx, +r1: U32, +r2: U32, +wall: D.Draw.Wall,
+  mem: Array<U32>) -> Array<U32> & D.Draw.Wall:
   match wall:
     case D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, [], tops, bottoms}:
-      mem
+      (mem, wall)
     case D.Wall{seg, +x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms}:
-      Masked.columns(texcols, tops, bottoms, x1, Masked.range(view, level, gfx, L.Level.seg(level, seg), x1,
-        scale1, step), mem)
+      Masked.wall.left(wall, Masked.columns(texcols, tops, bottoms, x1, r1, r2,
+        Masked.range(view, level, gfx, L.Level.seg(level, seg), x1, scale1, step), (mem, [])))
 
-# Every stored range, newest first; one with no middle texture has no
-# texture columns, and is passed over before anything is worked out
-# for it.
+def Masked.mem(p: Array<U32> & D.Draw.Wall) -> Array<U32>:
+  (mem, wall) = p
+  mem
+
+# Doom's last loop in R_DrawMasked: the columns no sprite drew, every
+# stored range's, newest first.
 def Masked.draw(walls: List<&2, D.Draw.Wall>, +view: P.View, +level: L.Level, +gfx: G.Gfx,
   mem: Array<U32>) -> Array<U32>:
   match walls:
     case []:
       mem
     case wall <> rest:
-      Masked.draw(rest, view, level, gfx, Masked.wall(view, level, gfx, wall, mem))
+      Masked.draw(rest, view, level, gfx, Masked.mem(Masked.wall(view, level, gfx, 0, 319, wall, mem)))

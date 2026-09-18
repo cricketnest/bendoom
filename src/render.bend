@@ -12,19 +12,17 @@ import ./project.bend as P
 import ./draw.bend as D
 import ./bsp.bend as B
 import ./planes.bend as N
-import ./masked.bend as M
 import ./sprites.bend as T
 
 def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
   P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p))
 
 # After the walk, the planes, then the sprites of the things in the
-# sectors it saw, then the masked middle textures over them all.
+# sectors it saw and the masked middle textures, in depth order.
 def Render.rest(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, st: D.Draw) ->
   Array<U32>:
-  D.Draw{mem, solid, +walls, tasks, planes, seen} = st
-  M.Masked.draw(walls, view, level, gfx, T.Sprites.masked(things, seen, view, level, gfx, walls,
-    N.Planes.draw(view, gfx, mem, planes)))
+  D.Draw{mem, solid, walls, tasks, planes, seen} = st
+  T.Sprites.masked(things, seen, view, level, gfx, walls, N.Planes.draw(view, gfx, mem, planes))
 
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, mem: Array<U32>) ->
   Array<U32>:

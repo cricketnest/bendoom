@@ -1,8 +1,9 @@
-# Doom's R_AddSprites, R_ProjectSprite, R_SortVisSprites, R_DrawSprite
-# and R_DrawVisSprite: the things in the sectors the walk saw, projected
-# from the eye, drawn farthest first, each clipped by the stored ranges
-# in front of it and drawn post by post, so the gaps between posts leave
-# the frame as it was.
+# Doom's R_AddSprites, R_ProjectSprite, R_SortVisSprites, R_DrawMasked,
+# R_DrawSprite and R_DrawVisSprite: the things in the sectors the walk
+# saw, projected from the eye, drawn farthest first, each after the
+# masked columns behind it, clipped by the stored ranges in front of it
+# and drawn post by post, so the gaps between posts leave the frame as it
+# was.
 import Base
 import ./bytes.bend as B
 import ./vec.bend as V
@@ -147,45 +148,71 @@ def Sprites.behind(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
   L.Seg{+x1, +y1, x2, y2, angle, offset, flags, side, front, back} = s
   L.Level.node_side(x, y, x1, y1, (x2 - x1 : U32), (y2 - y1 : U32))
 
-# Doom's R_DrawSprite for one stored range over some of the sprite's
-# columns: unless it is behind the sprite (all of it smaller than the
-# sprite, or some of it and the sprite in front of its seg), it clips the
-# columns no newer range clipped, below unless the sprite stands at or
-# over the height it clips below, above unless the sprite's top is at or
-# under the height it clips above.
-def Sprites.clip.range(+level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) -> Array<U32>:
-  Vis{+sx1, +sx2, +scale, +gx, +gy, +gz, +gzt, mid, frac, step, patch, cmap, rank, id} = vis
-  D.Wall{seg, +x1, +x2, +scale1, +scale2, wstep, +sil, +bsil, +tsil, texcols, tops, bottoms} = wall
+# A stored range in front of the sprite, over the columns they share,
+# r1 to r2: it clips the columns no newer range clipped, below unless
+# the sprite stands at or over the height it clips below, above unless
+# the sprite's top is at or under the height it clips above.
+def Sprites.clip.range(vis: Sprites.Vis, r1: U32, r2: U32, wall: D.Draw.Wall, mem: Array<U32>) -> Array<U32>:
+  Vis{sx1, sx2, scale, gx, gy, +gz, +gzt, mid, frac, step, patch, cmap, rank, id} = vis
+  D.Wall{seg, +x1, x2, scale1, scale2, wstep, +sil, +bsil, +tsil, texcols, tops, bottoms} = wall
   +bottom = Bool.and(Bool.not(U32.is_zero((sil .&. 1 : U32))), F.Fixed.lt(gz, bsil))
   +top = Bool.and(Bool.not(U32.is_zero((sil .&. 2 : U32))), F.Fixed.gt(gzt, tsil))
-  Sprites.clip.if(Bool.and(Bool.or(top, bottom), Bool.not(Bool.or(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale),
-      Bool.and(F.Fixed.lt(F.Fixed.min(scale1, scale2), scale),
-        Bool.not(Sprites.behind(L.Level.seg(level, seg), gx, gy)))))),
-    top, bottom, U32.max(x1, sx1), U32.min(x2, sx2), x1, tops, bottoms, mem)
+  Sprites.clip.if(Bool.or(top, bottom), top, bottom, r1, r2, x1, tops, bottoms, mem)
 
-# Whether a range can clip the sprite at all, the test vanilla makes
-# first: it has a silhouette and shares a column with the sprite.
+def Sprites.clip.kept(done: List<&2, D.Draw.Wall>, p: Array<U32> & D.Draw.Wall) ->
+  Array<U32> & List<&2, D.Draw.Wall>:
+  (mem, wall) = p
+  (mem, wall <> done)
+
+# A range behind the sprite draws its masked columns there still
+# pending, below the sprite; one in front clips it. Either is kept as
+# it is left.
+def Sprites.clip.side(behind: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, +vis: Sprites.Vis, +r1: U32,
+  +r2: U32, +wall: D.Draw.Wall, st: Array<U32> & List<&2, D.Draw.Wall>) -> Array<U32> & List<&2, D.Draw.Wall>:
+  match behind:
+    case True{}:
+      (mem, done) = st
+      Sprites.clip.kept(done, M.Masked.wall(view, level, gfx, r1, r2, wall, mem))
+    case False{}:
+      (mem, done) = st
+      (Sprites.clip.range(vis, r1, r2, wall, mem), wall <> done)
+
+# Whether a range can matter to the sprite at all, the test vanilla
+# makes first: it has a silhouette, which every masked range has, and
+# shares a column with the sprite.
 def Sprites.clip.meets(+vis: Sprites.Vis, +wall: D.Draw.Wall) -> Bool:
   Vis{+sx1, +sx2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
   D.Wall{seg, +x1, +x2, scale1, scale2, wstep, sil, bsil, tsil, texcols, tops, bottoms} = wall
   Bool.and(Bool.not(U32.is_zero(sil)), Bool.and(U32.is_le(x1, sx2), U32.is_ge(x2, sx1)))
 
-def Sprites.clip.wall(meets: Bool, +level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) ->
-  Array<U32>:
+# Doom's R_DrawSprite for one stored range: behind the sprite when all
+# of it is smaller than the sprite, or some of it is and the sprite is
+# in front of its seg; the columns they share are r1 to r2.
+def Sprites.clip.wall(meets: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, +vis: Sprites.Vis,
+  +wall: D.Draw.Wall, st: Array<U32> & List<&2, D.Draw.Wall>) -> Array<U32> & List<&2, D.Draw.Wall>:
   match meets:
     case False{}:
-      mem
+      (mem, done) = st
+      (mem, wall <> done)
     case True{}:
-      Sprites.clip.range(level, vis, wall, mem)
+      Vis{+sx1, +sx2, +scale, +gx, +gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
+      D.Wall{seg, +x1, +x2, +scale1, +scale2, wstep, sil, bsil, tsil, texcols, tops, bottoms} = wall
+      Sprites.clip.side(Bool.or(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale),
+          Bool.and(F.Fixed.lt(F.Fixed.min(scale1, scale2), scale),
+            Bool.not(Sprites.behind(L.Level.seg(level, seg), gx, gy)))),
+        view, level, gfx, vis, U32.max(x1, sx1), U32.min(x2, sx2), wall, st)
 
-# The stored ranges, newest first.
-def Sprites.clip.walls(walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Sprites.Vis, mem: Array<U32>) ->
-  Array<U32>:
+# The stored ranges, newest first, gathered as the sprite leaves them
+# and put back in their order.
+def Sprites.clip.walls(walls: List<&2, D.Draw.Wall>, +view: P.View, +level: L.Level, +gfx: G.Gfx,
+  +vis: Sprites.Vis, st: Array<U32> & List<&2, D.Draw.Wall>) -> Array<U32> & List<&2, D.Draw.Wall>:
   match walls:
     case []:
-      mem
+      (mem, done) = st
+      (mem, List.reverse(&2, D.Draw.Wall, done))
     case +wall <> rest:
-      Sprites.clip.walls(rest, level, vis, Sprites.clip.wall(Sprites.clip.meets(vis, wall), level, vis, wall, mem))
+      Sprites.clip.walls(rest, view, level, gfx, vis,
+        Sprites.clip.wall(Sprites.clip.meets(vis, wall), view, level, gfx, vis, wall, st))
 
 # Drawing
 # -------
@@ -225,28 +252,37 @@ def Sprites.col(i: Nat, st: Sprites.Col) -> Sprites.Col:
   +x = U32.from_nat(i)
   Sprites.col.top(x, vis, frac, B.Bytes.at(mem, (G.Gfx.cliptop() + x : U32)))
 
-# Doom's R_DrawSprite: the sprite's columns unclipped, clipped by every
-# stored range, then drawn.
-def Sprites.sprite(+walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Sprites.Vis, mem: Array<U32>) ->
-  Array<U32>:
+def Sprites.sprite.draw(+vis: Sprites.Vis, p: Array<U32> & List<&2, D.Draw.Wall>) ->
+  Array<U32> & List<&2, D.Draw.Wall>:
   Vis{+x1, +x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
-  +n = D.Draw.rows(x1, x2)
-  Sprites.Col.mem(D.Draw.each(~Sprites.Col, ~Sprites.col, n, U32.to_nat(x1),
-    Col{Sprites.clip.walls(walls, level, vis, D.Draw.set(n, D.Draw.set(n, mem, (G.Gfx.cliptop() + x1 : U32),
-      Sprites.unclipped()), (G.Gfx.clipbot() + x1 : U32), Sprites.unclipped())), vis, frac}))
+  (mem, walls) = p
+  (Sprites.Col.mem(D.Draw.each(~Sprites.Col, ~Sprites.col, D.Draw.rows(x1, x2), U32.to_nat(x1),
+    Col{mem, vis, frac})), walls)
 
-def Sprites.draw(sprites: List<&2, Sprites.Vis>, +walls: List<&2, D.Draw.Wall>, +level: L.Level,
-  mem: Array<U32>) -> Array<U32>:
+# Doom's R_DrawSprite: the sprite's columns unclipped, the stored ranges
+# walked, then the sprite drawn through the clips they left.
+def Sprites.sprite(+view: P.View, +level: L.Level, +gfx: G.Gfx, +vis: Sprites.Vis,
+  p: Array<U32> & List<&2, D.Draw.Wall>) -> Array<U32> & List<&2, D.Draw.Wall>:
+  Vis{+x1, +x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
+  (mem, walls) = p
+  +n = D.Draw.rows(x1, x2)
+  Sprites.sprite.draw(vis, Sprites.clip.walls(walls, view, level, gfx, vis,
+    (D.Draw.set(n, D.Draw.set(n, mem, (G.Gfx.cliptop() + x1 : U32), Sprites.unclipped()),
+      (G.Gfx.clipbot() + x1 : U32), Sprites.unclipped()), [])))
+
+def Sprites.draw(sprites: List<&2, Sprites.Vis>, +view: P.View, +level: L.Level, +gfx: G.Gfx,
+  p: Array<U32> & List<&2, D.Draw.Wall>) -> Array<U32>:
   match sprites:
     case []:
-      mem
+      (mem, walls) = p
+      M.Masked.draw(walls, view, level, gfx, mem)
     case vis <> rest:
-      Sprites.draw(rest, walls, level, Sprites.sprite(walls, level, vis, mem))
+      Sprites.draw(rest, view, level, gfx, Sprites.sprite(view, level, gfx, vis, p))
 
-# Doom's R_DrawMasked, the sprites' half: the things of the sectors the
-# walk saw, drawn farthest first.
+# Doom's R_DrawMasked: the things of the sectors the walk saw, drawn
+# farthest first, then the masked columns no sprite drew.
 def Sprites.masked(things: List<&2, H.Thing>, seen: D.Draw.Seen, +view: P.View, +level: L.Level, +gfx: G.Gfx,
-  +walls: List<&2, D.Draw.Wall>, mem: Array<U32>) -> Array<U32>:
+  walls: List<&2, D.Draw.Wall>, mem: Array<U32>) -> Array<U32>:
   D.Seen{ranks, next} = seen
-  Sprites.draw(List.sort(~Sprites.Vis, ~Sprites.before, Sprites.gather(things, ranks, view, level, gfx)), walls,
-    level, mem)
+  Sprites.draw(List.sort(~Sprites.Vis, ~Sprites.before, Sprites.gather(things, ranks, view, level, gfx)), view,
+    level, gfx, (mem, walls))

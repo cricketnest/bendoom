@@ -18,14 +18,19 @@
 # of its 1022 pixels; a hall where one-sided walls hide the sergeant and
 # a hung leg, and ledges two corpses, all projected; and a corpse
 # (record 171) beyond a raised bench, whose edge leaves 78 of its 220
-# pixels, and another (167) it hides whole. Then frames after scripts, which the oracle plays too: a
-# stride, riding the lift down, off its east edge, the first door half
-# open, the special 23 switch pressed, the exit switch pressed, a
-# blinking wall at its dark level, and the water on a later frame of its
-# cycle; each script is beside its frame below. Every frame holds the
-# things E1M1 spawns on Hurt Me Plenty. tools/oracle.nu finds no pixel
-# off vanilla's in the dark, grate, water, sky, sprite-rule, stride,
-# switch and blink frames. The others differ where a thing animates or
+# pixels, and another (167) it hides whole. Then the masked pass's two
+# depth orders: the yard's trees in front of the grate, which drawing
+# every sprite before every masked texture changes by 837 pixels, the
+# grate's top over the trees; and a hung body and the dead sergeant
+# behind the bars east of the walls hall, which drawing every masked
+# texture before every sprite changes by 516. Then frames after scripts,
+# which the oracle plays too: a stride, riding the lift down, off its
+# east edge, the first door half open, the special 23 switch pressed,
+# the exit switch pressed, a blinking wall at its dark level, and the
+# water on a later frame of its cycle; each script is beside its frame
+# below. Every frame holds the things E1M1 spawns on Hurt Me Plenty.
+# tools/oracle.nu finds no pixel off vanilla's in the dark, grate,
+# water, sky, sprite-rule, depth, stride, switch and blink frames. The others differ where a thing animates or
 # is full-bright, which ticket 05 brings; with those things taken out of
 # both games every count is 0, and until then their hashes are
 # regression pins. The exit is not compared: vanilla never stands in it
@@ -135,7 +140,9 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     s2 : Array<U32> <- frame("overlap 2752 960 0", tables, gfx, at(level, east(2752), east(960), 0), s1)
     s3 : Array<U32> <- frame("walls 704 256 0", tables, gfx, at(level, east(704), east(256), 0), s2)
     s4 : Array<U32> <- frame("ledge 256 128 90", tables, gfx, at(level, east(256), east(128), 90), s3)
-    m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), s4)
+    d1 : Array<U32> <- frame("yard -640 256 0", tables, gfx, at(level, west(640), east(256), 0), s4)
+    d2 : Array<U32> <- frame("bars 1024 200 0", tables, gfx, at(level, east(1024), east(200), 0), d1)
+    m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), d2)
     m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
     m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
     m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
@@ -173,6 +180,8 @@ def main() -> IO(Unit):
 #|overlap 2752 960 0 hash 4038843935 pixels 79 125 10 78 covered True
 #|walls 704 256 0 hash 3755778102 pixels 7 111 15 2 covered True
 #|ledge 256 128 90 hash 4089245318 pixels 6 10 15 107 covered True
+#|yard -640 256 0 hash 3050307010 pixels 1 100 78 8 covered True
+#|bars 1024 200 0 hash 605587869 pixels 109 79 5 5 covered True
 #|stride U!:34 hash 2845586337 pixels 2 5 164 6 covered True
 #|air U!:56 hash 2977300388 pixels 5 110 15 6 covered True
 #|landed U!:66 hash 4031325049 pixels 6 110 14 79 covered True
