@@ -6,8 +6,9 @@
 # rest on the floor and the angle a multiple of 45 degrees, so that
 # Chocolate Doom can stand in the same spot: a bright metal wall, the
 # dim bench room north of the start, the hazard-striped step under the
-# computer panels, the lowered opening west of the start, and the hall
-# under a strip of sky. Each frame is drawn twice, over a view blanked
+# computer panels, the lowered opening west of the start with the
+# grate of a masked middle texture across it, and the hall under a strip
+# of sky. Each frame is drawn twice, over a view blanked
 # to 0 and to 255: equal hashes mean every pixel of the view was
 # written. Pinned to Freedoom.
 import Base
@@ -91,7 +92,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m2 : Array<U32> <- frame("lit 736 464 135", tables, level, gfx, at(level, east(736), east(464), 135), m1)
     m3 : Array<U32> <- frame("dark -416 256 90", tables, level, gfx, at(level, west(416), east(256), 90), m2)
     m4 : Array<U32> <- frame("step 137 256 45", tables, level, gfx, at(level, east(137), east(256), 45), m3)
-    m5 : Array<U32> <- frame("opening -416 256 180", tables, level, gfx, at(level, west(416), east(256), 180), m4)
+    m5 : Array<U32> <- frame("grate -416 256 180", tables, level, gfx, at(level, west(416), east(256), 180), m4)
     m6 : Array<U32> <- frame("sky 3 256 0", tables, level, gfx, at(level, east(3), east(256), 0), m5)
     IO.print("end")
 
@@ -106,10 +107,10 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
     start(world)
 
-#|start hash 3888461448 pixels 1 1 7 5 covered True
+#|start hash 557988919 pixels 1 1 7 5 covered True
 #|lit 736 464 135 hash 3246659701 pixels 104 7 95 103 covered True
 #|dark -416 256 90 hash 3735729281 pixels 110 107 0 238 covered True
-#|step 137 256 45 hash 663928821 pixels 7 0 79 111 covered True
-#|opening -416 256 180 hash 2081440828 pixels 3 111 106 93 covered True
-#|sky 3 256 0 hash 3632819632 pixels 2 111 76 6 covered True
+#|step 137 256 45 hash 2640417900 pixels 7 0 79 111 covered True
+#|grate -416 256 180 hash 2636261899 pixels 3 111 106 93 covered True
+#|sky 3 256 0 hash 751409046 pixels 2 111 76 6 covered True
 #|end

@@ -17,7 +17,7 @@ import ../src/draw.bend as D
 import ../src/bsp.bend as R
 
 def wall(w: D.Draw.Wall) -> String:
-  D.Wall{seg, x1, x2, scale1, scale2, step} = w
+  D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms} = w
   "seg " ++ U32.show(seg) ++ " columns " ++ U32.show(x1) ++ " " ++ U32.show(x2) ++ " scale "
     ++ F.Fixed.show(scale1) ++ " step " ++ F.Fixed.show(step)
 

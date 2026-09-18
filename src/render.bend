@@ -11,17 +11,19 @@ import ./project.bend as P
 import ./draw.bend as D
 import ./bsp.bend as B
 import ./planes.bend as N
+import ./masked.bend as M
 
 def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
   P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p))
 
-# The planes after the walk, as Doom draws them.
-def Render.planes(+view: P.View, +gfx: G.Gfx, st: D.Draw) -> Array<U32>:
+# After the walk, the planes and then the masked middle textures, as
+# Doom draws them.
+def Render.rest(+view: P.View, +level: L.Level, +gfx: G.Gfx, st: D.Draw) -> Array<U32>:
   D.Draw{mem, solid, walls, tasks, planes} = st
-  N.Planes.draw(view, gfx, mem, planes)
+  M.Masked.draw(walls, view, level, gfx, N.Planes.draw(view, gfx, mem, planes))
 
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
-  Render.planes(view, gfx, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem)))
+  Render.rest(view, level, gfx, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem)))
 
 def Render.frame(tables: P.Project.Tables, level: L.Level, gfx: G.Gfx, p: S.Player, mem: Array<U32>) ->
   Array<U32>:
