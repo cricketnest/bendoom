@@ -71,5 +71,5 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
     start(world)
 
-#|start hash 3669206196 pixels 106 104 0 0
+#|start hash 1193745378 pixels 1 1 0 0
 #|end

@@ -2,6 +2,7 @@
 # static arrays, here with no limit. One value threaded through the BSP
 # walk, since every step reads what the last wrote.
 import Base
+import ./bytes.bend as B
 import ./clip.bend as C
 import ./gfx.bend as G
 
@@ -47,21 +48,38 @@ def Draw.rows(+yl: U32, +yh: U32) -> Nat:
 def Draw.at(x: U32, row: Nat) -> U32:
   (G.Gfx.frame() + U32.from_nat(row) * 320 + x : U32)
 
-# A column fill's state: the array, the column and the palette index.
-type Draw.Fill is Type:
-  Fill{mem: Array<U32>, x: U32, color: U32}
+# A column's state: the array, the column, the texture fraction at the
+# next row with its step a row, the index of the texture column's
+# texels, and of the colormap.
+type Draw.Col is Type:
+  Col{mem: Array<U32>, x: U32, frac: U32, step: U32, src: U32, cmap: U32}
 
-def Draw.fill.px(row: Nat, st: Draw.Fill) -> Draw.Fill:
-  Fill{mem, +x, +color} = st
-  Fill{Array.set(U32, mem, Draw.at(x, row), color), x, color}
+def Draw.col.lit(row: Nat, +x: U32, +frac: U32, +step: U32, src: U32, cmap: U32, p: Array<U32> & U32) ->
+  Draw.Col:
+  (mem, c) = p
+  Col{Array.set(U32, mem, Draw.at(x, row), c), x, (frac + step : U32), step, src, cmap}
 
-def Draw.Fill.mem(st: Draw.Fill) -> Array<U32>:
-  Fill{mem, x, color} = st
+def Draw.col.texel(row: Nat, x: U32, frac: U32, step: U32, src: U32, +cmap: U32, p: Array<U32> & U32) ->
+  Draw.Col:
+  (mem, t) = p
+  Draw.col.lit(row, x, frac, step, src, cmap, B.Bytes.at(mem, (cmap + t : U32)))
+
+# Doom's R_DrawColumn for one row: the texel at the fraction's whole
+# part, wrapped to 128 rows, through the colormap.
+def Draw.col.px(row: Nat, st: Draw.Col) -> Draw.Col:
+  Col{mem, x, +frac, step, +src, cmap} = st
+  Draw.col.texel(row, x, frac, step, src, cmap, B.Bytes.at(mem, (src + ((frac >> 16n) .&. 127) : U32)))
+
+def Draw.Col.mem(st: Draw.Col) -> Array<U32>:
+  Col{mem, x, frac, step, src, cmap} = st
   mem
 
-# Column x from row yl to yh in one palette index.
-def Draw.fill(mem: Array<U32>, x: U32, +yl: U32, yh: U32, color: U32) -> Array<U32>:
-  Draw.Fill.mem(Draw.each(~Draw.Fill, ~Draw.fill.px, Draw.rows(yl, yh), U32.to_nat(yl), Fill{mem, x, color}))
+# Column x from row yl to yh: the texture column at src, its row mid at
+# the view's centre row, stepped iscale a row, lit through cmap.
+def Draw.column(mem: Array<U32>, x: U32, +yl: U32, yh: U32, src: U32, mid: U32, +iscale: U32,
+  cmap: U32) -> Array<U32>:
+  Draw.Col.mem(Draw.each(~Draw.Col, ~Draw.col.px, Draw.rows(yl, yh), U32.to_nat(yl),
+    Col{mem, x, (mid + (yl - 84) * iscale : U32), iscale, src, cmap}))
 
 # n slots from i set to v.
 def Draw.set(n: Nat, mem: Array<U32>, +i: U32, +v: U32) -> Array<U32>:

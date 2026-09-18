@@ -12,6 +12,7 @@ import ./src/sim.bend as S
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
+import ./src/segs.bend as R
 
 # Bytes and the WAD
 # -----------------
@@ -384,6 +385,26 @@ law light_tables:
     P.Project.zlight(8, 0), P.Project.zlight(8, 7), P.Project.zlight(8, 127))
     == (31, 31, 0, 0, 28, 5, 0, 18, 28)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# LAW: a wall column's arithmetic, facing a wall 160 away head on with
+# texture offset 64. At the centre column the tangent 25 of the wall's
+# normal takes 4000/65536 off the offset, texture column 63; at column
+# 0's angle the tangent 65686 takes 160.37, texture column -97, the
+# shift flooring the negative. The reciprocal of scale 1 is 65535, of
+# the cap 64 it is 1023, of the floor 1/256 it is 16777215. At light 8
+# scale 1 is light index 16, colormap 20; scale 64 is index 1024, capped
+# at 47, colormap 5 (sanity).
+law wall_column:
+  {(R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}},
+      R.Geo{0, 10485760, 4194304, 1073741824}, 0),
+    R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}},
+      R.Geo{0, 10485760, 4194304, 1073741824}, 0),
+    R.Segs.iscale(65536), R.Segs.iscale(4194304), R.Segs.iscale(256),
+    R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
+    == (63, 4294967199, 65535, 1023, 16777215, 70912, 67072)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # A checker to ride the draw's loop: whether every index so far was the
 # one expected, and the one expected next.
