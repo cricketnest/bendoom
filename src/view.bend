@@ -1,7 +1,8 @@
 # A top-down view of the level around the player: the lines drawn into
 # a 320 by 200 framebuffer, one-sided walls in white, two-sided lines in
 # grey, the player as a yellow dot with a tick for its facing; then the
-# framebuffer folded into the frame's quadtree, two pixels a cell.
+# framebuffer folded into the frame's quadtree, four pixels a cell, so
+# the 1280 by 800 window shows Doom's resolution at a playable size.
 # Throwaway: milestone 3's wall renderer replaces this module.
 import Base
 import ./vec.bend as V
@@ -104,7 +105,7 @@ type View.State is Type:
   State{fb: Array<U32>, tasks: List<&2, View.Task>, images: List<&2, Image>}
 
 def View.off(+x: U32, +y: U32) -> Bool:
-  Bool.or(U32.is_ge(x, 640), U32.is_ge(y, 400))
+  Bool.or(U32.is_ge(x, 1280), U32.is_ge(y, 800))
 
 def View.visit(+e: Nat, +x: U32, +y: U32) -> View.Task:
   Visit{View.off(x, y), e, x, y}
@@ -116,7 +117,7 @@ def View.leaf.fin(tasks: List<&2, View.Task>, images: List<&2, Image>, p: Array<
 
 def View.leaf(fb: Array<U32>, +x: U32, +y: U32, tasks: List<&2, View.Task>,
   images: List<&2, Image>) -> View.State:
-  View.leaf.fin(tasks, images, fb[(y >> 1n) * View.w() + (x >> 1n)])
+  View.leaf.fin(tasks, images, fb[(y >> 2n) * View.w() + (x >> 2n)])
 
 def View.join(fb: Array<U32>, tasks: List<&2, View.Task>, images: List<&2, Image>) ->
   View.State:
@@ -135,7 +136,7 @@ def View.done(images: List<&2, Image>) -> Image:
 
 # The frame's quadtree from the framebuffer, with an explicit stack
 # since the array has one owner: a quadrant of depth d covers 2^d
-# pixels a side, a cell of depth 1 is one framebuffer pixel, and a
+# pixels a side, a cell of depth 2 is one framebuffer pixel, and a
 # quadrant off the framebuffer is one black pixel.
 def View.fold(fuel: Nat, st: View.State) -> Array<U32> & Image:
   match fuel:
@@ -153,11 +154,13 @@ def View.fold(fuel: Nat, st: View.State) -> Array<U32> & Image:
         case State{fb, Visit{False{}, 0n, x, y} <> rest, images}:
           View.fold(f, State{fb, rest, Pix{0} <> images})
         case State{fb, Visit{False{}, 1n, x, y} <> rest, images}:
+          View.fold(f, State{fb, rest, Pix{0} <> images})
+        case State{fb, Visit{False{}, 2n, x, y} <> rest, images}:
           View.fold(f, View.leaf(fb, x, y, rest, images))
-        case State{fb, Visit{False{}, 2n++e, +x, +y} <> rest, images}:
-          +h = U32.shln(1, 1n+e)
-          View.fold(f, State{fb, View.visit(1n+e, x, y) <> View.visit(1n+e, (x + h : U32), y)
-            <> View.visit(1n+e, x, (y + h : U32)) <> View.visit(1n+e, (x + h : U32), (y + h : U32))
+        case State{fb, Visit{False{}, 3n++e, +x, +y} <> rest, images}:
+          +h = U32.shln(1, 2n+e)
+          View.fold(f, State{fb, View.visit(2n+e, x, y) <> View.visit(2n+e, (x + h : U32), y)
+            <> View.visit(2n+e, x, (y + h : U32)) <> View.visit(2n+e, (x + h : U32), (y + h : U32))
             <> Join{} <> rest, images})
 
 # The frame: the level's lines and the player around the player.
@@ -166,4 +169,4 @@ def View.frame(+level: L.Level, +p: S.Player) -> Image:
   fb2 = View.player(View.lines(U32.to_nat(L.Level.line_count(level)), fb, level,
     S.Player.x(p), S.Player.y(p), 0), level, S.Player.angle(p))
   Pair.snd(Array<U32>, Image, View.fold(U32.to_nat(200000),
-    State{fb2, [View.visit(10n, 0, 0)], []}))
+    State{fb2, [View.visit(11n, 0, 0)], []}))

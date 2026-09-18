@@ -92,7 +92,7 @@ def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Unit):
 def Game.start(now: Nat, p: Array<U32> & L.Level) -> IO(Unit):
   (bytes, +level) = p
   do IO<Unit>:
-    window : Window <- IO.try(Window, Window.open("Bendoom", 640, 400))
+    window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 800))
     Game.loop(U32.to_nat(4294967295), window,
       Game{level, S.Player.start(level), K.Keys.none(), now, 0n})
 
