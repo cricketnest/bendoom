@@ -17,12 +17,12 @@ def View.w() -> U32:
 def View.h() -> U32:
   200
 
-# One map unit is an eighth of a pixel; the player is at the centre.
+# A pixel is four map units; the player is at the centre.
 def View.sx(+px: U32, +x: U32) -> U32:
-  (160 + F.Fixed.sarn((x - px : U32), 19n) : U32)
+  (160 + F.Fixed.sarn((x - px : U32), 18n) : U32)
 
 def View.sy(+py: U32, +y: U32) -> U32:
-  (100 - F.Fixed.sarn((y - py : U32), 19n) : U32)
+  (100 - F.Fixed.sarn((y - py : U32), 18n) : U32)
 
 def View.plot.at(on: Bool, fb: Array<U32>, i: U32, c: U32) -> Array<U32>:
   match on:
@@ -85,14 +85,14 @@ def View.lines(n: Nat, fb: Array<U32>, +level: L.Level, +px: U32, +py: U32, +i: 
       View.lines(m, View.draw(fb, px, py, L.Level.line(level, i)), level, px, py,
         (i + 1 : U32))
 
-# The player: a dot at the centre and a tick eight pixels long along
-# its facing.
+# The player: a dot at the centre and a tick along its facing as long
+# as its radius, so it never reaches past a wall the box stops at.
 def View.player(fb: Array<U32>, +level: L.Level, +angle: U32) -> Array<U32>:
   +sine = L.Level.sine(level)
   +f = A.Angle.fine(angle)
   View.plot(View.line(fb, 160, 100,
-    (160 + F.Fixed.sarn(F.Fixed.mul(524288, A.Angle.cos(sine, f)), 16n) : U32),
-    (100 - F.Fixed.sarn(F.Fixed.mul(524288, A.Angle.sin(sine, f)), 16n) : U32),
+    (160 + F.Fixed.sarn(F.Fixed.mul(262144, A.Angle.cos(sine, f)), 16n) : U32),
+    (100 - F.Fixed.sarn(F.Fixed.mul(262144, A.Angle.sin(sine, f)), 16n) : U32),
     16776960), 160, 100, 16776960)
 
 # The fold's work: a quadrant to visit (skipped when off the frame),
