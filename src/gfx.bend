@@ -741,3 +741,13 @@ def Gfx.column.at(+g: Gfx, first: U32, mask: U32, col: U32) -> U32:
 
 def Gfx.column(+g: Gfx, +t: U32, col: U32) -> U32:
   Gfx.column.at(g, Gfx.tex.first(g, t), Gfx.tex.mask(g, t), col)
+
+# The sides' texture numbers as loaded, which a state starts from.
+def Gfx.sidetex(g: Gfx) -> V.Vec:
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex} = g
+  sidetex
+
+# The graphics with a state's side textures where the renderer looks.
+def Gfx.sided(g: Gfx, sidetex: V.Vec) -> Gfx:
+  Gfx{flats, pics, sky, texs, cols, loaded, skytex} = g
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex}

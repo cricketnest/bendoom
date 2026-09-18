@@ -1,8 +1,8 @@
 # Doom's R_RenderPlayerView: a frame of the level from the player's eye,
 # drawn into the array's frame as palette indices. A pure function of
-# the tables, the level, the graphics, the player and the array it
-# redraws, so a frame renders in a test without a window; and the
-# latest tic's state with no interpolation, as vanilla shows it.
+# the tables, the graphics, the state and the array it redraws, so a
+# frame renders in a test without a window; and the latest tic's state
+# with no interpolation, as vanilla shows it.
 import Base
 import ./level.bend as L
 import ./gfx.bend as G
@@ -25,6 +25,8 @@ def Render.rest(+view: P.View, +level: L.Level, +gfx: G.Gfx, st: D.Draw) -> Arra
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   Render.rest(view, level, gfx, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem)))
 
-def Render.frame(tables: P.Project.Tables, level: L.Level, gfx: G.Gfx, p: S.Player, mem: Array<U32>) ->
-  Array<U32>:
-  Render.view(Render.eye(tables, p), level, gfx, mem)
+# The sectors' heights and light come from the state's level, the
+# sides' textures from the state.
+def Render.frame(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, mem: Array<U32>) -> Array<U32>:
+  S.State{player, level, sidetex, rnd, clock, ended} = s
+  Render.view(Render.eye(tables, player), level, G.Gfx.sided(gfx, sidetex), mem)

@@ -25,6 +25,20 @@ def Vec.get.go(v: Vec, odd: Bool, +i: U32) -> U32:
 def Vec.get(v: Vec, +i: U32) -> U32:
   Vec.get.go(v, Vec.odd(i), i)
 
+# The tree with x at index i, the nodes off the path shared with the
+# old tree.
+def Vec.set.go(v: Vec, odd: Bool, +i: U32, x: U32) -> Vec:
+  match v odd:
+    case Leaf{y} _:
+      Leaf{x}
+    case Node{l, r} False{}:
+      Node{Vec.set.go(l, Vec.odd((i >> 1n : U32)), (i >> 1n : U32), x), r}
+    case Node{l, r} True{}:
+      Node{l, Vec.set.go(r, Vec.odd((i >> 1n : U32)), (i >> 1n : U32), x)}
+
+def Vec.set(v: Vec, +i: U32, x: U32) -> Vec:
+  Vec.set.go(v, Vec.odd(i), i, x)
+
 def Vec.split.cons(h: U32, p: List<&2, U32> & List<&2, U32>) ->
   List<&2, U32> & List<&2, U32>:
   (o, e) = p

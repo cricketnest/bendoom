@@ -64,24 +64,24 @@ def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
     return mem
 
 # A frame's hash, drawn over a view blanked to an index.
-def hashed(+tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, +p: S.Player, blank: U32,
-  mem: Array<U32>) -> Hash:
-  D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, level, gfx, p,
+def hashed(+tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, blank: U32, mem: Array<U32>) -> Hash:
+  D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, gfx, s,
     D.Draw.set(U32.to_nat(53760), mem, G.Gfx.frame(), blank)), 2166136261})
 
-def again(tables: P.Project.Tables, level: L.Level, gfx: G.Gfx, p: S.Player, st: Hash) -> Array<U32> & String:
+def again(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, st: Hash) -> Array<U32> & String:
   Hash{mem, h} = st
-  line(h, hashed(tables, level, gfx, p, 255, mem))
+  line(h, hashed(tables, gfx, s, 255, mem))
 
-# A frame from the player, its line printed, and the array back.
-def frame(tag: String, +tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, +p: S.Player,
-  mem: Array<U32>) -> IO(Array<U32>):
-  print(tag, again(tables, level, gfx, p, hashed(tables, level, gfx, p, 0, mem)))
+# A frame of the state, its line printed, and the array back.
+def frame(tag: String, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) ->
+  IO(Array<U32>):
+  print(tag, again(tables, gfx, s, hashed(tables, gfx, s, 0, mem)))
 
-# The player at rest on the floor at a place: x and y in map units,
-# west and south given as negatives, the angle in degrees.
-def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.Player:
-  S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)})
+# The level's first state with the player at rest on the floor at a
+# place: x and y in map units, west and south given as negatives, the
+# angle in degrees.
+def at(gfx: G.Gfx, +level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
+  S.State.at(level, G.Gfx.sidetex(gfx), L.Start{x, y, A.Angle.of_thing(degrees)})
 
 def east(units: U32) -> U32:
   F.Fixed.of_map(units)
@@ -89,26 +89,26 @@ def east(units: U32) -> U32:
 def west(units: U32) -> U32:
   F.Fixed.neg(F.Fixed.of_map(units))
 
-# The player after running east from the start for some tics.
-def ran(+level: L.Level, tics: Nat) -> S.Player:
-  S.Sim.replay(K.Input.script(tics, K.Input{K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, 0}), level,
-    S.Player.start(level))
+# The state after running east from the start for some tics.
+def ran(gfx: G.Gfx, +level: L.Level, tics: Nat) -> S.State:
+  S.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, False{})),
+    S.State.start(level, G.Gfx.sidetex(gfx)))
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
   do IO<Unit>:
-    m1 : Array<U32> <- frame("start", tables, level, gfx, S.Player.start(level), mem)
-    m2 : Array<U32> <- frame("lit 736 464 135", tables, level, gfx, at(level, east(736), east(464), 135), m1)
-    m3 : Array<U32> <- frame("dark -416 256 90", tables, level, gfx, at(level, west(416), east(256), 90), m2)
-    m4 : Array<U32> <- frame("step 137 256 45", tables, level, gfx, at(level, east(137), east(256), 45), m3)
-    m5 : Array<U32> <- frame("grate -416 256 180", tables, level, gfx, at(level, west(416), east(256), 180), m4)
-    m6 : Array<U32> <- frame("water 3 256 0", tables, level, gfx, at(level, east(3), east(256), 0), m5)
-    m7 : Array<U32> <- frame("sky -640 256 90", tables, level, gfx, at(level, west(640), east(256), 90), m6)
-    m8 : Array<U32> <- frame("pit 488 256 0", tables, level, gfx, at(level, east(488), east(256), 0), m7)
-    m9 : Array<U32> <- frame("stride U!:34", tables, level, gfx, ran(level, 34n), m8)
-    m10 : Array<U32> <- frame("air U!:56", tables, level, gfx, ran(level, 56n), m9)
-    m11 : Array<U32> <- frame("landed U!:66", tables, level, gfx, ran(level, 66n), m10)
+    m1 : Array<U32> <- frame("start", tables, gfx, S.State.start(level, G.Gfx.sidetex(gfx)), mem)
+    m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, at(gfx, level, east(736), east(464), 135), m1)
+    m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, at(gfx, level, west(416), east(256), 90), m2)
+    m4 : Array<U32> <- frame("step 137 256 45", tables, gfx, at(gfx, level, east(137), east(256), 45), m3)
+    m5 : Array<U32> <- frame("grate -416 256 180", tables, gfx, at(gfx, level, west(416), east(256), 180), m4)
+    m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, at(gfx, level, east(3), east(256), 0), m5)
+    m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, at(gfx, level, west(640), east(256), 90), m6)
+    m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, at(gfx, level, east(488), east(256), 0), m7)
+    m9 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(gfx, level, 34n), m8)
+    m10 : Array<U32> <- frame("air U!:56", tables, gfx, ran(gfx, level, 56n), m9)
+    m11 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(gfx, level, 66n), m10)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):

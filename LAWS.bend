@@ -165,21 +165,40 @@ law turn_script:
 # The sim
 # -------
 
-# LAW: one tic of the idle command from rest leaves the player where it was, on
-# any level, at any position.
+# A level's first state with the player as given, at a clock.
+def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
+  S.State{p, level, V.Leaf{0}, 0, clock, False{}}
+
+# LAW: one tic of the idle command from rest leaves the player where it
+# was, on any level, at any position.
 law tic_rest:
   for +level: L.Level
   for +x: U32
   for +y: U32
-  {(S.Player.x(S.Sim.tic(level, K.Cmd.idle(),
-      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0})),
-    S.Player.y(S.Sim.tic(level, K.Cmd.idle(),
-      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0})))
+  {(S.Player.x(S.State.player(S.Sim.tic(K.Cmd.idle(),
+      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976}, level, 0)))),
+    S.Player.y(S.State.player(S.Sim.tic(K.Cmd.idle(),
+      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976}, level, 0)))))
     == (x, y) : U32 & U32}
+
+# LAW: a tic counts on the clock, and an ended level's tic changes
+# nothing, whatever the command.
+law tic_counts:
+  for +cmd: K.Cmd
+  for +p: S.Player
+  for +level: L.Level
+  for +clock: U32
+  {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
+    S.Sim.tic(cmd, S.State{p, level, V.Leaf{0}, 0, clock, True{}}))
+    == ((clock + 1 : U32), S.State{p, level, V.Leaf{0}, 0, clock, True{}}) : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
 # floor at 0 and the ceiling at 128 map units. Every number is computed
 # by hand from vanilla's formulas.
+
+# The player after a script in the room, from a player and a clock.
+def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
+  S.State.player(S.Sim.replay(script, Closed.state(p, L.Level.room(0, 128), clock)))
 
 # LAW: one tic forward from rest at angle zero thrusts 25 * 2048 along
 # the facing (51199 along x through the cosine 65535, 19 along y through
@@ -189,40 +208,34 @@ law tic_rest:
 # momentum over four is 9999, and half of it times the clock's sine 25
 # is 1 (sanity).
 law tic_from_rest:
-  {S.Sim.tic(L.Level.room(0, 128),
-    K.Cmd{25, 0, 0, False{}},
-    S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0})
-    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, 1} : S.Player}
+  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976}, 0)
+    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977} : S.Player}
 
 # LAW: standing still on the floor puts the eye 41 above it, at any
 # position, whatever the eye was.
 law eye_rest:
   for x: U32
   for y: U32
-  {S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
-    S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0})) == 2686976 : U32}
+  {S.Player.viewz(Closed.room([K.Cmd.idle()], S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 0))
+    == 2686976 : U32}
 
 # LAW: 64 above the floor, the first airborne tic sets the fall to twice
 # gravity without moving, the second moves by it and adds gravity once;
 # the eye sits 41 above the height the tic began at (sanity).
 law fall_gravity:
-  {(S.Sim.replay([K.Cmd.idle()], L.Level.room(0, 128),
-      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0}),
-    S.Sim.replay([K.Cmd.idle(), K.Cmd.idle()], L.Level.room(0, 128),
-      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0}))
-    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, 1},
-      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, 2})
+  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 0),
+    Closed.room([K.Cmd.idle(), K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 0))
+    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280},
+      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280})
     : S.Player & S.Player}
 
 # LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
 # landing at 8 a tic does not (sanity).
 law landing_dip:
-  {(S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
-      S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, 0}),
-    S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
-      S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, 0}))
-    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, 1},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, 1})
+  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0}, 0),
+    Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0}, 0))
+    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512})
     : S.Player & S.Player}
 
 # LAW: the bob at the clock's peak (tic 5, sine 65535). The first tic of
@@ -231,31 +244,26 @@ law landing_dip:
 # over four is 14745600, capped at 16 units, and half of it bobs the eye
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
-  {(S.Player.viewz(S.Sim.tic(L.Level.room(0, 128),
-      K.Cmd{50, 0, 0, False{}},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 5})),
-    S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
-      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, 5})))
+  {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, False{}}],
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 5)),
+    S.Player.viewz(Closed.room([K.Cmd.idle()],
+      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0}, 5)))
     == (2706974, 3211256) : U32 & U32}
 
 # LAW: a floor 16 above the player's feet lifts the player onto it, cuts
 # the view height by the 16 to 25, and sets it recovering by an eighth
 # of the gap, 2 a tic (sanity).
 law step_up_dip:
-  {S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
-    S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, 0})
-    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, 1}
-    : S.Player}
+  {Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0}, 0)
+    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976} : S.Player}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
-# for all scripts, levels and players.
+# for all scripts and states.
 law replay_append:
   for a: List<&2, K.Cmd>
   for b: List<&2, K.Cmd>
-  for +level: L.Level
-  for p: S.Player
-  {S.Sim.replay(List.append(&2, K.Cmd, a, b), level, p)
-    == S.Sim.replay(b, level, S.Sim.replay(a, level, p)) : S.Player}
+  for s: S.State
+  {S.Sim.replay(List.append(&2, K.Cmd, a, b), s) == S.Sim.replay(b, S.Sim.replay(a, s)) : S.State}
 
 # LAW: free is pinned to the geometry: when a position is free, every
 # line listed in the blockmap cells its box touches satisfies the
@@ -287,25 +295,34 @@ law line_geometry:
     == (True{}, True{}, False{}, False{}, True{}, False{}, True{})
     : Bool & Bool & Bool & Bool & Bool & Bool & Bool}
 
-# LAW: one tic from a free position answers a free position, for all
-# levels, commands and players.
-law tic_keeps_free:
-  for +level: L.Level
-  for +cmd: K.Cmd
-  for +p: S.Player
-  for free: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
-  {True{} == S.Sim.free(level, S.Player.x(S.Sim.tic(level, cmd, p)),
-    S.Player.y(S.Sim.tic(level, cmd, p))) : Bool}
+# A state whose player is free in its level.
+def Free(+s: S.State) -> Type:
+  {True{} == S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
+    : Bool}
 
-# LAW: the wall law: replaying any script from a free position, the
-# start included, leaves the player free of solid walls.
+# LAW: a tic leaves the geometry as it was: the lines, sides, vertices,
+# nodes and blockmap that free reads are the same trees after it, for
+# all commands and states.
+law tic_keeps_geometry:
+  for +cmd: K.Cmd
+  for +s: S.State
+  {L.Level.geo(S.State.level(S.Sim.tic(cmd, s))) == L.Level.geo(S.State.level(s)) : L.Level.Geo}
+
+# LAW: one tic from a free state answers a free state, for all commands
+# and states.
+law tic_keeps_free:
+  for +cmd: K.Cmd
+  for +s: S.State
+  for free: Free(s)
+  Free(S.Sim.tic(cmd, s))
+
+# LAW: the wall law: replaying any script from a free state, the start
+# included, leaves the player free of solid walls.
 law replay_keeps_free:
   for script: List<&2, K.Cmd>
-  for +level: L.Level
-  for +p: S.Player
-  for free: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
-  {True{} == S.Sim.free(level, S.Player.x(S.Sim.replay(script, level, p)),
-    S.Player.y(S.Sim.replay(script, level, p))) : Bool}
+  for +s: S.State
+  for free: Free(s)
+  Free(S.Sim.replay(script, s))
 
 # The renderer
 # ------------

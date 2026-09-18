@@ -2,7 +2,10 @@
 # loaded by the game's loaders: samples of what the renderer reads. Each
 # expected value was read from Freedoom's bytes independently, in
 # nushell, before the loader answered it; the multi-patch texels were
-# composed there by vanilla's rule, patches pasted in order.
+# composed there by vanilla's rule, patches pasted in order; the lines'
+# specials were counted there, and the two sectors' block boxes worked
+# out by P_GroupLines' rule from their lines' ends and the blockmap's
+# origin (-712, -1072, 32 columns by 27 rows).
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -86,6 +89,27 @@ def texels(+gfx: G.Gfx) -> List<&2, U32>:
     from(G.Gfx.column(gfx, G.Gfx.mid(gfx, 419), 17), [0, 1, 3, 20, 21, 23]),
     from(G.Gfx.column(gfx, G.Gfx.mid(gfx, 216), 0), [0, 1, 3])])
 
+# How many of the first n lines carry a special.
+def carrying(n: Nat, +level: L.Level, +special: U32, +i: U32) -> U32:
+  match n:
+    case 0n:
+      0
+    case 1n+m:
+      (Bool.to_u32(U32.is_eq(L.Level.special(level, i), special)) + carrying(m, level, special, (i + 1 : U32)) : U32)
+
+# Freedoom's E1M1 has 1175 lines; the count of each special it carries.
+def specials(+level: L.Level, which: List<&2, U32>) -> List<&2, String>:
+  match which:
+    case []:
+      []
+    case +k <> rest:
+      (U32.show(k) ++ ":" ++ U32.show(carrying(U32.to_nat(1175), level, k, 0))) <> specials(level, rest)
+
+def blocks(b: L.Level.Box) -> String:
+  L.Box{top, bottom, left, right} = b
+  "top " ++ U32.show(top) ++ " bottom " ++ U32.show(bottom) ++ " left " ++ U32.show(left) ++ " right "
+    ++ U32.show(right)
+
 def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   do IO<Unit>:
@@ -97,6 +121,10 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(sector(level, gfx, 140, L.Level.sector(level, 140)))
     IO.print(side(level, 0, L.Level.side(level, 0)))
     IO.print(side(level, 5, L.Level.side(level, 5)))
+    IO.print("specials " ++ names(specials(level, [1, 2, 11, 23, 26, 62, 88, 117, 48, 36])))
+    IO.print("line 528 special " ++ U32.show(L.Level.special(level, 528)) ++ " tag " ++ U32.show(L.Level.tag(level, 528)))
+    IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
+    IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
     IO.print(texture(gfx, "DOOR1", G.Gfx.top(gfx, 526)))
     IO.print(texture(gfx, "SKY1", G.Gfx.skytex(gfx)))
@@ -122,6 +150,10 @@ def main() -> IO(Unit):
 #|sector 140 floor 0.000000 ceil 128.000000 light 192 flats AQF054 SLIME14 sky False
 #|side 0 offset 53.000000 -24.000000 sector 15 textures - - MC5
 #|side 5 offset 94.000000 0.000000 sector 46 textures - MC18 -
+#|specials 1:20 2:6 11:1 23:1 26:4 62:4 88:5 117:1 48:0 36:0
+#|line 528 special 2 tag 5
+#|sector 10 blocks top 12 bottom 12 left 11 right 12
+#|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127
 #|texture DOOR1 64x72.000000 patches 1 mask 63
 #|texture SKY1 256x128.000000 patches 1 mask 255

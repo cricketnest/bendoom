@@ -1,5 +1,5 @@
 # The game's state and its frame loop: each frame draws the latest tic's
-# player, shows it, folds the frame's key events into the held keys, and
+# state, shows it, folds the frame's key events into the held keys, and
 # runs the tics the clock owes. The game runs it without end; the window
 # bench runs it for a count of frames.
 import Base
@@ -14,28 +14,29 @@ import ./show.bend as V
 # The clock is read each frame; the tics it owes accumulate in
 # thousandths of a tic, and at most eight run per frame, the rest
 # forgiven, so a stall cannot snowball. The array is the frame and the
-# graphics, redrawn each frame from the latest tic's player.
+# graphics, redrawn each frame from the latest tic's state. The level is
+# the map as loaded, which a fresh state is built from.
 type Game is Type:
-  Game{level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, player: S.Player, input: K.Input,
+  Game{level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, state: S.State, input: K.Input,
     last: Nat, owed: Nat, mem: Array<U32>}
 
-def Game.shown(level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, player: S.Player, input: K.Input,
+def Game.shown(level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, state: S.State, input: K.Input,
   last: Nat, owed: Nat, p: Array<U32> & Image) -> Game & Image:
   (mem, image) = p
-  (Game{level, gfx, tables, player, input, last, owed, mem}, image)
+  (Game{level, gfx, tables, state, input, last, owed, mem}, image)
 
 def Game.view(g: Game) -> Game & Image:
-  Game{+level, +gfx, +tables, +player, input, last, owed, mem} = g
-  Game.shown(level, gfx, tables, player, input, last, owed,
-    V.Show.image(R.Render.frame(tables, level, gfx, player, mem)))
+  Game{level, +gfx, +tables, +state, input, last, owed, mem} = g
+  Game.shown(level, gfx, tables, state, input, last, owed,
+    V.Show.image(R.Render.frame(tables, gfx, state, mem)))
 
 def Game.event(e: Event, g: Game) -> Maybe<Game>:
   match e:
     case Key{27, True{}}:
       None{}
     case Key{code, down}:
-      Game{level, gfx, tables, player, input, last, owed, mem} = g
-      Some{Game{level, gfx, tables, player, K.Input.press(code, down, input), last, owed, mem}}
+      Game{level, gfx, tables, state, input, last, owed, mem} = g
+      Some{Game{level, gfx, tables, state, K.Input.press(code, down, input), last, owed, mem}}
     case Close{}:
       None{}
     case _:
@@ -58,11 +59,11 @@ def Game.owed(capped: Bool, due: Nat) -> Nat:
 # The sim runs the tics the clock owes since the last frame, each on the
 # command built from the held keys.
 def Game.advance(+now: Nat, g: Game) -> Game:
-  Game{+level, gfx, tables, player, +input, last, owed, mem} = g
+  Game{level, gfx, tables, state, +input, last, owed, mem} = g
   +due = Nat.add(owed, Nat.mul(Nat.sub(now, last), 35n))
   +capped = Nat.is_gt(Nat.div(due, 1000n), 8n)
   +tics = Bool.pick(Nat, capped, 8n, Nat.div(due, 1000n))
-  Game{level, gfx, tables, S.Sim.replay(K.Input.script(tics, input), level, player),
+  Game{level, gfx, tables, S.Sim.replay(K.Input.script(tics, input), state),
     K.Input.after(tics, input), now, Game.owed(capped, due), mem}
 
 def Game.step(now: Nat, m: Maybe<Game>) -> Maybe<Game>:
@@ -100,11 +101,11 @@ def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Unit):
       Game.draw(window, Game.view(g), w => h => Game.loop(f, w, h))
 
 def Game.start.go(frames: Nat, input: K.Input, now: Nat, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
-  (gfx, +level) = gl
+  (+gfx, +level) = gl
   do IO<Unit>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
-    Game.loop(frames, window,
-      Game{level, gfx, P.Project.tables(level), S.Player.start(level), input, now, 0n, mem})
+    Game.loop(frames, window, Game{level, gfx, P.Project.tables(level),
+      S.State.start(level, G.Gfx.sidetex(gfx)), input, now, 0n, mem})
 
 # The window opened and the loop run from the player 1 start for at most
 # so many frames, with the given input at first.

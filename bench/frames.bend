@@ -17,13 +17,12 @@ def Bench.drop(p: Array<U32> & Image) -> Array<U32>:
   (mem, image) = p
   mem
 
-def Bench.go(n: Nat, +tables: P.Project.Tables, +level: L.Level, +gfx: G.Gfx, +p: S.Player,
-  mem: Array<U32>) -> Array<U32>:
+def Bench.go(n: Nat, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> Array<U32>:
   match n:
     case 0n:
       mem
     case 1n+m:
-      Bench.go(m, tables, level, gfx, p, Bench.drop(V.Show.image(R.Render.frame(tables, level, gfx, p, mem))))
+      Bench.go(m, tables, gfx, s, Bench.drop(V.Show.image(R.Render.frame(tables, gfx, s, mem))))
 
 def Bench.peek(p: Array<U32> & U32) -> U32:
   (mem, v) = p
@@ -31,8 +30,8 @@ def Bench.peek(p: Array<U32> & U32) -> U32:
 
 def Bench.frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
-  IO.print("centre " ++ U32.show(Bench.peek(B.Bytes.at(Bench.go(100n, P.Project.tables(level), level, gfx,
-    S.Player.start(level), mem), (84 * 320 + 160 : U32)))))
+  IO.print("centre " ++ U32.show(Bench.peek(B.Bytes.at(Bench.go(100n, P.Project.tables(level), gfx,
+    S.State.start(level, G.Gfx.sidetex(gfx)), mem), (84 * 320 + 160 : U32)))))
 
 def Bench.start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w

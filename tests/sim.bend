@@ -11,54 +11,57 @@
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
+import ../src/vec.bend as V
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
 
-def line(tag: String, +p: S.Player) -> String:
+def line(tag: String, s: S.State) -> String:
+  +p = S.State.player(s)
   tag ++ " " ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " "
     ++ A.Angle.show(S.Player.angle(p)) ++ " z " ++ F.Fixed.show(S.Player.z(p))
     ++ " floor " ++ F.Fixed.show(S.Player.floorz(p))
     ++ " eye " ++ F.Fixed.show((S.Player.viewz(p) - S.Player.floorz(p) : U32))
 
-def step(+level: L.Level, tag: String, n: Nat, keys: K.Keys, p: S.Player) -> IO(S.Player):
-  +q = S.Sim.replay(K.Input.script(n, K.Input{keys, 0}), level, p)
-  do IO<S.Player>:
+def step(tag: String, n: Nat, keys: K.Keys, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(K.Input.script(n, K.Input{keys, 0}), s)
+  do IO<S.State>:
     IO.print(line(tag, q))
     return q
 
-def free(+level: L.Level, +p: S.Player) -> IO(S.Player):
-  do IO<S.Player>:
-    IO.print("free at start " ++ Bool.show(S.Sim.free(level, S.Player.x(p), S.Player.y(p))))
-    return p
+def free(+s: S.State) -> IO(S.State):
+  +p = S.State.player(s)
+  do IO<S.State>:
+    IO.print("free at start " ++ Bool.show(S.Sim.free(S.State.level(s), S.Player.x(p), S.Player.y(p))))
+    return s
 
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
-    s : S.Player <- step(level, "start", 0n, K.Keys.none(), S.Player.start(level))
-    p0 : S.Player <- free(level, s)
-    p1 : S.Player <- step(level, "U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
-    p2 : S.Player <- step(level, "U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p1)
-    p3 : S.Player <- step(level, "L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p2)
-    p4 : S.Player <- step(level, "U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p3)
-    p5 : S.Player <- step(level, "-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
-    p6 : S.Player <- step(level, "R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p5)
-    p7 : S.Player <- step(level, "U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p6)
-    p8 : S.Player <- step(level, "L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p7)
-    p9 : S.Player <- step(level, "U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
-    p10 : S.Player <- step(level, "S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, p9)
-    p11 : S.Player <- step(level, "D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}}, p10)
-    p12 : S.Player <- step(level, "R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p11)
-    p13 : S.Player <- step(level, "U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p12)
-    p14 : S.Player <- step(level, "A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, p13)
-    q1 : S.Player <- step(level, "ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.Player.start(level))
-    q2 : S.Player <- step(level, "U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q1)
-    q3 : S.Player <- step(level, "U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q2)
-    q4 : S.Player <- step(level, "U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
-    q5 : S.Player <- step(level, "-:1", 1n, K.Keys.none(), q4)
-    q6 : S.Player <- step(level, "-:40", 40n, K.Keys.none(), q5)
+    s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level, V.Leaf{0}))
+    p0 : S.State <- free(s)
+    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
+    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p1)
+    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p2)
+    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p3)
+    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
+    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p5)
+    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p6)
+    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p7)
+    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
+    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, p9)
+    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}}, p10)
+    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p11)
+    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p12)
+    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, p13)
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.State.start(level, V.Leaf{0}))
+    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q1)
+    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q2)
+    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
+    q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
+    q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     IO.print("end")
 
 def main() -> IO(Unit):

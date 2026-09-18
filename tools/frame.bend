@@ -83,9 +83,9 @@ def Frame.rows(n: Nat, +row: U32, mem: Array<U32>) -> IO(Unit):
 
 def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, gl: G.Gfx & L.Level) ->
   IO(Unit):
-  (gfx, +level) = gl
-  Frame.rows(200n, 0, R.Render.frame(P.Project.tables(level), level, gfx,
-    S.Sim.replay(script, level, S.Player.at(level, place)), mem))
+  (+gfx, +level) = gl
+  Frame.rows(200n, 0, R.Render.frame(P.Project.tables(level), gfx,
+    S.Sim.replay(script, S.State.at(level, G.Gfx.sidetex(gfx), place)), mem))
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
