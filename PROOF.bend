@@ -292,6 +292,12 @@ def Laws.door_crushed():
 def Laws.turbo_floor_crossed():
   {==}
 
+def Laws.lift_timeline():
+  {==}
+
+def Laws.lift_crushed():
+  {==}
+
 def Laws.use_fires_once(forward, side, turn, next, player, level, sidetex, thinkers, rnd, clock, usedown):
   match next level:
     case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:

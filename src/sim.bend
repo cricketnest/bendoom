@@ -808,9 +808,12 @@ type Sim.Step is Data:
 
 # Doom's thinkers. A mover is T_VerticalDoor, T_PlatRaise and T_MoveFloor
 # in one: a sector's ceiling or floor, a speed, the steps left, and the
-# whole plan, which a crushed mover starts again.
+# whole plan, which a crushed mover starts again. A button is a pressed
+# switch waiting to pop back: the side, which of its three textures, the
+# texture it showed, and the tics left.
 type Thinker is Data:
   Mover{sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>}
+  Button{side: U32, slot: U32, texture: U32, tics: U32}
 
 # Everything a tic changes, in one value: the player, the level (its
 # sectors' words and its lines' specials), the sides' texture numbers
@@ -862,6 +865,11 @@ def State.usedown(s: State) -> Bool:
   State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
   usedown
 
+# The state with a thinker more, last to run.
+def State.thinking(s: State, t: Thinker) -> State:
+  State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, sidetex, List.append(&2, Thinker, thinkers, [t]), rnd, clock, ended, usedown}
+
 # Movers
 # ------
 
@@ -886,10 +894,7 @@ def Sim.mover.kept(sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.S
     case []:
       s
     case step <> rest:
-      State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
-      State{player, level, sidetex,
-        List.append(&2, Thinker, thinkers, [Mover{sector, ceiling, speed, step <> rest, plan}]), rnd,
-        clock, ended, usedown}
+      State.thinking(s, Mover{sector, ceiling, speed, step <> rest, plan})
 
 # A step the player does not fit is undone, the player clipped again,
 # and the mover crushed: it starts its plan again, unless the step was
@@ -932,6 +937,17 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
     State{player, L.Level.plane.put(level, sector, ceiling, Bool.pick(U32, past, dest, next)), sidetex,
       thinkers, rnd, clock, ended, usedown})
 
+# Doom's button in P_UpdateSpecials: the tic its count reaches zero the
+# side shows its texture again.
+def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: State) -> State:
+  match done:
+    case True{}:
+      State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
+      State{player, level, V.Vec.set(sidetex, (side * 3 + slot : U32), texture), thinkers, rnd, clock, ended,
+        usedown}
+    case False{}:
+      State.thinking(s, Button{side, slot, texture, (tics - 1 : U32)})
+
 # A thinker's tic. A wait counts down, and the tic it reaches zero does
 # nothing else, as Doom's doors and lifts turn.
 def Sim.think(t: Thinker, s: State) -> State:
@@ -943,6 +959,8 @@ def Sim.think(t: Thinker, s: State) -> State:
         Hold{(tics - 1 : U32)} <> rest), plan, s)
     case Mover{sector, ceiling, speed, Travel{down, dest} <> rest, plan}:
       Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, s)
+    case Button{side, slot, texture, +tics}:
+      Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
 
 # Doom's P_RunThinkers: each in turn, in the order they were started,
 # the state's list being those kept so far.
@@ -993,6 +1011,8 @@ def Sim.moving(thinkers: List<&2, Thinker>, +sector: U32) -> Bool:
       False{}
     case Mover{s, ceiling, speed, steps, plan} <> rest:
       Bool.or(U32.is_eq(s, sector), Sim.moving(rest, sector))
+    case Button{side, slot, texture, tics} <> rest:
+      Sim.moving(rest, sector)
 
 # A mover at the start of its plan.
 def Sim.mover.new(sector: U32, ceiling: Bool, speed: U32, +plan: List<&2, Sim.Step>) -> Thinker:
@@ -1011,21 +1031,15 @@ def Sim.door.turned(steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, floor: 
     case _:
       [Travel{True{}, floor}]
 
-def Sim.door.turn.one(mine: Bool, t: Thinker, floor: U32) -> Thinker:
-  match mine:
-    case False{}:
-      t
-    case True{}:
-      Mover{sector, ceiling, speed, steps, +plan} = t
-      Mover{sector, ceiling, speed, Sim.door.turned(steps, plan, floor), plan}
-
 def Sim.door.turn(thinkers: List<&2, Thinker>, +sector: U32, +floor: U32) -> List<&2, Thinker>:
   match thinkers:
     case []:
       []
-    case Mover{+s, ceiling, speed, steps, plan} <> rest:
-      Sim.door.turn.one(U32.is_eq(s, sector), Mover{s, ceiling, speed, steps, plan}, floor)
-        <> Sim.door.turn(rest, sector, floor)
+    case Mover{+s, ceiling, speed, +steps, +plan} <> rest:
+      Mover{s, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(s, sector),
+        Sim.door.turned(steps, plan, floor), steps), plan} <> Sim.door.turn(rest, sector, floor)
+    case Button{side, slot, texture, tics} <> rest:
+      Button{side, slot, texture, tics} <> Sim.door.turn(rest, sector, floor)
 
 # A door's top: 4 under the lowest ceiling around it.
 def Sim.door.top(+level: L.Level, sector: U32) -> U32:
@@ -1035,16 +1049,14 @@ def Sim.door.top(+level: L.Level, sector: U32) -> U32:
 def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, Sim.Step>:
   [Travel{False{}, Sim.door.top(level, sector)}, Hold{150}, Travel{True{}, L.Level.floor(level, sector)}]
 
-def Sim.door.on(moving: Bool, +sector: U32, speed: U32, s: State) -> State:
+def Sim.door.on(moving: Bool, +sector: U32, speed: U32, +s: State) -> State:
   match moving:
     case True{}:
       State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
       State{player, level, sidetex, Sim.door.turn(thinkers, sector, L.Level.floor(level, sector)), rnd,
         clock, ended, usedown}
     case False{}:
-      State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
-      State{player, level, sidetex, List.append(&2, Thinker, thinkers,
-        [Sim.mover.new(sector, True{}, speed, Sim.door.plan(level, sector))]), rnd, clock, ended, usedown}
+      State.thinking(s, Sim.mover.new(sector, True{}, speed, Sim.door.plan(State.level(s), sector)))
 
 # Doom's EV_VerticalDoor: the door is the sector behind the line.
 def Sim.door(line: L.Level.Line, speed: U32, +s: State) -> State:
@@ -1053,10 +1065,6 @@ def Sim.door(line: L.Level.Line, speed: U32, +s: State) -> State:
 
 # Switches and tagged movers
 # --------------------------
-
-def State.thinking(s: State, t: Thinker) -> State:
-  State{player, level, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  State{player, level, sidetex, List.append(&2, Thinker, thinkers, [t]), rnd, clock, ended, usedown}
 
 # The sectors of a tag with no mover, in sector order: the ones a tagged
 # special starts, as Doom passes over a sector whose specialdata is set.
@@ -1088,28 +1096,48 @@ def Sim.floor.low(+level: L.Level, +sector: U32) -> Thinker:
   Sim.mover.new(sector, False{}, 65536, [Travel{True{}, Sim.extreme(~F.Fixed.min,
     Sim.around(level, sector), level, False{}, L.Level.floor(level, sector))}])
 
-def Sim.switch.put(found: Bool, sidetex: V.Vec, at: U32, partner: U32) -> V.Vec:
-  match found:
+# Which of a side's three textures is a switch: the top, else the
+# middle, else the bottom; 3 when none is.
+def Sim.switch.slot(+level: L.Level, +sidetex: V.Vec, +at: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(L.Level.switch(level, V.Vec.get(sidetex, at))),
+    Bool.pick(U32, U32.is_zero(L.Level.switch(level, V.Vec.get(sidetex, (at + 2 : U32)))),
+      Bool.pick(U32, U32.is_zero(L.Level.switch(level, V.Vec.get(sidetex, (at + 1 : U32)))), 3, 1), 2), 0)
+
+def Sim.pressed.side(thinkers: List<&2, Thinker>, +side: U32) -> Bool:
+  match thinkers:
+    case []:
+      False{}
+    case Button{pressed, slot, texture, tics} <> rest:
+      Bool.or(U32.is_eq(pressed, side), Sim.pressed.side(rest, side))
+    case Mover{sector, ceiling, speed, steps, plan} <> rest:
+      Sim.pressed.side(rest, side)
+
+# A switch that works again starts a button of 35 tics for the texture
+# it showed, unless its side has one running.
+def Sim.switch.button(start: Bool, side: U32, slot: U32, showed: U32, s: State) -> State:
+  match start:
     case False{}:
-      sidetex
+      s
     case True{}:
-      V.Vec.set(sidetex, at, partner)
+      State.thinking(s, Button{side, slot, showed, 35})
 
-# The front side's switch texture swapped for its partner: the top if it
-# is a switch, else the middle, else the bottom.
-def Sim.switch.side(+level: L.Level, +sidetex: V.Vec, +at: U32) -> V.Vec:
-  +top = L.Level.switch(level, V.Vec.get(sidetex, at))
-  +mid = L.Level.switch(level, V.Vec.get(sidetex, (at + 2 : U32)))
-  +bottom = L.Level.switch(level, V.Vec.get(sidetex, (at + 1 : U32)))
-  Sim.switch.put(Bool.not(U32.is_zero((top .|. mid .|. bottom : U32))), sidetex,
-    Bool.pick(U32, U32.is_zero(top), Bool.pick(U32, U32.is_zero(mid), (at + 1 : U32), (at + 2 : U32)), at),
-    Bool.pick(U32, U32.is_zero(top), Bool.pick(U32, U32.is_zero(mid), bottom, mid), top))
+# The switch's texture swapped for its partner.
+def Sim.switch.swap(none: Bool, again: Bool, +side: U32, +slot: U32, s: State) -> State:
+  match none:
+    case True{}:
+      s
+    case False{}:
+      State{player, +level, +sidetex, +thinkers, rnd, clock, ended, usedown} = s
+      +showed = V.Vec.get(sidetex, (side * 3 + slot : U32))
+      Sim.switch.button(Bool.and(again, Bool.not(Sim.pressed.side(thinkers, side))), side, slot, showed,
+        State{player, level, V.Vec.set(sidetex, (side * 3 + slot : U32), L.Level.switch(level, showed)),
+          thinkers, rnd, clock, ended, usedown})
 
-# Doom's P_ChangeSwitchTexture.
-def Sim.switch(+line: U32, s: State) -> State:
-  State{player, +level, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  State{player, level, Sim.switch.side(level, sidetex, (L.Level.line.side(level, line, 0) * 3 : U32)), thinkers,
-    rnd, clock, ended, usedown}
+# Doom's P_ChangeSwitchTexture on the line's front side.
+def Sim.switch(again: Bool, line: U32, +s: State) -> State:
+  +side = L.Level.line.side(State.level(s), line, 0)
+  +slot = Sim.switch.slot(State.level(s), State.sidetex(s), (side * 3 : U32))
+  Sim.switch.swap(U32.is_eq(slot, 3), again, side, slot, s)
 
 # A line that works once has no special afterwards.
 def Sim.once(line: U32, s: State) -> State:
@@ -1124,7 +1152,24 @@ def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: L
     case []:
       s
     case sector <> rest:
-      Sim.once(line, Sim.switch(line, Sim.start(~make, sector <> rest, s)))
+      Sim.once(line, Sim.switch(False{}, line, Sim.start(~make, sector <> rest, s)))
+
+# A switch that works again: when its tag starts a mover, its texture is
+# swapped for 35 tics.
+def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, line: U32,
+  +s: State) -> State:
+  match sectors:
+    case []:
+      s
+    case sector <> rest:
+      Sim.switch(True{}, line, Sim.start(~make, sector <> rest, s))
+
+# Doom's downWaitUpStay lift: 4 a tic down to the lowest floor around,
+# its own included, 105 tics there, and back up to where it was.
+def Sim.lift(+level: L.Level, +sector: U32) -> Thinker:
+  Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.extreme(~F.Fixed.min,
+    Sim.around(level, sector), level, False{}, L.Level.floor(level, sector))}, Hold{105},
+    Travel{False{}, L.Level.floor(level, sector)}])
 
 # Walk-over lines
 # ---------------
@@ -1143,14 +1188,17 @@ def Sim.floor.turbo(+level: L.Level, +sector: U32) -> Thinker:
   Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.floor.turbo.to(Sim.extreme(~F.Fixed.max,
     Sim.around(level, sector), level, False{}, 4262199296), L.Level.floor(level, sector))}])
 
-# Doom's P_CrossSpecialLine for the specials E1M1 carries, both once
-# only: the line's special goes whether or not a sector started.
+# Doom's P_CrossSpecialLine for the specials E1M1 carries. The two that
+# work once lose their special whether or not a sector started; the
+# lift's line works every time.
 def Sim.cross.special(special: U32, +line: U32, +s: State) -> State:
   match special:
     case 2:
       Sim.once(line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
     case 36:
       Sim.once(line, Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s))
+    case 88:
+      Sim.start(~Sim.lift, Sim.tagged(s, line), s)
     case _:
       s
 
@@ -1167,7 +1215,7 @@ def Sim.cross(lines: List<&2, U32>, +s: State) -> State:
 # ---
 
 # Doom's P_UseSpecialLine for the specials E1M1 carries: the manual door
-# and its blazing twin, and the switch that lowers floors. The blue key
+# and its blazing twin, the switch that lowers floors, and the lift's. The blue key
 # door is not among them until keys exist, so it refuses, as any special
 # Doom does not know does nothing.
 def Sim.use.special(special: U32, +i: U32, +s: State) -> State:
@@ -1178,6 +1226,8 @@ def Sim.use.special(special: U32, +i: U32, +s: State) -> State:
       Sim.door(L.Level.line(State.level(s), i), 524288, s)
     case 23:
       Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
+    case 62:
+      Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
     case _:
       s
 

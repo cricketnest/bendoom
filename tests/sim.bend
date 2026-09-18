@@ -2,10 +2,12 @@
 # and two scripted walks through the game's step: the player 1 start,
 # then the position, facing, height, floor and eye above the floor after
 # each run of held keys (U up, D down, L left, R right, A strafe left,
-# S strafe right, ! run). The second walk runs east off a 140-unit
-# ledge: the last tic on it, the first two airborne tics (double
-# gravity, then single), the landing at 17 a tic with its dip of an
-# eighth of that, and the view recovered.
+# S strafe right, ! run). The level is alive under both: the first walk
+# turns on the lift its run called and rides it into the pit. The second
+# runs east across that lift (sector 98, called by the line on its west
+# edge) and off its east edge: the last tic on the lowering lift, the
+# first two airborne tics (double gravity, then single), the landing in
+# the pit with its dip, and the view recovered.
 # Freedoom's first map is not id's: the shareware start is 1056, -3616
 # facing 90, and its first tic forward lands at 1055.999694, -3615.218765.
 # Then the movers, as runs of one command in a demo's units from a
@@ -27,7 +29,14 @@
 # which starts nothing. Then a walk east over a special 2 line: sector
 # 145's ceiling 2 up on the tic of the crossing, at its top of 260 on the
 # 62nd and its thinker gone on the 63rd (ticket 07's hand computation),
-# and the walk back over the line, which starts nothing. The heights and tics are the hand
+# and the walk back over the line, which starts nothing. Then the lift:
+# called by the run over its west line and ridden, its floor 8 on the
+# tic of the crossing, -124 on the 34th, the wait, -120 on the 141st, 12
+# on the 174th and its thinker gone on the 175th (ticket 08's hand
+# computation), the eye 45 over the floor going down and 37 going up,
+# a tic behind it; then called by its switch from the pit, a use while
+# it runs, which starts nothing, and one once it is back, which calls it
+# again. The heights and tics are the hand
 # computation's; the positions are regression pins.
 import Base
 import ../src/bytes.bend as B
@@ -110,6 +119,29 @@ def crossed(+level: L.Level) -> IO(Unit):
     x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, False{}), [145], x3)
     IO.print("-")
 
+# Freedoom's first lift, sector 98: called by the walk-over line on its
+# west edge and ridden down and up, then called by its switch from the
+# pit east of it, used again while it runs, and again once it is back.
+def lift(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, False{}), [98], S.State.start(level))
+    l1 : S.State <- run("-", 4n, idle(), [98], l0)
+    l2 : S.State <- run("over", 1n, idle(), [98], l1)
+    l3 : S.State <- run("-", 33n, idle(), [98], l2)
+    l4 : S.State <- run("-", 1n, idle(), [98], l3)
+    l5 : S.State <- run("-", 105n, idle(), [98], l4)
+    l6 : S.State <- run("-", 1n, idle(), [98], l5)
+    l7 : S.State <- run("-", 33n, idle(), [98], l6)
+    l8 : S.State <- run("-", 1n, idle(), [98], l7)
+    s0 : S.State <- run("lift switch walk", 10n, forward(), [98], at(level, 240, 256, 180))
+    s1 : S.State <- run("use", 1n, use(), [98], s0)
+    s2 : S.State <- run("-", 1n, idle(), [98], s1)
+    s3 : S.State <- run("use", 1n, use(), [98], s2)
+    s4 : S.State <- run("-", 171n, idle(), [98], s3)
+    s5 : S.State <- run("-", 1n, idle(), [98], s4)
+    s6 : S.State <- run("use", 1n, use(), [98], s5)
+    IO.print("-")
+
 # The blue key door, sector 71, refuses.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -171,6 +203,7 @@ def door(+level: L.Level) -> IO(Unit):
     used(d0)
     floors(level)
     crossed(level)
+    lift(level)
     blue(level)
 
 def free(+s: S.State) -> IO(S.State):
@@ -216,24 +249,24 @@ def main() -> IO(Unit):
 #|free at start True
 #|U:1 -415.218765 256.000289 0.000 z 0.000000 floor 0.000000 eye 41.000015
 #|U!:34 3.282882 256.157440 0.000 z 0.000000 floor 0.000000 eye 33.430175
-#|L:20 137.245544 256.206893 61.523 z 12.000000 floor 12.000000 eye 40.403701
-#|U!:200 704.228622 495.748413 61.523 z 0.000000 floor 0.000000 eye 40.744659
-#|-:40 704.185119 495.791839 61.523 z 0.000000 floor 0.000000 eye 41.000000
-#|R:10 704.185119 495.791839 35.156 z 0.000000 floor 0.000000 eye 41.000000
-#|U!:70 735.938049 464.014968 35.156 z 0.000000 floor 0.000000 eye 40.617416
-#|L:30 735.938049 464.014968 131.835 z 0.000000 floor 0.000000 eye 41.000000
-#|U:100 592.012649 495.984710 131.835 z 0.000000 floor 0.000000 eye 41.065185
-#|S:60 730.213378 469.756973 131.835 z 0.000000 floor 0.000000 eye 41.068618
-#|D!:100 735.912536 464.048477 131.835 z 0.000000 floor 0.000000 eye 41.733978
-#|R:40 735.963653 464.013015 0.000 z 0.000000 floor 0.000000 eye 41.000000
-#|U!:120 735.963653 464.013015 0.000 z 0.000000 floor 0.000000 eye 41.763900
-#|A!:40 697.996063 495.962036 0.000 z 0.000000 floor 0.000000 eye 41.147979
-#|ledge U!:47 207.783569 256.234542 0.000 z 12.000000 floor 12.000000 eye 48.658081
-#|U!:1 224.302001 256.240737 0.000 z 12.000000 floor -128.000000 eye 187.570556
-#|U!:1 240.820434 256.246932 0.000 z 10.000000 floor -128.000000 eye 181.000000
-#|U!:15 488.596923 256.339859 0.000 z -128.000000 floor -128.000000 eye 46.000000
-#|-:1 505.115356 256.346054 0.000 z -128.000000 floor -128.000000 eye 46.408325
-#|-:40 661.677886 256.402297 0.000 z -128.000000 floor -128.000000 eye 41.012115
+#|L:20 137.245544 256.206893 61.523 z -48.000000 floor -48.000000 eye 44.403701
+#|U!:200 879.976928 495.961242 61.523 z -128.000000 floor -128.000000 eye 40.722702
+#|-:40 879.976928 495.961242 61.523 z -128.000000 floor -128.000000 eye 41.000000
+#|R:10 879.976928 495.961242 35.156 z -128.000000 floor -128.000000 eye 41.000000
+#|U!:70 879.976928 495.976135 35.156 z -128.000000 floor -128.000000 eye 40.730163
+#|L:30 879.976928 495.976135 131.835 z -128.000000 floor -128.000000 eye 41.000000
+#|U:100 784.014022 495.985275 131.835 z -128.000000 floor -128.000000 eye 41.065185
+#|S:60 879.981826 495.988571 131.835 z -128.000000 floor -128.000000 eye 41.059051
+#|D!:100 811.054748 331.127044 131.835 z -128.000000 floor -128.000000 eye 41.392868
+#|R:40 803.277694 323.355331 0.000 z -128.000000 floor -128.000000 eye 41.000000
+#|U!:120 879.949401 430.466888 0.000 z -128.000000 floor -128.000000 eye 41.234771
+#|A!:40 879.826950 495.961883 0.000 z -128.000000 floor -128.000000 eye 41.147918
+#|ledge U!:47 207.783569 256.234542 0.000 z -24.000000 floor -24.000000 eye 52.658081
+#|U!:1 224.302001 256.240737 0.000 z -24.000000 floor -128.000000 eye 151.570556
+#|U!:1 240.820434 256.246932 0.000 z -26.000000 floor -128.000000 eye 145.000000
+#|U!:15 492.898864 256.341476 0.000 z -128.000000 floor -128.000000 eye 42.834960
+#|-:1 509.055541 256.347518 0.000 z -128.000000 floor -128.000000 eye 43.033325
+#|-:40 662.189941 256.402572 0.000 z -128.000000 floor -128.000000 eye 41.011581
 #|door walk tic 40 831.926605 495.977203 90.000 z -128.000000 floor -128.000000 eye 40.975143 thinkers 0 sector 10 -128.000000 -128.000000
 #|use tic 41 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -126.000000
 #|- tic 61 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 1 sector 10 -128.000000 -86.000000
@@ -274,6 +307,23 @@ def main() -> IO(Unit):
 #|- tic 78 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 1 sector 145 136.000000 260.000000
 #|- tic 79 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 0 sector 145 136.000000 260.000000
 #|back tic 119 1846.728271 -450.053344 0.000 z 136.000000 floor 136.000000 eye 28.955810 thinkers 0 sector 145 136.000000 260.000000
+#|-
+#|lift run tic 35 11.349639 256.160812 0.000 z 0.000000 floor 0.000000 eye 33.430175 thinkers 0 sector 98 12.000000 128.000000
+#|- tic 39 62.115066 256.179794 0.000 z 12.000000 floor 12.000000 eye 25.687744 thinkers 0 sector 98 12.000000 128.000000
+#|over tic 40 71.977874 256.183471 0.000 z 8.000000 floor 8.000000 eye 33.644653 thinkers 1 sector 98 8.000000 128.000000
+#|- tic 73 163.614135 256.215759 0.000 z -124.000000 floor -124.000000 eye 44.989715 thinkers 1 sector 98 -124.000000 128.000000
+#|- tic 74 163.961135 256.215820 0.000 z -124.000000 floor -124.000000 eye 40.988113 thinkers 1 sector 98 -124.000000 128.000000
+#|- tic 179 166.744613 256.215911 0.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 1 sector 98 -124.000000 128.000000
+#|- tic 180 166.744613 256.215911 0.000 z -120.000000 floor -120.000000 eye 37.000000 thinkers 1 sector 98 -120.000000 128.000000
+#|- tic 213 166.744613 256.215911 0.000 z 12.000000 floor 12.000000 eye 37.000000 thinkers 1 sector 98 12.000000 128.000000
+#|- tic 214 166.744613 256.215911 0.000 z 12.000000 floor 12.000000 eye 41.000000 thinkers 0 sector 98 12.000000 128.000000
+#|lift switch walk tic 10 208.160308 255.986923 180.000 z -124.000000 floor -124.000000 eye 40.314453 thinkers 0 sector 98 12.000000 128.000000
+#|use tic 11 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 40.500000 thinkers 1 sector 98 8.000000 128.000000
+#|- tic 12 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 1 sector 98 4.000000 128.000000
+#|use tic 13 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 1 sector 98 0.000000 128.000000
+#|- tic 184 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 1 sector 98 12.000000 128.000000
+#|- tic 185 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 0 sector 98 12.000000 128.000000
+#|use tic 186 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 1 sector 98 8.000000 128.000000
 #|-
 #|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 0 sector 71 -128.000000 -128.000000
 #|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 71 -128.000000 -128.000000

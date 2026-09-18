@@ -159,9 +159,11 @@ def pistol-mask [wad: binary, bobbing: bool]: nothing -> list<int> {
   } | flatten | flatten | uniq | where $it < 168 * 320
 }
 
-# The first X display number with no server's lock file.
+# An X display number with no server's lock file, drawn at random so that
+# oracles run side by side do not pick the same one.
 def free-display []: nothing -> int {
-  90..<200 | where {|n| not ($"/tmp/.X($n)-lock" | path exists) } | first
+  0..<64 | each { random int 100..30000 }
+  | where {|n| not ($"/tmp/.X($n)-lock" | path exists) } | first
 }
 
 # Chocolate Doom's frame after the demo's script, paused. It can only
@@ -186,7 +188,7 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table
     }
   }
   let shot = with-env {DISPLAY: $display} {
-    let opened = 0..<50 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
+    let opened = 0..<150 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
       | where ($it | is-not-empty) | first 1 | flatten
     if ($opened | is-empty) { error make {msg: "Chocolate Doom's window did not open"} }
     sleep (($tics * 1000 / 35 | into int) * 1ms + 2sec)

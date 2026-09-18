@@ -11,9 +11,9 @@
 # grate of a masked middle texture across it and the sky behind, the
 # hall under a ceiling of water, the yard under the open sky beside a
 # wall of the sky's own texture, and the railed pit under the ledge.
-# Then three frames from the sim's run east off the ledge, which no
-# player start can express: mid-stride with the eye bobbing, in the air,
-# and just landed with the view dipping. Then frames the movers
+# Then three frames from the sim's run east over the lift its west line
+# calls, which no player start can express: mid-stride with the eye
+# bobbing, riding the lift down, and ten tics on, off its east edge. Then frames the movers
 # make, each after a script from a place, the oracle's zero recorded in
 # milestone 4's tickets: the first door half open, 21 tics after its use
 # (832 384 90, "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0"); the special 23
@@ -148,8 +148,8 @@ def main() -> IO(Unit):
 #|sky -640 256 90 hash 3006348923 pixels 8 89 105 105 covered True
 #|pit 488 256 0 hash 2052822416 pixels 8 6 111 1 covered True
 #|stride U!:34 hash 4182473275 pixels 2 109 164 6 covered True
-#|air U!:56 hash 1020890737 pixels 6 0 8 6 covered True
-#|landed U!:66 hash 577452768 pixels 79 110 111 6 covered True
+#|air U!:56 hash 2868816107 pixels 5 110 15 6 covered True
+#|landed U!:66 hash 2581086416 pixels 6 110 14 79 covered True
 #|door half open hash 1284933713 pixels 107 6 74 111 covered True
 #|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
 #|end

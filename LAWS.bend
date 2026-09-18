@@ -263,15 +263,22 @@ law step_up_dip:
 # Line 0 is the door's west face, its front to the west, special 1; line
 # 1 its east face, its front to the east, special 117. One blockmap
 # cell lists both, and one subsector stands for every point. Every
-# number below is computed by hand from vanilla's constants.
-def Closed.doors() -> L.Level:
+# number below is computed by hand from vanilla's constants. The
+# blockmap's origin is a parameter: at 0 a player in the west room is in
+# the one cell, so a mover re-clips it; moved east, the player is in no
+# sector's block box, and a long replay costs the checker no position
+# check.
+def Closed.level(ox: U32) -> L.Level:
   L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
     V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
-    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), 0, 0, 1, 1}, L.Start{0, 0, 0}, [], [],
+    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Start{0, 0, 0}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
+
+def Closed.doors() -> L.Level:
+  Closed.level(0)
 
 # A player at rest on the floor at 0, under a ceiling.
 def Closed.player(x: U32, y: U32, angle: U32, ceilz: U32) -> S.Player:
@@ -404,6 +411,65 @@ law turbo_floor_crossed:
     L.Level.special(S.State.level(Closed.idled(1n, Closed.turbo(2883584, 393216))), 0))
     == ((1572864, 786432, 1572864), (1572864, 524288, 1572864), [], 0, [], 36)
     : (U32 & U32 & U32) & (U32 & U32 & U32) & List<&2, S.Thinker> & U32 & List<&2, S.Thinker> & U32}
+
+# The literal level for the lift: the door sector's floor at -32 and its
+# ceiling at 128, line 0 a lift's switch (special 62; its tag 0 is every
+# sector), its front's middle texture 1, a switch whose partner is 2,
+# and the blockmap's origin 48 east, so the west room's player at
+# (32, 64) is in no block box.
+def Closed.lifts() -> S.State:
+  S.State{Closed.player(2097152, 4194304, 0, 8388608),
+    L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728), 1, False{},
+      4292870144), 1, True{}, 8388608), 0, 62), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
+    V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
+
+def Closed.seen(+s: S.State) -> U32 & U32:
+  (L.Level.floor(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2))
+
+# LAW: the lift, vanilla's downWaitUpStay, and the switch that calls it.
+# The use on tic 1 gives each sector a lift (the west room's: 4 a tic
+# down to -32, the lowest floor around, 105 tics there, back up to 0;
+# the door sector's is at its lowest already, so its first tic lands)
+# and swaps the switch to 2 with a button of 35 tics, 34 after that tic.
+# The west room's floor is -4 after tic 1 and -32 after tic 8; tic 9
+# lands and the wait starts; the count reaches zero on tic 114; -28
+# after tic 115, 0 after tic 122, and its thinker gone on tic 123. The
+# switch shows 2 through tic 34 and 1 again from tic 35 (sanity).
+law lift_timeline:
+  {(S.State.thinkers(Closed.used(0n, Closed.lifts())), Closed.seen(Closed.used(7n, Closed.lifts())),
+    Closed.seen(Closed.used(33n, Closed.lifts())), Closed.seen(Closed.used(34n, Closed.lifts())),
+    Closed.seen(Closed.used(113n, Closed.lifts())), Closed.seen(Closed.used(114n, Closed.lifts())),
+    Closed.seen(Closed.used(121n, Closed.lifts())), S.State.thinkers(Closed.used(122n, Closed.lifts())))
+    == ([S.Mover{0, False{}, 262144, [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}],
+        [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}]},
+      S.Mover{1, False{}, 262144, [S.Hold{105}, S.Travel{False{}, 4292870144}],
+        [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 4292870144}]},
+      S.Mover{2, False{}, 262144, [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}],
+        [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}]},
+      S.Button{0, 2, 1, 34}],
+      (4292870144, 2), (4292870144, 2), (4292870144, 1), (4292870144, 1), (4293132288, 1), (0, 1), [])
+    : List<&2, S.Thinker> & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32)
+      & List<&2, S.Thinker>}
+
+# LAW: a lift that rises into a player who does not fit goes back down.
+# The west room's floor at -32 under a ceiling at 40, rising 4 a tic
+# under a player 56 tall: -16 after 4 tics, which leaves 56; the 5th
+# would leave 52, so it is undone and the lift is back on its plan; -20
+# after the 6th (sanity).
+law lift_crushed:
+  {(L.Level.floor(S.State.level(Closed.idled(4n, Closed.moving(L.Level.plane.put(L.Level.plane.put(
+      Closed.doors(), 0, False{}, 4292870144), 0, True{}, 2621440),
+      S.Mover{0, False{}, 262144, [S.Travel{False{}, 0}], [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}]},
+      2097152, 4194304, 2621440))), 0),
+    L.Level.floor(S.State.level(Closed.idled(5n, Closed.moving(L.Level.plane.put(L.Level.plane.put(
+      Closed.doors(), 0, False{}, 4292870144), 0, True{}, 2621440),
+      S.Mover{0, False{}, 262144, [S.Travel{False{}, 0}], [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}]},
+      2097152, 4194304, 2621440))), 0),
+    L.Level.floor(S.State.level(Closed.idled(6n, Closed.moving(L.Level.plane.put(L.Level.plane.put(
+      Closed.doors(), 0, False{}, 4292870144), 0, True{}, 2621440),
+      S.Mover{0, False{}, 262144, [S.Travel{False{}, 0}], [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}]},
+      2097152, 4194304, 2621440))), 0))
+    == (4293918720, 4293918720, 4293656576) : U32 & U32 & U32}
 
 # LAW: use held across two tics fires on the first alone: after a live
 # tic whose command holds use, no command is a press, whatever the
