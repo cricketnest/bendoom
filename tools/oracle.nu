@@ -2,9 +2,9 @@
 # Diffs a frame of ours against vanilla's after the same commands from
 # the same place. Writes a copy of the IWAD whose E1M1 has one thing, a
 # player 1 start at x, y facing angle, and the command script as a
-# vanilla demo:
-# version 109, no monsters, four bytes a tic, then a tic whose buttons
-# press pause, then a minute of idle tics, then the end marker. Chocolate
+# vanilla demo: version 109, no monsters, four bytes a tic, then a tic
+# whose buttons press pause, then a minute of idle tics, then the end
+# marker. Chocolate
 # Doom plays the demo in real time in a scratch directory, at screen
 # size 10, on a headless X server of its own; a paused game runs no
 # playsim tic but keeps reading the demo, so the tail holds the frame of

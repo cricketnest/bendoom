@@ -17,7 +17,8 @@ with no self-updating launcher and no telemetry.
 
 Tests are `.bend` files under `tests/` whose trailing `#|` lines are the
 expected output, run natively and on the JS lane. `tools/oracle.nu`
-diffs a frame against Chocolate Doom's from the same spot. Specs live under
+plays a command script as a vanilla demo in Chocolate Doom and diffs its
+frame against ours after the same commands. Specs live under
 `.scratch/`; the Bend constraints the code lives by are in `docs/bend.md`.
 
 ## Milestones
@@ -30,7 +31,7 @@ for bug.
 1. WAD loads, directory parses, a window opens. Done.
 2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law. Done.
 3. Walls, floors, ceilings and the sky: vanilla's renderer, its frames Chocolate Doom's pixel for pixel. Done.
-4. Doors, the lift, switches, the exit: E1M1 completable, no enemies.
+4. Doors, the lift, switches, the exit, blinking and glowing lights, animated flats and textures, scrolling walls: E1M1 completable, no enemies, its frames Chocolate Doom's tic for tic. Done.
 5. Things: decorations, items, pickups, sprites.
 6. Monsters, weapons, damage, the status bar.
 7. Sound effects.
