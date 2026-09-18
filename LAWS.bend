@@ -415,7 +415,9 @@ law wall_column:
 # under the eye 13120 away; the frame's scales are 0 along x and 409
 # along y, so a span there steps 0 and 13120 * 409 a column, and with a
 # distance scale of 65537 it starts 13120.2 further along x through the
-# cosine 65535, and the sine 25 of that to the south (sanity).
+# cosine 65535, and the sine 25 of that to the south. Packed as the DOS
+# span loop packs it, x 1.5 and y 2.25 are 0x06000900, texel 1 of row 2
+# (sanity).
 law plane_span:
   {(N.Planes.skycol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
       V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0),
@@ -428,9 +430,10 @@ law plane_span:
       V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}),
     N.Planes.step(N.Flat{P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
       V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{20971520}, V.Leaf{65537}, V.Leaf{0}, 0}},
-      0, 409, 2686976, 8, 0}, 84, 0))
-    == (128, 384, 71424, 72960, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 72960})
-    : U32 & U32 & U32 & U32 & U32 & U32 & N.Planes.Step}
+      0, 409, 2686976, 8, 0}, 84, 0),
+    D.Draw.span.pack(98304, 147456), D.Draw.span.spot(100665600))
+    == (128, 384, 71424, 72960, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 72960}, 100665600, 129)
+    : U32 & U32 & U32 & U32 & U32 & U32 & N.Planes.Step & U32 & U32}
 
 # A checker to ride the draw's loop: whether every index so far was the
 # one expected, and the one expected next.

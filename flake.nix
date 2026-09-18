@@ -54,6 +54,9 @@
               pkgs.bun
               pkgs.llvmPackages_19.clang
               pkgs.jujutsu
+              # tools/oracle.nu diffs our frames against Chocolate Doom's.
+              pkgs.chocolate-doom
+              pkgs.xdotool
             ];
             buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = "${wads.freedoom}/share/games/doom/freedoom1.wad";

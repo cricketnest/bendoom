@@ -103,38 +103,49 @@ def Draw.column(mem: Array<U32>, x: U32, +yl: U32, yh: U32, src: U32, mid: U32, 
     Col{mem, x, (mid + (yl - 84) * iscale : U32), iscale, src, cmap}))
 
 # A span's state: the array, the index of its row's first pixel, the
-# flat's x and y fractions at the next column with their steps, and the
+# packed position in the flat at the next column with its step, and the
 # indices of the flat and the colormap.
 type Draw.Span is Type:
-  Span{mem: Array<U32>, row: U32, xfrac: U32, yfrac: U32, xstep: U32, ystep: U32, src: U32, cmap: U32}
+  Span{mem: Array<U32>, row: U32, position: U32, step: U32, src: U32, cmap: U32}
 
-def Draw.span.lit(x: U32, +row: U32, +xfrac: U32, +yfrac: U32, +xstep: U32, +ystep: U32, src: U32,
-  cmap: U32, p: Array<U32> & U32) -> Draw.Span:
+# The DOS executable's span position, which Chocolate Doom keeps: x in
+# the top sixteen bits and y in the bottom, each six whole bits over ten
+# of fraction, so a span drifts from the 16.16 fractions as it runs, and
+# y's overflow carries into x.
+def Draw.span.pack(xfrac: U32, yfrac: U32) -> U32:
+  (((xfrac << 10n) .&. 4294901760) .|. ((yfrac >> 6n) .&. 65535) : U32)
+
+# The texel of a packed position in a 64 by 64 flat.
+def Draw.span.spot(+position: U32) -> U32:
+  (((position >> 4n) .&. 4032) .|. (position >> 26n) : U32)
+
+def Draw.span.lit(x: U32, +row: U32, +position: U32, +step: U32, src: U32, cmap: U32,
+  p: Array<U32> & U32) -> Draw.Span:
   (mem, c) = p
-  Span{Array.set(U32, mem, (row + x : U32), c), row, (xfrac + xstep : U32), (yfrac + ystep : U32), xstep,
-    ystep, src, cmap}
+  Span{Array.set(U32, mem, (row + x : U32), c), row, (position + step : U32), step, src, cmap}
 
-def Draw.span.texel(x: U32, row: U32, xfrac: U32, yfrac: U32, xstep: U32, ystep: U32, src: U32,
-  +cmap: U32, p: Array<U32> & U32) -> Draw.Span:
+def Draw.span.texel(x: U32, row: U32, position: U32, step: U32, src: U32, +cmap: U32,
+  p: Array<U32> & U32) -> Draw.Span:
   (mem, t) = p
-  Draw.span.lit(x, row, xfrac, yfrac, xstep, ystep, src, cmap, B.Bytes.at(mem, (cmap + t : U32)))
+  Draw.span.lit(x, row, position, step, src, cmap, B.Bytes.at(mem, (cmap + t : U32)))
 
-# Doom's R_DrawSpan for one column: the flat's texel at the fractions'
-# whole parts, wrapped to 64 by 64, through the colormap.
+# Doom's R_DrawSpan for one column: the flat's texel at the position,
+# through the colormap.
 def Draw.span.px(i: Nat, st: Draw.Span) -> Draw.Span:
-  Span{mem, row, +xfrac, +yfrac, xstep, ystep, +src, cmap} = st
-  Draw.span.texel(U32.from_nat(i), row, xfrac, yfrac, xstep, ystep, src, cmap, B.Bytes.at(mem,
-    (src + ((yfrac >> 10n) .&. 4032) + ((xfrac >> 16n) .&. 63) : U32)))
+  Span{mem, row, +position, step, +src, cmap} = st
+  Draw.span.texel(U32.from_nat(i), row, position, step, src, cmap, B.Bytes.at(mem,
+    (src + Draw.span.spot(position) : U32)))
 
 def Draw.Span.mem(st: Draw.Span) -> Array<U32>:
-  Span{mem, row, xfrac, yfrac, xstep, ystep, src, cmap} = st
+  Span{mem, row, position, step, src, cmap} = st
   mem
 
 # Row y from column x1 to x2 of a flat.
 def Draw.span(mem: Array<U32>, y: U32, +x1: U32, x2: U32, xfrac: U32, yfrac: U32, xstep: U32,
   ystep: U32, src: U32, cmap: U32) -> Array<U32>:
   Draw.Span.mem(Draw.each(~Draw.Span, ~Draw.span.px, Draw.rows(x1, x2), U32.to_nat(x1),
-    Span{mem, (G.Gfx.frame() + y * 320 : U32), xfrac, yfrac, xstep, ystep, src, cmap}))
+    Span{mem, (G.Gfx.frame() + y * 320 : U32), Draw.span.pack(xfrac, yfrac), Draw.span.pack(xstep, ystep),
+      src, cmap}))
 
 # n slots from i set to v.
 def Draw.set(n: Nat, mem: Array<U32>, +i: U32, +v: U32) -> Array<U32>:

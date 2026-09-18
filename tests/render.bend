@@ -4,13 +4,18 @@
 # view's centre, near its top left, near its bottom right, and high on
 # its centre column). The start, then hand-chosen places with the eye at
 # rest on the floor and the angle a multiple of 45 degrees, so that
-# Chocolate Doom can stand in the same spot: a bright metal wall, the
-# dim bench room north of the start, the hazard-striped step under the
-# computer panels, the lowered opening west of the start with the
-# grate of a masked middle texture across it, and the hall under a strip
-# of sky. Each frame is drawn twice, over a view blanked
-# to 0 and to 255: equal hashes mean every pixel of the view was
-# written. Pinned to Freedoom.
+# Chocolate Doom can stand in the same spot (tools/oracle.nu finds no
+# pixel of any of them differing from its frame): a bright metal wall,
+# the dim bench room north of the start, the hazard-striped step under
+# the computer panels, the lowered opening west of the start with the
+# grate of a masked middle texture across it and the sky behind, the
+# hall under a ceiling of water, the yard under the open sky beside a
+# wall of the sky's own texture, and the railed pit under the ledge.
+# Then three frames from the sim's run east off the ledge, which no
+# player start can express: mid-stride with the eye bobbing, in the air,
+# and just landed with the view dipping. Each frame is drawn twice, over
+# a view blanked to 0 and to 255: equal hashes mean every pixel of the
+# view was written. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -18,6 +23,7 @@ import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/gfx.bend as G
+import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/project.bend as P
 import ../src/draw.bend as D
@@ -84,6 +90,11 @@ def east(units: U32) -> U32:
 def west(units: U32) -> U32:
   F.Fixed.neg(F.Fixed.of_map(units))
 
+# The player after running east from the start for some tics.
+def ran(+level: L.Level, tics: Nat) -> S.Player:
+  S.Sim.run(tics, level, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}},
+    S.Player.start(level))
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
@@ -93,7 +104,12 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m3 : Array<U32> <- frame("dark -416 256 90", tables, level, gfx, at(level, west(416), east(256), 90), m2)
     m4 : Array<U32> <- frame("step 137 256 45", tables, level, gfx, at(level, east(137), east(256), 45), m3)
     m5 : Array<U32> <- frame("grate -416 256 180", tables, level, gfx, at(level, west(416), east(256), 180), m4)
-    m6 : Array<U32> <- frame("sky 3 256 0", tables, level, gfx, at(level, east(3), east(256), 0), m5)
+    m6 : Array<U32> <- frame("water 3 256 0", tables, level, gfx, at(level, east(3), east(256), 0), m5)
+    m7 : Array<U32> <- frame("sky -640 256 90", tables, level, gfx, at(level, west(640), east(256), 90), m6)
+    m8 : Array<U32> <- frame("pit 488 256 0", tables, level, gfx, at(level, east(488), east(256), 0), m7)
+    m9 : Array<U32> <- frame("stride U!:34", tables, level, gfx, ran(level, 34n), m8)
+    m10 : Array<U32> <- frame("air U!:56", tables, level, gfx, ran(level, 56n), m9)
+    m11 : Array<U32> <- frame("landed U!:66", tables, level, gfx, ran(level, 66n), m10)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -107,10 +123,15 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
     start(world)
 
-#|start hash 557988919 pixels 1 1 7 5 covered True
-#|lit 736 464 135 hash 3246659701 pixels 104 7 95 103 covered True
-#|dark -416 256 90 hash 3735729281 pixels 110 107 0 238 covered True
-#|step 137 256 45 hash 2640417900 pixels 7 0 79 111 covered True
-#|grate -416 256 180 hash 2636261899 pixels 3 111 106 93 covered True
-#|sky 3 256 0 hash 751409046 pixels 2 111 76 6 covered True
+#|start hash 2160814949 pixels 1 1 7 5 covered True
+#|lit 736 464 135 hash 3300301580 pixels 104 7 95 103 covered True
+#|dark -416 256 90 hash 3488594130 pixels 110 107 0 238 covered True
+#|step 137 256 45 hash 3958655367 pixels 7 0 79 111 covered True
+#|grate -416 256 180 hash 2863794005 pixels 3 111 106 93 covered True
+#|water 3 256 0 hash 2231310396 pixels 2 111 76 6 covered True
+#|sky -640 256 90 hash 3006348923 pixels 8 89 105 105 covered True
+#|pit 488 256 0 hash 2052822416 pixels 8 6 111 1 covered True
+#|stride U!:34 hash 4182473275 pixels 2 109 164 6 covered True
+#|air U!:56 hash 1020890737 pixels 6 0 8 6 covered True
+#|landed U!:66 hash 577452768 pixels 79 110 111 6 covered True
 #|end
