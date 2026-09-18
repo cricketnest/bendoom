@@ -430,6 +430,29 @@ law once_clears:
   for s: S.State
   {L.Level.special(S.State.level(S.Sim.once(line, s)), line) == 0 : U32}
 
+# The literal level with an exit switch: line 0's special is 11, the
+# middle texture of its front side is numbered 1, and textures 1 and 2
+# are each other's partner.
+def Closed.exit() -> L.Level:
+  L.Level.textured(L.Level.special.put(Closed.doors(), 0, 11), V.Vec.of_list([0, 0, 1], 3),
+    V.Vec.of_list([0, 2, 1], 3))
+
+# The west room's player after two idle tics and then a tic of use.
+def Closed.exited() -> S.State:
+  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
+    Closed.exit(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}})
+
+# LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
+# G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
+# with the clock at 3, the line's special is gone and its side shows the
+# switch's partner; a tic of any command after that changes nothing.
+law exit_ends:
+  for +cmd: K.Cmd
+  {(S.State.ended(Closed.exited()), S.State.clock(Closed.exited()),
+    L.Level.special(S.State.level(Closed.exited()), 0), V.Vec.get(S.State.sidetex(Closed.exited()), 2),
+    S.Sim.tic(cmd, Closed.exited()))
+    == (True{}, 3, 0, 2, Closed.exited()) : Bool & U32 & U32 & U32 & S.State}
+
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
 law replay_append:
