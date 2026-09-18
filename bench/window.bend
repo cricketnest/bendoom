@@ -13,16 +13,16 @@ import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/game.bend as M
 
-def Bench.keys(+walk: Bool) -> K.Keys:
-  K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk}
+def Bench.input(+walk: Bool) -> K.Input:
+  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}}, 0}
 
 def Bench.rate(+t0: Nat, +t1: Nat) -> String:
   Nat.show(Nat.div(U32.to_nat(600000), Nat.sub(t1, t0))) ++ " frames a second (600 frames in "
     ++ Nat.show(Nat.sub(t1, t0)) ++ " ms)"
 
-def Bench.run(+t0: Nat, keys: K.Keys, world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+def Bench.run(+t0: Nat, input: K.Input, world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   do IO<Unit>:
-    M.Game.start(600n, keys, t0, world)
+    M.Game.start(600n, input, t0, world)
     t1 : Nat <- IO.now()
     IO.print(Bench.rate(t0, t1))
 
@@ -31,4 +31,4 @@ def main() -> IO(Unit):
     walk : Result<&1, &1, U32 & String, String> <- IO.get_env("WALK")
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     t0 : Nat <- IO.now()
-    Bench.run(t0, Bench.keys(Result.is_done(&1, &1, U32 & String, String, walk)), world)
+    Bench.run(t0, Bench.input(Result.is_done(&1, &1, U32 & String, String, walk)), world)

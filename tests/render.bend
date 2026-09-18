@@ -91,7 +91,7 @@ def west(units: U32) -> U32:
 
 # The player after running east from the start for some tics.
 def ran(+level: L.Level, tics: Nat) -> S.Player:
-  S.Sim.run(tics, level, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}},
+  S.Sim.replay(K.Input.script(tics, K.Input{K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, 0}), level,
     S.Player.start(level))
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):

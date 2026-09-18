@@ -138,33 +138,43 @@ law arrows_wasd:
     == (K.Keys.press(119, down, keys), K.Keys.press(115, down, keys)) : K.Keys & K.Keys}
 
 # LAW: walking forward is 25 a tic, running 50; strafing 24 and 40; a
-# turn is 320 for its first five tics, then 640, or 1280 running
-# (sanity).
+# turn is 320 for its first five tics, then 640, or 1280 running; Space
+# is the use button (sanity).
 law cmd_tables:
-  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}}, 5),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}}, 6))
-    == (K.Cmd{25, 0, 0}, K.Cmd{50, 0, 0}, K.Cmd{0, 24, 0}, K.Cmd{0, 4294967256, 0},
-      K.Cmd{0, 0, 320}, K.Cmd{0, 0, 640}, K.Cmd{0, 0, 4294966016})
-    : K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd}
+  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 5),
+    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 6),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}, False{}}, 6),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, True{}}, 0))
+    == (K.Cmd{25, 0, 0, False{}}, K.Cmd{50, 0, 0, False{}}, K.Cmd{0, 24, 0, False{}}, K.Cmd{0, 4294967256, 0, False{}},
+      K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 640, False{}}, K.Cmd{0, 0, 4294966016, False{}},
+      K.Cmd{0, 0, 0, True{}})
+    : K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd}
+
+# LAW: the held count lives in the input: seven tics of the left key
+# from a fresh input turn 320 five times, then 640 (sanity).
+law turn_script:
+  {K.Input.script(7n, K.Input{K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0})
+    == [K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}},
+      K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 640, False{}},
+      K.Cmd{0, 0, 640, False{}}] : List<&2, K.Cmd>}
 
 # The sim
 # -------
 
-# LAW: one tic of no keys from rest leaves the player where it was, on
+# LAW: one tic of the idle command from rest leaves the player where it was, on
 # any level, at any position.
 law tic_rest:
   for +level: L.Level
   for +x: U32
   for +y: U32
-  {(S.Player.x(S.Sim.tic(level, K.Keys.none(),
-      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})),
-    S.Player.y(S.Sim.tic(level, K.Keys.none(),
-      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})))
+  {(S.Player.x(S.Sim.tic(level, K.Cmd.idle(),
+      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0})),
+    S.Player.y(S.Sim.tic(level, K.Cmd.idle(),
+      S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0})))
     == (x, y) : U32 & U32}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
@@ -180,39 +190,39 @@ law tic_rest:
 # is 1 (sanity).
 law tic_from_rest:
   {S.Sim.tic(L.Level.room(0, 128),
-    K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}},
-    S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0, 0})
-    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, 0, 1} : S.Player}
+    K.Cmd{25, 0, 0, False{}},
+    S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, 0})
+    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, 1} : S.Player}
 
 # LAW: standing still on the floor puts the eye 41 above it, at any
 # position, whatever the eye was.
 law eye_rest:
   for x: U32
   for y: U32
-  {S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
-    S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0})) == 2686976 : U32}
+  {S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
+    S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0})) == 2686976 : U32}
 
 # LAW: 64 above the floor, the first airborne tic sets the fall to twice
 # gravity without moving, the second moves by it and adds gravity once;
 # the eye sits 41 above the height the tic began at (sanity).
 law fall_gravity:
-  {(S.Sim.run(1n, L.Level.room(0, 128), K.Keys.none(),
-      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0}),
-    S.Sim.run(2n, L.Level.room(0, 128), K.Keys.none(),
-      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 0}))
-    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, 0, 1},
-      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, 0, 2})
+  {(S.Sim.replay([K.Cmd.idle()], L.Level.room(0, 128),
+      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0}),
+    S.Sim.replay([K.Cmd.idle(), K.Cmd.idle()], L.Level.room(0, 128),
+      S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0}))
+    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, 1},
+      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, 2})
     : S.Player & S.Player}
 
 # LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
 # landing at 8 a tic does not (sanity).
 law landing_dip:
-  {(S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
-      S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, 0, 0}),
-    S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
-      S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, 0, 0}))
-    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, 0, 1},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, 0, 1})
+  {(S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
+      S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, 0}),
+    S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
+      S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, 0}))
+    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, 1},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, 1})
     : S.Player & S.Player}
 
 # LAW: the bob at the clock's peak (tic 5, sine 65535). The first tic of
@@ -222,29 +232,29 @@ law landing_dip:
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
   {(S.Player.viewz(S.Sim.tic(L.Level.room(0, 128),
-      K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 5})),
-    S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
-      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, 0, 5})))
+      K.Cmd{50, 0, 0, False{}},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, 5})),
+    S.Player.viewz(S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
+      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, 5})))
     == (2706974, 3211256) : U32 & U32}
 
 # LAW: a floor 16 above the player's feet lifts the player onto it, cuts
 # the view height by the 16 to 25, and sets it recovering by an eighth
 # of the gap, 2 a tic (sanity).
 law step_up_dip:
-  {S.Sim.tic(L.Level.room(0, 128), K.Keys.none(),
-    S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, 0, 0})
-    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, 0, 1}
+  {S.Sim.tic(L.Level.room(0, 128), K.Cmd.idle(),
+    S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, 0})
+    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, 1}
     : S.Player}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts, levels and players.
 law replay_append:
-  for a: List<&2, K.Keys>
-  for b: List<&2, K.Keys>
+  for a: List<&2, K.Cmd>
+  for b: List<&2, K.Cmd>
   for +level: L.Level
   for p: S.Player
-  {S.Sim.replay(List.append(&2, K.Keys, a, b), level, p)
+  {S.Sim.replay(List.append(&2, K.Cmd, a, b), level, p)
     == S.Sim.replay(b, level, S.Sim.replay(a, level, p)) : S.Player}
 
 # LAW: free is pinned to the geometry: when a position is free, every
@@ -278,19 +288,19 @@ law line_geometry:
     : Bool & Bool & Bool & Bool & Bool & Bool & Bool}
 
 # LAW: one tic from a free position answers a free position, for all
-# levels, held keys and players.
+# levels, commands and players.
 law tic_keeps_free:
   for +level: L.Level
-  for +keys: K.Keys
-  for p: S.Player
+  for +cmd: K.Cmd
+  for +p: S.Player
   for free: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
-  {True{} == S.Sim.free(level, S.Player.x(S.Sim.tic(level, keys, p)),
-    S.Player.y(S.Sim.tic(level, keys, p))) : Bool}
+  {True{} == S.Sim.free(level, S.Player.x(S.Sim.tic(level, cmd, p)),
+    S.Player.y(S.Sim.tic(level, cmd, p))) : Bool}
 
 # LAW: the wall law: replaying any script from a free position, the
 # start included, leaves the player free of solid walls.
 law replay_keeps_free:
-  for script: List<&2, K.Keys>
+  for script: List<&2, K.Cmd>
   for +level: L.Level
   for +p: S.Player
   for free: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
