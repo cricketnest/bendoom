@@ -46,4 +46,6 @@ Re-measured the same way (Xvfb, 600 frames, one thread as the package runs it), 
 | before the merge, on battery | 35 to 36 | 41 |
 | after the merge, on battery | 38 to 39 | 44 to 45 |
 
-The first table above was on mains. So the game holds 35 frames a second on the dev machine in either power state, with 3 to 4 to spare at the start on battery, the heaviest view measured. The figure on the desktop under niri is not measured: automated checks were kept off the desktop. To take it, run `bench/window.bend`'s binary from the dev shell on the desktop, at rest and with `WALK=1`.
+The first table above was on mains. So on Xvfb the game holds 35 frames a second on the dev machine in either power state, with 3 to 4 to spare at the start on battery, the heaviest view measured.
+
+Manual desktop test, 2026-09-18: the same binary under a Wayland compositor (Xwayland, the window at its full 1280 by 960 on a 1.5 scale output), on battery with `balance_power`, one thread. At rest, five runs: 37, 35, 35, 35, 36 (the slowest 600 frames in 17125 ms, 35.04). Circling, two runs: 42 and 42. The compositor costs 2 to 3 frames a second against Xvfb, so on battery the start view holds 35 with nothing to spare; on mains it is not measured on the desktop.
