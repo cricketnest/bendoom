@@ -37,3 +37,7 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 ### Bend constraints
 
 Read `docs/bend.md` before writing Bend code or proofs: what the checker refuses, and the shapes that pass.
+
+### Seeing the game
+
+`tools/screenshot.sh [binary] [seconds] [keys...]` runs the game, holds keys, and screenshots its window through niri; the X root is black under Xwayland, so X capture tools show nothing.
