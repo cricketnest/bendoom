@@ -14,6 +14,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **Linear arrays cannot be shared across nested calls.** A quadtree from an `Array` is an explicit stack (`Show.fold`); a copyable indexed structure is a `Vec` tree (`src/vec.bend`).
 - **Literals have limits:** a Nat literal past a few thousand (`9000n`) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`.
 - **`Bool.pick` evaluates both branches.** It is a function, and calls are strict, so a pick between a costly value and a cheap one pays for the costly one every time; a branch that builds something is a `match`.
+- **No def named `exit`.** The native runtime has one of its own, and a build that gives the def a function of its own fails with "two names mangle to FID_EXIT"; whether it does depends on what the compiler inlines, so the name can pass for a while.
 - **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun.
 
 ## Proofs

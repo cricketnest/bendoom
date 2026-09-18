@@ -32,15 +32,16 @@ What was built, and where it differs from the ticket's words:
 - `Thinker` gained `Blink` and `Glow`. One `Blink` is `T_LightFlash` and `T_StrobeFlash`: a count, a dark and a bright level, a time at each, and whether a time is the count or `P_Random`'s mask. When the count runs out it goes dark from its bright level, else bright (`Sim.blink.to`). A flash's spawn is that same step taken from dark, which is how its first count is drawn, so there is no second copy of the draw. Vanilla's strobe tests the dark level where its flash tests the bright one; the two differ only for a strobe in a sector of light 0, whose levels are both 0, so no light that is written differs. `Glow` is `T_Glow`: a step that would reach an end is undone and turns it, so the light never stands on either end after the first tic.
 - The random index starts at 1, not the ticket's 0: Bendoom has no things until milestone 5, and the index is where vanilla's is once the player has spawned. With monsters in the map it will be wherever their spawns leave it; milestone 5 owns that.
 - The table is `Tables.rndtable`, generated with the others: `tools/gen_tables.nu` now takes `tables.c` and `m_random.c`, and the other three tables came out byte for byte as they were. `Sim.random` reads it through a tree built on the draw. A draw happens on a flash's turn, a few times a second, so the table is not a field of the geometry, which would have put it in every literal level of the laws.
-- Lights spawn in `State.at`, in sector order (`Sim.lights`), so every state a test, a tool or the game builds has them, first in the thinkers' list, where they stay since a light never ends. `State.at` and `State.start` moved below `Sim.extreme`, which the spawn calls. `State.thinking` moved up beside the state's accessors, and `Sim.mover.kept` and `Sim.door.on` use it where each spelled the append out.
-- `Sim.extreme` takes the word's reader (`~L.Level.ceil`, `~L.Level.floor`, `~L.Level.sector.light`) where it took a ceiling flag, so `P_FindMinSurroundingLight` is `Sim.light.low`, the same fold over light. Its three callers changed with it.
-- `Sim.moving` passes over lights, as no light sets vanilla's `specialdata`: Freedoom's lift, sector 98, strobes. `Sim.door.turn.one` went into `Sim.door.turn`, which had to meet a thinker that is no mover; one match fewer.
+- Lights spawn in `State.at`, in sector order (`Sim.lights`), so every state a test, a tool or the game builds has them, first in the thinkers' list, where they stay since a light never ends. `State.at` and `State.start` moved below `Sim.extreme`, which the spawn calls. `Sim.mover.kept` and `Sim.door.on` use `State.thinking` where each spelled the append out.
+- `Sim.extreme` takes the word's reader (`~L.Level.ceil`, `~L.Level.floor`, `~L.Level.sector.light`) where it took a ceiling flag, so `P_FindMinSurroundingLight` is `Sim.light.low`, the same fold over light. Its four callers changed with it.
+- `Sim.moving` passes over lights, as no light sets vanilla's `specialdata`: Freedoom's lift, sector 98, strobes. `Sim.moving`, `Sim.door.turn` and `Sim.pressed.side` each name the one constructor they act on and pass over the rest with one case, where ticket 08 had a case a constructor. `Sim.door.turn.one` went into `Sim.door.turn`; one match fewer.
 - `Level.sector.special` and `Level.light.put` beside their kin.
-- The sim test's `thinkers` counts are each 9 more, Freedoom's nine lights; nothing else in its old lines moved. The render test's `stride U!:34` and `air U!:56` hashes moved, the hall's strobes being dark on tics 34 and 56; `blink dark` is new: the wall of sector 33 from 640 712 180 on tic 66, hash 4167308477, which is also the hash of the frame dump's output for that script worked out in nushell, so the pinned frame is the compared one. The dark and the bright frame there differ in 46872 pixels.
+- The sim test's and the game test's `thinkers` counts are each 9 more, Freedoom's nine lights; nothing else in their old lines moved. The render test's `stride U!:34` and `air U!:56` hashes moved, the hall's strobes being dark on tics 34 and 56 (`landed U!:66` did not: no strobing sector is in its view); `blink dark` is new: the wall of sector 33 from 640 712 180 on tic 66, hash 4167308477, which is also the hash of the frame dump's output for that script worked out in nushell, so the pinned frame is the compared one. The dark and the bright frame there differ in 46872 pixels.
+- The sim test's `exit` run is `exits` now: the native runtime has an `exit` of its own, and with a run after it the build failed with "two names mangle to FID_EXIT" (the JS lane built). `docs/bend.md` has the constraint.
 - `tools/oracle.nu` leaves SECTORS alone; the zeroing and its comment are gone. Line special 48 is still zeroed, ticket 11's.
 - The proof check takes about 50 seconds with the four laws, as main's does without them.
 
-Oracle, one shot each, sector specials left in:
+Oracle, one shot each, sector specials left in, every Freedoom row and the glow's run again on the lift's commit; the last rebase, over ticket 09's exit, changed no frame's hash:
 
 | WAD | place | script | what | differing |
 | --- | --- | --- | --- | --- |
@@ -55,6 +56,9 @@ Oracle, one shot each, sector specials left in:
 | | 640 712 180 | `66,0,0,0,0` | sector 33's wall at its dark level, the render test's frame | 0 |
 | | 640 712 180 | `64,0,0,0,0` | the same wall bright | 0 |
 | | -416 256 0 | `25,0,0,0,0 34,50,0,0,0` | the stride | 0 |
+| | -416 256 0 | `4,0,0,0,0 56,50,0,0,0` | riding the lift down, whose sector strobes | 0 |
+| | -416 256 0 | `90,0,0,0,0 66,50,0,0,0` | off the lift's east edge | 0 |
+| | -416 256 0 | `5,0,0,0,0 38,50,0,0,0 110,0,0,0,0` | stopped on the lift in its wait | 0 |
 | | -416 256 0 | `53,0,0,0,0 4,0,0,-16,0` | turning | 0 |
 | | 832 384 90 | `20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0` | the door half open | 0 |
 | | 2064 -260 90 | `20,0,0,0,0 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0` | the switch pressed | 0 |
