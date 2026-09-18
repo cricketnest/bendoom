@@ -26,6 +26,7 @@
 #   tools/listen.nu
 #   tools/listen.nu --wad doom1.wad --length 200sec --keep
 #   tools/listen.nu compare a/music.raw b/music.raw
+#   tools/listen.nu opening a/music.raw
 
 # The first frame of a capture with a sample other than zero, or null.
 def lead []: binary -> any {
@@ -94,17 +95,38 @@ def from-lead []: binary -> binary {
   $audio | bytes at (($audio | lead) * 4)..
 }
 
+# Where two runs of frames differ, over the shorter: each differing
+# sample's index (even left, odd right) and by how much.
+def differences [a: binary, b: binary]: nothing -> list<record<at: int, by: int>> {
+  let end = [($a | bytes length) ($b | bytes length)] | math min | $in // 4 * 4
+  let block = 4096
+  seq 0 $block ($end - 1) | each {|at|
+    let x = $a | bytes at $at..<([($at + $block) $end] | math min)
+    let y = $b | bytes at $at..<([($at + $block) $end] | math min)
+    if $x != $y {
+      $x | samples | zip ($y | samples) | enumerate
+        | each {|p| {at: ($at // 2 + $p.index), by: ($p.item.0 - $p.item.1 | math abs)} } | where by != 0
+    }
+  } | flatten
+}
+
 # Two captures from their first notes, over the shorter: how many
 # samples differ and by how much at most, both sides counted.
 def "main compare" [a: path, b: path]: nothing -> record {
   let a = open --raw $a | from-lead
   let b = open --raw $b | from-lead
-  let end = [($a | bytes length) ($b | bytes length)] | math min | $in // 4 * 4
-  let block = 4096
-  let differences = seq 0 $block ($end - 1) | each {|at|
-    let x = $a | bytes at $at..<([($at + $block) $end] | math min)
-    let y = $b | bytes at $at..<([($at + $block) $end] | math min)
-    if $x != $y { $x | samples | zip ($y | samples) | each {|p| $p.0 - $p.1 | math abs } | where $it != 0 }
-  } | flatten
-  {frames: ($end // 4), differing: ($differences | length), largest: ($differences | append 0 | math max)}
+  let d = differences $a $b
+  {frames: ([($a | bytes length) ($b | bytes length)] | math min | $in // 4), differing: ($d | length),
+    largest: ($d | get by | append 0 | math max)}
+}
+
+# The render of Freedoom's opening against a capture of it, both from
+# their first frame, left and right counted apart. The render prints its
+# frames as hex; build it first with bend tools/opening.bend -o opening.
+def "main opening" [capture: path, --binary: path = ./opening]: nothing -> record {
+  hide-env --ignore-errors LD_LIBRARY_PATH
+  let render = ^$binary --threads 1 | lines | str join | decode hex
+  let d = differences $render (open --raw $capture)
+  {frames: (($render | bytes length) // 4), left: ($d | where at mod 2 == 0 | length),
+    right: ($d | where at mod 2 == 1 | length), largest: ($d | get by | append 0 | math max)}
 }

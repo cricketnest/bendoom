@@ -153,3 +153,32 @@ def Bytes.lists(~T: Data, ~read: Array<U32> -> @+i: U32 -> Array<U32> & T,
       (a, [])
     case offs <> rest:
       Bytes.lists.cons(~T, ~read, offs, Bytes.lists(~T, ~read, rest, a))
+
+# A long run of bytes as a list, read from its last byte back to its
+# first by a loop whose body is not recursive, so the run's length is no
+# recursion depth on the JS lane.
+type Bytes.Run is Type:
+  Run{a: Array<U32>, i: U32, acc: List<&2, U32>}
+
+def Bytes.run.put(+i: U32, acc: List<&2, U32>, p: Array<U32> & U32) -> Bytes.Run:
+  (a, b) = p
+  Run{a, (i - 1 : U32), b <> acc}
+
+def Bytes.run.step(r: Bytes.Run) -> Bytes.Run:
+  Run{a, +i, acc} = r
+  Bytes.run.put(i, acc, Bytes.at(a, i))
+
+def Bytes.run.go(n: Nat, r: Bytes.Run) -> Bytes.Run:
+  match n:
+    case 0n:
+      r
+    case 1n+m:
+      Bytes.run.go(m, Bytes.run.step(r))
+
+def Bytes.run.fin(r: Bytes.Run) -> Array<U32> & List<&2, U32>:
+  Run{a, i, acc} = r
+  (a, acc)
+
+# The n bytes at i.
+def Bytes.list(a: Array<U32>, +i: U32, +n: U32) -> Array<U32> & List<&2, U32>:
+  Bytes.run.fin(Bytes.run.go(U32.to_nat(n), Run{a, (i + n - 1 : U32), []}))
