@@ -1,0 +1,86 @@
+# Milestone 8: E1M1's music
+
+Status: ready-for-agent
+
+## Problem Statement
+
+Bendoom is silent. Vanilla Doom starts the level's song as E1M1 loads and repeats it for as long as the player stays: "At Doom's Gate" in the shareware WAD, Freedoom's own track in Freedoom. Doom's music is a list of notes, not a recording. Doom's sound library, DMX, plays them through the OPL2 sound chip of the time, with the instruments stored in the WAD's GENMIDI lump. Hearing the song takes a music player and an imitation of that chip, and both decide what the player hears, so both are game code and both are Bend. The only C in Bendoom moves bytes between the program and the operating system.
+
+The maintainer chose on 18 Sep 2026 to run that Bend code while the flake builds, not while the game plays. The imitation then never has to keep up with the speakers. The cost is that each package plays the song of the WAD it was built with. `.scratch/music-from-the-wad/issues/01-music-plays-from-the-opened-wad.md` moves the same code into the game later.
+
+## Solution
+
+`music.bend`, a Bend program beside `doom.bend` and `film.bend`, reads the package's WAD and plays E1M1's song the way Chocolate Doom does: the same events, the same voices and instruments, and the same chip, sample for sample. It writes two files of samples: the song once through, and one repeat. The Nix build runs it once per WAD. The game streams the files to Bend's `Audio` effect a frame at a time: the first pass once, then the repeat forever. Chocolate Doom is the oracle again. A nushell tool records its music with no window and no sound card, and the render is compared with that recording sample by sample.
+
+## User Stories
+
+1. As a player, I want E1M1's song to start when the level starts, so that the game sounds like Doom.
+2. As a player, I want the song to repeat without a gap or a click for as long as I play, so that a long visit to the level never falls silent.
+3. As a player, I want each repeat to begin with the last notes of the previous pass still fading, so that the loop sounds like vanilla's, which never stops the chip.
+4. As a player, I want the shareware package to play the shareware song and the Freedoom package to play Freedoom's, so that each WAD keeps its own music.
+5. As a player, I want the song played with the instruments in the WAD's GENMIDI lump, so that Freedoom's instruments are Freedoom's and id's are id's.
+6. As a player, I want the song to sound as Chocolate Doom's default music does, at its default volume, so that Bendoom sounds like the game it copies.
+7. As a player, I want the music to keep playing through the level's end and a restart, so that it behaves as vanilla does when the same song is asked for again.
+8. As a player, I want the game to start and play silently when there is no sound device, so that a missing sound card never stops the game.
+9. As a player, I want the music to cost the game no frame rate I can see, so that milestone 5's 35 frames a second still hold.
+10. As a player, I want the music to stop when I quit, so that nothing keeps sounding after the window closes.
+11. As a player recording a demo, I want the film of it to carry the music from its first frame, so that the video sounds like the game did.
+12. As a developer, I want the music player and the chip written in Bend, so that everything the player hears is Doom in Bend.
+13. As a developer, I want the render to read D_E1M1 and GENMIDI from the same WAD the package plays, so that the song and the levels can never come from different WADs within one package.
+14. As a developer, I want the render to read both MUS and MIDI song lumps, so that the shareware WAD (MUS) and Freedoom (MIDI) both work.
+15. As a developer, I want the song's events timed and ordered exactly as Chocolate Doom schedules them, including its tempo changes, so that every note starts on vanilla's sample.
+16. As a developer, I want voices allocated, stolen and released as Chocolate Doom's DMX player does, so that a busy passage drops the same notes as vanilla.
+17. As a developer, I want the chip to produce Chocolate Doom's samples bit for bit, including its delayed register writes and its conversion to 44100 Hz, so that the comparison with vanilla can reach zero.
+18. As a developer, I want the chip to carry only what Doom's player drives, so that no four-operator voice, OPL3 stereo or rhythm mode sits unused in the code.
+19. As a developer, I want the render to find where the song repeats from Chocolate Doom's own restart and not from the song's written length, so that the loop lands on the sample where vanilla's does.
+20. As a developer, I want the render to write its samples as it makes them, so that it never holds a whole pass in memory.
+21. As a developer, I want the game to stream the song from disk and never hold it in memory, so that 23 MB of samples do not become tens of millions of array slots.
+22. As a developer, I want the music's position to follow the sound device's clock and not the tic clock, so that music timing does not depend on the frame rate, as in vanilla.
+23. As a developer, I want the game to keep the device's queue topped up to a fixed level each frame, so that the song neither runs dry at a normal frame rate nor piles up samples to drop.
+24. As a developer, I want a tool that records Chocolate Doom's music without a window, a desktop or a sound card, so that the render has an outside answer to be compared with.
+25. As a developer, I want the render's speed measured against real time, so that the music-from-the-wad ticket starts from a number.
+26. As a proof author, I want laws over the integer music code where a property holds over all inputs, starting with the stream position, so that the song cannot drift with frame sizes.
+27. As a packager, I want the render to be one node per WAD in the build graph, with no binary download, so that the flake stays hermetic and inspectable.
+28. As a packager, I want the shareware music built only when the shareware package is, so that the flake check never needs the unfree WAD.
+29. As a reader of the README, I want milestone 8 marked done only after both packages play their song and the comparison with Chocolate Doom is recorded, so that the roadmap does not overclaim.
+
+## Implementation Decisions
+
+- The reference is Chocolate Doom 3.1.1, the version nixpkgs pins and the dev shell runs. Its music path has four parts, and the Bend code follows each: `src/mus2mid.c` and `src/midifile.c` turn the lump into timed events; `src/i_oplmusic.c` is its reproduction of DMX's player; `opl/opl_queue.c` and `opl/opl_sdl.c` schedule the events against the samples; `opl/opl3.c` is the Nuked OPL3 chip emulator. They are read as the specification, not called: no C from them enters the repo or the build.
+- Settings are Chocolate Doom's defaults: 44100 samples a second, OPL2 mode (no `snd_dmxoption`), the Doom 1.9 driver behaviour that Chocolate Doom picks for both WADs, and music volume 8 of 15. The song starts looping, as `S_ChangeMusic` starts a level's.
+- The song reader turns a MUS lump or a MIDI lump into the events and delays Chocolate Doom's player would read. MUS goes straight to events with `mus2mid`'s channel, controller and velocity mapping; no MIDI bytes are built in between. A lump that is neither fails the render.
+- The player keeps DMX's state as Chocolate Doom has it: nine voices in OPL2 mode, the free and allocated voice lists and their stealing order, the GENMIDI instruments with their fine tuning and double voices, percussion from the percussion bank, the volume mapping tables, pitch bend, and the channel state that a restart resets. The Doom 1.666 driver variants, OPL3 mode and the debug text are left out.
+- Timing is integer throughout, as in Chocolate Doom: event delays turn into microseconds from the current tempo, callbacks sit in a queue that pops equal times in the same order as `opl_queue.c`'s heap, and generation splits at each due callback with the same rounding. Chocolate Doom rescales queued callbacks on a tempo change with a single-precision float (`OPL_Queue_AdjustCallbacks`), so that one step uses Bend's F32 with the same conversions; Freedoom's song changes tempo three times. That is the only F32 in the render.
+- The chip is Nuked OPL3's arithmetic for what DMX drives: two-operator voices, the waveform select Doom enables, note select, tremolo and vibrato, the envelope generator and its global timer, key scaling, feedback and both connection types. Register writes go through the delay buffer of `OPL3_WriteRegBuffered`, and output goes from the chip's 49716 Hz to 44100 Hz through `OPL3_GenerateResampled`'s integer interpolation. Nuked's log-sine and exponent tables are generated from `opl3.c` by a nushell tool, the way `tools/gen_tables.nu` generates `src/tables.bend`. In OPL2 mode every voice goes to both sides, so the chip computes one channel.
+- The render's first ticket builds the chip alone, checks a single held note against Chocolate Doom's, and measures samples per second before the player is written. A pass is about 96.0 s for the shareware song and 130.6 s for Freedoom's, so Freedoom's two passes are about 13 million chip samples. If the render runs slower than a tenth of real time, the ticket brings the number to the maintainer before going on.
+- `music.bend` reads the WAD with `Bytes.read` and writes each chunk of samples with `Bytes.write` as it is made. It writes two files, raw signed 16-bit little-endian mono at 44100 Hz. The first holds the first pass, from the song's start to the sample where the player's restart callback runs (5 ms after the last track ends). The second holds the second pass, from that restart to the next. The files come to about 17 MB for the shareware song and 23 MB for Freedoom's.
+- The game plays the first pass once and then the second pass forever. The second pass starts with the tails of the first pass's last notes, as every repeat in vanilla does. The one declared difference: vanilla's chip runs continuously, so from the second repeat on its vibrato and tremolo phases and its sub-millisecond timing drift a little from a replayed pass. It cannot be heard, and it is why the comparison covers the first two passes only.
+- `nix/music.nix` builds `music.bend` and runs it on one IWAD. The music is a function of the IWAD, and the packages that take an IWAD (`bendoom`, `film`) derive their music from it, so one override cannot pair the shareware levels with Freedoom's song. The wrapper defaults `BENDOOM_MUSIC` to the render's directory beside `BENDOOM_IWAD`, and the dev shell sets it to Freedoom's. Pointing `BENDOOM_IWAD` at another WAD at runtime still plays the package's song. That is the limit the music-from-the-wad ticket removes.
+- The game opens `Audio` at 44100 Hz when its loop starts. If opening it or the music files fails, the game prints one line to stderr and runs silent. The music state lives in the game record beside the demo: the audio handle, the open file, and which pass it is reading. Quitting closes both.
+- Each frame, a write of no samples reads the device's queue. The game then reads enough frames from the current file to bring the queue to 3072 of the ring's 4096 frames, about 70 ms. It turns each 16-bit sample into an F32 over 32768, written to both channels. At the end of a pass file it opens the second pass again and keeps reading. The song's position moves with what the device plays, not with tics. A frame longer than about 70 ms lets the ring run dry. The device plays silence until the next frame, and the song resumes where it stopped: late, never skipped. Vanilla's audio thread never stalls this way, and the frame-rate bar keeps it from happening at play.
+- The song starts on the loop's first frame, after the level loads, as vanilla starts it in `S_Start` at level load. Restarting after the exit leaves it playing, because vanilla's `S_ChangeMusic` returns early when asked for the song already playing.
+- The film derivation muxes the same two files under the video: the first pass then the second repeated, cut at the video's length, from frame zero.
+
+## Testing Decisions
+
+- A good test drives one seam. For the render, that is a WAD in and samples out. For the game, it is the music module reading the render in frame-sized pieces and producing the samples it would write. Neither tests the MUS reader, the voice lists or a chip operator on its own, and no automated check opens a sound device.
+- `tools/listen.nu` records Chocolate Doom's music. It runs Chocolate Doom from nixpkgs on the given WAD, warped to E1M1 with no monsters and no sound effects at default music settings. SDL's disk audio driver writes the output to a file, and nothing opens a window. The tool checks that left equals right, measures the silent samples before the first note, and compares the capture with a render that runs the chip idle for that many samples first. It reports the count of differing samples and the largest difference over the first two passes, target zero. It never runs in the flake check because Chocolate Doom runs in real time.
+- The idle lead matters because Nuked's envelope timer, tremolo and vibrato run on every sample, and Chocolate Doom's chip runs for a load-dependent while before the song starts. The shipped render starts the song at the chip's first sample. That changes only those phases, and only for the capture comparison.
+- The flake check gets `tests/music.bend`. It renders the first half second of Freedoom's song on both lanes, with the idle lead of a recorded capture, and prints a hash and sampled values that must equal the capture's, read from it in nushell. It also streams the Freedoom render through the music module in pieces of varying frame counts and prints the samples at the song's start, on either side of the first-pass boundary, and on either side of the second pass's wrap, with expected values read from the render files in nushell. `nix/tests.nix` gets the Freedoom render and sets `BENDOOM_MUSIC`.
+- A law says the stream position after `a` frames and then `b` frames equals the position after `a + b` frames, for any position and any pass lengths. Closed laws pin the position on either side of both boundaries for Freedoom's pass lengths. The chip, player and song reader are integer code. Each ticket adds a law when a property over all inputs shows up, as with the renderer. All laws are filled in so the flake check gates them.
+- The render's ticket records how long the Freedoom node takes to build and its samples per second against real time on the dev machine.
+- The window bench plays the music while it measures. It reports the frames a second and the number of frames on which the queue was empty before the write. The target is 35 frames a second or more and no empty queue after the first frame. The ticket records the machine and the power state.
+- Both packages are played with sound on the dev machine and listened to through at least one repeat. The shareware package and its capture comparison are run by hand, since its WAD is unfree.
+
+## Out of Scope
+
+Sound effects (milestone 7). Songs for other maps, the title, the intermission and the finale. A music volume setting or menu. Chocolate Doom's other music devices (General MIDI, GUS, native MIDI), OPL3 mode and the Doom 1.666 drivers. Running the music code while the game plays, and so playing the song of whichever WAD is opened at runtime (the music-from-the-wad ticket). Pausing, since Bendoom has no pause. Hellbent.
+
+## Further Notes
+
+- This milestone depends on no milestone 5, 6 or 7 work. It adds the render and its modules, the music module, the table tool, the listen tool and the test, and touches `doom.bend`, `src/game.bend`, `flake.nix` and the packaging in `nix/`. The demo recording work, not yet on main, changes the same three files and adds `Bytes.write` and the film, so milestone 8 starts after it lands.
+- The chip is the risky part: bit-exact output depends on porting every step of Nuked's envelope and phase generators in the order it runs them. Timing is the quieter risk: one callback popped out of order or rounded differently moves a note by a sample, and the capture comparison is what shows it.
+- Moving the music into the game later reuses the song reader, the player and the chip as they are. What that ticket adds is the speed to run them alongside the frame, which this milestone's measurement tells it how far off it is.
+- Milestone 7 will mix sound effects into the same stream. The music module stays the only writer to `Audio` until then. Milestone 7 decides the mixer, and nothing here prepares for it.
+- The first repeat's tails are the reason for rendering two passes and not one. Looping only the first pass would cut the release of the song's last notes at every repeat.
+- The Bend constraints that shape the implementation remain in the project's Bend guide.
