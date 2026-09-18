@@ -134,3 +134,22 @@ def Bytes.fields(n: Nat, +i: U32, +stride: U32, +fields: List<&2, U32>) -> List<
       []
     case 1n+m:
       Bytes.fields.one(fields, i, Bytes.fields(m, (i + stride : U32), stride, fields))
+
+def Bytes.lists.join(~T: Data, rest: List<&2, List<&2, T>>, q: Array<U32> & List<&2, T>) ->
+  Array<U32> & List<&2, List<&2, T>>:
+  (a, xs) = q
+  (a, xs <> rest)
+
+def Bytes.lists.cons(~T: Data, ~read: Array<U32> -> @+i: U32 -> Array<U32> & T, offs: List<&2, U32>,
+  p: Array<U32> & List<&2, List<&2, T>>) -> Array<U32> & List<&2, List<&2, T>>:
+  (a, rest) = p
+  Bytes.lists.join(~T, rest, Bytes.each(~T, ~read, offs, a))
+
+# Bytes.each over each plan of a list, a list of reads a plan.
+def Bytes.lists(~T: Data, ~read: Array<U32> -> @+i: U32 -> Array<U32> & T,
+  plans: List<&2, List<&2, U32>>, a: Array<U32>) -> Array<U32> & List<&2, List<&2, T>>:
+  match plans:
+    case []:
+      (a, [])
+    case offs <> rest:
+      Bytes.lists.cons(~T, ~read, offs, Bytes.lists(~T, ~read, rest, a))

@@ -113,25 +113,12 @@ def Level.plan(+map: List<&2, W.Wad.Lump>) -> List<&2, List<&2, U32>>:
     Level.fields(Level.lump(map, "SECTORS"), 26, [0, 2, 20]),
     Level.fields(Level.lump(map, "BLOCKMAP"), 2, [0])]
 
-def Level.reads.join(vs: List<&2, V.Vec>, count: U32, q: Array<U32> & List<&2, U32>) ->
-  Array<U32> & List<&2, V.Vec>:
-  (a, words) = q
-  (a, V.Vec.of_list(words, count) <> vs)
-
-def Level.reads.cons(+offs: List<&2, U32>, p: Array<U32> & List<&2, V.Vec>) ->
-  Array<U32> & List<&2, V.Vec>:
-  (a, vs) = p
-  Level.reads.join(vs, U32.from_nat(List.length(&2, U32, offs)),
-    B.Bytes.each(~U32, ~B.Bytes.u16, offs, a))
-
-# The lumps are read last to first, so the trees come out in order.
-def Level.reads(plan: List<&2, List<&2, U32>>, a: Array<U32>) ->
-  Array<U32> & List<&2, V.Vec>:
-  match plan:
+def Level.vecs(lists: List<&2, List<&2, U32>>) -> List<&2, V.Vec>:
+  match lists:
     case []:
-      (a, [])
-    case offs <> rest:
-      Level.reads.cons(offs, Level.reads(rest, a))
+      []
+    case +words <> rest:
+      V.Vec.of_list(words, U32.from_nat(List.length(&2, U32, words))) <> Level.vecs(rest)
 
 def Level.start.go(k: Nat, +things: V.Vec, +i: U32, hit: Bool) -> Level.Start:
   match k hit:
@@ -190,17 +177,17 @@ def Level.flats(+map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>, p: Array<U32> &
   Level.pack(map, vs, texnames, B.Bytes.each(~String, ~B.Bytes.name,
     Level.fields(Level.lump(map, "SECTORS"), 26, [4, 12]), a))
 
-def Level.names(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, V.Vec>) ->
+def Level.names(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, List<&2, U32>>) ->
   Array<U32> & Level:
-  (a, vs) = p
-  Level.flats(map, vs, B.Bytes.each(~String, ~B.Bytes.name,
+  (a, lists) = p
+  Level.flats(map, Level.vecs(lists), B.Bytes.each(~String, ~B.Bytes.name,
     Level.fields(Level.lump(map, "SIDEDEFS"), 30, [4, 12, 20]), a))
 
 # The level from the WAD's bytes and directory.
 def Level.load(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Level:
   (a, +lumps) = p
   +map = Level.map(lumps)
-  Level.names(map, Level.reads(Level.plan(map), a))
+  Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.u16, Level.plan(map), a))
 
 # Lookups
 # -------
