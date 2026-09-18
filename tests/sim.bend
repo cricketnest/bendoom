@@ -14,18 +14,27 @@
 # monster and 7 for multiplayer), and six records: the first, animated
 # armour, a leg hung from its ceiling, the blue key, the dead former
 # sergeant and the last, each with the sector under it (tools/wad.nu's
-# sector-at), its z, its state row, its tics and its definition.
+# sector-at), its z, its state row, its tics and its definition. The
+# player's inventory, G_PlayerReborn's.
 # Then the movers and the lights, as runs of one command in a demo's
 # units from a place, each line with the clock, the thinkers running
 # and chosen sectors' floors and ceilings: the first door used, turned
 # twice, held, walked through and closed on the player; the special 23
 # switch; a special 2 line crossed both ways; the lift called by its
-# line and by its switch; the blue key door refusing; the exit switch;
-# the blinks and the strobe from the start. The heights and tics are
-# the hand computations in milestone 4's tickets 04 to 10; the blinks'
-# lights, a nushell replay of T_LightFlash over Chocolate Doom's random
-# table from index 254, which from index 2 gives ticket 01's; the
-# positions are regression pins.
+# line and by its switch; the blue key taken, and its door, sector 71,
+# refusing the start's inventory and opening for the one the key left
+# and for the blue skull alone; the exit switch; the blinks and the
+# strobe from the start. The heights and tics are the hand computations
+# in milestone 4's tickets 04 to 10; the blinks' lights, a nushell
+# replay of T_LightFlash over Chocolate Doom's random table from index
+# 254, which from index 2 gives ticket 01's; the positions are
+# regression pins. The key's tic is P_TouchSpecialThing's reach, its
+# radius 20 and the player's 16: tic 33 leaves the player 37.79 east of
+# it, tic 34 35.58 east and 28.51 south, the tic Chocolate Doom's status
+# bar first shows the card on the same script; P_GiveCard's flash of 6
+# and the pickup's 6 make 12, one less a tic after. Door 71's top is 4
+# under the ceilings of 0 beside it in the WAD, reached at 2 a tic on
+# tic 92.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -35,6 +44,8 @@ import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/things.bend as H
+import ../src/inventory.bend as I
+import ../src/vec.bend as V
 
 def line(tag: String, s: S.State) -> String:
   +p = S.State.player(s)
@@ -130,13 +141,53 @@ def lift(+level: L.Level) -> IO(Unit):
     s6 : S.State <- run("use", 1n, use(), [98], s5)
     IO.print("-")
 
-# The blue key door, sector 71, refuses.
+def present(things: List<&2, H.Thing>, +id: U32) -> Bool:
+  match things:
+    case []:
+      False{}
+    case H.Thing{i, kind, x, y, z, sector, state, tics} <> rest:
+      Bool.or(U32.is_eq(i, id), present(rest, id))
+
+# A run, then the blue key door's heights, whether the blue key (record
+# 87) is there, how many things are, and the cards and pickup flash.
+def keyed(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  +inv = S.Player.inv(S.State.player(q))
+  do IO<S.State>:
+    IO.print(watch(tag, [71], q) ++ " key " ++ Bool.show(present(S.State.things(q), 87)) ++ " things "
+      ++ Nat.show(List.length(&2, H.Thing, S.State.things(q))) ++ " cards " ++ U32.show(I.Inventory.cards(inv))
+      ++ " flash " ++ U32.show(I.Inventory.bonus(inv)))
+    return q
+
+# The state with the player holding an inventory.
+def holding(inv: I.Inventory, s: S.State) -> S.State:
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown}
+
+# The blue key door, sector 71, used from the south by a player holding
+# an inventory.
+def door71(tag: String, inv: I.Inventory, +level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    b0 : S.State <- keyed(tag, 30n, forward(), holding(inv, at(level, 832, 1400, 90)))
+    b1 : S.State <- keyed("use", 1n, use(), b0)
+    b2 : S.State <- keyed("-", 10n, idle(), b1)
+    b3 : S.State <- keyed("-", 51n, idle(), b2)
+    IO.print("-")
+
+# The blue key, taken strafing past it, the oracle's script: 20 idle
+# tics, a turn to 157.5, strafing left. Then the door refusing the
+# start's inventory and opening for the inventory the key left, or for
+# the blue skull alone.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    b0 : S.State <- run("blue walk", 30n, forward(), [71], at(level, 832, 1400, 90))
-    b1 : S.State <- run("use", 1n, use(), [71], b0)
-    b2 : S.State <- run("-", 10n, idle(), [71], b1)
-    IO.print("-")
+    k0 : S.State <- keyed("key turn", 1n, K.Cmd.demo(0, 0, 4294967280, False{}),
+      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
+    k1 : S.State <- keyed("strafe", 12n, K.Cmd.demo(0, 4294967272, 0, False{}), k0)
+    k2 : S.State <- keyed("-", 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
+    k3 : S.State <- keyed("-", 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
+    door71("blue walk", S.Player.inv(S.State.player(S.State.start(level))), level)
+    door71("blue walk with the key", S.Player.inv(S.State.player(k3)), level)
+    door71("blue walk with the skull", I.Inventory.card(8, I.Inventory.start()), level)
 
 # A run, then whether the level has ended and the exit line's special.
 def ending(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
@@ -285,11 +336,26 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
         IO.print(thing(S.State.things(s), id))
         things(rest, s)
 
+def words(+v: V.Vec, n: Nat, +i: U32) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+m:
+      " " ++ U32.show(V.Vec.get(v, i)) ++ words(v, m, (i + 1 : U32))
+
+def inventory(inv: I.Inventory) -> String:
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  "inventory health " ++ U32.show(health) ++ " armour " ++ U32.show(armour) ++ " type " ++ U32.show(armourtype)
+    ++ " cards " ++ U32.show(cards) ++ " ammo" ++ words(ammo, 4n, 0) ++ " caps" ++ words(caps, 4n, 0)
+    ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers" ++ words(powers, 6n, 0)
+    ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
+
 def free(+s: S.State) -> IO(S.State):
   +p = S.State.player(s)
   +spawned = S.State.things(s)
   do IO<S.State>:
     IO.print("free at start " ++ Bool.show(S.Sim.free(S.State.level(s), S.Player.x(p), S.Player.y(p))))
+    IO.print(inventory(S.Player.inv(p)))
     IO.print("things at start " ++ Nat.show(List.length(&2, H.Thing, spawned)) ++ " random "
       ++ U32.show(S.State.rnd(s)))
     IO.print("by type" ++ kinds(H.Thing.defs(), spawned))
@@ -332,6 +398,7 @@ def main() -> IO(Unit):
 
 #|start -416.000000 256.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000
 #|free at start True
+#|inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0
 #|things at start 180 random 1
 #|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1
 #|first 2 6 8 9 10 11 12 13 14 15 16 17
@@ -419,9 +486,24 @@ def main() -> IO(Unit):
 #|- tic 185 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 9 sector 98 12.000000 128.000000
 #|use tic 186 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 8.000000 128.000000
 #|-
-#|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000
-#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000
-#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000
+#|key turn tic 21 2246.000000 592.000000 157.500 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|- tic 34 2227.581390 547.485961 157.500 z 136.000000 floor 136.000000 eye 37.663955 thinkers 9 sector 71 -128.000000 -128.000000 key False things 179 cards 1 flash 12
+#|- tic 44 2202.145187 486.011810 157.500 z 136.000000 floor 136.000000 eye 46.122497 thinkers 9 sector 71 -128.000000 -128.000000 key False things 179 cards 1 flash 2
+#|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|-
+#|blue walk with the key tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 1 flash 0
+#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 180 cards 1 flash 0
+#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 180 cards 1 flash 0
+#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 180 cards 1 flash 0
+#|-
+#|blue walk with the skull tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 8 flash 0
+#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 180 cards 8 flash 0
+#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 180 cards 8 flash 0
+#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 180 cards 8 flash 0
 #|-
 #|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
 #|- tic 20 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11

@@ -22,6 +22,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 
 - **A universal U32 law does not compute.** Every word operation on a symbolic word is stuck in the checker, and Base has only `Word.add_comm`; state arithmetic facts as closed sample laws unless you are writing the word library.
 - **Normalization duplicates.** A def that uses its argument twice, nested n deep (`sar(sar(sar(x)))`), makes the checker's term 2^n large; write it linear.
+- **A let bound to a record is annotated** (`+level = {L.Level{geo, ..} : L.Level}`): the checker cannot infer a constructor's type from its fields.
 - **Hypotheses are parameters.** A lemma takes the fact it needs (`e: {True{} == f(x) : Bool}`) and returns the fact it proves; the caller passes `{==}` or an earlier lemma. Rewriting a hypothesis in place is not the tool.
 - **Orient equations value-first.** `%e : P` with `e : {a == b}` marks `b` in the goal with `_` and puts `a` there, so to replace a computed term by its answer the equation reads `{answer == computed}`.
 - **Refute through a motive:** `%e : BD(_, Unit, goal)` then `Unit{}`, where `BD` picks `goal` for the impossible side (proof_numerics' pattern).

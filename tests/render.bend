@@ -11,10 +11,13 @@
 # on its bench. Then frames after scripts, which the oracle plays too: a
 # stride, riding the lift down, off its east edge, the first door half
 # open, the special 23 switch pressed, the exit switch pressed, a
-# blinking wall at its dark level, and the water on a later frame of its
-# cycle; each script is beside its frame below. Every frame holds the
-# things E1M1 spawns on Hurt Me Plenty. tools/oracle.nu finds no pixel
-# off vanilla's in the dark, water, sky, stride, switch and blink frames.
+# blinking wall at its dark level, the water on a later frame of its
+# cycle, and the blue key on the tic before the player strafing past it
+# takes it and on the tic it does; each script is beside its frame
+# below. Every frame holds the things E1M1 spawns on Hurt Me Plenty.
+# tools/oracle.nu finds no pixel off vanilla's in the dark, water, sky,
+# stride, switch, blink and key frames; the key is 44 compared pixels of
+# the first and would be 347 of the second.
 # The others differ where a thing animates or is full-bright, which
 # ticket 05 brings, or where the big trees behind the grate overlap
 # unsorted, ticket 03's: with the animated and full-bright things taken
@@ -107,6 +110,9 @@ def ran(+level: L.Level, tics: Nat) -> S.State:
 def after(runs: List<&2, List<&2, K.Cmd>>, s: S.State) -> S.State:
   S.Sim.replay(List.concat(&2, K.Cmd, runs), s)
 
+def strafe(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(0, 4294967272, 0, False{}))
+
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
 
@@ -137,6 +143,10 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m16 : Array<U32> <- frame("blink dark", tables, gfx, after([idle(66n)], at(level, east(640), east(712), 180)),
       m15)
     m17 : Array<U32> <- frame("water moving", tables, gfx, after([idle(20n)], at(level, east(3), east(256), 0)), m16)
+    m18 : Array<U32> <- frame("key before", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
+      strafe(12n)], at(level, east(2246), east(592), 180)), m17)
+    m19 : Array<U32> <- frame("key after", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
+      strafe(13n)], at(level, east(2246), east(592), 180)), m18)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -165,4 +175,6 @@ def main() -> IO(Unit):
 #|exit pressed hash 847822191 pixels 102 95 102 3 covered True
 #|blink dark hash 568518560 pixels 94 73 73 101 covered True
 #|water moving hash 1934760231 pixels 2 6 77 6 covered True
+#|key before hash 331051703 pixels 6 10 5 89 covered True
+#|key after hash 1474234797 pixels 105 10 2 89 covered True
 #|end
