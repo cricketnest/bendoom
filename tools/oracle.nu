@@ -3,20 +3,21 @@
 # PWAD of E1M1 whose things are one player 1 start at x, y facing angle
 # and whose sectors and lines have no specials (so no light blinks and
 # no wall scrolls; Bendoom reads neither yet), runs Chocolate Doom on it
-# in a scratch directory at screen size 10, waits for the pistol to
-# finish rising, takes its paletted screenshot eight times about 0.2 s
-# apart, and compares the first settled one with the frame tools/frame.bend dumps,
-# outside the status bar rows and the pixels the resting pistol covers.
-# Pixels that differ among Chocolate Doom's own shots are its animated
-# textures and flats, which Bendoom does not animate yet, and are
-# counted apart. An animation changes frame every 8 tics, 0.23 s, and
-# none has more than four frames, so the shots see every frame of every
-# cycle; Bendoom draws the first frame, which is one of them, so a pixel
-# of an animated surface that differs from ours differs among the shots
-# too, and none leaks into the count.
+# in a scratch directory, at screen size 10, on a headless X server of
+# its own, waits for the pistol to finish rising, takes its paletted
+# screenshot eight times about 0.2 s apart, and compares the first
+# settled one with the frame tools/frame.bend dumps, outside the status
+# bar rows and the pixels the resting pistol covers. Pixels that differ
+# among Chocolate Doom's own shots are its animated textures and flats,
+# which Bendoom does not animate yet, and are counted apart. An
+# animation changes frame every 8 tics, 0.23 s, and none has more than
+# four frames, so the shots see every frame of every cycle; Bendoom
+# draws the first frame, which is one of them, so a pixel of an animated
+# surface that differs from ours differs among the shots too, and none
+# leaks into the count.
 #
-# Needs chocolate-doom and xdotool (both in the dev shell), niri, and
-# the frame dump built:
+# Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
+# frame dump built:
 #
 #   bend tools/frame.bend -o frame
 #   tools/oracle.nu -416 256 0
@@ -122,44 +123,46 @@ def pistol-mask [wad: binary]: nothing -> list<int> {
   } | flatten | where $it < 168 * 320
 }
 
-# The niri window whose title holds the text, once it opens.
-def wait-window [title: string]: nothing -> record {
-  let found = 0..<50
-    | each {|_| sleep 200ms; niri msg --json windows | from json | where title =~ $title }
-    | where ($it | is-not-empty) | first 1 | flatten
-  if ($found | is-empty) { error make {msg: $"no window titled ($title) opened"} }
-  $found | first
+# The first X display number with no server's lock file.
+def free-display []: nothing -> int {
+  90..<200 | where {|n| not ($"/tmp/.X($n)-lock" | path exists) } | first
 }
 
-# Chocolate Doom's frame at the start the PWAD gives, eight times.
+# Chocolate Doom's frame at the start the PWAD gives, eight times. It
+# can only take a screenshot while it runs, so it runs on an X server of
+# its own with no screen, Xvfb, where nothing shows on the desktop and
+# no window takes the focus, and xdotool presses its screenshot key.
 def vanilla [wad: path, map: binary, dir: path]: nothing -> list<string> {
   $map | save --force ($dir | path join start.wad)
   # Doom's default screen size 9 borders a 288 by 144 view; 10 is the
   # full 320 by 168 over the status bar, which is what Bendoom draws.
   # With messages off, no "screen shot" is written over the later shots.
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
-  let before = niri msg --json focused-window | from json
-  job spawn {
+  let display = $":(free-display)"
+  let server = job spawn { ^Xvfb $display -screen 0 1024x768x24 | ignore }
+  sleep 1sec
+  let game = job spawn {
     cd $dir
-    with-env {HOME: $dir} {
+    with-env {HOME: $dir, DISPLAY: $display} {
       ^chocolate-doom -iwad $wad -file start.wad -config default.cfg -warp 1 1 -skill 1 -nomonsters -devparm -window -nosound | ignore
     }
   }
-  let window = wait-window "Chocolate Doom"
-  niri msg action focus-window --id $window.id
-  sleep 4sec
-  let target = ^xdotool search --name "Chocolate Doom" | lines | first
-  # The first press after the focus change is swallowed, so F1 is
-  # pressed until all eight shots exist.
-  for _ in 0..<16 {
-    if ($dir | path join DOOM07.pcx | path exists) { break }
-    ^xdotool keydown --window $target F1
-    sleep 30ms
-    ^xdotool keyup --window $target F1
-    sleep 140ms
+  with-env {DISPLAY: $display} {
+    let found = 0..<50 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
+      | where ($it | is-not-empty) | first 1 | flatten
+    if ($found | is-empty) { error make {msg: "Chocolate Doom's window did not open"} }
+    # The screen wipe and the pistol's rise.
+    sleep 4sec
+    for _ in 0..<16 {
+      if ($dir | path join DOOM07.pcx | path exists) { break }
+      ^xdotool keydown --window ($found | first) F1
+      sleep 30ms
+      ^xdotool keyup --window ($found | first) F1
+      sleep 140ms
+    }
   }
-  kill $window.pid
-  if $before != null { niri msg action focus-window --id $before.id }
+  job kill $game
+  job kill $server
   0..<8 | each {|n| open --raw ($dir | path join $"DOOM0($n).pcx") | pcx-indices }
 }
 
@@ -177,7 +180,6 @@ def main [
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
-  $env.DISPLAY = ($env.DISPLAY? | default ":1")
   let wad = $wad | default $env.BENDOOM_IWAD
   let bytes = open --raw $wad
   let dir = mktemp --directory

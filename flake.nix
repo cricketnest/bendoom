@@ -54,8 +54,10 @@
               pkgs.bun
               pkgs.llvmPackages_19.clang
               pkgs.jujutsu
-              # tools/oracle.nu diffs our frames against Chocolate Doom's.
+              # tools/oracle.nu diffs our frames against Chocolate Doom's,
+              # which it runs on a headless X server.
               pkgs.chocolate-doom
+              pkgs.xorg.xorgserver
               pkgs.xdotool
             ];
             buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
