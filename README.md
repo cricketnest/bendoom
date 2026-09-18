@@ -12,10 +12,13 @@ check` refuses a build with an open or broken law.
     nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#bendoom-shareware
 
-`RECORD` names a vanilla demo to record until the level ends or the game
-quits, which Chocolate Doom also plays; `film` encodes one as a 1600 by
-1200 MP4 at Doom's 35 tics a second (`film-shareware` for the shareware
-WAD):
+To record a game and make a video of it, first play with `RECORD` naming
+the demo to write, and quit with Esc or by closing the window; the demo
+also ends with the level. Ctrl+C in the terminal leaves it without its
+end marker. Then `film` encodes the demo as a 1600 by 1200 MP4 at Doom's
+35 tics a second, and leaves an existing video alone. The demo is
+vanilla's .lmp, which Chocolate Doom plays too. A demo recorded with
+`bendoom-shareware` is filmed with `film-shareware`.
 
     RECORD=run.lmp nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
