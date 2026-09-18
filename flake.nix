@@ -55,7 +55,8 @@
               pkgs.llvmPackages_19.clang
               pkgs.jujutsu
               # tools/oracle.nu diffs our frames against Chocolate Doom's,
-              # which it runs on a headless X server.
+              # which it runs on a headless X server; tools/listen.nu
+              # records its music.
               pkgs.chocolate-doom
               pkgs.xorg.xorgserver
               pkgs.xdotool
