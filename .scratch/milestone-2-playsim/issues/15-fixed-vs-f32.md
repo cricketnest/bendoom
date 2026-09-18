@@ -21,3 +21,5 @@ Timed as native binaries with `--threads 1` on an x86_64 benchmark host (Linux),
     f32    0.105 s  0.106 s  0.106 s
 
 Emulated fixed point is 5.2 times slower than F32 in this loop, about 42 ns a column against 8 ns. The fixed loop's cost is dominated by `Fixed.div`'s sixteen shift-subtract steps and the four partial products of `Fixed.mul`; a renderer that keeps Doom's table-driven column loop (no division per column) would narrow it. The number for milestone 3: F32 for the renderer's inner loops is a fivefold win, at the price of leaving vanilla's bit-exact rendering.
+
+Decision, for milestone 3: the renderer uses the same fixed point as the sim, drawing at Doom's 320 by 200 into the framebuffer the debug view already folds into the 1280 by 800 window. At that resolution the fixed loop's 24 million columns a second is an order of magnitude past the 2.2 million a Doom frame rate needs, and vanilla's bit-exact rendering is kept. F32 is worth revisiting only for a higher internal resolution.
