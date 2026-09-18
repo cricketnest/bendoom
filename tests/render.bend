@@ -27,15 +27,25 @@
 # every sprite changes by 516. Then frames after scripts, which the
 # oracle plays too: a stride, riding the lift down, off its east edge,
 # the first door half open, the special 23 switch pressed, the exit
-# switch pressed, a blinking wall at its dark level, and the blue key on
-# the last tic of its dim state, 22, and the first of its full-bright
-# one, 23; each script is beside its frame below. Every frame holds the
-# things E1M1 spawns on Hurt Me Plenty, each in its state on that tic.
-# tools/oracle.nu finds no pixel off vanilla's in any frame but the
-# exit, which is not compared: vanilla never stands in it (milestone 4's
-# ticket 09 compares it another way). Each frame is drawn twice, over a
-# view blanked to 0 and to 255: equal hashes mean every pixel of the
-# view was written. Pinned to Freedoom.
+# switch pressed, a blinking wall at its dark level, the blue key on the
+# last tic of its dim state, 22, and the first of its full-bright one,
+# 23, then the pickups: the blue key on the tic before the player
+# strafing past it takes it and on the tic it does, a health bonus on a
+# step 24 up on the tic before a walk reaches it and on the tic it does,
+# green armour before and after a walk across it and back, and a
+# stimpack and a medikit before and after the same walk at 100 health,
+# which leaves both; each script is beside its frame below. Every frame
+# holds the things E1M1 spawns on Hurt Me Plenty, each in its state on
+# that tic. tools/oracle.nu finds no pixel off vanilla's in any frame
+# but the exit, which is not compared: vanilla never stands in it
+# (milestone 4's ticket 09 compares it another way). The pickup frames
+# do show their pickup: the key is 44 compared pixels of the first key
+# frame and would be 347 of the second, a bonus never taken would be
+# 1465 of the second bonus frame, green armour never taken 2137 of its
+# second frame, and a stimpack and a medikit taken at 100 health 2744 of
+# theirs. Each frame is drawn twice, over a view blanked to 0 and to
+# 255: equal hashes mean every pixel of the view was written. Pinned to
+# Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -119,12 +129,21 @@ def ran(+level: L.Level, tics: Nat) -> S.State:
 def after(runs: List<&2, List<&2, K.Cmd>>, s: S.State) -> S.State:
   S.Sim.replay(List.concat(&2, K.Cmd, runs), s)
 
+def strafe(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(0, 4294967272, 0, False{}))
+
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
 
 # A place after the oracle's 20 idle tics.
 def rested(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
   S.Sim.replay(idle(20n), at(level, x, y, degrees))
+
+def walk(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(25, 0, 0, False{}))
+
+def back(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, False{}))
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
@@ -148,11 +167,11 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), d2)
     m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
     m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
-    m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
-      List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
+    m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n), walk(20n),
+      [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
       at(level, east(832), east(384), 90)), m12)
-    m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n),
-      List.replicate(K.Cmd, 10n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
+    m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n), walk(10n),
+      [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
       at(level, east(2064), west(260), 90)), m13)
     m15 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
       idle(10n)], at(level, west(352), east(1296), 180)), m14)
@@ -162,6 +181,20 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(2380), east(600), 180)), m16)
     m18 : Array<U32> <- frame("key bright 23", tables, gfx, after([idle(23n)], at(level, east(2380), east(600), 180)),
       m17)
+    m19 : Array<U32> <- frame("key before", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
+      strafe(12n)], at(level, east(2246), east(592), 180)), m18)
+    m20 : Array<U32> <- frame("key after", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
+      strafe(13n)], at(level, east(2246), east(592), 180)), m19)
+    m21 : Array<U32> <- frame("bonus before", tables, gfx, after([idle(20n), walk(18n)],
+      at(level, east(2590), east(780), 90)), m20)
+    m22 : Array<U32> <- frame("bonus after", tables, gfx, after([idle(20n), walk(19n)],
+      at(level, east(2590), east(780), 90)), m21)
+    m23 : Array<U32> <- frame("green armour before", tables, gfx, rested(level, east(1631), east(1008), 90), m22)
+    m24 : Array<U32> <- frame("green armour after", tables, gfx, after([idle(20n), walk(16n), back(24n)],
+      at(level, east(1631), east(1008), 90)), m23)
+    m25 : Array<U32> <- frame("stimpack and medikit before", tables, gfx, rested(level, east(0), east(400), 90), m24)
+    m26 : Array<U32> <- frame("stimpack and medikit refused", tables, gfx, after([idle(20n), walk(16n), back(24n)],
+      at(level, east(0), east(400), 90)), m25)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -197,4 +230,12 @@ def main() -> IO(Unit):
 #|blink dark hash 568518560 pixels 94 73 73 101 covered True
 #|key 2380 600 180 22 hash 2254628260 pixels 5 1 6 110 covered True
 #|key bright 23 hash 2616277943 pixels 5 1 6 110 covered True
+#|key before hash 331051703 pixels 6 10 5 89 covered True
+#|key after hash 1474234797 pixels 105 10 2 89 covered True
+#|bonus before hash 4048638776 pixels 11 79 78 6 covered True
+#|bonus after hash 3882055195 pixels 10 78 2 11 covered True
+#|green armour before hash 414084707 pixels 6 111 243 2 covered True
+#|green armour after hash 1168881465 pixels 8 2 109 2 covered True
+#|stimpack and medikit before hash 1922567378 pixels 111 109 7 111 covered True
+#|stimpack and medikit refused hash 442016221 pixels 110 108 2 107 covered True
 #|end

@@ -136,6 +136,10 @@ def Thing.def.go(defs: List<&2, Thing.Def>, +kind: U32) -> Maybe<&2, Thing.Def>:
 def Thing.def(kind: U32) -> Maybe<&2, Thing.Def>:
   Thing.def.go(Thing.defs(), kind)
 
+# The definition of a spawned thing's type.
+def Thing.info(+kind: U32) -> Thing.Def:
+  Maybe.default(&2, Thing.Def, Thing.def(kind), Def{kind, 0, 0, 0, 0})
+
 # The things spawned, the last first while they spawn, and the random
 # index.
 type Thing.Spawn is Data:

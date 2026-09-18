@@ -11,6 +11,7 @@ import ./src/keys.bend as K
 import ./src/sim.bend as S
 import ./src/random.bend as M
 import ./src/things.bend as H
+import ./src/inventory.bend as I
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
@@ -193,9 +194,9 @@ law tic_rest:
   for +x: U32
   for +y: U32
   {(S.Player.x(S.State.player(S.Sim.tic(K.Cmd.idle(),
-      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []}, level, 0)))),
+      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()}, level, 0)))),
     S.Player.y(S.State.player(S.Sim.tic(K.Cmd.idle(),
-      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []}, level, 0)))))
+      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()}, level, 0)))))
     == (x, y) : U32 & U32}
 
 # LAW: a tic counts on the clock, and an ended level's tic changes
@@ -225,34 +226,34 @@ def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
 # momentum over four is 9999, and half of it times the clock's sine 25
 # is 1 (sanity).
 law tic_from_rest:
-  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []}, 0)
-    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, []} : S.Player}
+  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()}, 0)
+    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, [], I.Inventory.start()} : S.Player}
 
 # LAW: standing still on the floor puts the eye 41 above it, at any
 # position, whatever the eye was.
 law eye_rest:
   for x: U32
   for y: U32
-  {S.Player.viewz(Closed.room([K.Cmd.idle()], S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 0))
+  {S.Player.viewz(Closed.room([K.Cmd.idle()], S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 0))
     == 2686976 : U32}
 
 # LAW: 64 above the floor, the first airborne tic sets the fall to twice
 # gravity without moving, the second moves by it and adds gravity once;
 # the eye sits 41 above the height the tic began at (sanity).
 law fall_gravity:
-  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 0),
-    Closed.room([K.Cmd.idle(), K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 0))
-    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, []},
-      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, []})
+  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 0),
+    Closed.room([K.Cmd.idle(), K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 0))
+    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, [], I.Inventory.start()},
+      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, [], I.Inventory.start()})
     : S.Player & S.Player}
 
 # LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
 # landing at 8 a tic does not (sanity).
 law landing_dip:
-  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, []}, 0),
-    Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, []}, 0))
-    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, []},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, []})
+  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 0),
+    Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 0))
+    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, [], I.Inventory.start()},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, [], I.Inventory.start()})
     : S.Player & S.Player}
 
 # LAW: the bob at the clock's peak (tic 5, sine 65535). The first tic of
@@ -262,17 +263,17 @@ law landing_dip:
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
   {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, False{}}],
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 5)),
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 5)),
     S.Player.viewz(Closed.room([K.Cmd.idle()],
-      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 5)))
+      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 5)))
     == (2706974, 3211256) : U32 & U32}
 
 # LAW: a floor 16 above the player's feet lifts the player onto it, cuts
 # the view height by the 16 to 25, and sets it recovering by an eighth
 # of the gap, 2 a tic (sanity).
 law step_up_dip:
-  {Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, []}, 0)
-    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, []} : S.Player}
+  {Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, [], I.Inventory.start()}, 0)
+    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, [], I.Inventory.start()} : S.Player}
 
 # The movers' closed laws stand on a literal level: a west room (sector
 # 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
@@ -299,7 +300,7 @@ def Closed.doors() -> L.Level:
 
 # A player at rest on the floor at 0, under a ceiling.
 def Closed.player(x: U32, y: U32, angle: U32, ceilz: U32) -> S.Player:
-  S.Player{x, y, 0, angle, 0, 0, 0, 0, ceilz, 2686976, 0, 2686976, []}
+  S.Player{x, y, 0, angle, 0, 0, 0, 0, ceilz, 2686976, 0, 2686976, [], I.Inventory.start()}
 
 # The west room's player, 32 units from the door and facing it, and the
 # east room's.
@@ -369,9 +370,9 @@ law floor_carries:
     S.State.player(Closed.idled(1n, Closed.moving(Closed.doors(),
       S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}]},
       13107200, 4194304, 8388608))))
-    == (S.Player{2097152, 4194304, 4294705152, 0, 0, 0, 0, 4294705152, 8388608, 2686976, 0, 2686976, []},
-      S.Player{2097152, 4194304, 4294443008, 0, 0, 0, 0, 4294443008, 8388608, 2686976, 0, 2424832, []},
-      S.Player{13107200, 4194304, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []})
+    == (S.Player{2097152, 4194304, 4294705152, 0, 0, 0, 0, 4294705152, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
+      S.Player{2097152, 4194304, 4294443008, 0, 0, 0, 0, 4294443008, 8388608, 2686976, 0, 2424832, [], I.Inventory.start()},
+      S.Player{13107200, 4194304, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()})
     : S.Player & S.Player & S.Player}
 
 # LAW: a door that closes on the player goes back up. From 68, 2 a tic,
@@ -401,7 +402,7 @@ law door_crushed:
 # tag 0 is every sector), the door sector's floor at 16, its ceiling and
 # the east room's at 128, and a player at x moving east at a speed.
 def Closed.turbo(x: U32, momx: U32) -> S.State:
-  S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, []},
+  S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
     L.Level.special.put(L.Level.plane.put(L.Level.plane.put(L.Level.plane.put(Closed.doors(), 1, False{},
       1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), [], V.Leaf{0}, [], 0, 0, False{}, False{}}
 
@@ -612,6 +613,240 @@ law glow_turns:
     Closed.light(Closed.idled(14n, Closed.lit(8, 96))), Closed.light(Closed.idled(15n, Closed.lit(8, 96))),
     Closed.light(Closed.idled(16n, Closed.lit(8, 96))))
     == (152, 104, 104, 112, 152, 152, 144) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# Pickups and keys
+# ----------------
+
+# The west room's player holding an inventory, beside the door with
+# line 0 made vanilla's blue locked door, special 26.
+def Closed.locked(inv: I.Inventory) -> S.State:
+  Closed.state(S.Player.holding(Closed.player(2097152, 4194304, 0, 8388608), inv),
+    L.Level.special.put(Closed.doors(), 0, 26), 0)
+
+# LAW: the blue locked door, vanilla's EV_VerticalDoor for special 26.
+# Used on tic 1 with no card, or with the yellow card alone, it stays
+# shut; with the blue card or the blue skull it is the manual door, 2
+# up after that tic (sanity).
+law blue_door_locked:
+  {(Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.start())), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(2, I.Inventory.start()))), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(1, I.Inventory.start()))), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, I.Inventory.start()))), 1))
+    == (0, 0, 131072, 131072) : U32 & U32 & U32 & U32}
+
+# The west room's player at (x, 64), on the floor under a ceiling at
+# 128, moving by a momentum a tic, among things, on the literal level.
+def Closed.among(x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
+  S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
+    Closed.doors(), things, V.Leaf{0}, [], 0, 0, False{}, False{}}
+
+# A blue card named id at (x, y) and z, its state lasting: these laws
+# are about its touch, not its tics.
+def Closed.key(id: U32, x: U32, y: U32, z: U32) -> H.Thing:
+  H.Thing{id, 5, x, y, z, 0, 0, 24, 4294967295}
+
+# The things left, and the cards and the pickup flash held.
+def Closed.held(+s: S.State) -> List<&2, H.Thing> & U32 & U32:
+  (S.State.things(s), I.Inventory.cards(S.Player.inv(S.State.player(s))),
+    I.Inventory.bonus(S.Player.inv(S.State.player(s))))
+
+# Moving north at 8 a tic from (32, 64) past a bloody mess (record 3)
+# and a blue card (record 87), both at (32, 112), toward another blue
+# card (record 90) at (32, 400).
+def Closed.passing() -> S.State:
+  Closed.among(2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 0, 1, 4294967295},
+    Closed.key(87, 2097152, 7340032, 0), Closed.key(90, 2097152, 26214400, 0)])
+
+# LAW: P_TouchSpecialThing for the blue card. Tic 1 moves the player to
+# 72, 40 short of the card, and the reach is its radius 20 and the
+# player's 16. Friction leaves 7.25 a tic, so tic 2 moves it to 79.25,
+# 32.75 short: record 87 is gone and no other, the blue card is held,
+# and P_GiveCard's 6 and the pickup's 6 set the flash to 12. On tic 3,
+# still in reach of where it was, nothing is touched again and the
+# flash fades to 11 (sanity).
+law key_taken:
+  {(Closed.held(Closed.idled(1n, Closed.passing())), Closed.held(Closed.idled(2n, Closed.passing())),
+    Closed.held(Closed.idled(3n, Closed.passing())))
+    == (([H.Thing{3, 10, 2097152, 7340032, 0, 0, 0, 1, 4294967295}, Closed.key(87, 2097152, 7340032, 0),
+      Closed.key(90, 2097152, 26214400, 0)], 0, 0),
+      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 0, 1, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 12),
+      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 0, 1, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 11))
+    : (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32)}
+
+# LAW: a move of 20 a tic is tried in halves, to 74 and then 84, and a
+# blue card at (32, 100) is in reach of both: the first takes it, the
+# second finds it gone, so the flash is 12 and not 18 (sanity).
+law key_taken_once:
+  {Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 1310720, [Closed.key(87, 2097152, 6553600, 0)])))
+    == ([], 1, 12) : List<&2, H.Thing> & U32 & U32}
+
+# LAW: vertical reach. A tic moves the player to 72, 8 from a blue card
+# at (32, 80); the card is taken with its bottom 56 over the player's
+# feet and not 57, and 8 under them and not 9 (sanity).
+law key_reach:
+  {(Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3670016)]))),
+    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3735552)]))),
+    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294443008)]))),
+    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294377472)]))))
+    == (([], 1, 12), ([Closed.key(87, 2097152, 5242880, 3735552)], 0, 0), ([], 1, 12),
+      ([Closed.key(87, 2097152, 5242880, 4294377472)], 0, 0))
+    : (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32)
+      & (List<&2, H.Thing> & U32 & U32)}
+
+# The player at (40, 64) moving east at 12 a tic into the shut door,
+# with a blue card at (86, 64) past it.
+def Closed.shut_out() -> S.State:
+  Closed.idled(1n, Closed.among(2621440, 786432, 0, [Closed.key(87, 5636096, 4194304, 0)]))
+
+# LAW: P_CheckPosition touches things before it checks lines. The move
+# to 52 puts the box across the shut door, whose opening refuses it,
+# but its position check has already taken the card, 34 away; the
+# slide that follows stops the player short of the door, at most 48,
+# from where the card is out of reach (sanity).
+law key_through_door:
+  {(Closed.held(Closed.shut_out()), F.Fixed.le(S.Player.x(S.State.player(Closed.shut_out())), 3145728))
+    == (([], 1, 12), True{}) : (List<&2, H.Thing> & U32 & U32) & Bool}
+
+# The health, armour and power laws' expected values are p_inter.c's
+# P_TouchSpecialThing, P_GiveBody, P_GiveArmor and P_GivePower and
+# p_user.c's P_PlayerThink in Chocolate Doom 3.1.1, by hand.
+
+# An inventory as G_PlayerReborn's but for its health, armour points and
+# type, strength counter, tally and flash.
+def Closed.inv(health: U32, armour: U32, armourtype: U32, strength: U32, items: U32, bonus: U32) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
+    False{}, 3, V.Vec.of_list([0, strength, 0, 0, 0, 0], 6), items, bonus}
+
+# A thing of a type named id, on the floor at (0, y).
+def Closed.item(id: U32, kind: U32, y: U32) -> H.Thing:
+  H.Thing{id, kind, 0, y, 0, 0, 0, 0, 4294967295}
+
+# The thing of a type named 8, 200 north of the origin, out of reach.
+def Closed.far(kind: U32) -> List<&2, H.Thing>:
+  [Closed.item(8, kind, 13107200)]
+
+# Both things of a type: one named 7, 16 north of the origin and in
+# reach, and the one out of reach.
+def Closed.both(+kind: U32) -> List<&2, H.Thing>:
+  Closed.item(7, kind, 1048576) <> Closed.far(kind)
+
+# What a position check leaves: the inventory and the things.
+type Closed.Left is Data:
+  Left{inv: I.Inventory, things: List<&2, H.Thing>}
+
+def Closed.left(p: I.Inventory & List<&2, H.Thing>) -> Closed.Left:
+  (inv, things) = p
+  Left{inv, things}
+
+# The position check of a player with its feet on the floor at the
+# origin, holding an inventory, among both things of a type.
+def Closed.offered(kind: U32, inv: I.Inventory) -> Closed.Left:
+  Closed.left(S.Sim.touch(Closed.both(kind), 0, 0, 0, inv))
+
+# LAW: the health bonus is always taken and counted. From 100 it makes
+# 101, from 199 200, and at 200 it adds nothing and still goes. Only
+# the thing touched, 7, goes; the flash is 6 (sanity).
+law health_bonus:
+  {[Closed.offered(2014, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2014, Closed.inv(199, 0, 0, 0, 0, 0)),
+    Closed.offered(2014, Closed.inv(200, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(101, 0, 0, 0, 1, 6), Closed.far(2014)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2014)},
+      Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2014)}] : List<&2, Closed.Left>}
+
+# LAW: the stimpack heals 10 up to 100 and is not counted: 89 makes 99,
+# 99 makes 100, and at 100 it stays, the inventory untouched (sanity).
+law stimpack:
+  {[Closed.offered(2011, Closed.inv(89, 0, 0, 0, 0, 0)), Closed.offered(2011, Closed.inv(99, 0, 0, 0, 0, 0)),
+    Closed.offered(2011, Closed.inv(100, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(99, 0, 0, 0, 0, 6), Closed.far(2011)}, Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2011)},
+      Left{Closed.inv(100, 0, 0, 0, 0, 0), Closed.both(2011)}] : List<&2, Closed.Left>}
+
+# LAW: the medikit heals 25 up to 100 and is not counted: 74 makes 99,
+# 75 and 99 make 100, and at 100, or at 150 from bonuses, it stays
+# (sanity).
+law medikit:
+  {[Closed.offered(2012, Closed.inv(74, 0, 0, 0, 0, 0)), Closed.offered(2012, Closed.inv(75, 0, 0, 0, 0, 0)),
+    Closed.offered(2012, Closed.inv(99, 0, 0, 0, 0, 0)), Closed.offered(2012, Closed.inv(100, 0, 0, 0, 0, 0)),
+    Closed.offered(2012, Closed.inv(150, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(99, 0, 0, 0, 0, 6), Closed.far(2012)}, Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2012)},
+      Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2012)}, Left{Closed.inv(100, 0, 0, 0, 0, 0), Closed.both(2012)},
+      Left{Closed.inv(150, 0, 0, 0, 0, 0), Closed.both(2012)}] : List<&2, Closed.Left>}
+
+# LAW: the soul sphere adds 100 up to 200 and is always taken and
+# counted: 99 makes 199, 100 and 101 make 200, and 200 stays 200
+# (sanity).
+law soul_sphere:
+  {[Closed.offered(2013, Closed.inv(99, 0, 0, 0, 0, 0)), Closed.offered(2013, Closed.inv(100, 0, 0, 0, 0, 0)),
+    Closed.offered(2013, Closed.inv(101, 0, 0, 0, 0, 0)), Closed.offered(2013, Closed.inv(200, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(199, 0, 0, 0, 1, 6), Closed.far(2013)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)},
+      Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)}]
+    : List<&2, Closed.Left>}
+
+# LAW: the berserk pack is always taken and counted, and sets the
+# strength counter to 1, even over one already running at 40. It heals
+# 1 to 100, leaves 100 at 100, and does not lower 150 (sanity).
+law berserk:
+  {[Closed.offered(2023, Closed.inv(1, 0, 0, 0, 0, 0)), Closed.offered(2023, Closed.inv(100, 0, 0, 0, 0, 0)),
+    Closed.offered(2023, Closed.inv(150, 0, 0, 0, 0, 0)), Closed.offered(2023, Closed.inv(100, 0, 0, 40, 0, 0))]
+    == [Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)}, Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)},
+      Left{Closed.inv(150, 0, 0, 1, 1, 6), Closed.far(2023)}, Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)}]
+    : List<&2, Closed.Left>}
+
+# LAW: the armour bonus is always taken and counted: no armour makes 1
+# point of green armour's type, 199 points of blue make 200 and stay
+# blue, and 200 points of green take nothing more (sanity).
+law armour_bonus:
+  {[Closed.offered(2015, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2015, Closed.inv(100, 199, 2, 0, 0, 0)),
+    Closed.offered(2015, Closed.inv(100, 200, 1, 0, 0, 0))]
+    == [Left{Closed.inv(100, 1, 1, 0, 1, 6), Closed.far(2015)}, Left{Closed.inv(100, 200, 2, 0, 1, 6), Closed.far(2015)},
+      Left{Closed.inv(100, 200, 1, 0, 1, 6), Closed.far(2015)}] : List<&2, Closed.Left>}
+
+# LAW: green armour gives 100 points of type 1 over fewer points of any
+# type, blue's 99 among them, and is not counted; with 100 points of
+# green, or 150 of blue, it stays (sanity).
+law green_armour:
+  {[Closed.offered(2018, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2018, Closed.inv(100, 99, 2, 0, 0, 0)),
+    Closed.offered(2018, Closed.inv(100, 100, 1, 0, 0, 0)), Closed.offered(2018, Closed.inv(100, 150, 2, 0, 0, 0))]
+    == [Left{Closed.inv(100, 100, 1, 0, 0, 6), Closed.far(2018)}, Left{Closed.inv(100, 100, 1, 0, 0, 6), Closed.far(2018)},
+      Left{Closed.inv(100, 100, 1, 0, 0, 0), Closed.both(2018)}, Left{Closed.inv(100, 150, 2, 0, 0, 0), Closed.both(2018)}]
+    : List<&2, Closed.Left>}
+
+# LAW: blue armour gives 200 points of type 2 over fewer, 199 among
+# them, and is not counted; with 200 points of either type it stays
+# (sanity).
+law blue_armour:
+  {[Closed.offered(2019, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2019, Closed.inv(100, 199, 1, 0, 0, 0)),
+    Closed.offered(2019, Closed.inv(100, 200, 1, 0, 0, 0)), Closed.offered(2019, Closed.inv(100, 200, 2, 0, 0, 0))]
+    == [Left{Closed.inv(100, 200, 2, 0, 0, 6), Closed.far(2019)}, Left{Closed.inv(100, 200, 2, 0, 0, 6), Closed.far(2019)},
+      Left{Closed.inv(100, 200, 1, 0, 0, 0), Closed.both(2019)}, Left{Closed.inv(100, 200, 2, 0, 0, 0), Closed.both(2019)}]
+    : List<&2, Closed.Left>}
+
+# A thing of a type named 9 at (32, y) on the literal level's floor.
+def Closed.placed(kind: U32, y: U32) -> H.Thing:
+  H.Thing{9, kind, 2097152, y, 0, 0, 0, 0, 4294967295}
+
+# The inventory held and the things left.
+def Closed.kept(+s: S.State) -> Closed.Left:
+  Left{S.Player.inv(S.State.player(s)), S.State.things(s)}
+
+# LAW: a move of 20 a tic is tried in halves, to 74 and then 84, and a
+# health bonus at (32, 100) is in reach of both: the first takes it and
+# the second finds it gone, so health is 101, the tally 1 and the flash
+# 6, not 102, 2 and 12 (sanity).
+law bonus_counted_once:
+  {Closed.kept(Closed.idled(1n, Closed.among(2097152, 0, 1310720, [Closed.placed(2014, 6553600)])))
+    == Left{Closed.inv(101, 0, 0, 0, 1, 6), []} : Closed.Left}
+
+# LAW: P_PlayerThink counts strength up a tic before it counts the flash
+# down, and both before the mobj moves: a berserk pack at (32, 80), 8
+# from where the first tic moves the player, is taken on that tic with
+# the counter at 1 and the flash at 6; the next two tics make 2 and 5,
+# then 3 and 4 (sanity).
+law strength_counts:
+  {[Closed.kept(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)]))),
+    Closed.kept(Closed.idled(2n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)]))),
+    Closed.kept(Closed.idled(3n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)])))]
+    == [Left{Closed.inv(100, 0, 0, 1, 1, 6), []}, Left{Closed.inv(100, 0, 0, 2, 1, 5), []},
+      Left{Closed.inv(100, 0, 0, 3, 1, 4), []}] : List<&2, Closed.Left>}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
