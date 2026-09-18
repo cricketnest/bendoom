@@ -17,3 +17,17 @@ with no self-updating launcher and no telemetry.
 
 Tests are `.bend` files under `tests/` whose trailing `#|` lines are the
 expected output. Specs live under `.scratch/`.
+
+## Milestones
+
+Each is a spec under `.scratch/`, cut into tickets, then implemented.
+
+1. WAD loads, directory parses, a window opens. Done.
+2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law.
+3. Walls, then floors, ceilings and sky.
+4. Doors, the lift, switches, the exit: E1M1 completable, no enemies.
+5. Things: decorations, items, pickups, sprites.
+6. Monsters, weapons, damage, the status bar.
+7. Sound effects.
+8. Music, rendered to PCM at build time.
+9. Hellbent: the game as one λ-expression.
