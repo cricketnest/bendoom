@@ -1250,3 +1250,18 @@ def Laws.bonus_counted_once():
 
 def Laws.strength_counts():
   {==}
+
+def Laws.ammo_amounts():
+  {==}
+
+def Laws.ammo_caps():
+  {==}
+
+def Laws.backpack_first():
+  {==}
+
+def Laws.backpack_later():
+  {==}
+
+def Laws.weapon_taken():
+  {==}

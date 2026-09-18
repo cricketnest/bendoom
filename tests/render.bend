@@ -32,20 +32,27 @@
 # 23, then the pickups: the blue key on the tic before the player
 # strafing past it takes it and on the tic it does, a health bonus on a
 # step 24 up on the tic before a walk reaches it and on the tic it does,
-# green armour before and after a walk across it and back, and a
-# stimpack and a medikit before and after the same walk at 100 health,
-# which leaves both; each script is beside its frame below. Every frame
-# holds the things E1M1 spawns on Hurt Me Plenty, each in its state on
-# that tic. tools/oracle.nu finds no pixel off vanilla's in any frame
-# but the exit, which is not compared: vanilla never stands in it
-# (milestone 4's ticket 09 compares it another way). The pickup frames
-# do show their pickup: the key is 44 compared pixels of the first key
-# frame and would be 347 of the second, a bonus never taken would be
-# 1465 of the second bonus frame, green armour never taken 2137 of its
-# second frame, and a stimpack and a medikit taken at 100 health 2744 of
-# theirs. Each frame is drawn twice, over a view blanked to 0 and to
-# 255: equal hashes mean every pixel of the view was written. Pinned to
-# Freedoom.
+# green armour 33 to the right of a walk on the tic before it reaches it
+# and on the tic it does, a stimpack and a medikit before and after a
+# walk across them and back at 100 health, which leaves both, the rocket
+# in its nook strafed past facing 112.5 degrees on the tic before it is
+# taken and the tic it is, and on that tic with every ammo type at its
+# cap, where it stays, and the chainsaw on the key's script on the tic
+# it is taken and, owned, on the tic it stays; each script is beside its
+# frame below. Every frame holds the things E1M1 spawns on Hurt Me
+# Plenty, each in its state on that tic. tools/oracle.nu finds no pixel
+# off vanilla's in any frame but the exit, which is not compared:
+# vanilla never stands in it (milestone 4's ticket 09 compares it
+# another way), and the two refused frames, whose full inventory
+# vanilla's demo cannot reach. The pickup frames show their pickup: the
+# key is 44 compared pixels of the first key frame and would be 347 of
+# the second, a bonus never taken would be 1465 of the second bonus
+# frame, the green armour is 745 of its first frame and would be 419 of
+# its second, and a stimpack and a medikit taken at 100 health 2744 of
+# theirs; a refused frame differs from its taken twin only in the
+# pickup's sprite, 762 pixels of the rocket and 5092 of the chainsaw.
+# Each frame is drawn twice, over a view blanked to 0 and to 255: equal
+# hashes mean every pixel of the view was written. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -57,6 +64,7 @@ import ../src/sim.bend as S
 import ../src/project.bend as P
 import ../src/draw.bend as D
 import ../src/render.bend as R
+import ../src/inventory.bend as I
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32}
@@ -145,6 +153,21 @@ def walk(n: Nat) -> List<&2, K.Cmd>:
 def back(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, False{}))
 
+# A pickup strafed past: the idle tics, a turn, then strafing left.
+def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
+  after([idle(20n), [K.Cmd.demo(0, 0, turn, False{})], strafe(n)], s)
+
+# Every weapon and every ammo type at its cap, so that no ammo or weapon
+# pickup can be taken.
+def maxed(inv: I.Inventory) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus} = inv
+  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus}
+
+def full(s: S.State) -> S.State:
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
+    usedown}
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
@@ -181,20 +204,29 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(2380), east(600), 180)), m16)
     m18 : Array<U32> <- frame("key bright 23", tables, gfx, after([idle(23n)], at(level, east(2380), east(600), 180)),
       m17)
-    m19 : Array<U32> <- frame("key before", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
-      strafe(12n)], at(level, east(2246), east(592), 180)), m18)
-    m20 : Array<U32> <- frame("key after", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
-      strafe(13n)], at(level, east(2246), east(592), 180)), m19)
+    m19 : Array<U32> <- frame("key before", tables, gfx, strafed(4294967280, 12n,
+      at(level, east(2246), east(592), 180)), m18)
+    m20 : Array<U32> <- frame("key after", tables, gfx, strafed(4294967280, 13n,
+      at(level, east(2246), east(592), 180)), m19)
     m21 : Array<U32> <- frame("bonus before", tables, gfx, after([idle(20n), walk(18n)],
       at(level, east(2590), east(780), 90)), m20)
     m22 : Array<U32> <- frame("bonus after", tables, gfx, after([idle(20n), walk(19n)],
       at(level, east(2590), east(780), 90)), m21)
-    m23 : Array<U32> <- frame("green armour before", tables, gfx, rested(level, east(1631), east(1008), 90), m22)
-    m24 : Array<U32> <- frame("green armour after", tables, gfx, after([idle(20n), walk(16n), back(24n)],
+    m23 : Array<U32> <- frame("green armour before", tables, gfx, after([idle(20n), walk(11n)],
+      at(level, east(1631), east(1008), 90)), m22)
+    m24 : Array<U32> <- frame("green armour after", tables, gfx, after([idle(20n), walk(12n)],
       at(level, east(1631), east(1008), 90)), m23)
     m25 : Array<U32> <- frame("stimpack and medikit before", tables, gfx, rested(level, east(0), east(400), 90), m24)
     m26 : Array<U32> <- frame("stimpack and medikit refused", tables, gfx, after([idle(20n), walk(16n), back(24n)],
       at(level, east(0), east(400), 90)), m25)
+    m27 : Array<U32> <- frame("rocket before", tables, gfx, strafed(16, 11n, at(level, east(714), west(1011), 90)), m26)
+    m28 : Array<U32> <- frame("rocket after", tables, gfx, strafed(16, 12n, at(level, east(714), west(1011), 90)), m27)
+    m29 : Array<U32> <- frame("rocket refused", tables, gfx, strafed(16, 12n,
+      full(at(level, east(714), west(1011), 90))), m28)
+    m30 : Array<U32> <- frame("chainsaw after", tables, gfx, strafed(4294967280, 13n,
+      at(level, east(3158), east(2176), 180)), m29)
+    m31 : Array<U32> <- frame("chainsaw refused", tables, gfx, strafed(4294967280, 13n,
+      full(at(level, east(3158), east(2176), 180))), m30)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -234,8 +266,13 @@ def main() -> IO(Unit):
 #|key after hash 1474234797 pixels 105 10 2 89 covered True
 #|bonus before hash 4048638776 pixels 11 79 78 6 covered True
 #|bonus after hash 3882055195 pixels 10 78 2 11 covered True
-#|green armour before hash 414084707 pixels 6 111 243 2 covered True
-#|green armour after hash 1168881465 pixels 8 2 109 2 covered True
+#|green armour before hash 3461155049 pixels 110 110 6 1 covered True
+#|green armour after hash 2966202358 pixels 8 110 103 2 covered True
 #|stimpack and medikit before hash 1922567378 pixels 111 109 7 111 covered True
 #|stimpack and medikit refused hash 442016221 pixels 110 108 2 107 covered True
+#|rocket before hash 1385688744 pixels 105 109 105 77 covered True
+#|rocket after hash 2195675567 pixels 106 109 105 77 covered True
+#|rocket refused hash 330851925 pixels 106 109 105 77 covered True
+#|chainsaw after hash 3701006664 pixels 5 5 137 141 covered True
+#|chainsaw refused hash 4000560599 pixels 5 5 137 141 covered True
 #|end

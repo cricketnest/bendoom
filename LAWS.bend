@@ -634,10 +634,11 @@ law blue_door_locked:
     Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, I.Inventory.start()))), 1))
     == (0, 0, 131072, 131072) : U32 & U32 & U32 & U32}
 
-# The west room's player at (x, 64), on the floor under a ceiling at
-# 128, moving by a momentum a tic, among things, on the literal level.
-def Closed.among(x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
-  S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
+# The west room's player holding an inventory at (x, 64), on the floor
+# under a ceiling at 128, moving by a momentum a tic, among things, on
+# the literal level.
+def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
+  S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], inv},
     Closed.doors(), things, V.Leaf{0}, [], 0, 0, False{}, False{}}
 
 # A blue card named id at (x, y) and z, its state lasting: these laws
@@ -654,7 +655,7 @@ def Closed.held(+s: S.State) -> List<&2, H.Thing> & U32 & U32:
 # and a blue card (record 87), both at (32, 112), toward another blue
 # card (record 90) at (32, 400).
 def Closed.passing() -> S.State:
-  Closed.among(2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 0, 1, 4294967295},
+  Closed.among(I.Inventory.start(), 2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 0, 1, 4294967295},
     Closed.key(87, 2097152, 7340032, 0), Closed.key(90, 2097152, 26214400, 0)])
 
 # LAW: P_TouchSpecialThing for the blue card. Tic 1 moves the player to
@@ -677,17 +678,17 @@ law key_taken:
 # blue card at (32, 100) is in reach of both: the first takes it, the
 # second finds it gone, so the flash is 12 and not 18 (sanity).
 law key_taken_once:
-  {Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 1310720, [Closed.key(87, 2097152, 6553600, 0)])))
+  {Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 1310720, [Closed.key(87, 2097152, 6553600, 0)])))
     == ([], 1, 12) : List<&2, H.Thing> & U32 & U32}
 
 # LAW: vertical reach. A tic moves the player to 72, 8 from a blue card
 # at (32, 80); the card is taken with its bottom 56 over the player's
 # feet and not 57, and 8 under them and not 9 (sanity).
 law key_reach:
-  {(Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3670016)]))),
-    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3735552)]))),
-    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294443008)]))),
-    Closed.held(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294377472)]))))
+  {(Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3670016)]))),
+    Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 3735552)]))),
+    Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294443008)]))),
+    Closed.held(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.key(87, 2097152, 5242880, 4294377472)]))))
     == (([], 1, 12), ([Closed.key(87, 2097152, 5242880, 3735552)], 0, 0), ([], 1, 12),
       ([Closed.key(87, 2097152, 5242880, 4294377472)], 0, 0))
     : (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32)
@@ -696,7 +697,7 @@ law key_reach:
 # The player at (40, 64) moving east at 12 a tic into the shut door,
 # with a blue card at (86, 64) past it.
 def Closed.shut_out() -> S.State:
-  Closed.idled(1n, Closed.among(2621440, 786432, 0, [Closed.key(87, 5636096, 4194304, 0)]))
+  Closed.idled(1n, Closed.among(I.Inventory.start(), 2621440, 786432, 0, [Closed.key(87, 5636096, 4194304, 0)]))
 
 # LAW: P_CheckPosition touches things before it checks lines. The move
 # to 52 puts the box across the shut door, whose opening refuses it,
@@ -707,146 +708,269 @@ law key_through_door:
   {(Closed.held(Closed.shut_out()), F.Fixed.le(S.Player.x(S.State.player(Closed.shut_out())), 3145728))
     == (([], 1, 12), True{}) : (List<&2, H.Thing> & U32 & U32) & Bool}
 
-# The health, armour and power laws' expected values are p_inter.c's
-# P_TouchSpecialThing, P_GiveBody, P_GiveArmor and P_GivePower and
-# p_user.c's P_PlayerThink in Chocolate Doom 3.1.1, by hand.
+# The pickup laws' expected values are p_inter.c's P_TouchSpecialThing,
+# P_GiveBody, P_GiveArmor, P_GivePower, P_GiveAmmo and P_GiveWeapon,
+# d_items.c's clips and p_user.c's P_PlayerThink in Chocolate Doom
+# 3.1.1, by hand.
 
-# An inventory as G_PlayerReborn's but for its health, armour points and
-# type, strength counter, tally and flash.
-def Closed.inv(health: U32, armour: U32, armourtype: U32, strength: U32, items: U32, bonus: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
-    False{}, 3, V.Vec.of_list([0, strength, 0, 0, 0, 0], 6), items, bonus}
+# A change to an inventory: its health, its armour points and type, its
+# ammo in ammotype_t order (bullets, shells, cells, rockets), the
+# backpack with the caps it doubles, 400 100 600 100, the weapons owned,
+# the strength counter, the tally or the flash.
+type Closed.Edit is Data:
+  Health{n: U32}
+  Armour{points: U32, kind: U32}
+  Ammo{rounds: List<&2, U32>}
+  Backpack{}
+  Weapons{bits: U32}
+  Strength{n: U32}
+  Items{n: U32}
+  Flash{n: U32}
 
-# A thing of a type named id, on the floor at (0, y).
-def Closed.item(id: U32, kind: U32, y: U32) -> H.Thing:
-  H.Thing{id, kind, 0, y, 0, 0, 0, 0, 4294967295}
+def Closed.edit(e: Closed.Edit, inv: I.Inventory) -> I.Inventory:
+  match e inv:
+    case Health{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+    case Armour{points, kind} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers,
+      items, bonus}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+    case Ammo{rounds} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus}:
+      I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
+        bonus}
+    case Backpack{} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+      I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
+        powers, items, bonus}
+    case Weapons{bits} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus}
+    case Strength{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus}
+    case Items{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus}
+    case Flash{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n}
 
-# The thing of a type named 8, 200 north of the origin, out of reach.
-def Closed.far(kind: U32) -> List<&2, H.Thing>:
-  [Closed.item(8, kind, 13107200)]
+def Closed.edits(es: List<&2, Closed.Edit>, inv: I.Inventory) -> I.Inventory:
+  match es:
+    case []:
+      inv
+    case e <> rest:
+      Closed.edits(rest, Closed.edit(e, inv))
 
-# Both things of a type: one named 7, 16 north of the origin and in
-# reach, and the one out of reach.
-def Closed.both(+kind: U32) -> List<&2, H.Thing>:
-  Closed.item(7, kind, 1048576) <> Closed.far(kind)
+# G_PlayerReborn's inventory with changes.
+def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
+  Closed.edits(es, I.Inventory.start())
 
-# What a position check leaves: the inventory and the things.
-type Closed.Left is Data:
-  Left{inv: I.Inventory, things: List<&2, H.Thing>}
+# A thing of a type, record 1, at (32, 80), its state lasting.
+def Closed.item(kind: U32) -> H.Thing:
+  H.Thing{1, kind, 2097152, 5242880, 0, 0, 0, 0, 4294967295}
 
-def Closed.left(p: I.Inventory & List<&2, H.Thing>) -> Closed.Left:
-  (inv, things) = p
-  Left{inv, things}
+# What a pickup leaves: the things and the inventory.
+type Closed.Got is Data:
+  Got{things: List<&2, H.Thing>, inv: I.Inventory}
 
-# The position check of a player with its feet on the floor at the
-# origin, holding an inventory, among both things of a type.
-def Closed.offered(kind: U32, inv: I.Inventory) -> Closed.Left:
-  Closed.left(S.Sim.touch(Closed.both(kind), 0, 0, 0, inv))
+def Closed.kept(+s: S.State) -> Closed.Got:
+  Got{S.State.things(s), S.Player.inv(S.State.player(s))}
+
+# The things left and the inventory after the tic that brings the west
+# room's player, holding an inventory, 8 from a thing of a type, in its
+# reach.
+def Closed.offer(inv: I.Inventory, kind: U32) -> Closed.Got:
+  Closed.kept(Closed.idled(1n, Closed.among(inv, 2097152, 0, 524288, [Closed.item(kind)])))
 
 # LAW: the health bonus is always taken and counted. From 100 it makes
-# 101, from 199 200, and at 200 it adds nothing and still goes. Only
-# the thing touched, 7, goes; the flash is 6 (sanity).
+# 101, from 199 200, and at 200 it adds nothing and still goes; the
+# flash is 6 (sanity).
 law health_bonus:
-  {[Closed.offered(2014, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2014, Closed.inv(199, 0, 0, 0, 0, 0)),
-    Closed.offered(2014, Closed.inv(200, 0, 0, 0, 0, 0))]
-    == [Left{Closed.inv(101, 0, 0, 0, 1, 6), Closed.far(2014)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2014)},
-      Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2014)}] : List<&2, Closed.Left>}
+  {[Closed.offer(I.Inventory.start(), 2014), Closed.offer(Closed.inv([Health{199}]), 2014),
+    Closed.offer(Closed.inv([Health{200}]), 2014)]
+    == [Got{[], Closed.inv([Health{101}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Health{200}, Items{1}, Flash{6}])},
+      Got{[], Closed.inv([Health{200}, Items{1}, Flash{6}])}] : List<&2, Closed.Got>}
 
 # LAW: the stimpack heals 10 up to 100 and is not counted: 89 makes 99,
 # 99 makes 100, and at 100 it stays, the inventory untouched (sanity).
 law stimpack:
-  {[Closed.offered(2011, Closed.inv(89, 0, 0, 0, 0, 0)), Closed.offered(2011, Closed.inv(99, 0, 0, 0, 0, 0)),
-    Closed.offered(2011, Closed.inv(100, 0, 0, 0, 0, 0))]
-    == [Left{Closed.inv(99, 0, 0, 0, 0, 6), Closed.far(2011)}, Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2011)},
-      Left{Closed.inv(100, 0, 0, 0, 0, 0), Closed.both(2011)}] : List<&2, Closed.Left>}
+  {[Closed.offer(Closed.inv([Health{89}]), 2011), Closed.offer(Closed.inv([Health{99}]), 2011),
+    Closed.offer(I.Inventory.start(), 2011)]
+    == [Got{[], Closed.inv([Health{99}, Flash{6}])}, Got{[], Closed.inv([Health{100}, Flash{6}])},
+      Got{[Closed.item(2011)], I.Inventory.start()}] : List<&2, Closed.Got>}
 
 # LAW: the medikit heals 25 up to 100 and is not counted: 74 makes 99,
 # 75 and 99 make 100, and at 100, or at 150 from bonuses, it stays
 # (sanity).
 law medikit:
-  {[Closed.offered(2012, Closed.inv(74, 0, 0, 0, 0, 0)), Closed.offered(2012, Closed.inv(75, 0, 0, 0, 0, 0)),
-    Closed.offered(2012, Closed.inv(99, 0, 0, 0, 0, 0)), Closed.offered(2012, Closed.inv(100, 0, 0, 0, 0, 0)),
-    Closed.offered(2012, Closed.inv(150, 0, 0, 0, 0, 0))]
-    == [Left{Closed.inv(99, 0, 0, 0, 0, 6), Closed.far(2012)}, Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2012)},
-      Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2012)}, Left{Closed.inv(100, 0, 0, 0, 0, 0), Closed.both(2012)},
-      Left{Closed.inv(150, 0, 0, 0, 0, 0), Closed.both(2012)}] : List<&2, Closed.Left>}
+  {[Closed.offer(Closed.inv([Health{74}]), 2012), Closed.offer(Closed.inv([Health{75}]), 2012),
+    Closed.offer(Closed.inv([Health{99}]), 2012), Closed.offer(I.Inventory.start(), 2012),
+    Closed.offer(Closed.inv([Health{150}]), 2012)]
+    == [Got{[], Closed.inv([Health{99}, Flash{6}])}, Got{[], Closed.inv([Health{100}, Flash{6}])},
+      Got{[], Closed.inv([Health{100}, Flash{6}])}, Got{[Closed.item(2012)], I.Inventory.start()},
+      Got{[Closed.item(2012)], Closed.inv([Health{150}])}] : List<&2, Closed.Got>}
 
 # LAW: the soul sphere adds 100 up to 200 and is always taken and
 # counted: 99 makes 199, 100 and 101 make 200, and 200 stays 200
 # (sanity).
 law soul_sphere:
-  {[Closed.offered(2013, Closed.inv(99, 0, 0, 0, 0, 0)), Closed.offered(2013, Closed.inv(100, 0, 0, 0, 0, 0)),
-    Closed.offered(2013, Closed.inv(101, 0, 0, 0, 0, 0)), Closed.offered(2013, Closed.inv(200, 0, 0, 0, 0, 0))]
-    == [Left{Closed.inv(199, 0, 0, 0, 1, 6), Closed.far(2013)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)},
-      Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)}]
-    : List<&2, Closed.Left>}
+  {[Closed.offer(Closed.inv([Health{99}]), 2013), Closed.offer(I.Inventory.start(), 2013),
+    Closed.offer(Closed.inv([Health{101}]), 2013), Closed.offer(Closed.inv([Health{200}]), 2013)]
+    == [Got{[], Closed.inv([Health{199}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Health{200}, Items{1}, Flash{6}])},
+      Got{[], Closed.inv([Health{200}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Health{200}, Items{1}, Flash{6}])}]
+    : List<&2, Closed.Got>}
 
 # LAW: the berserk pack is always taken and counted, and sets the
 # strength counter to 1, even over one already running at 40. It heals
 # 1 to 100, leaves 100 at 100, and does not lower 150 (sanity).
 law berserk:
-  {[Closed.offered(2023, Closed.inv(1, 0, 0, 0, 0, 0)), Closed.offered(2023, Closed.inv(100, 0, 0, 0, 0, 0)),
-    Closed.offered(2023, Closed.inv(150, 0, 0, 0, 0, 0)), Closed.offered(2023, Closed.inv(100, 0, 0, 40, 0, 0))]
-    == [Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)}, Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)},
-      Left{Closed.inv(150, 0, 0, 1, 1, 6), Closed.far(2023)}, Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)}]
-    : List<&2, Closed.Left>}
+  {[Closed.offer(Closed.inv([Health{1}]), 2023), Closed.offer(I.Inventory.start(), 2023),
+    Closed.offer(Closed.inv([Health{150}]), 2023), Closed.offer(Closed.inv([Strength{40}]), 2023)]
+    == [Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])},
+      Got{[], Closed.inv([Health{150}, Strength{1}, Items{1}, Flash{6}])},
+      Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])}] : List<&2, Closed.Got>}
 
 # LAW: the armour bonus is always taken and counted: no armour makes 1
 # point of green armour's type, 199 points of blue make 200 and stay
 # blue, and 200 points of green take nothing more (sanity).
 law armour_bonus:
-  {[Closed.offered(2015, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2015, Closed.inv(100, 199, 2, 0, 0, 0)),
-    Closed.offered(2015, Closed.inv(100, 200, 1, 0, 0, 0))]
-    == [Left{Closed.inv(100, 1, 1, 0, 1, 6), Closed.far(2015)}, Left{Closed.inv(100, 200, 2, 0, 1, 6), Closed.far(2015)},
-      Left{Closed.inv(100, 200, 1, 0, 1, 6), Closed.far(2015)}] : List<&2, Closed.Left>}
+  {[Closed.offer(I.Inventory.start(), 2015), Closed.offer(Closed.inv([Armour{199, 2}]), 2015),
+    Closed.offer(Closed.inv([Armour{200, 1}]), 2015)]
+    == [Got{[], Closed.inv([Armour{1, 1}, Items{1}, Flash{6}])},
+      Got{[], Closed.inv([Armour{200, 2}, Items{1}, Flash{6}])},
+      Got{[], Closed.inv([Armour{200, 1}, Items{1}, Flash{6}])}] : List<&2, Closed.Got>}
 
 # LAW: green armour gives 100 points of type 1 over fewer points of any
 # type, blue's 99 among them, and is not counted; with 100 points of
 # green, or 150 of blue, it stays (sanity).
 law green_armour:
-  {[Closed.offered(2018, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2018, Closed.inv(100, 99, 2, 0, 0, 0)),
-    Closed.offered(2018, Closed.inv(100, 100, 1, 0, 0, 0)), Closed.offered(2018, Closed.inv(100, 150, 2, 0, 0, 0))]
-    == [Left{Closed.inv(100, 100, 1, 0, 0, 6), Closed.far(2018)}, Left{Closed.inv(100, 100, 1, 0, 0, 6), Closed.far(2018)},
-      Left{Closed.inv(100, 100, 1, 0, 0, 0), Closed.both(2018)}, Left{Closed.inv(100, 150, 2, 0, 0, 0), Closed.both(2018)}]
-    : List<&2, Closed.Left>}
+  {[Closed.offer(I.Inventory.start(), 2018), Closed.offer(Closed.inv([Armour{99, 2}]), 2018),
+    Closed.offer(Closed.inv([Armour{100, 1}]), 2018), Closed.offer(Closed.inv([Armour{150, 2}]), 2018)]
+    == [Got{[], Closed.inv([Armour{100, 1}, Flash{6}])}, Got{[], Closed.inv([Armour{100, 1}, Flash{6}])},
+      Got{[Closed.item(2018)], Closed.inv([Armour{100, 1}])}, Got{[Closed.item(2018)], Closed.inv([Armour{150, 2}])}]
+    : List<&2, Closed.Got>}
 
 # LAW: blue armour gives 200 points of type 2 over fewer, 199 among
 # them, and is not counted; with 200 points of either type it stays
 # (sanity).
 law blue_armour:
-  {[Closed.offered(2019, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2019, Closed.inv(100, 199, 1, 0, 0, 0)),
-    Closed.offered(2019, Closed.inv(100, 200, 1, 0, 0, 0)), Closed.offered(2019, Closed.inv(100, 200, 2, 0, 0, 0))]
-    == [Left{Closed.inv(100, 200, 2, 0, 0, 6), Closed.far(2019)}, Left{Closed.inv(100, 200, 2, 0, 0, 6), Closed.far(2019)},
-      Left{Closed.inv(100, 200, 1, 0, 0, 0), Closed.both(2019)}, Left{Closed.inv(100, 200, 2, 0, 0, 0), Closed.both(2019)}]
-    : List<&2, Closed.Left>}
-
-# A thing of a type named 9 at (32, y) on the literal level's floor.
-def Closed.placed(kind: U32, y: U32) -> H.Thing:
-  H.Thing{9, kind, 2097152, y, 0, 0, 0, 0, 4294967295}
-
-# The inventory held and the things left.
-def Closed.kept(+s: S.State) -> Closed.Left:
-  Left{S.Player.inv(S.State.player(s)), S.State.things(s)}
+  {[Closed.offer(I.Inventory.start(), 2019), Closed.offer(Closed.inv([Armour{199, 1}]), 2019),
+    Closed.offer(Closed.inv([Armour{200, 1}]), 2019), Closed.offer(Closed.inv([Armour{200, 2}]), 2019)]
+    == [Got{[], Closed.inv([Armour{200, 2}, Flash{6}])}, Got{[], Closed.inv([Armour{200, 2}, Flash{6}])},
+      Got{[Closed.item(2019)], Closed.inv([Armour{200, 1}])}, Got{[Closed.item(2019)], Closed.inv([Armour{200, 2}])}]
+    : List<&2, Closed.Got>}
 
 # LAW: a move of 20 a tic is tried in halves, to 74 and then 84, and a
-# health bonus at (32, 100) is in reach of both: the first takes it and
+# health bonus at (32, 80) is in reach of both: the first takes it and
 # the second finds it gone, so health is 101, the tally 1 and the flash
 # 6, not 102, 2 and 12 (sanity).
 law bonus_counted_once:
-  {Closed.kept(Closed.idled(1n, Closed.among(2097152, 0, 1310720, [Closed.placed(2014, 6553600)])))
-    == Left{Closed.inv(101, 0, 0, 0, 1, 6), []} : Closed.Left}
+  {Closed.kept(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 1310720, [Closed.item(2014)])))
+    == Got{[], Closed.inv([Health{101}, Items{1}, Flash{6}])} : Closed.Got}
 
 # LAW: P_PlayerThink counts strength up a tic before it counts the flash
-# down, and both before the mobj moves: a berserk pack at (32, 80), 8
-# from where the first tic moves the player, is taken on that tic with
-# the counter at 1 and the flash at 6; the next two tics make 2 and 5,
-# then 3 and 4 (sanity).
+# down, and both before the mobj moves: a berserk pack taken on the
+# first tic leaves the counter at 1 and the flash at 6; the next two
+# tics make 2 and 5, then 3 and 4 (sanity).
 law strength_counts:
-  {[Closed.kept(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)]))),
-    Closed.kept(Closed.idled(2n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)]))),
-    Closed.kept(Closed.idled(3n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)])))]
-    == [Left{Closed.inv(100, 0, 0, 1, 1, 6), []}, Left{Closed.inv(100, 0, 0, 2, 1, 5), []},
-      Left{Closed.inv(100, 0, 0, 3, 1, 4), []}] : List<&2, Closed.Left>}
+  {[Closed.kept(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.item(2023)]))),
+    Closed.kept(Closed.idled(2n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.item(2023)]))),
+    Closed.kept(Closed.idled(3n, Closed.among(I.Inventory.start(), 2097152, 0, 524288, [Closed.item(2023)])))]
+    == [Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Strength{2}, Items{1}, Flash{5}])},
+      Got{[], Closed.inv([Strength{3}, Items{1}, Flash{4}])}] : List<&2, Closed.Got>}
+
+# LAW: P_GiveAmmo's clipammo on Hurt Me Plenty, which doubles nothing,
+# from G_PlayerReborn's inventory: a clip gives 10 bullets, shells 4, a
+# cell 20, a rocket 1; the boxes give five clips, 50 bullets, 20 shells,
+# 100 cells and 5 rockets. Each is taken, and flashes 6 (sanity).
+law ammo_amounts:
+  {[Closed.offer(I.Inventory.start(), 2007), Closed.offer(I.Inventory.start(), 2008),
+    Closed.offer(I.Inventory.start(), 2047), Closed.offer(I.Inventory.start(), 2010),
+    Closed.offer(I.Inventory.start(), 2048), Closed.offer(I.Inventory.start(), 2049),
+    Closed.offer(I.Inventory.start(), 17), Closed.offer(I.Inventory.start(), 2046)]
+    == [Got{[], Closed.inv([Ammo{[60, 0, 0, 0]}, Flash{6}])}, Got{[], Closed.inv([Ammo{[50, 4, 0, 0]}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[50, 0, 20, 0]}, Flash{6}])}, Got{[], Closed.inv([Ammo{[50, 0, 0, 1]}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[100, 0, 0, 0]}, Flash{6}])}, Got{[], Closed.inv([Ammo{[50, 20, 0, 0]}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[50, 0, 100, 0]}, Flash{6}])}, Got{[], Closed.inv([Ammo{[50, 0, 0, 5]}, Flash{6}])}]
+    : List<&2, Closed.Got>}
+
+# LAW: maxammo's caps, 200 bullets, 50 shells, 300 cells and 50 rockets.
+# At each, the loose round and the box are refused, stay, and change
+# nothing; one short of each, the box is taken and fills it to the cap
+# (sanity).
+law ammo_caps:
+  {[Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2007),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2048),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2008),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2049),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2047),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 17),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2010),
+    Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 2046),
+    Closed.offer(Closed.inv([Ammo{[199, 49, 299, 49]}]), 2048),
+    Closed.offer(Closed.inv([Ammo{[199, 49, 299, 49]}]), 2049),
+    Closed.offer(Closed.inv([Ammo{[199, 49, 299, 49]}]), 17),
+    Closed.offer(Closed.inv([Ammo{[199, 49, 299, 49]}]), 2046)]
+    == [Got{[Closed.item(2007)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(2048)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(2008)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(2049)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(2047)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(17)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(2010)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[Closed.item(2046)], Closed.inv([Ammo{[200, 50, 300, 50]}])},
+      Got{[], Closed.inv([Ammo{[200, 49, 299, 49]}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[199, 50, 299, 49]}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[199, 49, 300, 49]}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[199, 49, 299, 50]}, Flash{6}])}]
+    : List<&2, Closed.Got>}
+
+# LAW: the first backpack doubles every cap, to 400 100 600 100, before
+# it gives a clip of each ammo type: from the start 60 4 20 1, and from
+# ammo at the old caps 210 54 320 51. Either way it is taken (sanity).
+law backpack_first:
+  {[Closed.offer(I.Inventory.start(), 8), Closed.offer(Closed.inv([Ammo{[200, 50, 300, 50]}]), 8)]
+    == [Got{[], Closed.inv([Ammo{[60, 4, 20, 1]}, Backpack{}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[210, 54, 320, 51]}, Backpack{}, Flash{6}])}]
+    : List<&2, Closed.Got>}
+
+# LAW: a later backpack leaves the doubled caps as they are and gives the
+# clips again, 60 4 20 1 to 70 8 40 2; at the doubled caps it gives
+# nothing, and it is still taken (sanity).
+law backpack_later:
+  {[Closed.offer(Closed.inv([Ammo{[60, 4, 20, 1]}, Backpack{}]), 8),
+    Closed.offer(Closed.inv([Ammo{[400, 100, 600, 100]}, Backpack{}]), 8)]
+    == [Got{[], Closed.inv([Ammo{[70, 8, 40, 2]}, Backpack{}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[400, 100, 600, 100]}, Backpack{}, Flash{6}])}]
+    : List<&2, Closed.Got>}
+
+# LAW: P_GiveWeapon for a weapon found, which brings two clips. The
+# shotgun, not owned, is owned (weapons 3 to 7) with 8 shells; owned, its
+# 8 shells alone take it; owned at 50 shells it stays; not owned at 50
+# shells the weapon alone takes it. The chaingun brings 20 bullets and
+# stays when owned at 200, the rocket launcher 2 rockets, the plasma
+# rifle 40 cells. The chainsaw has no ammo: taken when not owned, left
+# when owned (sanity).
+law weapon_taken:
+  {[Closed.offer(I.Inventory.start(), 2001),
+    Closed.offer(Closed.inv([Ammo{[50, 8, 0, 0]}, Weapons{7}]), 2001),
+    Closed.offer(Closed.inv([Ammo{[50, 50, 0, 0]}, Weapons{7}]), 2001),
+    Closed.offer(Closed.inv([Ammo{[50, 50, 0, 0]}]), 2001),
+    Closed.offer(I.Inventory.start(), 2002),
+    Closed.offer(Closed.inv([Ammo{[200, 0, 0, 0]}, Weapons{11}]), 2002),
+    Closed.offer(I.Inventory.start(), 2003), Closed.offer(I.Inventory.start(), 2004),
+    Closed.offer(I.Inventory.start(), 2005),
+    Closed.offer(Closed.inv([Weapons{131}]), 2005)]
+    == [Got{[], Closed.inv([Ammo{[50, 8, 0, 0]}, Weapons{7}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[50, 16, 0, 0]}, Weapons{7}, Flash{6}])},
+      Got{[Closed.item(2001)], Closed.inv([Ammo{[50, 50, 0, 0]}, Weapons{7}])},
+      Got{[], Closed.inv([Ammo{[50, 50, 0, 0]}, Weapons{7}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[70, 0, 0, 0]}, Weapons{11}, Flash{6}])},
+      Got{[Closed.item(2002)], Closed.inv([Ammo{[200, 0, 0, 0]}, Weapons{11}])},
+      Got{[], Closed.inv([Ammo{[50, 0, 0, 2]}, Weapons{19}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[50, 0, 40, 0]}, Weapons{35}, Flash{6}])},
+      Got{[], Closed.inv([Weapons{131}, Flash{6}])},
+      Got{[Closed.item(2005)], Closed.inv([Weapons{131}])}]
+    : List<&2, Closed.Got>}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.

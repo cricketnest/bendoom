@@ -32,19 +32,71 @@ def Inventory.bonus(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   bonus
 
+# The armour types.
+def Inventory.green_armour() -> U32:
+  1
+
+def Inventory.blue_armour() -> U32:
+  2
+
+# The blue card's and the blue skull's bits among the cards.
+def Inventory.bluecard() -> U32:
+  1
+
+def Inventory.blueskull() -> U32:
+  8
+
+# ammotype_t's indexes.
+def Inventory.am_clip() -> U32:
+  0
+
+def Inventory.am_shell() -> U32:
+  1
+
+def Inventory.am_cell() -> U32:
+  2
+
+def Inventory.am_misl() -> U32:
+  3
+
+# The world weapons' bits among the weapons owned.
+def Inventory.shotgun() -> U32:
+  4
+
+def Inventory.chaingun() -> U32:
+  8
+
+def Inventory.launcher() -> U32:
+  16
+
+def Inventory.plasma() -> U32:
+  32
+
+def Inventory.chainsaw() -> U32:
+  128
+
 # powertype_t's pw_strength, the berserk pack's power.
 def Inventory.pw_strength() -> U32:
   1
 
 # Whether the blue card or the blue skull is owned.
 def Inventory.blue(inv: Inventory) -> Bool:
-  Bool.not(U32.is_zero((Inventory.cards(inv) .&. 9 : U32)))
+  Bool.not(U32.is_zero((Inventory.cards(inv) .&. (Inventory.bluecard() .|. Inventory.blueskull() : U32) : U32)))
 
 # Doom's P_GiveCard: a card not owned yet sets the flash to 6.
 def Inventory.card(+bit: U32, inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, +cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   Inventory{health, armour, armourtype, (cards .|. bit : U32), ammo, caps, backpack, weapons, powers, items,
     Bool.pick(U32, U32.is_zero((cards .&. bit : U32)), 6, bonus)}
+
+# A grant's answer: the inventory after it when the thing is taken, none
+# when it stays.
+def Inventory.taken(taken: Bool, inv: Inventory) -> Maybe<&2, Inventory>:
+  match taken:
+    case True{}:
+      Some{inv}
+    case False{}:
+      None{}
 
 # A count raised by an amount up to a cap, and never lowered by it: a
 # count already at or past the cap stays.
@@ -60,8 +112,7 @@ def Inventory.heal(+amount: U32, +cap: U32, inv: Inventory) -> Inventory:
 # Doom's P_GiveBody: under 100 health, heal by an amount up to 100; at
 # 100 or more the thing stays.
 def Inventory.body(+amount: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
-  Bool.pick(Maybe<&2, Inventory>, U32.is_lt(Inventory.health(inv), 100), Some{Inventory.heal(amount, 100, inv)},
-    None{})
+  Inventory.taken(U32.is_lt(Inventory.health(inv), 100), Inventory.heal(amount, 100, inv))
 
 # The strength power on, its counter at 1.
 def Inventory.strong(inv: Inventory) -> Inventory:
@@ -73,26 +124,105 @@ def Inventory.strong(inv: Inventory) -> Inventory:
 # none is worn.
 def Inventory.helmet(inv: Inventory) -> Inventory:
   Inventory{health, +armour, +armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
-  Inventory{health, Inventory.upto(armour, 1, 200), U32.max(armourtype, 1), cards, ammo, caps, backpack, weapons,
-    powers, items, bonus}
+  Inventory{health, Inventory.upto(armour, 1, 200), U32.max(armourtype, Inventory.green_armour()), cards, ammo,
+    caps, backpack, weapons, powers, items, bonus}
 
 # Doom's P_GiveArmor: a type's 100 points each, and the type, over fewer
 # points of any type; with as many or more the thing stays.
 def Inventory.suit(+kind: U32, inv: Inventory) -> Maybe<&2, Inventory>:
   Inventory{health, +armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
-  Bool.pick(Maybe<&2, Inventory>, U32.is_lt(armour, (kind * 100 : U32)),
-    Some{Inventory{health, (kind * 100 : U32), kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}},
-    None{})
+  Inventory.taken(U32.is_lt(armour, (kind * 100 : U32)),
+    Inventory{health, (kind * 100 : U32), kind, cards, ammo, caps, backpack, weapons, powers, items, bonus})
 
-# P_TouchSpecialThing's grant for a type: the inventory after it, none
-# when the thing stays. The blue card, the two bonuses and the soul
-# sphere are always taken, and so is the berserk pack, P_GivePower's
-# strength with P_GiveBody's 100 whether it heals or not; the stimpack
-# heals 10, the medikit 25; green armour is type 1, blue type 2.
-def Inventory.grant(kind: U32, inv: Inventory) -> Maybe<&2, Inventory>:
+# Doom's clipammo: the rounds in a clip of each ammo type.
+def Inventory.clip(+t: U32) -> U32:
+  V.Vec.get(V.Vec.of_list([10, 4, 20, 1], 4), t)
+
+# Whether an ammo type is short of its cap: P_GiveAmmo gives nothing
+# otherwise.
+def Inventory.room(+t: U32, inv: Inventory) -> Bool:
+  Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus} = inv
+  Bool.not(U32.is_eq(V.Vec.get(ammo, t), V.Vec.get(caps, t)))
+
+# P_GiveAmmo's rounds: clips of an ammo type, up to its cap. Only the
+# easiest and hardest skills double them, never Hurt Me Plenty.
+def Inventory.give(+t: U32, clips: U32, inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus} = inv
+  Inventory{health, armour, armourtype, cards,
+    V.Vec.set(ammo, t, Inventory.upto(V.Vec.get(ammo, t), (clips * Inventory.clip(t) : U32), V.Vec.get(caps, t))),
+    caps, backpack, weapons, powers, items, bonus}
+
+# An ammo pickup: P_GiveAmmo, refused at the cap.
+def Inventory.ammo(+t: U32, clips: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
+  Inventory.taken(Inventory.room(t, inv), Inventory.give(t, clips, inv))
+
+# P_GiveWeapon for a weapon found on the map, from the inventory its
+# ammo left: the weapon is owned after, and it is taken when the ammo
+# was given or the weapon was not owned before. Doom also makes it the
+# pending weapon, which Bendoom has none of yet.
+def Inventory.weapon(+bit: U32, gave: Bool, inv: Inventory) -> Maybe<&2, Inventory>:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, +weapons, powers, items, bonus} = inv
+  Inventory.taken(Bool.or(gave, U32.is_zero((weapons .&. bit : U32))),
+    Inventory{health, armour, armourtype, cards, ammo, caps, backpack, (weapons .|. bit : U32), powers, items, bonus})
+
+# A weapon found with ammo of a type: two clips of it.
+def Inventory.armed(bit: U32, +t: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
+  Inventory.weapon(bit, Inventory.room(t, inv), Inventory.give(t, 2, inv))
+
+def Inventory.doubled(v: V.Vec) -> V.Vec:
+  match v:
+    case V.Leaf{x}:
+      V.Leaf{(x * 2 : U32)}
+    case V.Node{l, r}:
+      V.Node{Inventory.doubled(l), Inventory.doubled(r)}
+
+# The caps once a backpack is taken: the first doubles each.
+def Inventory.bag(had: Bool, caps: V.Vec) -> V.Vec:
+  match had:
+    case True{}:
+      caps
+    case False{}:
+      Inventory.doubled(caps)
+
+# P_TouchSpecialThing's backpack, always taken: the caps as the bag
+# leaves them, then a clip of each ammo type in turn.
+def Inventory.backpack(inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  Inventory.give(Inventory.am_misl(), 1, Inventory.give(Inventory.am_cell(), 1, Inventory.give(Inventory.am_shell(),
+    1, Inventory.give(Inventory.am_clip(), 1, Inventory{health, armour, armourtype, cards, ammo,
+      Inventory.bag(backpack, caps), True{}, weapons, powers, items, bonus}))))
+
+# P_TouchSpecialThing's switch for the types Bendoom spawns: the
+# inventory after the grant, none when the thing stays. The blue card,
+# the two bonuses, the soul sphere and the backpack are always taken, and
+# so is the berserk pack, P_GivePower's strength with P_GiveBody's 100
+# whether it heals or not; the stimpack heals 10, the medikit 25; a box
+# holds five clips; a weapon brings two clips of its ammo, and the
+# chainsaw has none.
+def Inventory.grant(kind: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
   match kind:
     case 5:
-      Some{Inventory.card(1, inv)}
+      Some{Inventory.card(Inventory.bluecard(), inv)}
+    case 8:
+      Some{Inventory.backpack(inv)}
+    case 17:
+      Inventory.ammo(Inventory.am_cell(), 5, inv)
+    case 2001:
+      Inventory.armed(Inventory.shotgun(), Inventory.am_shell(), inv)
+    case 2002:
+      Inventory.armed(Inventory.chaingun(), Inventory.am_clip(), inv)
+    case 2003:
+      Inventory.armed(Inventory.launcher(), Inventory.am_misl(), inv)
+    case 2004:
+      Inventory.armed(Inventory.plasma(), Inventory.am_cell(), inv)
+    case 2005:
+      Inventory.weapon(Inventory.chainsaw(), False{}, inv)
+    case 2007:
+      Inventory.ammo(Inventory.am_clip(), 1, inv)
+    case 2008:
+      Inventory.ammo(Inventory.am_shell(), 1, inv)
+    case 2010:
+      Inventory.ammo(Inventory.am_misl(), 1, inv)
     case 2011:
       Inventory.body(10, inv)
     case 2012:
@@ -104,11 +234,19 @@ def Inventory.grant(kind: U32, inv: Inventory) -> Maybe<&2, Inventory>:
     case 2015:
       Some{Inventory.helmet(inv)}
     case 2018:
-      Inventory.suit(1, inv)
+      Inventory.suit(Inventory.green_armour(), inv)
     case 2019:
-      Inventory.suit(2, inv)
+      Inventory.suit(Inventory.blue_armour(), inv)
     case 2023:
       Some{Inventory.strong(Inventory.heal(100, 100, inv))}
+    case 2046:
+      Inventory.ammo(Inventory.am_misl(), 5, inv)
+    case 2047:
+      Inventory.ammo(Inventory.am_cell(), 1, inv)
+    case 2048:
+      Inventory.ammo(Inventory.am_clip(), 5, inv)
+    case 2049:
+      Inventory.ammo(Inventory.am_shell(), 5, inv)
     case _:
       None{}
 
