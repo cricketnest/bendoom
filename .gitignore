@@ -1,0 +1,6 @@
+result
+result-*
+.direnv/
+*.c.tmp
+/bendoom
+/bendoom.gpu
