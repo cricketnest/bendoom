@@ -11,7 +11,7 @@ import ./fixed.bend as F
 import ./angle.bend as A
 import ./level.bend as L
 import ./keys.bend as K
-import ./tables.bend as T
+import ./random.bend as M
 import ./things.bend as H
 
 # Doom's mobj and player_t for one player: the position with its height,
@@ -878,13 +878,6 @@ def State.thinking(s: State, t: Thinker) -> State:
 # Lights
 # ------
 
-# Doom's P_Random steps its index, then answers the table's entry there.
-def Sim.random.next(rnd: U32) -> U32:
-  ((rnd + 1 : U32) .&. 255 : U32)
-
-def Sim.random(i: U32) -> U32:
-  V.Vec.get(V.Vec.of_list(T.Tables.rndtable(), 256), i)
-
 def Sim.light(s: State, sector: U32) -> U32:
   L.Level.sector.light(State.level(s), sector)
 
@@ -894,10 +887,10 @@ def Sim.blink.to(+lit: Bool, +sector: U32, +dark: U32, +bright: U32, +darktime: 
   +random: Bool, s: State) -> State:
   State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown} = s
   +time = Bool.pick(U32, lit, darktime, brighttime)
-  +i = Bool.pick(U32, random, Sim.random.next(rnd), rnd)
+  +i = Bool.pick(U32, random, M.Random.next(rnd), rnd)
   State.thinking(State{player, L.Level.light.put(level, sector, Bool.pick(U32, lit, dark, bright)), things, sidetex,
     thinkers, i, clock, ended, usedown}, Blink{sector, Bool.pick(U32, random,
-    ((Sim.random(i) .&. time : U32) + 1 : U32), time), dark, bright, darktime, brighttime, random})
+    ((M.Random.at(i) .&. time : U32) + 1 : U32), time), dark, bright, darktime, brighttime, random})
 
 def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, darktime: U32, brighttime: U32,
   random: Bool, +s: State) -> State:
@@ -1109,15 +1102,14 @@ def Sim.lights(n: Nat, +sector: U32, +s: State) -> State:
         Sim.light.spawn(L.Level.sector.special(State.level(s), sector), sector, s))
 
 # The state a level starts in, from the map as loaded, with the player
-# at rest at a place, the things spawned, and then the lights in sector
-# order. Doom's P_SpawnMobj draws a random number for each thing it
-# spawns, the player one of them, so the random index starts at their
-# count. Use counts as down, as Doom's G_PlayerReborn leaves it, so a key
-# held since before the level does nothing.
-def State.at.spawned(+level: L.Level, place: L.Level.Start, +things: List<&2, H.Thing>) -> State:
+# at rest at a place, the things spawned with the random numbers they
+# draw, and then the lights in sector order. Use counts as down, as
+# Doom's G_PlayerReborn leaves it, so a key held since before the level
+# does nothing.
+def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn) -> State:
+  H.Spawn{things, rnd} = spawn
   Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
-    State{Player.at(level, place), level, things, L.Level.sidetex(level), [],
-      U32.from_nat(1n+List.length(&2, H.Thing, things)), 0, False{}, True{}})
+    State{Player.at(level, place), level, things, L.Level.sidetex(level), [], rnd, 0, False{}, True{}})
 
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
   State.at.spawned(level, place, H.Thing.spawn(level))

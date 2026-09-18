@@ -6,11 +6,15 @@
 # run called and rides it into the pit; the second runs across that
 # lift and off its east edge into the fall and the landing. Freedoom's
 # first map is not id's: the shareware start is 1056, -3616 facing 90.
-# The start's things: on Hurt Me Plenty THINGS record 245 alone, the
-# dead former sergeant (record 281, the other of type 19, is for the
-# easy skills), on sector 170's floor 16 units up, as a nushell walk of
-# the WAD's nodes finds it; the random index is 5 once P_SpawnMobj has
-# drawn for the player and for it and the three flashes have spawned.
+# The start's things, as a nushell replay of P_SpawnMapThing over the
+# THINGS records, info.c and m_random.c finds them on Hurt Me Plenty with
+# no monsters: how many, the random index once they and the three flashes
+# have drawn, how many of each type Bendoom defines, the names of the
+# first twelve (records 0, 1, 4 and 5 are for the easy skills, 3 is a
+# monster and 7 for multiplayer), and six records: the first, animated
+# armour, a leg hung from its ceiling, the blue key, the dead former
+# sergeant and the last, each with the sector under it (tools/wad.nu's
+# sector-at), its z, its state row, its tics and its definition.
 # Then the movers and the lights, as runs of one command in a demo's
 # units from a place, each line with the clock, the thinkers running
 # and chosen sectors' floors and ceilings: the first door used, turned
@@ -20,7 +24,7 @@
 # the blinks and the strobe from the start. The heights and tics are
 # the hand computations in milestone 4's tickets 04 to 10; the blinks'
 # lights, a nushell replay of T_LightFlash over Chocolate Doom's random
-# table from index 2, which from index 1 gives milestone 4's; the
+# table from index 254, which from index 2 gives ticket 01's; the
 # positions are regression pins.
 import Base
 import ../src/bytes.bend as B
@@ -225,19 +229,72 @@ def door(+level: L.Level) -> IO(Unit):
     exits(level)
     lights([1n, 34n, 1n, 4n, 1n, 23n, 1n, 1n, 1n, 2n, 2n, 60n, 1n, 2n, 1n, 1n, 1n, 1n, 4n, 1n, 0n], S.State.start(level))
 
-def spawned(things: List<&2, H.Thing>) -> String:
+def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
+  match things:
+    case []:
+      0
+    case H.Thing{id, k, x, y, z, sector, state, tics} <> rest:
+      (Bool.to_u32(U32.is_eq(k, kind)) + count(rest, kind) : U32)
+
+# How many things of each type Bendoom defines.
+def kinds(defs: List<&2, H.Thing.Def>, +things: List<&2, H.Thing>) -> String:
+  match defs:
+    case []:
+      ""
+    case H.Def{+kind, state, radius, height, flags} <> rest:
+      " " ++ U32.show(kind) ++ ":" ++ U32.show(count(things, kind)) ++ kinds(rest, things)
+
+def ids(things: List<&2, H.Thing>) -> String:
   match things:
     case []:
       ""
-    case H.Thing{id, kind, x, y, z, sector, state} <> rest:
-      " thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
-        ++ " z " ++ F.Fixed.show(z) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ spawned(rest)
+    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
+      " " ++ U32.show(id) ++ ids(rest)
+
+def described(d: Maybe<&2, H.Thing.Def>) -> String:
+  match d:
+    case None{}:
+      " undefined"
+    case Some{H.Def{kind, state, radius, height, flags}}:
+      " radius " ++ U32.show(radius) ++ " height " ++ U32.show(height) ++ " flags " ++ U32.show(flags)
+
+def shown(hit: Bool, t: H.Thing, rest: String) -> String:
+  match hit:
+    case False{}:
+      rest
+    case True{}:
+      H.Thing{id, +kind, x, y, z, sector, state, tics} = t
+      "thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
+        ++ " z " ++ F.Fixed.show(z) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ " tics "
+        ++ U32.show(tics) ++ described(H.Thing.def(kind))
+
+# The line of the thing named id, empty when none has that name.
+def thing(things: List<&2, H.Thing>, +id: U32) -> String:
+  match things:
+    case []:
+      ""
+    case H.Thing{+i, kind, x, y, z, sector, state, tics} <> rest:
+      shown(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, sector, state, tics}, thing(rest, id))
+
+def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
+  match chosen:
+    case []:
+      IO.pure(Unit, Unit{})
+    case id <> rest:
+      do IO<Unit>:
+        IO.print(thing(S.State.things(s), id))
+        things(rest, s)
 
 def free(+s: S.State) -> IO(S.State):
   +p = S.State.player(s)
+  +spawned = S.State.things(s)
   do IO<S.State>:
     IO.print("free at start " ++ Bool.show(S.Sim.free(S.State.level(s), S.Player.x(p), S.Player.y(p))))
-    IO.print("things at start" ++ spawned(S.State.things(s)) ++ " random " ++ U32.show(S.State.rnd(s)))
+    IO.print("things at start " ++ Nat.show(List.length(&2, H.Thing, spawned)) ++ " random "
+      ++ U32.show(S.State.rnd(s)))
+    IO.print("by type" ++ kinds(H.Thing.defs(), spawned))
+    IO.print("first" ++ ids(List.take(&2, H.Thing, spawned, 12n)))
+    things([2, 6, 29, 87, 245, 291], s)
     return s
 
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
@@ -275,7 +332,15 @@ def main() -> IO(Unit):
 
 #|start -416.000000 256.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000
 #|free at start True
-#|things at start thing 245 type 19 at 1248.000000 224.000000 z 16.000000 sector 170 state 0 random 5
+#|things at start 180 random 1
+#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1
+#|first 2 6 8 9 10 11 12 13 14 15 16 17
+#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 sector 139 state 21 tics 4294967295 radius 20 height 16 flags 1
+#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 sector 130 state 30 tics 5 radius 20 height 16 flags 1
+#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 sector 153 state 16 tics 4294967295 radius 20 height 68 flags 768
+#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 sector 35 state 0 tics 3 radius 20 height 16 flags 33554433
+#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 sector 170 state 6 tics 4294967295 radius 20 height 16 flags 0
+#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 sector 150 state 32 tics 4294967295 radius 20 height 16 flags 8388609
 #|U:1 -415.218765 256.000289 0.000 z 0.000000 floor 0.000000 eye 41.000015
 #|U!:34 3.282882 256.157440 0.000 z 0.000000 floor 0.000000 eye 33.430175
 #|L:20 137.245544 256.206893 61.523 z -48.000000 floor -48.000000 eye 44.403701
@@ -364,24 +429,24 @@ def main() -> IO(Unit):
 #|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
 #|-
 #|lights tic 0 sector 32 176 sector 33 176 sector 48 140 sector 90 192
-#|lights tic 1 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 1 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|lights tic 35 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 36 sector 32 176 sector 33 176 sector 48 140 sector 90 192
 #|lights tic 40 sector 32 176 sector 33 176 sector 48 140 sector 90 192
 #|lights tic 41 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 64 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 65 sector 32 144 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 66 sector 32 144 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 67 sector 32 144 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 65 sector 32 144 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 66 sector 32 144 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 67 sector 32 144 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 69 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 71 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 71 sector 32 176 sector 33 176 sector 48 120 sector 90 160
 #|lights tic 131 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 132 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 134 sector 32 176 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 135 sector 32 176 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 136 sector 32 176 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 137 sector 32 176 sector 33 176 sector 48 120 sector 90 160
-#|lights tic 138 sector 32 144 sector 33 176 sector 48 120 sector 90 160
-#|lights tic 142 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 143 sector 32 144 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 134 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 135 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 136 sector 32 144 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 137 sector 32 144 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 138 sector 32 144 sector 33 140 sector 48 140 sector 90 160
+#|lights tic 142 sector 32 176 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 143 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|end

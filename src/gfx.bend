@@ -638,15 +638,20 @@ def Gfx.sprite.space(lumps: List<&2, W.Wad.Lump>, inside: Bool) -> List<&2, W.Wa
 # The lump of a state row's frame, seen from every side: the sprite's
 # name, the frame's letter and rotation 0.
 def Gfx.sprite.name(r: H.Thing.Row) -> String:
-  H.Row{sprite, frame} = r
+  H.Row{sprite, frame, tics} = r
   sprite ++ String.from_list([Char.from_u32((65 + frame : U32)), Char.from_u32(48)])
 
-def Gfx.sprite.states(things: List<&2, H.Thing>) -> List<&2, U32>:
+def Gfx.sprite.states.go(things: List<&2, H.Thing>) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, sector, state} <> rest:
-      state <> Gfx.sprite.states(rest)
+    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
+      state <> Gfx.sprite.states.go(rest)
+
+# The state rows the level's things spawn in.
+def Gfx.sprite.states(s: H.Thing.Spawn) -> List<&2, U32>:
+  H.Spawn{things, rnd} = s
+  Gfx.sprite.states.go(things)
 
 def Gfx.sprite.names(states: List<&2, U32>) -> List<&2, String>:
   match states:

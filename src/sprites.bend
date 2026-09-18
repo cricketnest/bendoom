@@ -48,7 +48,7 @@ def Sprites.project.if(shows: Bool, vis: Sprites.Vis, rest: List<&2, Sprites.Vis
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing, rest: List<&2, Sprites.Vis>) ->
   List<&2, Sprites.Vis>:
   P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
-  H.Thing{id, kind, +x, +y, +z, sector, +state} = thing
+  H.Thing{id, kind, +x, +y, +z, sector, +state, tics} = thing
   +trx = (x - vx : U32)
   +try = (y - vy : U32)
   +tz = (F.Fixed.mul(trx, cos) + F.Fixed.mul(try, sin) : U32)
@@ -81,9 +81,9 @@ def Sprites.gather(things: List<&2, H.Thing>, +seen: V.Vec, +view: P.View, +leve
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, +sector, state} <> rest:
+    case H.Thing{id, kind, x, y, z, +sector, state, tics} <> rest:
       Sprites.gather.if(U32.is_eq(V.Vec.get(seen, sector), 1), view, level, gfx,
-        H.Thing{id, kind, x, y, z, sector, state}, Sprites.gather(rest, seen, view, level, gfx))
+        H.Thing{id, kind, x, y, z, sector, state, tics}, Sprites.gather(rest, seen, view, level, gfx))
 
 # Clipping
 # --------
@@ -118,21 +118,36 @@ def Sprites.behind(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
   L.Seg{+x1, +y1, x2, y2, angle, offset, flags, side, front, back} = s
   L.Level.node_side(x, y, x1, y1, (x2 - x1 : U32), (y2 - y1 : U32))
 
-# Doom's R_DrawSprite for one stored range: a range over some of the
-# sprite's columns, not behind it (it is behind when all of it is
-# smaller than the sprite, or some of it is and the sprite is in front
-# of its seg), clips the columns no newer range clipped, below unless the
-# sprite stands at or over the height it clips below, above unless the
-# sprite's top is at or under the height it clips above.
-def Sprites.clip.wall(+level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) -> Array<U32>:
+# Doom's R_DrawSprite for one stored range over some of the sprite's
+# columns: unless it is behind the sprite (all of it smaller than the
+# sprite, or some of it and the sprite in front of its seg), it clips the
+# columns no newer range clipped, below unless the sprite stands at or
+# over the height it clips below, above unless the sprite's top is at or
+# under the height it clips above.
+def Sprites.clip.range(+level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) -> Array<U32>:
   Vis{+sx1, +sx2, +scale, +gx, +gy, +gz, +gzt, mid, frac, step, patch, cmap} = vis
   D.Wall{seg, +x1, +x2, +scale1, +scale2, wstep, +sil, +bsil, +tsil, texcols, tops, bottoms} = wall
   +bottom = Bool.and(Bool.not(U32.is_zero((sil .&. 1 : U32))), F.Fixed.lt(gz, bsil))
   +top = Bool.and(Bool.not(U32.is_zero((sil .&. 2 : U32))), F.Fixed.gt(gzt, tsil))
-  Sprites.clip.if(Bool.and(Bool.or(top, bottom), Bool.and(Bool.and(U32.is_le(x1, sx2), U32.is_ge(x2, sx1)),
-      Bool.not(Bool.or(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale), Bool.and(
-        F.Fixed.lt(F.Fixed.min(scale1, scale2), scale), Bool.not(Sprites.behind(L.Level.seg(level, seg), gx, gy))))))),
+  Sprites.clip.if(Bool.and(Bool.or(top, bottom), Bool.not(Bool.or(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale),
+      Bool.and(F.Fixed.lt(F.Fixed.min(scale1, scale2), scale),
+        Bool.not(Sprites.behind(L.Level.seg(level, seg), gx, gy)))))),
     top, bottom, U32.max(x1, sx1), U32.min(x2, sx2), x1, tops, bottoms, mem)
+
+# Whether a range can clip the sprite at all, the test vanilla makes
+# first: it has a silhouette and shares a column with the sprite.
+def Sprites.clip.meets(+vis: Sprites.Vis, +wall: D.Draw.Wall) -> Bool:
+  Vis{+sx1, +sx2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap} = vis
+  D.Wall{seg, +x1, +x2, scale1, scale2, wstep, sil, bsil, tsil, texcols, tops, bottoms} = wall
+  Bool.and(Bool.not(U32.is_zero(sil)), Bool.and(U32.is_le(x1, sx2), U32.is_ge(x2, sx1)))
+
+def Sprites.clip.wall(meets: Bool, +level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) ->
+  Array<U32>:
+  match meets:
+    case False{}:
+      mem
+    case True{}:
+      Sprites.clip.range(level, vis, wall, mem)
 
 # The stored ranges, newest first.
 def Sprites.clip.walls(walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Sprites.Vis, mem: Array<U32>) ->
@@ -140,8 +155,8 @@ def Sprites.clip.walls(walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Spri
   match walls:
     case []:
       mem
-    case wall <> rest:
-      Sprites.clip.walls(rest, level, vis, Sprites.clip.wall(level, vis, wall, mem))
+    case +wall <> rest:
+      Sprites.clip.walls(rest, level, vis, Sprites.clip.wall(Sprites.clip.meets(vis, wall), level, vis, wall, mem))
 
 # Drawing
 # -------

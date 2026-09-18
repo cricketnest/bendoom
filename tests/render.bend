@@ -8,18 +8,22 @@
 # step under the computer panels, the lowered opening west of the start
 # with a masked grate across it, the hall under a ceiling of water, the
 # yard under the open sky, the railed pit, and the dead former sergeant
-# whole on its bench, the one thing Bendoom spawns yet; the start, the
-# water and the stride see a few of its pixels past the walls between,
-# and the pit sees none. Then frames after scripts, which the oracle
-# plays too: a stride, riding the lift down, off its east edge, the
-# first door half open, the special 23 switch pressed, the exit switch
-# pressed, a blinking wall at its dark level, and the water on a later
-# frame of its cycle. tools/oracle.nu finds no pixel of any of them off
-# vanilla's, bar the exit, which vanilla never stands in (milestone 4's
-# ticket 09 compares it another way); each script is beside its frame
-# below. Each frame is drawn twice, over a view blanked to 0 and to 255:
-# equal hashes mean every pixel of the view was written. Pinned to
-# Freedoom.
+# on its bench. Then frames after scripts, which the oracle plays too: a
+# stride, riding the lift down, off its east edge, the first door half
+# open, the special 23 switch pressed, the exit switch pressed, a
+# blinking wall at its dark level, and the water on a later frame of its
+# cycle; each script is beside its frame below. Every frame holds the
+# things E1M1 spawns on Hurt Me Plenty. tools/oracle.nu finds no pixel
+# off vanilla's in the dark, water, sky, stride, switch and blink frames.
+# The others differ where a thing animates or is full-bright, which
+# ticket 05 brings, or where the big trees behind the grate overlap
+# unsorted, ticket 03's: with the animated and full-bright things taken
+# out of both games every count but the grate's is 0, and sorting the
+# sprites makes that 0 too. Until those tickets their hashes are
+# regression pins. The exit is not compared: vanilla never stands in it
+# (milestone 4's ticket 09 compares it another way). Each frame is drawn
+# twice, over a view blanked to 0 and to 255: equal hashes mean every
+# pixel of the view was written. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -144,21 +148,21 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start hash 309742466 pixels 1 1 7 5 covered True
-#|lit 736 464 135 hash 3300301580 pixels 104 7 95 103 covered True
-#|dark -416 256 90 hash 3488594130 pixels 110 107 0 238 covered True
-#|step 137 256 45 hash 3958655367 pixels 7 0 79 111 covered True
-#|grate -416 256 180 hash 2863794005 pixels 3 111 106 93 covered True
-#|water 3 256 0 hash 233320077 pixels 2 111 76 6 covered True
-#|sky -640 256 90 hash 3006348923 pixels 8 89 105 105 covered True
-#|pit 488 256 0 hash 2052822416 pixels 8 6 111 1 covered True
-#|sergeant 1144 259 315 hash 1178944882 pixels 111 108 0 1 covered True
-#|stride U!:34 hash 1320634075 pixels 2 5 164 6 covered True
-#|air U!:56 hash 2556132464 pixels 5 110 15 6 covered True
-#|landed U!:66 hash 1207877047 pixels 6 110 14 79 covered True
-#|door half open hash 1284933713 pixels 107 6 74 111 covered True
+#|start hash 3582478214 pixels 1 1 7 5 covered True
+#|lit 736 464 135 hash 3223437629 pixels 104 7 95 103 covered True
+#|dark -416 256 90 hash 3549150205 pixels 110 107 0 238 covered True
+#|step 137 256 45 hash 912470422 pixels 7 0 79 111 covered True
+#|grate -416 256 180 hash 2556056556 pixels 3 111 106 93 covered True
+#|water 3 256 0 hash 2875924069 pixels 2 111 76 6 covered True
+#|sky -640 256 90 hash 4166025265 pixels 239 14 239 105 covered True
+#|pit 488 256 0 hash 4118378470 pixels 8 6 111 1 covered True
+#|sergeant 1144 259 315 hash 3133938681 pixels 111 108 0 1 covered True
+#|stride U!:34 hash 2845586337 pixels 2 5 164 6 covered True
+#|air U!:56 hash 2977300388 pixels 5 110 15 6 covered True
+#|landed U!:66 hash 4031325049 pixels 6 110 14 79 covered True
+#|door half open hash 4026928401 pixels 107 6 74 111 covered True
 #|switch pressed hash 2946116189 pixels 3 110 107 7 covered True
 #|exit pressed hash 847822191 pixels 102 95 102 3 covered True
-#|blink dark hash 4167308477 pixels 99 73 73 3 covered True
-#|water moving hash 4092342880 pixels 2 6 77 6 covered True
+#|blink dark hash 568518560 pixels 94 73 73 101 covered True
+#|water moving hash 1934760231 pixels 2 6 77 6 covered True
 #|end

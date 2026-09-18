@@ -9,6 +9,7 @@ import ./src/tables.bend as T
 import ./src/level.bend as L
 import ./src/keys.bend as K
 import ./src/sim.bend as S
+import ./src/random.bend as M
 import ./src/things.bend as H
 import ./src/clip.bend as C
 import ./src/project.bend as P
@@ -546,8 +547,8 @@ law exit_ends:
 # LAW: vanilla's random table, its first entries and its last, and the
 # index wrapping at 256 (sanity).
 law random_table:
-  {(S.Sim.random(0), S.Sim.random(1), S.Sim.random(2), S.Sim.random(3), S.Sim.random(255),
-    S.Sim.random.next(0), S.Sim.random.next(255))
+  {(M.Random.at(0), M.Random.at(1), M.Random.at(2), M.Random.at(3), M.Random.at(255),
+    M.Random.next(0), M.Random.next(255))
     == (0, 8, 109, 220, 249, 1, 0) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # The lights' closed laws stand on the literal level with the west room

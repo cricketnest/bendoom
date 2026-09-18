@@ -1,16 +1,17 @@
 #!/usr/bin/env nu
 # Diffs a frame of ours against vanilla's after the same commands from
-# the same place. Writes a copy of the IWAD whose E1M1 keeps the things
-# Bendoom spawns and has player 1 start at x, y facing angle, and the
-# command script as a vanilla demo: version 109, Hurt Me Plenty, no
-# monsters, four bytes a tic, then a tic whose buttons press pause, then
-# a minute of idle tics, then the end marker. Chocolate Doom plays the
-# demo in real time in a scratch directory, at screen size 10, on a
-# headless X server of its own; a paused game runs no playsim tic but
-# keeps reading the demo, so the tail holds the frame of the script's
-# last tic for a minute, and one paletted screenshot is taken inside it.
-# A shot counts once it shows the pause graphic. It is compared with the
-# frame tools/frame.bend dumps after the same script, outside the status
+# the same place. Writes a copy of the IWAD whose E1M1 has player 1
+# start at x, y facing angle, its other things as they are, and the
+# command script as a vanilla demo: version 109, Hurt Me Plenty,
+# no monsters, so none spawns, four bytes a tic, then a tic whose
+# buttons press pause, then a minute of idle tics, then the end
+# marker. Chocolate Doom plays the demo in real time in a scratch
+# directory, at screen size 10, on a headless X server of its own;
+# a paused game runs no playsim tic but keeps reading the demo, so
+# the tail holds the frame of the script's last tic for a minute,
+# and one paletted screenshot is taken inside it. A shot counts
+# once it shows the pause graphic. It is compared with the frame
+# tools/frame.bend dumps after the same script, outside the status
 # bar rows, the pause graphic, and the pistol: at rest where a script
 # that never moves leaves it, widened by the bob's 16 units to either
 # side and below for one that moves. The pistol rises for the level's
@@ -31,30 +32,14 @@ def le [width: int]: int -> binary {
   $in | into binary | bytes at 0..<$width
 }
 
-# The DoomEd types Bendoom spawns: those src/things.bend gives a spawn
-# state.
-const spawned = [19]
-
-# The IWAD with E1M1's things cut to the records of the types Bendoom
-# spawns, options and all, and player 1's start, replaced in place by
-# one at x, y facing angle on every skill: the lump added after the
-# directory, and the THINGS entry's position and size pointed at it. A
-# whole IWAD and not a PWAD, since Doom refuses -file with the shareware
-# one.
+# The IWAD with player 1's start in E1M1's THINGS replaced in place by
+# one at x, y facing angle on every skill, and every other record kept.
+# A whole IWAD and not a PWAD, since Doom refuses -file with the
+# shareware one.
 def start-iwad [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
-  let all = $wad | lumps | enumerate | flatten
-  let marker = $all | where name == "E1M1" | first | get index
-  let map = $all | where index > $marker | first 10
-  let things = $map | where name == "THINGS" | first
-  let entry = ($wad | bytes at 8..11 | into int --endian little) + $things.index * 16
+  let at = ($wad | map-lump THINGS | get pos) + ($wad | things | where type == 1 | first | get i) * 10
   let start = [($x | le 2) ($y | le 2) ($angle | le 2) (1 | le 2) (7 | le 2)] | bytes collect
-  let lump = 0..<($things.size // 10)
-    | each {|i| $wad | bytes at ($things.pos + $i * 10)..<($things.pos + $i * 10 + 10) }
-    | each {|record| let type = $record | bytes at 6..7 | into int --endian little
-      if $type == 1 { $start } else if $type in $spawned { $record } }
-    | bytes collect
-  [($wad | bytes at 0..<$entry) ($wad | bytes length | le 4) ($lump | bytes length | le 4) ($wad | bytes at ($entry + 8)..) $lump]
-  | bytes collect
+  [($wad | bytes at 0..<$at) $start ($wad | bytes at ($at + 10)..)] | bytes collect
 }
 
 # A script's runs: how many tics, and the four bytes a demo keeps of the

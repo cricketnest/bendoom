@@ -2,20 +2,22 @@
 # and the frame's key events in, the state and what it prints out. No
 # window opens. Each line is the clock, whether the level has ended, the
 # player, the thinkers running, the floor and ceiling of sector 64 (the
-# exit room's door), line 407's special (the exit switch, 11 as loaded)
-# and whether its side shows the switch's partner.
-# First the state the game starts with. Then a game handed the state a
-# script leaves beside Freedoom's exit switch with the room's door open
-# behind the player, 50 tics in. A frame 200 ms on with Space pressed
-# runs 7 tics: the first ends the level and the rest change nothing, and
-# the frame prints the time, 51 tics, a second. A held Space repeating,
-# as X sends it, a release and a press in one frame, restarts nothing,
-# nor does its release; a press of Enter does, and with no time gone the
-# state is the one the game started with: the door shut, the switch's
-# special back. Esc quits. Then the time of a few clocks, worked out by
-# hand in milestone 4's ticket 09. The door's height is the hand
-# computation's (4 under sector 68's ceiling of -56); the positions are
-# regression pins.
+# exit room's door), line 407's special (the exit switch, 11 as loaded),
+# whether its side shows the switch's partner, and how many things there
+# are and the random index.
+# First the state the game starts with. Then a game handed the state
+# a script leaves beside Freedoom's exit switch with the room's door
+# open behind the player, 50 tics in. A frame 200 ms on with Space
+# pressed runs 7 tics: the first ends the level and the rest change
+# nothing, and the frame prints the time, 51 tics, a second. A held
+# Space repeating, as X sends it, a release and a press in one frame,
+# restarts nothing, nor does its release; a press of Enter does,
+# and with no time gone the state is the one the game started with:
+# the door shut, the switch's special back, the things and the random
+# index as they spawned. Esc quits. Then the time of a few clocks,
+# worked out by hand in milestone 4's ticket 09. The door's height
+# is the hand computation's (4 under sector 68's ceiling of -56);
+# the positions are regression pins.
 import Base
 import ../src/vec.bend as V
 import ../src/fixed.bend as F
@@ -24,6 +26,7 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/things.bend as H
 import ../src/project.bend as P
 import ../src/game.bend as M
 
@@ -39,6 +42,7 @@ def line(tag: String, +s: S.State) -> String:
     ++ " thinkers " ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ " sector 64 "
     ++ F.Fixed.show(L.Level.floor(level, 64)) ++ " " ++ F.Fixed.show(L.Level.ceil(level, 64)) ++ " special "
     ++ U32.show(L.Level.special(level, 407)) ++ " pressed " ++ Bool.show(pressed(level, S.State.sidetex(s)))
+    ++ " things " ++ Nat.show(List.length(&2, H.Thing, S.State.things(s))) ++ " random " ++ U32.show(S.State.rnd(s))
 
 def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
   do IO<Maybe<M.Game>>:
@@ -94,12 +98,12 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False
-#|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False
+#|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 1
+#|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 180 random 5
 #|Time 0:01
-#|space tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True
-#|repeat tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True
-#|release tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True
-#|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False
+#|space tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
+#|repeat tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
+#|release tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
+#|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 1
 #|esc quit
 #|Time 0:00, Time 0:59, Time 1:00, Time 2:03
