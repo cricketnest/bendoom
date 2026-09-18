@@ -21,6 +21,9 @@ expected output. Specs live under `.scratch/`.
 ## Milestones
 
 Each is a spec under `.scratch/`, cut into tickets, then implemented.
+The reference for how anything looks or behaves is vanilla Doom: the
+1997 linuxdoom-1.10 source and Chocolate Doom, which reproduces it bug
+for bug.
 
 1. WAD loads, directory parses, a window opens. Done.
 2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law.
