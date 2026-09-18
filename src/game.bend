@@ -82,20 +82,25 @@ def Game.advanced(+from: S.State, +next: S.State, g: Game) -> IO(Maybe<Game>):
     return Some{g}
 
 # After the exit a press of Space or Enter starts the level again, from
-# the map as loaded.
-def Game.from(pressed: Bool, level: L.Level, +state: S.State) -> S.State:
-  Bool.pick(S.State, Bool.and(pressed, S.State.ended(state)), S.State.start(level), state)
+# the map as loaded. A match and not a pick, which would build the fresh
+# state every frame.
+def Game.from(again: Bool, +level: L.Level, state: S.State) -> S.State:
+  match again:
+    case True{}:
+      S.State.start(level)
+    case False{}:
+      state
 
 # The sim runs the tics the clock owes since the last frame, each on the
 # command built from the held keys. A press is a key down now that was
 # up a frame ago: a held key repeats as a release and a press within one
 # frame's events, or as presses alone, and neither is one.
 def Game.advance(+now: Nat, was: Bool, g: Game) -> IO(Maybe<Game>):
-  Game{+level, gfx, tables, state, +input, +again, last, owed, mem} = g
+  Game{+level, gfx, tables, +state, +input, +again, last, owed, mem} = g
   +due = Nat.add(owed, Nat.mul(Nat.sub(now, last), 35n))
   +capped = Nat.is_gt(Nat.div(due, 1000n), 8n)
   +tics = Bool.pick(Nat, capped, 8n, Nat.div(due, 1000n))
-  +from = Game.from(Bool.and(again, Bool.not(was)), level, state)
+  +from = Game.from(Bool.and(Bool.and(again, Bool.not(was)), S.State.ended(state)), level, state)
   +next = S.Sim.replay(K.Input.script(tics, input), from)
   Game.advanced(from, next, Game{level, gfx, tables, next, K.Input.after(tics, input), again, now,
     Game.owed(capped, due), mem})
@@ -139,16 +144,18 @@ def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Unit):
     case 1n+f:
       Game.draw(window, Game.view(g), w => h => Game.loop(f, w, h))
 
-def Game.start.go(frames: Nat, input: K.Input, now: Nat, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
+def Game.start.go(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, now: Nat, mem: Array<U32>,
+  gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   do IO<Unit>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
     Game.loop(frames, window, Game{level, gfx, P.Project.tables(level),
-      S.State.start(level), input, False{}, now, 0n, mem})
+      S.Sim.replay(script, S.State.start(level)), input, False{}, now, 0n, mem})
 
-# The window opened and the loop run from the player 1 start for at most
-# so many frames, with the given input at first.
-def Game.start(frames: Nat, input: K.Input, now: Nat, world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+# The window opened and the loop run for at most so many frames, from
+# the player 1 start after a script, with the given input at first.
+def Game.start(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, now: Nat,
+  world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = world
-  Game.start.go(frames, input, now, mem, gl)
+  Game.start.go(frames, input, script, now, mem, gl)
 
