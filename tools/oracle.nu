@@ -14,15 +14,8 @@
 # outside the status bar rows, the pause graphic, and the pistol: at
 # rest where a script that never moves leaves it, widened by the bob's
 # 16 units to either side and below for one that moves. The pistol
-# rises for the level's first 16 tics, so a script is at least 18.
-#
-# Until Bendoom scrolls walls (milestone 4's ticket 11) the copy zeroes
-# line special 48. Until it animates (ticket 11) the default script
-# idles 57 tics, where Freedoom's water and nukage show the frame the
-# map names: vanilla shows frame (t + n) mod count of an animation whose
-# first frame is flat or texture number n, t being the tics run less
-# one, over 8. Its two waterfall textures are then a frame off; a view
-# of them wants 81.
+# rises for the level's first 16 tics, so a script is at least 18; the
+# default idles 20.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
@@ -30,7 +23,7 @@
 #
 #   bend tools/frame.bend -o frame
 #   tools/oracle.nu -416 256 0
-#   tools/oracle.nu -416 256 0 "63,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
+#   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 
 source wad.nu
 
@@ -39,43 +32,19 @@ def le [width: int]: int -> binary {
   $in | into binary | bytes at 0..<$width
 }
 
-# A lump of fixed-size records, the two bytes at an offset zeroed in each
-# record the test picks.
-def zeroed [size: int, at: int, pick: closure]: binary -> binary {
-  $in | chunks $size | each {|r|
-    if (do $pick ($r | bytes at $at..($at + 1) | into int --endian little)) {
-      [($r | bytes at 0..<$at) 0x[00 00] ($r | bytes at ($at + 2)..)] | bytes collect
-    } else { $r }
-  } | bytes collect
-}
-
-# The bytes with same-length pieces written over them, each at its place.
-def patched [pieces: table<at: int, data: binary>]: binary -> binary {
-  let bytes = $in
-  let sorted = $pieces | sort-by at
-  let ends = $sorted | each {|p| $p.at + ($p.data | bytes length) }
-  let starts = [0] | append $ends
-  $sorted | enumerate | each {|p| [($bytes | bytes at ($starts | get $p.index)..<$p.item.at) $p.item.data] } | flatten
-  | append ($bytes | bytes at ($ends | last)..)
-  | bytes collect
-}
-
-# The IWAD with E1M1's things one player 1 start on every skill and no
-# line special 48: its LINEDEFS edited where they lie, the thing added
-# after the directory, and the THINGS entry pointed at it. A whole IWAD
-# and not a PWAD, since Doom refuses -file with the shareware one.
+# The IWAD with E1M1's things one player 1 start on every skill: the
+# thing added after the directory, and the THINGS entry's position and
+# size pointed at it. A whole IWAD and not a PWAD, since Doom refuses
+# -file with the shareware one.
 def start-iwad [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
   let all = $wad | lumps | enumerate | flatten
   let marker = $all | where name == "E1M1" | first | get index
   let map = $all | where index > $marker | first 10
   let things = $map | where name == "THINGS" | first
-  let lines = $map | where name == "LINEDEFS" | first
-  let dir = $wad | bytes at 8..11 | into int --endian little
+  let entry = ($wad | bytes at 8..11 | into int --endian little) + $things.index * 16
   let thing = [($x | le 2) ($y | le 2) ($angle | le 2) (1 | le 2) (7 | le 2)] | bytes collect
-  $wad | patched [
-    {at: $lines.pos, data: ($wad | bytes at $lines.pos..<($lines.pos + $lines.size) | zeroed 14 6 {|special| $special == 48 })}
-    {at: ($dir + $things.index * 16), data: ([($wad | bytes length | le 4) (10 | le 4)] | bytes collect)}
-  ] | [$in $thing] | bytes collect
+  [($wad | bytes at 0..<$entry) ($wad | bytes length | le 4) (10 | le 4) ($wad | bytes at ($entry + 8)..) $thing]
+  | bytes collect
 }
 
 # A script's runs: how many tics, and the four bytes a demo keeps of the
@@ -156,35 +125,30 @@ def pistol-mask [wad: binary, bobbing: bool]: nothing -> list<int> {
   } | flatten | flatten | uniq | where $it < 168 * 320
 }
 
-# An X display number with no server's lock file, drawn at random so that
-# oracles run side by side do not pick the same one.
-def free-display []: nothing -> int {
-  0..<64 | each { random int 100..30000 }
-  | where {|n| not ($"/tmp/.X($n)-lock" | path exists) } | first
-}
-
 # Chocolate Doom's frame after the demo's script, paused. It can only
 # take a screenshot while it runs, so it runs on an X server of its own
 # with no screen, Xvfb, where nothing shows on the desktop and no window
-# takes the focus. Once the script has had its time, xdotool presses
-# the screenshot key until a shot shows the pause graphic whole, which
-# is the frame the pause froze. The config sets screen size 10, the
-# full 320 by 168 view over the status bar that Bendoom draws (Doom's
-# default 9 borders a 288 by 144 view), and turns messages off.
+# takes the focus; the server picks its display number and writes it
+# out, so runs side by side never share one. Once the script has had
+# its time, xdotool presses the screenshot key until a shot shows the
+# pause graphic whole, which is the frame the pause froze. The config
+# sets screen size 10, the full 320 by 168 view over the status bar that
+# Bendoom draws (Doom's default 9 borders a 288 by 144 view), and turns
+# messages off.
 def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
-  let display = $":(free-display)"
-  let server = job spawn { ^Xvfb $display -screen 0 1024x768x24 | ignore }
+  let server = job spawn { ^Xvfb -displayfd 1 -screen 0 1024x768x24 o> ($dir | path join display) }
   sleep 1sec
+  let display = $":(open --raw ($dir | path join display) | str trim)"
   let game = job spawn {
     cd $dir
     with-env {HOME: $dir, DISPLAY: $display} {
       ^chocolate-doom -iwad $name -playdemo script -config default.cfg -devparm -window -nosound | ignore
     }
   }
-  let shot = with-env {DISPLAY: $display} {
+  let shot = try { with-env {DISPLAY: $display} {
     let opened = 0..<150 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
       | where ($it | is-not-empty) | first 1 | flatten
     if ($opened | is-empty) { error make {msg: "Chocolate Doom's window did not open"} }
@@ -198,9 +162,10 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table
       let file = $dir | path join $"DOOM($n | fill --alignment right --character '0' --width 2).pcx"
       if ($file | path exists) { open --raw $file | pcx-indices } else { [] }
     } | where {|shot| ($shot | is-not-empty) and ($pause | all {|p| ($shot | get $p.at) == $p.colour }) } | first 1
+  } } finally {
+    job kill $game
+    job kill $server
   }
-  job kill $game
-  job kill $server
   if ($shot | is-empty) { error make {msg: "no screenshot showed the pause graphic"} }
   $shot | first
 }
@@ -209,7 +174,7 @@ def main [
   x: int                                   # the start's x, in map units
   y: int                                   # the start's y
   angle: int                               # its facing in degrees, a multiple of 45
-  script: string = "57,0,0,0,0"            # the commands, runs of "count,forward,side,turn,use"
+  script: string = "20,0,0,0,0"            # the commands, runs of "count,forward,side,turn,use"
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
   --keep                                   # keep the scratch directory

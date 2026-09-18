@@ -24,8 +24,8 @@ def Segs.step(+start: U32, +stop: U32, +scale1: U32, scale2: U32) -> U32:
 # vertex: the wall's normal; its distance, the first vertex's times the
 # sine of the angle the view makes with the wall; the texture offset
 # where the view meets it, the first vertex's distance along the wall
-# plus the side's and the seg's offsets; and the angle its texture
-# columns are measured from.
+# plus the side's and the seg's offsets and the wall's scroll; and the
+# angle its texture columns are measured from.
 type Segs.Geo is Data:
   Geo{normal: U32, distance: U32, offset: U32, centerangle: U32}
 
@@ -39,11 +39,11 @@ def Segs.geo.of(+view: P.View, +normal: U32, +delta: U32, +hyp: U32, offsets: U3
     (Bool.pick(U32, U32.is_lt(delta, A.Angle.ang180()), F.Fixed.neg(along), along) + offsets : U32),
     (A.Angle.ang90() + P.View.angle(view) - normal : U32)}
 
-def Segs.geo(+view: P.View, seg: L.Level.Seg, side: L.Level.Side, angle1: U32) -> Segs.Geo:
+def Segs.geo(+view: P.View, seg: L.Level.Seg, side: L.Level.Side, scroll: U32, angle1: U32) -> Segs.Geo:
   L.Seg{x1, y1, x2, y2, +angle, offset, flags, sidedef, front, back} = seg
   L.Side{xoff, yoff, sector} = side
   Segs.geo.of(view, (angle + A.Angle.ang90() : U32), (angle + A.Angle.ang90() - angle1 : U32),
-    P.View.dist_to(view, x1, y1), (xoff + offset : U32))
+    P.View.dist_to(view, x1, y1), (xoff + offset + scroll : U32))
 
 def Segs.wall(+view: P.View, index: U32, +start: U32, +stop: U32, geo: Segs.Geo, sil: U32 & U32 & U32) ->
   D.Draw.Wall:
@@ -365,10 +365,11 @@ def Segs.seg.side(seg: L.Level.Seg) -> U32:
   L.Seg{x1, y1, x2, y2, angle, offset, flags, side, front, back} = seg
   side
 
-def Segs.store(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, index: U32, angle1: U32,
+def Segs.store(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, +index: U32, angle1: U32,
   gap: C.Clip.Range, st: D.Draw) -> D.Draw:
   Segs.store.geo(view, level, gfx, seg, index, gap,
-    Segs.geo(view, seg, L.Level.side(level, Segs.seg.side(seg)), angle1), st)
+    Segs.geo(view, seg, L.Level.side(level, Segs.seg.side(seg)),
+      L.Level.seg.scroll(level, index, G.Gfx.clock(gfx)), angle1), st)
 
 def Segs.stores(gaps: List<&2, C.Clip.Range>, +view: P.View, +level: L.Level, +gfx: G.Gfx,
   +seg: L.Level.Seg, +index: U32, +angle1: U32, st: D.Draw) -> D.Draw:

@@ -9,7 +9,15 @@
 # map names (SW1BRN1 on side 1166, SW1GRAY on side 615) have partners
 # the map does not name, composed all the same: SW2BRN1 is 64 by 128 of
 # 5 patches and SW2GRAY 64 by 128 of 3 in TEXTURE1; a switch's partner's
-# partner is itself, and COMPUTE1 has none.
+# partner is itself, and COMPUTE1 has none. The map touches four of
+# Freedoom's 22 animations, by their first frames: NUKAGE1 (the WAD's
+# flat 122, of 3; sector 23's floor), FWATER1 (flat 141, of 4; sector
+# 36's ceiling), SFALL1 (texture 502, of 4; side 203's middle) and
+# WFALL1 (texture 494, of 4; side 932's middle). Their frames are
+# numbered first, flats from 0 and textures from 1, and what each shows
+# at a clock is worked out by P_UpdateSpecials' rule; the flats' texels
+# 0 and 2077 are NUKAGE1's and FWATER1's at clock 0, NUKAGE3's and
+# FWATER2's at clock 1.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -93,6 +101,17 @@ def texels(+gfx: G.Gfx) -> List<&2, U32>:
     from(G.Gfx.column(gfx, G.Gfx.mid(gfx, 419), 17), [0, 1, 3, 20, 21, 23]),
     from(G.Gfx.column(gfx, G.Gfx.mid(gfx, 216), 0), [0, 1, 3])])
 
+# What the four animated names show at a clock.
+def animated(+gfx: G.Gfx) -> String:
+  show([G.Gfx.floorpic(gfx, 23), G.Gfx.ceilpic(gfx, 36), G.Gfx.mid(gfx, 203), G.Gfx.mid(gfx, 932)])
+
+def at(gfx: G.Gfx, +level: L.Level, clock: U32) -> G.Gfx:
+  G.Gfx.of_state(gfx, L.Level.sidetex(level), clock)
+
+def moving(+gfx: G.Gfx) -> List<&2, U32>:
+  [G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 23)), (G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 23)) + 2077 : U32),
+    G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 36)), (G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 36)) + 2077 : U32)]
+
 # How many of the first n lines carry a special.
 def carrying(n: Nat, +level: L.Level, +special: U32, +i: U32) -> U32:
   match n:
@@ -138,8 +157,11 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(texture(gfx, "SW2GRAY", L.Level.switch(level, G.Gfx.mid(gfx, 615))))
     IO.print("switches " ++ show([G.Gfx.mid(gfx, 1166), L.Level.switch(level, G.Gfx.mid(gfx, 1166)),
       L.Level.switch(level, L.Level.switch(level, G.Gfx.mid(gfx, 1166))), L.Level.switch(level, G.Gfx.mid(gfx, 1386))]))
+    IO.print("animations " ++ String.join([animated(at(gfx, level, 0)), animated(at(gfx, level, 1)),
+      animated(at(gfx, level, 8)), animated(at(gfx, level, 9)), animated(at(gfx, level, 41))], ", "))
     IO.print("palette colormap flats texels " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
-      B.Bytes.each(~U32, ~B.Bytes.at, List.append(&2, U32, peeks(gfx), texels(gfx)), mem))))
+      B.Bytes.each(~U32, ~B.Bytes.at, List.concat(&2, U32, [peeks(gfx), texels(gfx), moving(at(gfx, level, 0)),
+        moving(at(gfx, level, 1))]), mem))))
 
 def report(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -165,8 +187,9 @@ def main() -> IO(Unit):
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127
 #|texture DOOR1 64x72.000000 patches 1 mask 63
 #|texture SKY1 256x128.000000 patches 1 mask 255
-#|side 526 textures 60 61 0
+#|side 526 textures 67 68 0
 #|texture SW2BRN1 64x128.000000 patches 5 mask 63
 #|texture SW2GRAY 64x128.000000 patches 3 mask 63
-#|switches 99 115 99 0
-#|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106
+#|switches 105 121 105 0
+#|animations 0 3 1 5, 2 4 3 7, 2 4 3 7, 0 5 4 8, 1 5 4 8
+#|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207
