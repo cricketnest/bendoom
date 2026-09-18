@@ -24,7 +24,10 @@
 # its tag's three blocks lowered to the floors and on the tics of ticket
 # 06's hand computation (144 on the 120th tic after the use, 136 on the
 # 128th and the 136th, each thinker gone a tic later), and a second use,
-# which starts nothing. The heights and tics are the hand
+# which starts nothing. Then a walk east over a special 2 line: sector
+# 145's ceiling 2 up on the tic of the crossing, at its top of 260 on the
+# 62nd and its thinker gone on the 63rd (ticket 07's hand computation),
+# and the walk back over the line, which starts nothing. The heights and tics are the hand
 # computation's; the positions are regression pins.
 import Base
 import ../src/bytes.bend as B
@@ -96,6 +99,17 @@ def floors(+level: L.Level) -> IO(Unit):
     f8 : S.State <- run("use", 1n, use(), [76, 126, 129], f7)
     IO.print("-")
 
+# Freedoom's special 2 lines along x 2032: crossing one opens sector 145
+# for good, and crossing it again starts nothing.
+def crossed(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    x0 : S.State <- run("trigger walk", 16n, forward(), [145], at(level, 1960, 65086, 0))
+    x1 : S.State <- run("over", 1n, forward(), [145], x0)
+    x2 : S.State <- run("-", 61n, idle(), [145], x1)
+    x3 : S.State <- run("-", 1n, idle(), [145], x2)
+    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, False{}), [145], x3)
+    IO.print("-")
+
 # The blue key door, sector 71, refuses.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -156,6 +170,7 @@ def door(+level: L.Level) -> IO(Unit):
     d0 : S.State <- run("door walk", 40n, forward(), [10], at(level, 832, 384, 90))
     used(d0)
     floors(level)
+    crossed(level)
     blue(level)
 
 def free(+s: S.State) -> IO(S.State):
@@ -253,6 +268,12 @@ def main() -> IO(Unit):
 #|- tic 166 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 1 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
 #|- tic 167 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 0 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
 #|use tic 168 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 0 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
+#|-
+#|trigger walk tic 16 2029.450805 -449.974945 0.000 z 128.000000 floor 128.000000 eye 35.541717 thinkers 0 sector 145 136.000000 136.000000
+#|over tic 17 2036.220657 -449.972503 0.000 z 128.000000 floor 128.000000 eye 35.539337 thinkers 1 sector 145 136.000000 138.000000
+#|- tic 78 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 1 sector 145 136.000000 260.000000
+#|- tic 79 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 0 sector 145 136.000000 260.000000
+#|back tic 119 1846.728271 -450.053344 0.000 z 136.000000 floor 136.000000 eye 28.955810 thinkers 0 sector 145 136.000000 260.000000
 #|-
 #|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 0 sector 71 -128.000000 -128.000000
 #|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 0 sector 71 -128.000000 -128.000000

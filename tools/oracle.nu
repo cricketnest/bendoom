@@ -1,7 +1,8 @@
 #!/usr/bin/env nu
 # Diffs a frame of ours against vanilla's after the same commands from
-# the same place. Writes a PWAD of E1M1 whose things are one player 1
-# start at x, y facing angle, and the command script as a vanilla demo:
+# the same place. Writes a copy of the IWAD whose E1M1 has one thing, a
+# player 1 start at x, y facing angle, and the command script as a
+# vanilla demo:
 # version 109, no monsters, four bytes a tic, then a tic whose buttons
 # press pause, then a minute of idle tics, then the end marker. Chocolate
 # Doom plays the demo in real time in a scratch directory, at screen
@@ -16,7 +17,7 @@
 # rises for the level's first 16 tics, so a script is at least 18.
 #
 # Until Bendoom lights sectors and scrolls walls (milestone 4's tickets
-# 10 and 11) the PWAD zeroes sector specials and line special 48. Until
+# 10 and 11) the copy zeroes sector specials and line special 48. Until
 # it animates (ticket 11) the default script idles 57 tics, where
 # Freedoom's water and nukage show the frame the map names: vanilla
 # shows frame (t + n) mod count of an animation whose first frame is
@@ -38,24 +39,6 @@ def le [width: int]: int -> binary {
   $in | into binary | bytes at 0..<$width
 }
 
-# A PWAD of the given lumps.
-def pwad []: table<name: string, data: binary> -> binary {
-  let entries = $in
-  let sizes = $entries | each {|e| $e.data | bytes length }
-  let starts = $sizes | reduce --fold [12] {|size, acc| $acc | append (($acc | last) + $size) }
-  let directory = $entries | enumerate | each {|e|
-    [
-      ($starts | get $e.index | le 4)
-      ($sizes | get $e.index | le 4)
-      ([($e.item.name | into binary) 0x[00 00 00 00 00 00 00 00]] | bytes collect | bytes at 0..<8)
-    ] | bytes collect
-  }
-  [("PWAD" | into binary) ($entries | length | le 4) ($starts | last | le 4)]
-  | append ($entries | get data)
-  | append $directory
-  | bytes collect
-}
-
 # A lump of fixed-size records, the two bytes at an offset zeroed in each
 # record the test picks.
 def zeroed [size: int, at: int, pick: closure]: binary -> binary {
@@ -66,24 +49,36 @@ def zeroed [size: int, at: int, pick: closure]: binary -> binary {
   } | bytes collect
 }
 
-# E1M1 with one thing, player 1's start on every skill, no sector
-# specials and no line special 48.
-def start-map [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
-  let all = $wad | lumps
-  let marker = $all | enumerate | where item.name == "E1M1" | first | get index
+# The bytes with same-length pieces written over them, each at its place.
+def patched [pieces: table<at: int, data: binary>]: binary -> binary {
+  let bytes = $in
+  let sorted = $pieces | sort-by at
+  let ends = $sorted | each {|p| $p.at + ($p.data | bytes length) }
+  let starts = [0] | append $ends
+  $sorted | enumerate | each {|p| [($bytes | bytes at ($starts | get $p.index)..<$p.item.at) $p.item.data] } | flatten
+  | append ($bytes | bytes at ($ends | last)..)
+  | bytes collect
+}
+
+# The IWAD with E1M1's things one player 1 start on every skill, no
+# sector specials and no line special 48: its LINEDEFS and SECTORS edited
+# where they lie, the thing added after the directory, and the THINGS
+# entry pointed at it. A whole IWAD and not a PWAD, since Doom refuses
+# -file with the shareware one.
+def start-iwad [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
+  let all = $wad | lumps | enumerate | flatten
+  let marker = $all | where name == "E1M1" | first | get index
+  let map = $all | where index > $marker | first 10
+  let things = $map | where name == "THINGS" | first
+  let lines = $map | where name == "LINEDEFS" | first
+  let sectors = $map | where name == "SECTORS" | first
+  let dir = $wad | bytes at 8..11 | into int --endian little
   let thing = [($x | le 2) ($y | le 2) ($angle | le 2) (1 | le 2) (7 | le 2)] | bytes collect
-  $all | skip $marker | first 11 | each {|l|
-    let data = if $l.size == 0 { 0x[] } else { $wad | bytes at $l.pos..<($l.pos + $l.size) }
-    {
-      name: $l.name
-      data: (match $l.name {
-        "THINGS" => $thing
-        "LINEDEFS" => ($data | zeroed 14 6 {|special| $special == 48 })
-        "SECTORS" => ($data | zeroed 26 22 {|special| true })
-        _ => $data
-      })
-    }
-  } | pwad
+  $wad | patched [
+    {at: $lines.pos, data: ($wad | bytes at $lines.pos..<($lines.pos + $lines.size) | zeroed 14 6 {|special| $special == 48 })}
+    {at: $sectors.pos, data: ($wad | bytes at $sectors.pos..<($sectors.pos + $sectors.size) | zeroed 26 22 {|special| true })}
+    {at: ($dir + $things.index * 16), data: ([($wad | bytes length | le 4) (10 | le 4)] | bytes collect)}
+  ] | [$in $thing] | bytes collect
 }
 
 # A script's runs: how many tics, and the four bytes a demo keeps of the
@@ -177,8 +172,8 @@ def free-display []: nothing -> int {
 # is the frame the pause froze. The config sets screen size 10, the
 # full 320 by 168 view over the status bar that Bendoom draws (Doom's
 # default 9 borders a 288 by 144 view), and turns messages off.
-def vanilla [wad: path, map: binary, script: binary, tics: int, pause: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
-  $map | save --force ($dir | path join start.wad)
+def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
+  $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
   let display = $":(free-display)"
@@ -187,7 +182,7 @@ def vanilla [wad: path, map: binary, script: binary, tics: int, pause: table<at:
   let game = job spawn {
     cd $dir
     with-env {HOME: $dir, DISPLAY: $display} {
-      ^chocolate-doom -iwad $wad -file start.wad -playdemo script -config default.cfg -devparm -window -nosound | ignore
+      ^chocolate-doom -iwad $name -playdemo script -config default.cfg -devparm -window -nosound | ignore
     }
   }
   let shot = with-env {DISPLAY: $display} {
@@ -228,7 +223,7 @@ def main [
   if $tics < 18 { error make {msg: "the pistol is still rising before tic 18"} }
   let pause = patch-pixels $bytes M_PAUSE 126 4
   let dir = mktemp --directory
-  let shot = vanilla $wad (start-map $bytes $x $y $angle) ($runs | demo) $tics $pause $dir
+  let shot = vanilla (start-iwad $bytes $x $y $angle) ($wad | path basename) ($runs | demo) $tics $pause $dir
   let ours = with-env {BENDOOM_IWAD: $wad, FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let moves = $runs | any {|run| ($run.bytes | bytes at 0..1) != 0x[00 00] }

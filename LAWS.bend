@@ -176,9 +176,9 @@ law tic_rest:
   for +x: U32
   for +y: U32
   {(S.Player.x(S.State.player(S.Sim.tic(K.Cmd.idle(),
-      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976}, level, 0)))),
+      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []}, level, 0)))),
     S.Player.y(S.State.player(S.Sim.tic(K.Cmd.idle(),
-      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976}, level, 0)))))
+      Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []}, level, 0)))))
     == (x, y) : U32 & U32}
 
 # LAW: a tic counts on the clock, and an ended level's tic changes
@@ -208,34 +208,34 @@ def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
 # momentum over four is 9999, and half of it times the clock's sine 25
 # is 1 (sanity).
 law tic_from_rest:
-  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976}, 0)
-    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977} : S.Player}
+  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []}, 0)
+    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, []} : S.Player}
 
 # LAW: standing still on the floor puts the eye 41 above it, at any
 # position, whatever the eye was.
 law eye_rest:
   for x: U32
   for y: U32
-  {S.Player.viewz(Closed.room([K.Cmd.idle()], S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 0))
+  {S.Player.viewz(Closed.room([K.Cmd.idle()], S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 0))
     == 2686976 : U32}
 
 # LAW: 64 above the floor, the first airborne tic sets the fall to twice
 # gravity without moving, the second moves by it and adds gravity once;
 # the eye sits 41 above the height the tic began at (sanity).
 law fall_gravity:
-  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 0),
-    Closed.room([K.Cmd.idle(), K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 0))
-    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280},
-      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280})
+  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 0),
+    Closed.room([K.Cmd.idle(), K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 0))
+    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, []},
+      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, []})
     : S.Player & S.Player}
 
 # LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
 # landing at 8 a tic does not (sanity).
 law landing_dip:
-  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0}, 0),
-    Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0}, 0))
-    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512})
+  {(Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, []}, 0),
+    Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, []}, 0))
+    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, []},
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, []})
     : S.Player & S.Player}
 
 # LAW: the bob at the clock's peak (tic 5, sine 65535). The first tic of
@@ -245,17 +245,17 @@ law landing_dip:
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
   {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, False{}}],
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0}, 5)),
+      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 5)),
     S.Player.viewz(Closed.room([K.Cmd.idle()],
-      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0}, 5)))
+      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, []}, 5)))
     == (2706974, 3211256) : U32 & U32}
 
 # LAW: a floor 16 above the player's feet lifts the player onto it, cuts
 # the view height by the 16 to 25, and sets it recovering by an eighth
 # of the gap, 2 a tic (sanity).
 law step_up_dip:
-  {Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0}, 0)
-    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976} : S.Player}
+  {Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, []}, 0)
+    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, []} : S.Player}
 
 # The movers' closed laws stand on a literal level: a west room (sector
 # 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
@@ -275,7 +275,7 @@ def Closed.doors() -> L.Level:
 
 # A player at rest on the floor at 0, under a ceiling.
 def Closed.player(x: U32, y: U32, angle: U32, ceilz: U32) -> S.Player:
-  S.Player{x, y, 0, angle, 0, 0, 0, 0, ceilz, 2686976, 0, 2686976}
+  S.Player{x, y, 0, angle, 0, 0, 0, 0, ceilz, 2686976, 0, 2686976, []}
 
 # The west room's player, 32 units from the door and facing it, and the
 # east room's.
@@ -345,9 +345,9 @@ law floor_carries:
     S.State.player(Closed.idled(1n, Closed.moving(Closed.doors(),
       S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}]},
       13107200, 4194304, 8388608))))
-    == (S.Player{2097152, 4194304, 4294705152, 0, 0, 0, 0, 4294705152, 8388608, 2686976, 0, 2686976},
-      S.Player{2097152, 4194304, 4294443008, 0, 0, 0, 0, 4294443008, 8388608, 2686976, 0, 2424832},
-      S.Player{13107200, 4194304, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976})
+    == (S.Player{2097152, 4194304, 4294705152, 0, 0, 0, 0, 4294705152, 8388608, 2686976, 0, 2686976, []},
+      S.Player{2097152, 4194304, 4294443008, 0, 0, 0, 0, 4294443008, 8388608, 2686976, 0, 2424832, []},
+      S.Player{13107200, 4194304, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, []})
     : S.Player & S.Player & S.Player}
 
 # LAW: a door that closes on the player goes back up. From 68, 2 a tic,
@@ -372,6 +372,38 @@ law door_crushed:
       [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
         [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]}], 3801088)
     : U32 & U32 & List<&2, S.Thinker> & U32}
+
+# The literal level with line 0 a walk-over turbo floor (special 36; its
+# tag 0 is every sector), the door sector's floor at 16, its ceiling and
+# the east room's at 128, and a player at x moving east at a speed.
+def Closed.turbo(x: U32, momx: U32) -> S.State:
+  S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, []},
+    L.Level.special.put(L.Level.plane.put(L.Level.plane.put(L.Level.plane.put(Closed.doors(), 1, False{},
+      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), V.Leaf{0}, [], 0, 0, False{}, False{}}
+
+def Closed.floors(+s: S.State) -> U32 & U32 & U32:
+  (L.Level.floor(S.State.level(s), 0), L.Level.floor(S.State.level(s), 1), L.Level.floor(S.State.level(s), 2))
+
+# LAW: a walk-over line fires from the move that crosses it, once, and
+# special 36 is vanilla's turboLower: 4 a tic down to the highest floor
+# around, plus 8 when that is not the floor's own. A player at (60, 64)
+# moving 8 a tic east crosses line 0 on the first tic. Sector 1, floor
+# 16 between floors at 0, goes to 8: 12 after that tic, 8 after the
+# second, its thinker gone on the third. Sectors 0 and 2, floors at 0
+# beside one at 16, go to 24, which is above them, and a travel down to
+# a height above lands at once. The line's special is 0 from the first
+# tic. A player at (44, 64) moving 6 a tic ends with its box across the
+# line and its centre short of it: nothing starts, the special stays
+# (sanity).
+law turbo_floor_crossed:
+  {(Closed.floors(Closed.idled(1n, Closed.turbo(3932160, 524288))),
+    Closed.floors(Closed.idled(2n, Closed.turbo(3932160, 524288))),
+    S.State.thinkers(Closed.idled(3n, Closed.turbo(3932160, 524288))),
+    L.Level.special(S.State.level(Closed.idled(1n, Closed.turbo(3932160, 524288))), 0),
+    S.State.thinkers(Closed.idled(1n, Closed.turbo(2883584, 393216))),
+    L.Level.special(S.State.level(Closed.idled(1n, Closed.turbo(2883584, 393216))), 0))
+    == ((1572864, 786432, 1572864), (1572864, 524288, 1572864), [], 0, [], 36)
+    : (U32 & U32 & U32) & (U32 & U32 & U32) & List<&2, S.Thinker> & U32 & List<&2, S.Thinker> & U32}
 
 # LAW: use held across two tics fires on the first alone: after a live
 # tic whose command holds use, no command is a press, whatever the

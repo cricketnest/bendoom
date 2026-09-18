@@ -13,10 +13,11 @@ import ./keys.bend as K
 
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
-# height and its delta, and the eye's height.
+# height and its delta, the eye's height, and the special lines this
+# tic's moves have crossed, in the order they fire.
 type Player is Data:
   Player{x: U32, y: U32, z: U32, angle: U32, momx: U32, momy: U32, momz: U32,
-    floorz: U32, ceilz: U32, viewheight: U32, deltaview: U32, viewz: U32}
+    floorz: U32, ceilz: U32, viewheight: U32, deltaview: U32, viewz: U32, crossed: List<&2, U32>}
 
 # What a position check answers: whether it is clear of solid lines,
 # and the floor and ceiling there, from the sector under the point
@@ -61,45 +62,49 @@ def Sim.maxbob() -> U32:
   1048576
 
 def Player.x(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   x
 
 def Player.y(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   y
 
 def Player.angle(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   angle
 
 def Player.momx(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   momx
 
 def Player.z(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   z
 
 def Player.floorz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   floorz
 
 def Player.ceilz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   ceilz
 
+def Player.crossed(+p: Player) -> List<&2, U32>:
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
+  crossed
+
 def Player.viewz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   viewz
 
 # On the ground: at or below the floor.
 def Player.onground(+p: Player) -> Bool:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   F.Fixed.le(z, floorz)
 
 def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32) -> Player:
   Player{x, y, floor, angle, 0, 0, 0, floor, ceil, Sim.viewheight(), 0,
-    (floor + Sim.viewheight() : U32)}
+    (floor + Sim.viewheight() : U32), []}
 
 def Player.at(+level: L.Level, s: L.Level.Start) -> Player:
   L.Start{+x, +y, angle} = s
@@ -254,27 +259,70 @@ def Sim.free(+level: L.Level, x: U32, y: U32) -> Bool:
 # Moving
 # ------
 
-def Sim.try_move.fin(go: Bool, p: Player, x: U32, y: U32, floor: U32, ceil: U32) -> Sim.Try:
+def Sim.keep(keep: Bool, x: U32, rest: List<&2, U32>) -> List<&2, U32>:
+  match keep:
+    case False{}:
+      rest
+    case True{}:
+      x <> rest
+
+def Sim.member(xs: List<&2, U32>, +i: U32) -> Bool:
+  match xs:
+    case []:
+      False{}
+    case x <> rest:
+      Bool.or(U32.is_eq(x, i), Sim.member(rest, i))
+
+# Whether a move from (ox, oy) to (x, y) crosses a line with a special:
+# Doom's spechit, a two-sided special line the box at the new place is
+# across, tested as P_TryMove tests it, by the side of the player's
+# centre before and after.
+def Sim.crosses(+level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32, +i: U32) -> Bool:
+  +line = L.Level.line(level, i)
+  Bool.and(Bool.not(U32.is_zero(L.Level.special(level, i))),
+    Bool.and(Bool.not(Sim.solid(line)), Bool.and(Sim.box_touches(x, y, line),
+      Bool.and(Sim.box_crosses(x, y, line),
+        Bool.xor(Sim.point_side(ox, oy, line), Sim.point_side(x, y, line))))))
+
+# The lines a move crosses, the last gathered first, as Doom fires them,
+# a line the blockmap lists twice taken once.
+def Sim.crossings.go(lines: List<&2, U32>, +level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32,
+  +found: List<&2, U32>) -> List<&2, U32>:
+  match lines:
+    case []:
+      found
+    case +i <> rest:
+      Sim.crossings.go(rest, level, ox, oy, x, y, Sim.keep(Bool.and(Sim.crosses(level, ox, oy, x, y, i),
+        Bool.not(Sim.member(found, i))), i, found))
+
+def Sim.crossings(+level: L.Level, ox: U32, oy: U32, +x: U32, +y: U32) -> List<&2, U32>:
+  Sim.crossings.go(Sim.lines(level, (x - Sim.radius() : U32), (y - Sim.radius() : U32),
+    (x + Sim.radius() : U32), (y + Sim.radius() : U32)), level, ox, oy, x, y, [])
+
+def Sim.try_move.fin(go: Bool, p: Player, x: U32, y: U32, floor: U32, ceil: U32, over: List<&2, U32>) ->
+  Sim.Try:
   match go:
     case False{}:
       Try{False{}, p}
     case True{}:
-      Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
-      Try{True{}, Player{x, y, z, angle, momx, momy, momz, floor, ceil, viewheight, deltaview, viewz}}
+      Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
+      Try{True{}, Player{x, y, z, angle, momx, momy, momz, floor, ceil, viewheight, deltaview, viewz,
+        List.append(&2, U32, crossed, over)}}
 
 # The move is taken when the position is free, the opening fits the
 # player, the ceiling is high enough from the player's feet, and the
 # floor is at most 24 units up.
-def Sim.try_move.fit(+p: Player, x: U32, y: U32, f: Sim.Fit) -> Sim.Try:
+def Sim.try_move.fit(+p: Player, x: U32, y: U32, f: Sim.Fit, over: List<&2, U32>) -> Sim.Try:
   Fit{ok, +floor, +ceil} = f
   +z = Player.z(p)
   Sim.try_move.fin(Bool.and(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), Sim.height()),
     Bool.and(F.Fixed.ge((ceil - z : U32), Sim.height()),
-      F.Fixed.le((floor - z : U32), Sim.step_up())))), p, x, y, floor, ceil)
+      F.Fixed.le((floor - z : U32), Sim.step_up())))), p, x, y, floor, ceil, over)
 
-# Doom's P_TryMove.
-def Sim.try_move(+level: L.Level, p: Player, +x: U32, +y: U32) -> Sim.Try:
-  Sim.try_move.fit(p, x, y, Sim.fit(level, x, y))
+# Doom's P_TryMove: a move taken adds the special lines it crossed to
+# the player's.
+def Sim.try_move(+level: L.Level, +p: Player, +x: U32, +y: U32) -> Sim.Try:
+  Sim.try_move.fit(p, x, y, Sim.fit(level, x, y), Sim.crossings(level, Player.x(p), Player.y(p), x, y))
 
 def Sim.Try.player(t: Sim.Try) -> Player:
   Try{ok, p} = t
@@ -448,15 +496,15 @@ def Sim.stairstep.fin(+level: L.Level, t: Sim.Try) -> Player:
 
 # Doom's stairstep: the move along y alone, else along x alone.
 def Sim.stairstep(+level: L.Level, +p: Player) -> Player:
-  Player{+x, +y, z, angle, momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{+x, +y, z, angle, momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   Sim.stairstep.fin(level, Sim.try_move(level, p, x, (y + momy : U32)))
 
 # The remainder of the move, clipped along the wall, becomes the
 # momentum and is tried; a failure retries the slide from here.
 def Sim.slide.wall.go(+level: L.Level, +p: Player, m: U32 & U32) -> Sim.Try:
-  Player{+x, +y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{+x, +y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   (+mx, +my) = m
-  Sim.try_move(level, Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz}, (x + mx : U32),
+  Sim.try_move(level, Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed}, (x + mx : U32),
     (y + my : U32))
 
 def Sim.slide.wall(left: Bool, +level: L.Level, +p: Player, +frac: U32, i: U32) -> Sim.Try:
@@ -464,7 +512,7 @@ def Sim.slide.wall(left: Bool, +level: L.Level, +p: Player, +frac: U32, i: U32) 
     case False{}:
       Try{True{}, p}
     case True{}:
-      Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+      Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
       Sim.slide.wall.go(level, p, Sim.along(level, p, i, F.Fixed.mul(momx, frac),
         F.Fixed.mul(momy, frac)))
 
@@ -487,7 +535,7 @@ def Sim.slide.upto(some: Bool, +level: L.Level, +p: Player, +frac: U32, i: U32) 
     case False{}:
       Sim.slide.rest(level, p, frac, i)
     case True{}:
-      Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+      Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
       Sim.slide.upto.fin(level, frac, i, Sim.try_move(level, p,
         (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32)))
 
@@ -512,7 +560,7 @@ def Sim.trail(+v: U32, +mom: U32) -> U32:
 # One try of the slide: the three leading corners are traced along the
 # momentum for the closest blocking line.
 def Sim.slide.once(+level: L.Level, +p: Player) -> Sim.Try:
-  Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   +lx = Sim.lead(x, momx)
   +ly = Sim.lead(y, momy)
   +tx = Sim.trail(x, momx)
@@ -577,19 +625,19 @@ def Sim.xy.go(fuel: Nat, +level: L.Level, st: Sim.Xy) -> Player:
 def Sim.slow(stop: Bool, p: Player) -> Player:
   match stop:
     case True{}:
-      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
-      Player{x, y, z, angle, 0, 0, momz, floorz, ceilz, viewheight, deltaview, viewz}
+      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
+      Player{x, y, z, angle, 0, 0, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed}
     case False{}:
-      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
       Player{x, y, z, angle, F.Fixed.mul(momx, Sim.decay()), F.Fixed.mul(momy, Sim.decay()),
-        momz, floorz, ceilz, viewheight, deltaview, viewz}
+        momz, floorz, ceilz, viewheight, deltaview, viewz, crossed}
 
 def Sim.crawling(+mom: U32) -> Bool:
   Bool.and(F.Fixed.gt(mom, F.Fixed.neg(Sim.stopspeed())), F.Fixed.lt(mom, Sim.stopspeed()))
 
 def Sim.friction.ground(+cmd: K.Cmd, +p: Player) -> Player:
   K.Cmd{forward, side, turn, use} = cmd
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   Sim.slow(Bool.and(Sim.crawling(momx), Bool.and(Sim.crawling(momy),
     Bool.and(U32.is_zero(forward), U32.is_zero(side)))), p)
 
@@ -605,16 +653,16 @@ def Sim.xy.moving(moving: Bool, +level: L.Level, +cmd: K.Cmd, +p: Player) -> Pla
     case False{}:
       p
     case True{}:
-      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
       +xm = Sim.clamp(momx)
       +ym = Sim.clamp(momy)
       Sim.friction(cmd, Sim.xy.go(2n, level,
-        Xy{False{}, Player{x, y, z, angle, xm, ym, momz, floorz, ceilz, viewheight, deltaview, viewz}, xm, ym}))
+        Xy{False{}, Player{x, y, z, angle, xm, ym, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed}, xm, ym}))
 
 # Doom's P_XYMovement: the momentum, capped, moves the player, in
 # halves when large; a blocked move slides; then friction.
 def Sim.xy(+level: L.Level, cmd: K.Cmd, +p: Player) -> Player:
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   Sim.xy.moving(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, cmd, p)
 
 # The move
@@ -622,12 +670,12 @@ def Sim.xy(+level: L.Level, cmd: K.Cmd, +p: Player) -> Player:
 
 # Doom's P_Thrust: momentum along an angle.
 def Sim.thrust(+level: L.Level, p: Player, +angle: U32, +move: U32) -> Player:
-  Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   +sine = L.Level.sine(level)
   +f = A.Angle.fine(angle)
   Player{x, y, z, a, (momx + F.Fixed.mul(move, A.Angle.cos(sine, f)) : U32),
     (momy + F.Fixed.mul(move, A.Angle.sin(sine, f)) : U32), momz, floorz, ceilz, viewheight,
-    deltaview, viewz}
+    deltaview, viewz, crossed}
 
 # A move key thrusts only on the ground.
 def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
@@ -637,10 +685,10 @@ def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
 # Doom's P_MovePlayer: turn, then thrust forward and sideways.
 def Sim.move(+level: L.Level, +cmd: K.Cmd, p: Player) -> Player:
   K.Cmd{forward, side, turn, use} = cmd
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   +a = (angle + (turn << 16n) : U32)
   Sim.push(level, Sim.push(level, Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight,
-    deltaview, viewz}, a, forward), (a - A.Angle.ang90() : U32), side)
+    deltaview, viewz, crossed}, a, forward), (a - A.Angle.ang90() : U32), side)
 
 # The eye
 # -------
@@ -659,20 +707,20 @@ def Sim.eye.delta(+viewheight: U32, +deltaview: U32) -> U32 & U32:
   (vh, Bool.pick(U32, U32.is_zero(dv), 0, Bool.pick(U32, U32.is_zero(dv2), 1, dv2)))
 
 def Sim.eye.ground.fin(+p: Player, +swing: U32, vd: U32 & U32) -> Player:
-  Player{x, y, +z, angle, momx, momy, momz, floorz, +ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, +z, angle, momx, momy, momz, floorz, +ceilz, viewheight, deltaview, viewz, crossed} = p
   (+vh, dv) = vd
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, vh, dv,
-    F.Fixed.min((z + vh + swing : U32), (ceilz - 262144 : U32))}
+    F.Fixed.min((z + vh + swing : U32), (ceilz - 262144 : U32)), crossed}
 
 def Sim.eye.ground(+p: Player, swing: U32) -> Player:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, +viewheight, +deltaview, viewz} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, +viewheight, +deltaview, viewz, crossed} = p
   Sim.eye.ground.fin(p, swing, Sim.eye.delta((viewheight + deltaview : U32), deltaview))
 
 # In the air the eye sits at the view height, unbobbed.
 def Sim.eye.air(p: Player) -> Player:
-  Player{x, y, +z, angle, momx, momy, momz, floorz, ceilz, +viewheight, deltaview, viewz} = p
+  Player{x, y, +z, angle, momx, momy, momz, floorz, ceilz, +viewheight, deltaview, viewz, crossed} = p
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview,
-    (z + viewheight : U32)}
+    (z + viewheight : U32), crossed}
 
 def Sim.eye.if(onground: Bool, +p: Player, swing: U32) -> Player:
   match onground:
@@ -684,7 +732,7 @@ def Sim.eye.if(onground: Bool, +p: Player, swing: U32) -> Player:
 # The bob is the squared momentum over four, at most 16 units; half of
 # it swings the eye on the level's clock, a turn every 20 tics.
 def Sim.eye(+level: L.Level, clock: U32, +p: Player) -> Player:
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   Sim.eye.if(Player.onground(p), p, F.Fixed.mul((F.Fixed.min(Sim.maxbob(),
     ((F.Fixed.mul(momx, momx) + F.Fixed.mul(momy, momy) : U32) >> 2n : U32)) >> 1n : U32),
     A.Angle.sin(L.Level.sine(level), ((409 * clock : U32) .&. 8191 : U32))))
@@ -709,32 +757,32 @@ def Sim.z.ceiling(+z: U32, +momz: U32, +ceilz: U32) -> U32 & U32:
     Bool.pick(U32, Bool.and(hit, F.Fixed.gt(momz, 0)), 0, momz))
 
 def Sim.z.fin(+p: Player, zm: U32 & U32) -> Player:
-  Player{x, y, oz, angle, momx, momy, omomz, floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, oz, angle, momx, momy, omomz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   (z, momz) = zm
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz}
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed}
 
 # On or under the floor the fall ends there; above it gravity pulls,
 # doubled on the first airborne tic.
 def Sim.z.clip(+p: Player, +z: U32) -> Player:
-  Player{x, y, oz, angle, momx, momy, +momz, +floorz, +ceilz, viewheight, +deltaview, viewz} = p
+  Player{x, y, oz, angle, momx, momy, +momz, +floorz, +ceilz, viewheight, +deltaview, viewz, crossed} = p
   +floored = F.Fixed.le(z, floorz)
   +falling = F.Fixed.lt(momz, 0)
   +momz2 = Bool.pick(U32, floored, Bool.pick(U32, falling, 0, momz),
     Bool.pick(U32, U32.is_zero(momz), F.Fixed.neg((Sim.gravity() << 1n : U32)),
       (momz - Sim.gravity() : U32)))
   Sim.z.fin(Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight,
-    Sim.z.land(Bool.and(floored, falling), momz, deltaview), viewz},
+    Sim.z.land(Bool.and(floored, falling), momz, deltaview), viewz, crossed},
     Sim.z.ceiling(Bool.pick(U32, floored, floorz, z), momz2, ceilz))
 
 # A floor risen under the player dips the view by the rise, to recover
 # by an eighth of the gap a tic.
 def Sim.z.step(+p: Player) -> Player:
-  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, +viewheight, deltaview, viewz} = p
+  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, +viewheight, deltaview, viewz, crossed} = p
   +below = F.Fixed.lt(z, floorz)
   +vh = Bool.pick(U32, below, (viewheight - (floorz - z) : U32), viewheight)
   Sim.z.clip(Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, vh,
     Bool.pick(U32, below, F.Fixed.sarn((Sim.viewheight() - vh : U32), 3n), deltaview),
-    viewz}, (z + momz : U32))
+    viewz, crossed}, (z + momz : U32))
 
 def Sim.z.if(still: Bool, +p: Player) -> Player:
   match still:
@@ -746,7 +794,7 @@ def Sim.z.if(still: Bool, +p: Player) -> Player:
 # Doom's P_ZMovement, run when the player is off the floor or moving
 # vertically.
 def Sim.z(+p: Player) -> Player:
-  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   Sim.z.if(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), p)
 
 # The state
@@ -821,11 +869,11 @@ def State.usedown(s: State) -> Bool:
 # a player who stood on the floor kept on it, a head in the ceiling
 # lowered under it, and whether the player still fits.
 def Sim.reclip.fit(p: Player, f: Sim.Fit) -> Sim.Try:
-  Player{x, y, +z, angle, momx, momy, momz, +floorz, ceilz, viewheight, deltaview, viewz} = p
+  Player{x, y, +z, angle, momx, momy, momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed} = p
   Fit{ok, +floor, +ceil} = f
   Try{F.Fixed.ge((ceil - floor : U32), Sim.height()), Player{x, y,
     Bool.pick(U32, U32.is_eq(z, floorz), floor, F.Fixed.min(z, (ceil - Sim.height() : U32))), angle, momx,
-    momy, momz, floor, ceil, viewheight, deltaview, viewz}}
+    momy, momz, floor, ceil, viewheight, deltaview, viewz, crossed}}
 
 def Sim.reclip(+level: L.Level, +p: Player) -> Sim.Try:
   Sim.reclip.fit(p, Sim.fit(level, Player.x(p), Player.y(p)))
@@ -912,13 +960,6 @@ def Sim.thinkers(s: State) -> State:
 # The sectors across a sector's two-sided lines, as Doom's getNextSector
 # answers them line by line: the back of a line whose front is the
 # sector, else the front.
-def Sim.keep(keep: Bool, x: U32, rest: List<&2, U32>) -> List<&2, U32>:
-  match keep:
-    case False{}:
-      rest
-    case True{}:
-      x <> rest
-
 def Sim.around.of(+sector: U32, line: L.Level.Line, rest: List<&2, U32>) -> List<&2, U32>:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
   Sim.keep(Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
@@ -986,11 +1027,13 @@ def Sim.door.turn(thinkers: List<&2, Thinker>, +sector: U32, +floor: U32) -> Lis
       Sim.door.turn.one(U32.is_eq(s, sector), Mover{s, ceiling, speed, steps, plan}, floor)
         <> Sim.door.turn(rest, sector, floor)
 
-# A door's plan: up to 4 under the lowest ceiling around it, 150 tics
-# open, down to its floor.
+# A door's top: 4 under the lowest ceiling around it.
+def Sim.door.top(+level: L.Level, sector: U32) -> U32:
+  (Sim.extreme(~F.Fixed.min, Sim.around(level, sector), level, True{}, 2147483647) - 262144 : U32)
+
+# A door's plan: up to its top, 150 tics open, down to its floor.
 def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, Sim.Step>:
-  [Travel{False{}, (Sim.extreme(~F.Fixed.min, Sim.around(level, sector), level, True{}, 2147483647)
-    - 262144 : U32)}, Hold{150}, Travel{True{}, L.Level.floor(level, sector)}]
+  [Travel{False{}, Sim.door.top(level, sector)}, Hold{150}, Travel{True{}, L.Level.floor(level, sector)}]
 
 def Sim.door.on(moving: Bool, +sector: U32, speed: U32, s: State) -> State:
   match moving:
@@ -1082,6 +1125,43 @@ def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: L
       s
     case sector <> rest:
       Sim.once(line, Sim.switch(line, Sim.start(~make, sector <> rest, s)))
+
+# Walk-over lines
+# ---------------
+
+# Doom's EV_DoDoor open: up to the door's top, where it stays.
+def Sim.door.open(+level: L.Level, +sector: U32) -> Thinker:
+  Sim.mover.new(sector, True{}, 131072, [Travel{False{}, Sim.door.top(level, sector)}])
+
+# Doom's turboLower: 4 a tic down to the highest floor around, plus 8
+# when that is not the floor's own height. A travel down to a height
+# above lands at once, as Doom's does.
+def Sim.floor.turbo.to(+highest: U32, own: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(highest, own), highest, (highest + 524288 : U32))
+
+def Sim.floor.turbo(+level: L.Level, +sector: U32) -> Thinker:
+  Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.floor.turbo.to(Sim.extreme(~F.Fixed.max,
+    Sim.around(level, sector), level, False{}, 4262199296), L.Level.floor(level, sector))}])
+
+# Doom's P_CrossSpecialLine for the specials E1M1 carries, both once
+# only: the line's special goes whether or not a sector started.
+def Sim.cross.special(special: U32, +line: U32, +s: State) -> State:
+  match special:
+    case 2:
+      Sim.once(line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
+    case 36:
+      Sim.once(line, Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s))
+    case _:
+      s
+
+# The lines the player's moves crossed this tic, each by the special it
+# has when its turn comes.
+def Sim.cross(lines: List<&2, U32>, +s: State) -> State:
+  match lines:
+    case []:
+      s
+    case +line <> rest:
+      Sim.cross(rest, Sim.cross.special(L.Level.special(State.level(s), line), line, s))
 
 # Use
 # ---
@@ -1184,11 +1264,12 @@ def Sim.use(press: Bool, +p: Player, +s: State) -> State:
 def Sim.pressed(cmd: K.Cmd, usedown: Bool) -> Bool:
   Bool.and(K.Cmd.use(cmd), Bool.not(usedown))
 
-# The player as moved, at the height, floor and ceiling a mover left.
+# The player as moved, at the height, floor and ceiling a mover left,
+# the lines it crossed fired and forgotten.
 def Player.stood(moved: Player, +q: Player) -> Player:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz} = moved
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed} = moved
   Player{x, y, Player.z(q), angle, momx, momy, momz, Player.floorz(q), Player.ceilz(q), viewheight,
-    deltaview, viewz}
+    deltaview, viewz, []}
 
 # What a live tic keeps of the state it began with, whatever the
 # thinkers did: the geometry, so no tic writes a wall, and the place the
@@ -1199,8 +1280,9 @@ def Sim.tic.kept(geo: L.Level.Geo, moved: Player, clock: U32, use: Bool, +after:
     use}
 
 # One tic in Doom's order: the player thinks (the move, the eye, then
-# use on the press), the XY and the vertical movement, the thinkers in
-# the order they were started, the clock. An ended level stands still.
+# use on the press), the XY and the vertical movement, the lines that
+# movement crossed, the thinkers in the order they were started, the
+# clock. An ended level stands still.
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
     case State{player, level, sidetex, thinkers, rnd, clock, True{}, usedown}:
@@ -1209,8 +1291,9 @@ def Sim.tic(+cmd: K.Cmd, s: State) -> State:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = Sim.eye(level, clock, Sim.move(level, cmd, player))
       +moved = Sim.z(Sim.xy(level, cmd, thought))
-      Sim.tic.kept(geo, moved, clock, K.Cmd.use(cmd), Sim.thinkers(Sim.use(Sim.pressed(cmd, usedown),
-        thought, State{moved, level, sidetex, thinkers, rnd, clock, False{}, usedown})))
+      Sim.tic.kept(geo, moved, clock, K.Cmd.use(cmd), Sim.thinkers(Sim.cross(Player.crossed(moved),
+        Sim.use(Sim.pressed(cmd, usedown), thought,
+          State{moved, level, sidetex, thinkers, rnd, clock, False{}, usedown}))))
 
 # A tic for each command of the list, in order: a demo.
 def Sim.replay(script: List<&2, K.Cmd>, s: State) -> State:
