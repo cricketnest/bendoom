@@ -1,6 +1,6 @@
 # 05: The repeat and the render node
 
-**What to build:** `music.bend` renders a WAD's song to two files and the build graph runs it. The render runs the song looping and cuts at the sample where the player's restart callback runs, 5 ms after the last track ends. The first file holds the first pass and the second file the second pass, raw signed 16-bit little-endian mono at 44100 Hz, written with `Bytes.write` chunk by chunk. `nix/music.nix` builds and runs it for one IWAD, and the render's cost is measured.
+**What to build:** `music.bend` renders a WAD's song to two files and the build graph runs it. The render runs the song looping and cuts at the sample where the player's restart callback runs, 5 ms after the last track ends. The first file holds the first pass and the second file the second pass, raw signed 16-bit little-endian stereo at 44100 Hz, written with `Bytes.write` chunk by chunk. `nix/music.nix` builds and runs it for one IWAD, and the render's cost is measured.
 
 **Blocked by:** 03 (Freedoom's first pass matches), and the demo recording work on main for `Bytes.write`
 

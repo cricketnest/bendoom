@@ -10,6 +10,7 @@
 - [ ] The chip carries two-operator voices, waveform select, note select, tremolo, vibrato, the envelope generator and its global timer, key scaling, feedback and both connections, and nothing Doom's player does not write
 - [ ] Register writes go through the delay buffer of `OPL3_WriteRegBuffered`, and output goes through `OPL3_GenerateResampled`
 - [ ] The player's chip setup and note start follow `i_oplmusic.c` for the Doom 1.9 driver in OPL2 mode, at music volume 8
-- [ ] The opening's samples equal the capture's after the idle lead; the count of differing samples is recorded, target zero
+- [ ] How much of the capture's 4536-frame lead is idle chip, and how much is the song's scheduling and the first note's attack, is worked out from Chocolate Doom's source and recorded
+- [ ] The opening's left and right samples equal the capture's after the idle lead; the count of differing samples is recorded, target zero
 - [ ] The chip's samples a second against real time are measured natively on the dev machine and recorded; below a tenth of real time, the ticket stops and brings the number to the maintainer
 - [ ] A test in the flake check renders the opening on both lanes and prints a hash and sampled values taken from the capture in nushell

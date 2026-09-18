@@ -1,6 +1,6 @@
 # 06: The game plays the music
 
-**What to build:** The game streams its package's render to `Audio`. It opens `Audio` at 44100 Hz when its loop starts. Each frame a write of no samples reads the queue, and the game reads enough frames from the current file to bring the queue to 3072 frames, each sample an F32 over 32768 on both channels. It plays the first pass once, then the second pass forever by opening it again at its end. The wrapper defaults `BENDOOM_MUSIC` beside `BENDOOM_IWAD`, and the dev shell sets it to Freedoom's render. A missing device or missing files leave the game silent with one line on stderr. The music keeps playing through the level's end and a restart, and quitting closes the device and the file.
+**What to build:** The game streams its package's render to `Audio`. It opens `Audio` at 44100 Hz when its loop starts. Each frame a write of no samples reads the queue, and the game reads enough frames from the current file to bring the queue to 3072 frames, each left and right sample an F32 over 32768. It plays the first pass once, then the second pass forever by opening it again at its end. The wrapper defaults `BENDOOM_MUSIC` beside `BENDOOM_IWAD`, and the dev shell sets it to Freedoom's render. A missing device or missing files leave the game silent with one line on stderr. The music keeps playing through the level's end and a restart, and quitting closes the device and the file.
 
 **Blocked by:** 05 (The repeat and the render node)
 
