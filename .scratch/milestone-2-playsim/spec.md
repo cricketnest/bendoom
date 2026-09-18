@@ -1,6 +1,6 @@
 # Milestone 2: the playsim, one player, no monsters
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
@@ -59,7 +59,7 @@ Add the playsim for one player and no monsters: E1M1's map data loaded from the 
 
 ## Testing Decisions
 
-- A good test drives the program at its own boundary and checks what it prints, never how it got there. The sim test loads the real E1M1 through the same loader the game uses, runs a scripted command list through the same step the game uses, and prints position and angle in map units. Expected values are pinned after a hand check against Doom's known constants (start at 1056, -3616 facing east; walk thrust 25 per tic; friction 0.90625).
+- A good test drives the program at its own boundary and checks what it prints, never how it got there. The sim test loads the real E1M1 through the same loader the game uses, runs a scripted command list through the same step the game uses, and prints position and angle in map units. The flake check runs against Freedoom, whose first map differs from the shareware E1M1, so expected values are pinned to Freedoom; the shareware numbers (start at 1056, -3616 facing 90, north; walk thrust 25 per tic; friction 0.90625) are checked by hand once and noted in the ticket.
 - Prior art is the WAD directory test: a main whose output must match its trailing `#|` lines, run under BENDOOM_IWAD, on both lanes.
 - Laws are the other check: universal ones over all command lists and all positions in LAWS.bend, closed sanity ones evaluated by the checker, all filled in PROOF.bend so the flake check gates them.
 - The fixed-point and lump modules get no tests of their own beyond closed laws; they are exercised through the sim test.
@@ -72,6 +72,6 @@ Rendering walls, floors or the sky; doors, lifts, switches and the exit; things 
 ## Further Notes
 
 - Every complete Doom rewrite that reports on it names the renderer's shared state and 32-bit fixed-point semantics as the two hardest parts. This milestone takes on the second one deliberately and early, in the sim, where laws can hold it.
-- Bend constraints that shape all the code, learned in milestone 1: helpers before callers; no tuple pattern on a call result; the shrinking argument first in a recursive call; no mutual recursion; lists need the reusable quantity to be read twice; rewrites replace the right side of an equation by the left.
+- The Bend constraints that shape all the code are in `docs/bend.md`.
 - The wall law is only as strong as the "free" predicate. The second law is what gives it teeth, and its proof is the risky part of this milestone.
-- Open question for the maintainer: the single test seam (scripted tic commands through the sim over the real E1M1, printing position and angle) plus laws. Confirm or change before issues are cut.
+- Delivered with three cuts, each argued in its ticket's comments: the universal fixed-point laws (multiply by one, commutativity, the split-word product) are closed sample laws, since the checker has no word arithmetic library (02); the level is a record of copyable trees rather than linear arrays, so the step takes it by copy (06); the slide's traces gather lines by the trace's box of cells, not Doom's stepping walk (13). The slow turn lasts Doom's five tics, not two (05).

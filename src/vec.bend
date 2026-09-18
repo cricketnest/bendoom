@@ -1,0 +1,80 @@
+# A copyable array of U32: a complete binary tree of 2^d leaves, Data
+# like everything the sim reads, indexed in d steps. The low bit of an
+# index picks the child, so a lookup needs no depth, and a tree is built
+# from a list by splitting it into its even and odd positions.
+import Base
+
+type Vec is Data:
+  Leaf{x: U32}
+  Node{l: Vec, r: Vec}
+
+def Vec.odd(+i: U32) -> Bool:
+  U32.is_eq((i .&. 1 : U32), 1)
+
+# The child is chosen by a bit passed in, computed for the next level
+# beside the shifted index, so the recursion descends on the tree alone.
+def Vec.get.go(v: Vec, odd: Bool, +i: U32) -> U32:
+  match v odd:
+    case Leaf{x} _:
+      x
+    case Node{l, r} False{}:
+      Vec.get.go(l, Vec.odd((i >> 1n : U32)), (i >> 1n : U32))
+    case Node{l, r} True{}:
+      Vec.get.go(r, Vec.odd((i >> 1n : U32)), (i >> 1n : U32))
+
+def Vec.get(v: Vec, +i: U32) -> U32:
+  Vec.get.go(v, Vec.odd(i), i)
+
+def Vec.split.cons(h: U32, p: List<&2, U32> & List<&2, U32>) ->
+  List<&2, U32> & List<&2, U32>:
+  (o, e) = p
+  (h <> e, o)
+
+# The elements at even positions beside those at odd ones.
+def Vec.split(xs: List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
+  match xs:
+    case []:
+      ([], [])
+    case h <> t:
+      Vec.split.cons(h, Vec.split(t))
+
+def Vec.head(xs: List<&2, U32>) -> U32:
+  match xs:
+    case []:
+      0
+    case h <> t:
+      h
+
+def Vec.of.go(d: Nat, eo: List<&2, U32> & List<&2, U32>) -> Vec:
+  match d:
+    case 0n:
+      (e, o) = eo
+      Leaf{Vec.head(e)}
+    case 1n++p:
+      (e, o) = eo
+      Node{Vec.of.go(p, Vec.split(e)), Vec.of.go(p, Vec.split(o))}
+
+def Vec.depth.go(fuel: Nat, +n: U32, +size: U32, d: Nat, done: Bool) -> Nat:
+  match fuel done:
+    case _ True{}:
+      d
+    case 0n _:
+      d
+    case 1n+f False{}:
+      Vec.depth.go(f, n, (size * 2 : U32), 1n+d, U32.is_ge((size * 2 : U32), n))
+
+# The least depth whose leaves hold n elements.
+def Vec.depth(+n: U32) -> Nat:
+  Vec.depth.go(32n, n, 1, 0n, U32.is_ge(1, n))
+
+# The n elements of xs as a tree; missing ones read as zero.
+def Vec.of_list(xs: List<&2, U32>, n: U32) -> Vec:
+  Vec.of.go(Vec.depth(n), Vec.split(xs))
+
+# Every element shifted left by sixteen: a map coordinate as fixed point.
+def Vec.fixed(v: Vec) -> Vec:
+  match v:
+    case Leaf{x}:
+      Leaf{(x << 16n : U32)}
+    case Node{l, r}:
+      Node{Vec.fixed(l), Vec.fixed(r)}

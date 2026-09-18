@@ -1,6 +1,6 @@
-# Every tests/*.bend, built native and run against Freedoom; its output
-# must equal its trailing #| lines.
-{ lib, llvmPackages_19, bend, freedoom }:
+# Every tests/*.bend, run against Freedoom on both lanes, native and
+# JS; its output must equal its trailing #| lines on each.
+{ lib, llvmPackages_19, bend, bun, freedoom }:
 
 llvmPackages_19.stdenv.mkDerivation {
   pname = "bendoom-tests";
@@ -11,7 +11,7 @@ llvmPackages_19.stdenv.mkDerivation {
     fileset = lib.fileset.unions [ ../src ../tests ];
   };
 
-  nativeBuildInputs = [ bend ];
+  nativeBuildInputs = [ bend bun ];
 
   BENDOOM_IWAD = "${freedoom}/share/games/doom/freedoom1.wad";
 
@@ -20,10 +20,13 @@ llvmPackages_19.stdenv.mkDerivation {
     export HOME=$TMPDIR
     for t in tests/*.bend; do
       name=$(basename $t .bend)
-      bend $t -o $name
       sed -n 's/^#|//p' $t > $name.want
-      ./$name > $name.got
-      diff $name.want $name.got && echo "PASS $name"
+      bend $t -o $name
+      ./$name > $name.native.got
+      diff $name.want $name.native.got && echo "PASS $name native"
+      bend $t -o $name.js
+      bun $name.js > $name.js.got
+      diff $name.want $name.js.got && echo "PASS $name js"
     done
     runHook postBuild
   '';

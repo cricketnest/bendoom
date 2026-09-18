@@ -33,3 +33,7 @@ Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, 
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Bend constraints
+
+Read `docs/bend.md` before writing Bend code or proofs: what the checker refuses, and the shapes that pass.

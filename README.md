@@ -16,7 +16,8 @@ Bend itself is built from its source in the flake, pinned to one commit,
 with no self-updating launcher and no telemetry.
 
 Tests are `.bend` files under `tests/` whose trailing `#|` lines are the
-expected output. Specs live under `.scratch/`.
+expected output, run natively and on the JS lane. Specs live under
+`.scratch/`; the Bend constraints the code lives by are in `docs/bend.md`.
 
 ## Milestones
 
@@ -26,7 +27,7 @@ The reference for how anything looks or behaves is vanilla Doom: the
 for bug.
 
 1. WAD loads, directory parses, a window opens. Done.
-2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law.
+2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law. Done.
 3. Walls, then floors, ceilings and sky.
 4. Doors, the lift, switches, the exit: E1M1 completable, no enemies.
 5. Things: decorations, items, pickups, sprites.
