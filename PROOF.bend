@@ -295,6 +295,9 @@ def Laws.turbo_floor_crossed():
 def Laws.lift_timeline():
   {==}
 
+def Laws.floor_lowered():
+  {==}
+
 def Laws.lift_crushed():
   {==}
 

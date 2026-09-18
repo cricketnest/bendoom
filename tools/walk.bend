@@ -10,7 +10,6 @@
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
-import ../src/vec.bend as V
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L

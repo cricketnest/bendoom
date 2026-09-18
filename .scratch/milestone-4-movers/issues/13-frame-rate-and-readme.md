@@ -32,3 +32,20 @@ The door runs are the bench with `SCRIPT` set to the route's first 160 tics and 
 **The oracle counts of tickets 02 to 12.** Every count is 0, or has its cause beside it and a 0 once the cause was gone: ticket 02's airborne and landing frames (the lift, 0 in ticket 08), ticket 05's 163 and ticket 07's 11312 (an animation's phase, 0 with the idle and 0 without it after ticket 11), ticket 12's route landmarks (0 without idles now), and the frames after the exit, where vanilla has left the level.
 
 The spec's status stays open with ticket 12, which waits for the maintainer to play both maps to the exit in the window.
+
+**The code review** (`/code-review` since `cecf33f`, a standards and a spec reviewer in parallel). The spec reviewer found the sim vanilla's in tic order, `T_MovePlane`, the door, lift and floor timings, the crush paths, use, the triggers, the lights, the animation phase and the exit clock. Fixed from the two reports:
+
+- Special 48 scrolled both sides of its line; vanilla's `P_UpdateSpecials` moves `sidenum[0]` alone. The shareware map's eight are two-sided. `Level.seg.scroll` now asks the seg's side; the pedestal still reports 0 at 21 and 27 tics.
+- The spec's closed law on special 23's destination was missing; `floor_lowered` pins it on the switched literal level (`Closed.switched(special)`, which the lift law now shares): -1 after tic 1, -32 after tic 32, both thinkers gone on tic 33, the door sector landing at once, the special gone.
+- `Sim.use.insert` recursed through a `Bool.pick` on both arms, the same trap as the frame rate's; it takes whether the meet goes first as a parameter now.
+- Three unused imports; the side textures built twice at load; `Vec.set`'s comment, which now says a leaf standing for many indices takes the value for all of them; the sim and render tests' headers, which restated the tickets' numbers and are now a paragraph each.
+
+Left, with the reason:
+
+- The random index starts at 1, not the spec's 0: 1 is vanilla's once it has spawned the player (ticket 10).
+- Buttons count down among the thinkers, not after them; no thinker reads a side texture, so the order cannot be seen (ticket 08).
+- A door's way down is fixed when it starts, where vanilla reads the sector's floor each tic; no floor under a door moves in either E1M1, so the two cannot differ on them, and a map where they would is a map with a mover no E1M1 carries.
+- A second use on an open-and-stay door that sends it down, and the switch slot order when a side names two switches, differ from vanilla only where neither map goes (tickets 04 and 06).
+- The repeatable switch's button is pinned by `lift_timeline` and not the sim test, since Freedoom's special 62 lines name no switch texture.
+- The route is its own test file rather than lines of the sim test: 585 tics of one script read better alone.
+- The smells the standards reviewer named as judgement calls (the mover's fields threaded as parameters, the Geo record spelled in every accessor, the test helpers repeated across test files, the closed laws' repeated setups) are the shapes `docs/bend.md` pushes toward: a record opened in the def that uses it, no shared test module the flake's test runner would build as a test. None hides a branch.

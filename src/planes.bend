@@ -6,7 +6,6 @@
 # each plane is then drawn as spans, a row's span running as far as the
 # plane's columns hold that row, or as columns of the sky.
 import Base
-import ./vec.bend as V
 import ./bytes.bend as B
 import ./fixed.bend as F
 import ./angle.bend as A

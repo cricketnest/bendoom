@@ -1,56 +1,23 @@
 # E1M1 from the WAD named by BENDOOM_IWAD, loaded by the game's loader,
-# and two scripted walks through the game's step: the player 1 start,
-# then the position, facing, height, floor and eye above the floor after
-# each run of held keys (U up, D down, L left, R right, A strafe left,
-# S strafe right, ! run). The level is alive under both: the first walk
-# turns on the lift its run called and rides it into the pit. The second
-# runs east across that lift (sector 98, called by the line on its west
-# edge) and off its east edge: the last tic on the lowering lift, the
-# first two airborne tics (double gravity, then single), the landing in
-# the pit with its dip, and the view recovered.
-# Freedoom's first map is not id's: the shareware start is 1056, -3616
-# facing 90, and its first tic forward lands at 1055.999694, -3615.218765.
-# Then the movers, as runs of one command in a demo's units from a
-# place, each line with the clock, the thinkers running and a sector's
-# floor and ceiling. The first door, sector 10, used from the pit south
-# of it: its ceiling on the tics worked out by hand in milestone 4's
-# ticket 04 from the WAD and vanilla's constants (-126 on the tic of the
-# use, -4 61 tics on, the wait, -6 on the 214th, shut on the 275th, its
-# thinker gone on the 276th); a use while it closes and one while it
-# waits; use held down for 300 tics, which opens it once; a walk through
-# it while open, where the first walk stopped at its shut face; a stand
-# in the doorway through the wait, where the door comes down to the
-# player's head at -72 on the 247th tic after the use, is blocked on the
-# 248th and goes back up (ticket 05's hand computation); and the blue
-# key door, which refuses. Then Freedoom's special 23 switch from before it:
-# its tag's three blocks lowered to the floors and on the tics of ticket
-# 06's hand computation (144 on the 120th tic after the use, 136 on the
-# 128th and the 136th, each thinker gone a tic later), and a second use,
-# which starts nothing. Then a walk east over a special 2 line: sector
-# 145's ceiling 2 up on the tic of the crossing, at its top of 260 on the
-# 62nd and its thinker gone on the 63rd (ticket 07's hand computation),
-# and the walk back over the line, which starts nothing. Then the lift:
-# called by the run over its west line and ridden, its floor 8 on the
-# tic of the crossing, -124 on the 34th, the wait, -120 on the 141st, 12
-# on the 174th and its thinker gone on the 175th (ticket 08's hand
-# computation), the eye 45 over the floor going down and 37 going up,
-# a tic behind it; then called by its switch from the pit, a use while
-# it runs, which starts nothing, and one once it is back, which calls it
-# again. Then the exit switch,
-# line 407, from before it (ticket 09's hand computation): use on a
-# level's first tic does nothing, as Doom starts a player with use counted
-# as down; the use on tic 21 ends the level, the clock counted and the
-# line's special gone; ten tics of walking with use held change nothing.
-# Then the lights from the start, idle: the random blinks of
-# sectors 32, 33 and 48, which draw from one table in sector order, and
-# the slow strobe of sector 90, on the tics of ticket 10's hand
-# computation from the WAD and vanilla's random table. The heights,
-# lights and tics are the hand computation's; the positions are
-# regression pins. The thinkers count the level's nine lights too.
+# and scripted runs through the game's step. First two walks from the
+# player 1 start, the position, facing, height, floor and eye above the
+# floor after each run of held keys (U up, D down, L left, R right, A
+# strafe left, S strafe right, ! run): the first turns on the lift its
+# run called and rides it into the pit; the second runs across that
+# lift and off its east edge into the fall and the landing. Freedoom's
+# first map is not id's: the shareware start is 1056, -3616 facing 90.
+# Then the movers and the lights, as runs of one command in a demo's
+# units from a place, each line with the clock, the thinkers running
+# and chosen sectors' floors and ceilings: the first door used, turned
+# twice, held, walked through and closed on the player; the special 23
+# switch; a special 2 line crossed both ways; the lift called by its
+# line and by its switch; the blue key door refusing; the exit switch;
+# the blinks and the strobe from the start. The heights, lights and
+# tics are the hand computations in milestone 4's tickets 04 to 10; the
+# positions are regression pins.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
-import ../src/vec.bend as V
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L

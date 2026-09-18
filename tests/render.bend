@@ -3,31 +3,20 @@
 # view's 320 by 168 palette indices and the indices at four pixels (the
 # view's centre, near its top left, near its bottom right, and high on
 # its centre column). The start, then hand-chosen places with the eye at
-# rest on the floor and the angle a multiple of 45 degrees, so that
-# Chocolate Doom can stand in the same spot (tools/oracle.nu finds no
-# pixel of any of them differing from its frame): a bright metal wall,
-# the dim bench room north of the start, the hazard-striped step under
-# the computer panels, the lowered opening west of the start with the
-# grate of a masked middle texture across it and the sky behind, the
-# hall under a ceiling of water, the yard under the open sky beside a
-# wall of the sky's own texture, and the railed pit under the ledge.
-# Then three frames from the sim's run east over the lift its west line
-# calls, which no player start can express: mid-stride with the eye
-# bobbing, riding the lift down, and ten tics on, off its east edge. Then frames the movers
-# make, each after a script from a place, the oracle's zero recorded in
-# milestone 4's tickets: the first door half open, 21 tics after its use
-# (832 384 90, "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0"); the special 23
-# switch pressed, 28 tics after its use (2064 -260 90, "20,0,0,0,0
-# 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0"); the exit switch pressed and the
-# level ended, which vanilla never stands in: the frame is pixel for
-# pixel ours of a map whose side names the pressed switch, which the
-# oracle finds no pixel off (ticket 09; -352 1296 180, "20,0,0,0,0
-# 1,0,0,0,1 10,0,0,0,0"); the wall of sector 33, which blinks at random,
-# at its dark level on tic 66 (640 712 180, "66,0,0,0,0"); the hall under
-# the water again after 20 idle tics (3 256 0, "20,0,0,0,0"), when the
-# ceiling shows FWATER4 where the map names FWATER1. Each frame is drawn
-# twice, over a view blanked to 0 and to 255: equal hashes mean every
-# pixel of the view was written. Pinned to Freedoom.
+# rest on the floor and the angle a multiple of 45 degrees: a bright
+# metal wall, the dim bench room north of the start, the hazard-striped
+# step under the computer panels, the lowered opening west of the start
+# with a masked grate across it, the hall under a ceiling of water, the
+# yard under the open sky, and the railed pit. Then frames after
+# scripts, which the oracle plays too: a stride, riding the lift down,
+# off its east edge, the first door half open, the special 23 switch
+# pressed, the exit switch pressed, a blinking wall at its dark level,
+# and the water on a later frame of its cycle. tools/oracle.nu finds no
+# pixel of any of them off vanilla's, bar the exit, which vanilla never
+# stands in (milestone 4's ticket 09 compares it another way); each
+# script is beside its frame below. Each frame is drawn twice, over a
+# view blanked to 0 and to 255: equal hashes mean every pixel of the
+# view was written. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F

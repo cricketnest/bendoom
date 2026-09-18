@@ -1380,22 +1380,32 @@ def Sim.Meet.frac(m: Sim.Meet) -> U32:
   Meet{frac, line} = m
   frac
 
-# A meet into a list sorted by fraction, after its equals, so the first
-# gathered of equals stays first, as Doom picks them.
-def Sim.use.insert(+m: Sim.Meet, sorted: List<&2, Sim.Meet>) -> List<&2, Sim.Meet>:
+# Whether a meet goes before a sorted list's head: nearer than it, or
+# the list empty.
+def Sim.use.before(+m: Sim.Meet, sorted: List<&2, Sim.Meet>) -> Bool:
   match sorted:
     case []:
-      [m]
-    case +h <> +rest:
-      Bool.pick(List<&2, Sim.Meet>, U32.is_lt(Sim.Meet.frac(m), Sim.Meet.frac(h)), m <> h <> rest,
-        h <> Sim.use.insert(m, rest))
+      True{}
+    case h <> rest:
+      U32.is_lt(Sim.Meet.frac(m), Sim.Meet.frac(h))
 
-def Sim.use.sort(meets: List<&2, Sim.Meet>, sorted: List<&2, Sim.Meet>) -> List<&2, Sim.Meet>:
+# A meet into a list sorted by fraction, after its equals, so the first
+# gathered of equals stays first, as Doom picks them.
+def Sim.use.insert(sorted: List<&2, Sim.Meet>, before: Bool, +m: Sim.Meet) -> List<&2, Sim.Meet>:
+  match sorted before:
+    case _ True{}:
+      m <> sorted
+    case [] False{}:
+      [m]
+    case h <> +rest False{}:
+      h <> Sim.use.insert(rest, Sim.use.before(m, rest), m)
+
+def Sim.use.sort(meets: List<&2, Sim.Meet>, +sorted: List<&2, Sim.Meet>) -> List<&2, Sim.Meet>:
   match meets:
     case []:
       sorted
-    case m <> rest:
-      Sim.use.sort(rest, Sim.use.insert(m, sorted))
+    case +m <> rest:
+      Sim.use.sort(rest, Sim.use.insert(sorted, Sim.use.before(m, sorted), m))
 
 # Doom's P_UseLines, on the press: a trace of 64 units along the facing.
 def Sim.use(press: Bool, +p: Player, +s: State) -> State:

@@ -675,15 +675,15 @@ def Gfx.Asm.cols(asm: Gfx.Asm) -> V.Vec:
 def Gfx.build(a: Array<U32>, base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>,
   plumps: List<&2, W.Wad.Lump>, +asm: Gfx.Asm) -> Array<U32> & Gfx & L.Level:
   Base{level, +fl, pal, cmap, flats, anims} = base
+  +sidetex = V.Vec.of(Gfx.Names.numbers(tn))
   (Gfx.pastes(Gfx.Asm.pastes(asm), Gfx.Copy.dst(Gfx.copies(
       Job{Gfx.lump.pos(cmap), Gfx.colormap(), 8704} <> List.append(&2, Gfx.Job,
         Gfx.jobs(Gfx.flat.lumps(flats), Gfx.lumps()), Gfx.jobs(plumps, Gfx.last(fbases))),
       Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, 256n, 3, Gfx.lump.pos(pal), Gfx.palette(),
         Copy{a, Array.new(U32, V.Vec.depth((Gfx.Asm.comp(asm) + 128 : U32)), 0)})))),
     Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
-      Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), V.Vec.of(Gfx.Names.numbers(tn)),
-      Gfx.Names.number(tn, "SKY1"), anims},
-    L.Level.textured(level, V.Vec.of(Gfx.Names.numbers(tn)),
+      Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"), anims},
+    L.Level.textured(level, sidetex,
       Gfx.switch.table(Gfx.switch.pairs(), tn, V.Vec.of_list([], Gfx.Names.next(tn)))))
 
 # The flats end where the patches start, the patches where the composed

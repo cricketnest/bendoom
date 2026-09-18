@@ -26,7 +26,8 @@ def Vec.get(v: Vec, +i: U32) -> U32:
   Vec.get.go(v, Vec.odd(i), i)
 
 # The tree with x at index i, the nodes off the path shared with the
-# old tree.
+# old tree. A leaf standing for many indices, as a lump of zeros does,
+# takes x for all of them.
 def Vec.set.go(v: Vec, odd: Bool, +i: U32, x: U32) -> Vec:
   match v odd:
     case Leaf{y} _:

@@ -173,12 +173,13 @@ def Level.tag(+l: Level, line: U32) -> U32:
   Level.word(specials, line, 2, 1)
 
 # Doom's line special 48, which P_UpdateSpecials moves a unit left each
-# tic: how far a seg's wall has scrolled after clock tics, in fixed
-# point.
-def Level.seg.scroll(+l: Level, seg: U32, clock: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+# tic on the line's front side: how far a seg's wall has scrolled after
+# clock tics, in fixed point.
+def Level.seg.scroll(+l: Level, +seg: U32, clock: U32) -> U32:
+  Level{Geo{lines, sides, verts, +segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
-  F.Fixed.of_map((clock * Bool.to_u32(U32.is_eq(Level.special(l, Level.word(segs, seg, 6, 3)), 48)) : U32))
+  F.Fixed.of_map((clock * Bool.to_u32(Bool.and(U32.is_eq(Level.special(l, Level.word(segs, seg, 6, 3)), 48),
+    U32.is_zero(Level.word(segs, seg, 6, 4)))) : U32))
 
 def Level.nlines(+l: Level) -> U32:
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},

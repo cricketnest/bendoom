@@ -413,16 +413,19 @@ law turbo_floor_crossed:
     == ((1572864, 786432, 1572864), (1572864, 524288, 1572864), [], 0, [], 36)
     : (U32 & U32 & U32) & (U32 & U32 & U32) & List<&2, S.Thinker> & U32 & List<&2, S.Thinker> & U32}
 
-# The literal level for the lift: the door sector's floor at -32 and its
-# ceiling at 128, line 0 a lift's switch (special 62; its tag 0 is every
-# sector), its front's middle texture 1, a switch whose partner is 2,
-# and the blockmap's origin 48 east, so the west room's player at
-# (32, 64) is in no block box.
-def Closed.lifts() -> S.State:
+# The literal level for the switched movers: the door sector's floor at
+# -32 and its ceiling at 128, line 0 a switch of the given special (its
+# tag 0 is every sector), its front's middle texture 1, a switch whose
+# partner is 2, and the blockmap's origin 48 east, so the west room's
+# player at (32, 64) is in no block box.
+def Closed.switched(special: U32) -> S.State:
   S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728), 1, False{},
-      4292870144), 1, True{}, 8388608), 0, 62), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
+      4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
     V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
+
+def Closed.lifts() -> S.State:
+  Closed.switched(62)
 
 def Closed.seen(+s: S.State) -> U32 & U32:
   (L.Level.floor(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2))
@@ -451,6 +454,24 @@ law lift_timeline:
       (4292870144, 2), (4292870144, 2), (4292870144, 1), (4292870144, 1), (4293132288, 1), (0, 1), [])
     : List<&2, S.Thinker> & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32)
       & List<&2, S.Thinker>}
+
+# LAW: the switched floor, vanilla's lowerFloorToLowest: 1 a tic down to
+# the lowest floor around, its own included. The use on tic 1 starts
+# the west room and the east room toward the door sector's -32; the door
+# sector is at its lowest already, so its first tic lands and ends it.
+# The west room is -1 after tic 1 and -32 after tic 32; tic 33 would
+# pass it, so it lands and both thinkers end. The switch works once: its
+# line has no special from the first tic (sanity).
+law floor_lowered:
+  {(L.Level.floor(S.State.level(Closed.used(0n, Closed.switched(23))), 0),
+    S.State.thinkers(Closed.used(0n, Closed.switched(23))),
+    L.Level.special(S.State.level(Closed.used(0n, Closed.switched(23))), 0),
+    L.Level.floor(S.State.level(Closed.used(31n, Closed.switched(23))), 0),
+    S.State.thinkers(Closed.used(32n, Closed.switched(23))))
+    == (4294901760, [S.Mover{0, False{}, 65536, [S.Travel{True{}, 4292870144}], [S.Travel{True{}, 4292870144}]},
+      S.Mover{2, False{}, 65536, [S.Travel{True{}, 4292870144}], [S.Travel{True{}, 4292870144}]}], 0,
+      4292870144, [])
+    : U32 & List<&2, S.Thinker> & U32 & U32 & List<&2, S.Thinker>}
 
 # LAW: a lift that rises into a player who does not fit goes back down.
 # The west room's floor at -32 under a ceiling at 40, rising 4 a tic
