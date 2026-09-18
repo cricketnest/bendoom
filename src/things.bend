@@ -1,7 +1,8 @@
-# Doom's info.c and P_SpawnMapThing for the things Bendoom spawns: the
-# definitions of the DoomEd types either E1M1 places, less the monsters
-# and the starts, their spawn states' rows, and the map's THINGS records
-# made the level's first things.
+# Doom's info.c, P_SpawnMapThing and the state half of P_MobjThinker for
+# the things Bendoom spawns: the definitions of the DoomEd types either
+# E1M1 places, less the monsters and the starts, the state rows their
+# spawn states lead to, the map's THINGS records made the level's first
+# things, and a thing's tic through its states.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
@@ -16,32 +17,81 @@ type Thing is Data:
   Thing{id: U32, kind: U32, x: U32, y: U32, z: U32, angle: U32, sector: U32, state: U32, tics: U32}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
-# (0 for A), and its tics, -1 for a state that lasts.
+# (0 for A), whether it is full-bright, its tics, and the row after it.
+# A row of -1 tics lasts, and it stores itself as its next, where
+# vanilla's is S_NULL; no tic reads it, and the sprite load's chase
+# stops there.
 type Thing.Row is Data:
-  Row{sprite: String, frame: U32, tics: U32}
+  Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32}
 
-# The state rows by Bendoom's number: the spawn states of the types
-# below, in their order.
+# The state rows by Bendoom's number: every state the spawn states of the
+# types below lead to, in vanilla's order. None has 0 tics or an action.
 def Thing.rows() -> List<&2, Thing.Row>:
-  [Row{"BKEY", 0, 10}, Row{"BPAK", 0, 4294967295}, Row{"PLAY", 22, 4294967295}, Row{"PLAY", 13, 4294967295},
-    Row{"CELP", 0, 4294967295}, Row{"POSS", 11, 4294967295}, Row{"SPOS", 11, 4294967295},
-    Row{"TROO", 12, 4294967295}, Row{"SARG", 13, 4294967295}, Row{"POL5", 0, 4294967295}, Row{"POL6", 0, 6},
-    Row{"CBRA", 0, 4294967295}, Row{"TRE1", 0, 4294967295}, Row{"SMIT", 0, 4294967295},
-    Row{"ELEC", 0, 4294967295}, Row{"TRE2", 0, 4294967295}, Row{"GOR4", 0, 4294967295},
-    Row{"SHOT", 0, 4294967295}, Row{"MGUN", 0, 4294967295}, Row{"LAUN", 0, 4294967295},
-    Row{"PLAS", 0, 4294967295}, Row{"CSAW", 0, 4294967295}, Row{"CLIP", 0, 4294967295},
-    Row{"SHEL", 0, 4294967295}, Row{"ROCK", 0, 4294967295}, Row{"STIM", 0, 4294967295},
-    Row{"MEDI", 0, 4294967295}, Row{"SOUL", 0, 6}, Row{"BON1", 0, 6}, Row{"BON2", 0, 6}, Row{"ARM1", 0, 6},
-    Row{"ARM2", 0, 6}, Row{"PSTR", 0, 4294967295}, Row{"COLU", 0, 4294967295}, Row{"BAR1", 0, 6},
-    Row{"BROK", 0, 4294967295}, Row{"CELL", 0, 4294967295}, Row{"AMMO", 0, 4294967295},
-    Row{"SBOX", 0, 4294967295}]
+  [Row{"PLAY", 13, False{}, 4294967295, 0}, Row{"PLAY", 22, False{}, 4294967295, 1},
+    Row{"POSS", 11, False{}, 4294967295, 2}, Row{"SPOS", 11, False{}, 4294967295, 3},
+    Row{"TROO", 12, False{}, 4294967295, 4}, Row{"SARG", 13, False{}, 4294967295, 5},
+    Row{"ARM1", 0, False{}, 6, 7}, Row{"ARM1", 1, True{}, 7, 6}, Row{"ARM2", 0, False{}, 6, 9},
+    Row{"ARM2", 1, True{}, 6, 8}, Row{"BAR1", 0, False{}, 6, 11}, Row{"BAR1", 1, False{}, 6, 10},
+    Row{"BON1", 0, False{}, 6, 13}, Row{"BON1", 1, False{}, 6, 14}, Row{"BON1", 2, False{}, 6, 15},
+    Row{"BON1", 3, False{}, 6, 16}, Row{"BON1", 2, False{}, 6, 17}, Row{"BON1", 1, False{}, 6, 12},
+    Row{"BON2", 0, False{}, 6, 19}, Row{"BON2", 1, False{}, 6, 20}, Row{"BON2", 2, False{}, 6, 21},
+    Row{"BON2", 3, False{}, 6, 22}, Row{"BON2", 2, False{}, 6, 23}, Row{"BON2", 1, False{}, 6, 18},
+    Row{"BKEY", 0, False{}, 10, 25}, Row{"BKEY", 1, True{}, 10, 24}, Row{"STIM", 0, False{}, 4294967295, 26},
+    Row{"MEDI", 0, False{}, 4294967295, 27}, Row{"SOUL", 0, True{}, 6, 29}, Row{"SOUL", 1, True{}, 6, 30},
+    Row{"SOUL", 2, True{}, 6, 31}, Row{"SOUL", 3, True{}, 6, 32}, Row{"SOUL", 2, True{}, 6, 33},
+    Row{"SOUL", 1, True{}, 6, 28}, Row{"PSTR", 0, True{}, 4294967295, 34}, Row{"CLIP", 0, False{}, 4294967295, 35},
+    Row{"AMMO", 0, False{}, 4294967295, 36}, Row{"ROCK", 0, False{}, 4294967295, 37},
+    Row{"BROK", 0, False{}, 4294967295, 38}, Row{"CELL", 0, False{}, 4294967295, 39},
+    Row{"CELP", 0, False{}, 4294967295, 40}, Row{"SHEL", 0, False{}, 4294967295, 41},
+    Row{"SBOX", 0, False{}, 4294967295, 42}, Row{"BPAK", 0, False{}, 4294967295, 43},
+    Row{"MGUN", 0, False{}, 4294967295, 44}, Row{"CSAW", 0, False{}, 4294967295, 45},
+    Row{"LAUN", 0, False{}, 4294967295, 46}, Row{"PLAS", 0, False{}, 4294967295, 47},
+    Row{"SHOT", 0, False{}, 4294967295, 48}, Row{"COLU", 0, True{}, 4294967295, 49},
+    Row{"POL5", 0, False{}, 4294967295, 50}, Row{"POL6", 0, False{}, 6, 52}, Row{"POL6", 1, False{}, 8, 51},
+    Row{"GOR4", 0, False{}, 4294967295, 53}, Row{"SMIT", 0, False{}, 4294967295, 54},
+    Row{"CBRA", 0, True{}, 4294967295, 55}, Row{"TRE1", 0, False{}, 4294967295, 56},
+    Row{"TRE2", 0, False{}, 4294967295, 57}, Row{"ELEC", 0, False{}, 4294967295, 58}]
 
 def Thing.row(s: U32) -> Thing.Row:
-  Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, 0})
+  Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, False{}, 0, 0})
 
 def Thing.Row.tics(r: Thing.Row) -> U32:
-  Row{sprite, frame, tics} = r
+  Row{sprite, frame, bright, tics, next} = r
   tics
+
+def Thing.Row.bright(r: Thing.Row) -> Bool:
+  Row{sprite, frame, bright, tics, next} = r
+  bright
+
+def Thing.Row.next(r: Thing.Row) -> U32:
+  Row{sprite, frame, bright, tics, next} = r
+  next
+
+# Doom's P_MobjThinker for a thing that does not move: a lasting state
+# stays as it is; another counts its tics down, and the tic they run out
+# the thing enters the next state for that state's tics.
+def Thing.tic.step(lasting: Bool, out: Bool, thing: Thing) -> Thing:
+  match lasting out thing:
+    case True{} _ _:
+      thing
+    case False{} True{} Thing{id, kind, x, y, z, angle, sector, state, tics}:
+      +next = Thing.Row.next(Thing.row(state))
+      Thing{id, kind, x, y, z, angle, sector, next, Thing.Row.tics(Thing.row(next))}
+    case False{} False{} Thing{id, kind, x, y, z, angle, sector, state, tics}:
+      Thing{id, kind, x, y, z, angle, sector, state, (tics - 1 : U32)}
+
+def Thing.tic(thing: Thing) -> Thing:
+  Thing{id, kind, x, y, z, angle, sector, state, +tics} = thing
+  Thing.tic.step(U32.is_eq(tics, 4294967295), U32.is_eq(tics, 1),
+    Thing{id, kind, x, y, z, angle, sector, state, tics})
+
+# Every thing's tic, in the order they spawned.
+def Thing.tics(things: List<&2, Thing>) -> List<&2, Thing>:
+  match things:
+    case []:
+      []
+    case thing <> rest:
+      Thing.tic(thing) <> Thing.tics(rest)
 
 # A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
 # radius and height in map units, and vanilla's flags: 1 special, 2
@@ -51,17 +101,17 @@ type Thing.Def is Data:
   Def{kind: U32, state: U32, radius: U32, height: U32, flags: U32}
 
 def Thing.defs() -> List<&2, Thing.Def>:
-  [Def{5, 0, 20, 16, 33554433}, Def{8, 1, 20, 16, 1}, Def{10, 2, 20, 16, 0}, Def{12, 2, 20, 16, 0},
-    Def{15, 3, 20, 16, 0}, Def{17, 4, 20, 16, 1}, Def{18, 5, 20, 16, 0}, Def{19, 6, 20, 16, 0},
-    Def{20, 7, 20, 16, 0}, Def{21, 8, 20, 16, 0}, Def{24, 9, 20, 16, 0}, Def{26, 10, 16, 16, 2},
-    Def{35, 11, 16, 16, 2}, Def{43, 12, 16, 16, 2}, Def{47, 13, 16, 16, 2}, Def{48, 14, 16, 16, 2},
-    Def{54, 15, 32, 16, 2}, Def{60, 16, 20, 68, 768}, Def{2001, 17, 20, 16, 1}, Def{2002, 18, 20, 16, 1},
-    Def{2003, 19, 20, 16, 1}, Def{2004, 20, 20, 16, 1}, Def{2005, 21, 20, 16, 1}, Def{2007, 22, 20, 16, 1},
-    Def{2008, 23, 20, 16, 1}, Def{2010, 24, 20, 16, 1}, Def{2011, 25, 20, 16, 1}, Def{2012, 26, 20, 16, 1},
-    Def{2013, 27, 20, 16, 8388609}, Def{2014, 28, 20, 16, 8388609}, Def{2015, 29, 20, 16, 8388609},
-    Def{2018, 30, 20, 16, 1}, Def{2019, 31, 20, 16, 1}, Def{2023, 32, 20, 16, 8388609},
-    Def{2028, 33, 16, 16, 2}, Def{2035, 34, 10, 42, 524294}, Def{2046, 35, 20, 16, 1},
-    Def{2047, 36, 20, 16, 1}, Def{2048, 37, 20, 16, 1}, Def{2049, 38, 20, 16, 1}]
+  [Def{5, 24, 20, 16, 33554433}, Def{8, 43, 20, 16, 1}, Def{10, 1, 20, 16, 0}, Def{12, 1, 20, 16, 0},
+    Def{15, 0, 20, 16, 0}, Def{17, 40, 20, 16, 1}, Def{18, 2, 20, 16, 0}, Def{19, 3, 20, 16, 0},
+    Def{20, 4, 20, 16, 0}, Def{21, 5, 20, 16, 0}, Def{24, 50, 20, 16, 0}, Def{26, 51, 16, 16, 2},
+    Def{35, 55, 16, 16, 2}, Def{43, 56, 16, 16, 2}, Def{47, 54, 16, 16, 2}, Def{48, 58, 16, 16, 2},
+    Def{54, 57, 32, 16, 2}, Def{60, 53, 20, 68, 768}, Def{2001, 48, 20, 16, 1}, Def{2002, 44, 20, 16, 1},
+    Def{2003, 46, 20, 16, 1}, Def{2004, 47, 20, 16, 1}, Def{2005, 45, 20, 16, 1}, Def{2007, 35, 20, 16, 1},
+    Def{2008, 41, 20, 16, 1}, Def{2010, 37, 20, 16, 1}, Def{2011, 26, 20, 16, 1}, Def{2012, 27, 20, 16, 1},
+    Def{2013, 28, 20, 16, 8388609}, Def{2014, 12, 20, 16, 8388609}, Def{2015, 18, 20, 16, 8388609},
+    Def{2018, 6, 20, 16, 1}, Def{2019, 8, 20, 16, 1}, Def{2023, 34, 20, 16, 8388609}, Def{2028, 49, 16, 16, 2},
+    Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
+    Def{2049, 42, 20, 16, 1}]
 
 def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d

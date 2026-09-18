@@ -26,7 +26,12 @@
 # the hand computations in milestone 4's tickets 04 to 10; the blinks'
 # lights, a nushell replay of T_LightFlash over Chocolate Doom's random
 # table from index 254, which from index 2 gives ticket 01's; the
-# positions are regression pins.
+# positions are regression pins. Between the exit and the lights, from
+# the start to tic 36, the state row and tics of a lasting chainsaw, the
+# armour, the blue key, a barrel, an armour bonus, a health bonus and
+# the twitching impaled body: a nushell replay of P_MobjThinker over
+# info.c's states from the spawn's tics, the rows numbered in info.c's
+# order.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -172,6 +177,40 @@ def lights(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
         IO.print("lights tic " ++ U32.show(S.State.clock(s)) ++ lit([32, 33, 48, 90], S.State.level(s)))
         lights(rest, S.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
 
+def phased(hit: Bool, t: H.Thing, rest: String) -> String:
+  match hit:
+    case False{}:
+      rest
+    case True{}:
+      H.Thing{id, kind, x, y, z, angle, sector, state, tics} = t
+      " " ++ U32.show(id) ++ ":" ++ U32.show(state) ++ "/" ++ U32.show(tics)
+
+# The state row and tics of the thing named id.
+def phase(things: List<&2, H.Thing>, +id: U32) -> String:
+  match things:
+    case []:
+      ""
+    case H.Thing{+i, kind, x, y, z, angle, sector, state, tics} <> rest:
+      phased(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, angle, sector, state, tics}, phase(rest, id))
+
+def phases(ids: List<&2, U32>, +things: List<&2, H.Thing>) -> String:
+  match ids:
+    case []:
+      ""
+    case id <> rest:
+      phase(things, id) ++ phases(rest, things)
+
+# Seven things' states after each run of idle tics.
+def states(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
+  match gaps:
+    case []:
+      IO.pure(Unit, Unit{})
+    case n <> rest:
+      do IO<Unit>:
+        IO.print("states tic " ++ U32.show(S.State.clock(s)) ++ phases([2, 6, 87, 24, 121, 144, 172],
+          S.State.things(s)))
+        states(rest, S.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
+
 # A use while the door closes sends it back up; one while it waits
 # starts it down.
 def turned(+closing: S.State) -> IO(Unit):
@@ -228,6 +267,7 @@ def door(+level: L.Level) -> IO(Unit):
     lift(level)
     blue(level)
     exits(level)
+    states([1n, 1n, 1n, 1n, 1n, 8n, 10n, 12n, 1n, 0n], S.State.start(level))
     lights([1n, 34n, 1n, 4n, 1n, 23n, 1n, 1n, 1n, 2n, 2n, 60n, 1n, 2n, 1n, 1n, 1n, 1n, 4n, 1n, 0n], S.State.start(level))
 
 def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
@@ -336,12 +376,12 @@ def main() -> IO(Unit):
 #|things at start 180 random 1
 #|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1
 #|first 2 6 8 9 10 11 12 13 14 15 16 17
-#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 21 tics 4294967295 radius 20 height 16 flags 1
-#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 angle 270.000 sector 130 state 30 tics 5 radius 20 height 16 flags 1
-#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 angle 90.000 sector 153 state 16 tics 4294967295 radius 20 height 68 flags 768
-#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 angle 270.000 sector 35 state 0 tics 3 radius 20 height 16 flags 33554433
-#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 angle 90.000 sector 170 state 6 tics 4294967295 radius 20 height 16 flags 0
-#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 angle 270.000 sector 150 state 32 tics 4294967295 radius 20 height 16 flags 8388609
+#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1
+#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 angle 270.000 sector 130 state 6 tics 5 radius 20 height 16 flags 1
+#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 angle 90.000 sector 153 state 53 tics 4294967295 radius 20 height 68 flags 768
+#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 angle 270.000 sector 35 state 24 tics 3 radius 20 height 16 flags 33554433
+#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 angle 90.000 sector 170 state 3 tics 4294967295 radius 20 height 16 flags 0
+#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 angle 270.000 sector 150 state 34 tics 4294967295 radius 20 height 16 flags 8388609
 #|U:1 -415.218765 256.000289 0.000 z 0.000000 floor 0.000000 eye 41.000015
 #|U!:34 3.282882 256.157440 0.000 z 0.000000 floor 0.000000 eye 33.430175
 #|L:20 137.245544 256.206893 61.523 z -48.000000 floor -48.000000 eye 44.403701
@@ -429,6 +469,16 @@ def main() -> IO(Unit):
 #|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
 #|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
 #|-
+#|states tic 0 2:45/4294967295 6:6/5 87:24/3 24:10/4 121:18/6 144:12/1 172:51/6
+#|states tic 1 2:45/4294967295 6:6/4 87:24/2 24:10/3 121:18/5 144:13/6 172:51/5
+#|states tic 2 2:45/4294967295 6:6/3 87:24/1 24:10/2 121:18/4 144:13/5 172:51/4
+#|states tic 3 2:45/4294967295 6:6/2 87:25/10 24:10/1 121:18/3 144:13/4 172:51/3
+#|states tic 4 2:45/4294967295 6:6/1 87:25/9 24:11/6 121:18/2 144:13/3 172:51/2
+#|states tic 5 2:45/4294967295 6:7/7 87:25/8 24:11/5 121:18/1 144:13/2 172:51/1
+#|states tic 13 2:45/4294967295 6:6/5 87:24/10 24:10/3 121:20/5 144:15/6 172:52/1
+#|states tic 23 2:45/4294967295 6:7/2 87:25/10 24:10/5 121:21/1 144:16/2 172:52/5
+#|states tic 35 2:45/4294967295 6:7/3 87:24/8 24:10/5 121:23/1 144:12/2 172:52/7
+#|states tic 36 2:45/4294967295 6:7/2 87:24/7 24:10/4 121:18/6 144:12/1 172:52/6
 #|lights tic 0 sector 32 176 sector 33 176 sector 48 140 sector 90 192
 #|lights tic 1 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|lights tic 35 sector 32 176 sector 33 176 sector 48 140 sector 90 160

@@ -22,15 +22,18 @@
 # Hurt Me Plenty, and a record west of the origin. Its sprite, SPOSL0
 # between S_START and S_END, is 52 wide with offsets 26 and 20; column
 # 0 is one post at row 16, one texel long, and column 26's first post
-# starts at row 1, 17 long, its column offsets being 216 and 659. Then
-# sprite definitions built from the sprite namespace by the rules of
-# R_InitSpriteDefs and R_InstallSpriteLump, each rotation's lump and 1
-# if mirrored, rotation 1 first. No spawn state of milestone 5 has a
-# rotated frame, so they are read here: PLAY's frame A, whose rotations
-# 2 to 4 are mirrored to 8 to 6 (PLAYA1, PLAYA2A8, PLAYA3A7, PLAYA4A6,
-# PLAYA5 in the WAD); POSS's frame A, eight lumps; SPOS's frame L, one
-# lump for every side; PLAY's frame X, past its last, W; and four
-# namespaces that vanilla refuses, written here.
+# starts at row 1, 17 long, its column offsets being 216 and 659. The
+# twitching impaled body's second state, S_LIVESTICK2, is reached only by
+# animation; its POL6B0 is 28 wide with offsets 15 and 62, where POL6A0's
+# left offset is 14. Of info.c's frames, S_ARM1A's is full-bright and
+# the sergeant's is not. Then sprite definitions built from the sprite
+# namespace by the rules of R_InitSpriteDefs and R_InstallSpriteLump,
+# each rotation's lump and 1 if mirrored, rotation 1 first. No spawn
+# state of milestone 5 has a rotated frame, so they are read here:
+# PLAY's frame A, whose rotations 2 to 4 are mirrored to 8 to 6 (PLAYA1,
+# PLAYA2A8, PLAYA3A7, PLAYA4A6, PLAYA5 in the WAD); POSS's frame A, eight
+# lumps; SPOS's frame L, one lump for every side; PLAY's frame X, past
+# its last, W; and four namespaces that vanilla refuses, written here.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -148,13 +151,17 @@ def thing(+i: U32, t: L.Level.Thing) -> String:
   "thing " ++ U32.show(i) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y) ++ " angle " ++ U32.show(angle)
     ++ " type " ++ U32.show(kind) ++ " options " ++ U32.show(options)
 
-# The sprite of state row 6, the dead former sergeant's: its width and
+# The sprite of state row 3, the dead former sergeant's: its width and
 # offsets, then the header and first texel of column 0's post, the end
 # marker after it, and column 26's first post's header and first texel.
 def sprite(+gfx: G.Gfx) -> List<&2, U32>:
-  +patch = G.Gfx.sprite(gfx, 6, 0, 0)
+  +patch = G.Gfx.sprite(gfx, 3, 0, 0)
   [(patch + 216 : U32), (patch + 217 : U32), (patch + 219 : U32), (patch + 221 : U32), (patch + 659 : U32),
     (patch + 660 : U32), (patch + 662 : U32)]
+
+def sprite.head(+gfx: G.Gfx, +state: U32) -> String:
+  "sprite of state " ++ U32.show(state) ++ " width " ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 0, 1)) ++ " offset "
+    ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 0, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 0, 3))
 
 def installs(vs: List<&2, G.Gfx.Install>) -> List<&2, String>:
   match vs:
@@ -177,19 +184,23 @@ def test(names: List<&2, String>) -> List<&2, W.Wad.Lump>:
     case name <> rest:
       W.Lump{0, 0, name} <> test(rest)
 
+# A row of a sprite's frame; the definition reads nothing else of it.
+def row(sprite: String, frame: U32) -> H.Thing.Row:
+  H.Row{sprite, frame, False{}, 0, 0}
+
 def defs(p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
   (bytes, lumps) = p
   +space = G.Gfx.sprite.space(lumps, False{})
   do IO<Unit>:
-    IO.print("PLAY A " ++ views(G.Gfx.sprite.def(space, H.Row{"PLAY", 0, 0})))
-    IO.print("POSS A " ++ views(G.Gfx.sprite.def(space, H.Row{"POSS", 0, 0})))
-    IO.print("SPOS L " ++ views(G.Gfx.sprite.def(space, H.Row{"SPOS", 11, 0})))
-    IO.print("PLAY X " ++ views(G.Gfx.sprite.def(space, H.Row{"PLAY", 23, 0})))
-    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA1"]), H.Row{"TEST", 0, 0})))
-    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA0"]), H.Row{"TEST", 0, 0})))
+    IO.print("PLAY A " ++ views(G.Gfx.sprite.def(space, row("PLAY", 0))))
+    IO.print("POSS A " ++ views(G.Gfx.sprite.def(space, row("POSS", 0))))
+    IO.print("SPOS L " ++ views(G.Gfx.sprite.def(space, row("SPOS", 11))))
+    IO.print("PLAY X " ++ views(G.Gfx.sprite.def(space, row("PLAY", 23))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA1"]), row("TEST", 0))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA0"]), row("TEST", 0))))
     IO.print(views(G.Gfx.sprite.def(test(["TESTA1", "TESTA2", "TESTA3", "TESTA4", "TESTA5", "TESTA6", "TESTA7"]),
-      H.Row{"TEST", 0, 0})))
-    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTC0"]), H.Row{"TEST", 0, 0})))
+      row("TEST", 0))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTC0"]), row("TEST", 0))))
 
 def blocks(b: L.Level.Box) -> String:
   L.Box{top, bottom, left, right} = b
@@ -213,8 +224,10 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(thing(157, L.Level.thing(level, 157)))
     IO.print(thing(245, L.Level.thing(level, 245)))
     IO.print(thing(42, L.Level.thing(level, 42)))
-    IO.print("sprite of state 6 width " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 0, 1)) ++ " offset "
-      ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 0, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 0, 3)))
+    IO.print(sprite.head(gfx, 3))
+    IO.print(sprite.head(gfx, 52))
+    IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
+      ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -258,7 +271,9 @@ def main() -> IO(Unit):
 #|thing 157 at -416.000000 256.000000 angle 0 type 1 options 7
 #|thing 245 at 1248.000000 224.000000 angle 90 type 19 options 15
 #|thing 42 at -160.000000 1328.000000 angle 225 type 2048 options 23
-#|sprite of state 6 width 52.000000 offset 26.000000 top 20.000000
+#|sprite of state 3 width 52.000000 offset 26.000000 top 20.000000
+#|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
+#|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127

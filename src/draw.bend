@@ -19,9 +19,10 @@ type Draw.Task is Data:
 # column, and its scale at each with the step between; its silhouette (1
 # clips sprites behind it at the bottom, 2 at the top) with the heights
 # it clips below and above; and, a column each from the first, the
-# texture columns of a two-sided middle texture (none without one) and
-# the ceiling and floor clips the range left, which clip what is drawn
-# behind it later.
+# texture columns of a two-sided middle texture (none without one), a
+# column already drawn holding Masked.drawn() instead, and the ceiling
+# and floor clips the range left, which clip what is drawn behind it
+# later.
 type Draw.Wall is Data:
   Wall{seg: U32, x1: U32, x2: U32, scale1: U32, scale2: U32, step: U32, sil: U32, bsil: U32, tsil: U32,
     texcols: List<&2, U32>, tops: List<&2, U32>, bottoms: List<&2, U32>}

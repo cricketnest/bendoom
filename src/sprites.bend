@@ -53,8 +53,9 @@ def Sprites.rotation(seen: U32, facing: U32) -> U32:
 # four times its depth, or its patch's edges, placed by its offsets and
 # scaled, fall wholly off the screen. The columns are held to the
 # screen, and the patch's fraction starts that far in, from its last
-# column stepping back for a mirrored patch. Its sector's light, with no
-# fake contrast, and its scale pick the colormap.
+# column stepping back for a mirrored patch. A full-bright frame takes
+# the first colormap; another's is picked by its sector's light, with no
+# fake contrast, and its scale.
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, thing: H.Thing,
   rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
   P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
@@ -78,7 +79,8 @@ def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, thin
       Bool.and(F.Fixed.le(x1, 320), F.Fixed.ge(x2, 0)))),
     Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32),
       (Bool.pick(U32, flip, (width - 1 : U32), 0) + step * (first - x1) : U32), step,
-      G.Gfx.sprite(gfx, state, rot, 0), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale),
+      G.Gfx.sprite(gfx, state, rot, 0), Bool.pick(U32, U32.is_eq(G.Gfx.sprite(gfx, state, rot, 5), 1),
+        G.Gfx.colormap(), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale)),
       rank, id},
     rest)
 

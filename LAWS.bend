@@ -284,18 +284,18 @@ law step_up_dip:
 # blockmap's origin is a parameter: at 0 a player in the west room is in
 # the one cell, so a mover re-clips it; moved east, the player is in no
 # sector's block box, and a long replay costs the checker no position
-# check.
-def Closed.level(ox: U32) -> L.Level:
+# check. Its THINGS records are a parameter too.
+def Closed.level(ox: U32, things: L.Level.Things) -> L.Level:
   L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
     V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
-    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Things{V.Leaf{0}, 0}, [], [],
+    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, things, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
 
 def Closed.doors() -> L.Level:
-  Closed.level(0)
+  Closed.level(0, L.Things{V.Leaf{0}, 0})
 
 # A player at rest on the floor at 0, under a ceiling.
 def Closed.player(x: U32, y: U32, angle: U32, ceilz: U32) -> S.Player:
@@ -436,8 +436,9 @@ law turbo_floor_crossed:
 # player at (32, 64) is in no block box.
 def Closed.switched(special: U32) -> S.State:
   S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728), 1, False{},
-      4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
+    L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728,
+      L.Things{V.Leaf{0}, 0}), 1, False{}, 4292870144), 1, True{}, 8388608), 0, special),
+      V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
     [], V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
 
 def Closed.lifts() -> S.State:
@@ -678,6 +679,66 @@ law replay_keeps_free:
   for +s: S.State
   for free: Free(s)
   Free(S.Sim.replay(script, s))
+
+# Things
+# ------
+
+# The things' closed laws stand on the literal level with three THINGS
+# records on every skill: player 1's start at (32, 64) in the west room,
+# a health bonus at (16, 32) and green armour at (16, 96). The one
+# subsector's seg is line 0's front, so each stands in the west room, on
+# its floor at 0. Their rows are Bendoom's numbers for info.c's states:
+# S_BON1 12, then S_BON1A to S_BON1E 13 to 17, 6 tics each, then S_BON1
+# again; S_ARM1 6, 6 tics, and S_ARM1A 7, 7 tics, in turn.
+def Closed.stocked() -> S.State:
+  S.State.at(Closed.level(0, L.Things{V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 2014, 7, 16, 96, 0, 2018, 7], 15),
+    3}), L.Start{2097152, 4194304, 0})
+
+# LAW: the spawn's phase, vanilla's P_SpawnMapThing. The player draws
+# the random table's entry 1. The bonus draws entry 2 for P_SpawnMobj,
+# then entry 3, 220, for its first state's tics: 1 + 220 mod 6 = 5. The
+# armour draws entry 4, then entry 5, 241: 1 + 241 mod 6 = 2. The index
+# is 5 (sanity).
+law spawn_phase:
+  {(S.State.things(Closed.stocked()), S.State.rnd(Closed.stocked()))
+    == ([H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 12, 5}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 6, 2}], 5)
+    : List<&2, H.Thing> & U32}
+
+# LAW: one complete cycle of the bonus, vanilla's P_MobjThinker. Its 5
+# tics are down to 1 after tic 4; tic 5 enters S_BON1A for 6; tics 11,
+# 17, 23 and 29 enter the next four states, and tic 35 is back in S_BON1
+# for 6. The armour enters S_ARM1A for 7 on tic 2, S_ARM1 for 6 on tic
+# 9, and so on each 13 tics. No thing draws a random number, and the
+# clock counts 35 (sanity).
+law bonus_cycle:
+  {(S.State.things(Closed.idled(4n, Closed.stocked())), S.State.things(Closed.idled(5n, Closed.stocked())),
+    S.State.things(Closed.idled(11n, Closed.stocked())), S.State.things(Closed.idled(17n, Closed.stocked())),
+    S.State.things(Closed.idled(23n, Closed.stocked())), S.State.things(Closed.idled(29n, Closed.stocked())),
+    S.State.things(Closed.idled(35n, Closed.stocked())), S.State.rnd(Closed.idled(35n, Closed.stocked())),
+    S.State.clock(Closed.idled(35n, Closed.stocked())))
+    == ([H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 12, 1}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 7, 5}],
+      [H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 13, 6}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 7, 4}],
+      [H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 14, 6}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 6, 4}],
+      [H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 15, 6}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 7, 5}],
+      [H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 16, 6}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 6, 5}],
+      [H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 17, 6}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 7, 6}],
+      [H.Thing{1, 2014, 1048576, 2097152, 0, 0, 0, 12, 6}, H.Thing{2, 2018, 1048576, 6291456, 0, 0, 0, 6, 6}], 5, 35)
+    : List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing>
+      & List<&2, H.Thing> & List<&2, H.Thing> & U32 & U32}
+
+# LAW: a thing in a lasting state, of -1 tics, is the same thing after
+# its tic, for every thing.
+law lasting_stays:
+  for id: U32
+  for kind: U32
+  for x: U32
+  for y: U32
+  for z: U32
+  for angle: U32
+  for sector: U32
+  for state: U32
+  {H.Thing.tic(H.Thing{id, kind, x, y, z, angle, sector, state, 4294967295})
+    == H.Thing{id, kind, x, y, z, angle, sector, state, 4294967295} : H.Thing}
 
 # The renderer
 # ------------

@@ -1009,7 +1009,8 @@ def Sim.think(t: Thinker, s: State) -> State:
       Sim.glow(sector, dark, bright, down, s)
 
 # Doom's P_RunThinkers: each in turn, in the order they were started,
-# the state's list being those kept so far.
+# the state's list being those kept so far. The things spawned before
+# the level's lights and movers, so their tics come first.
 def Sim.thinkers.go(todo: List<&2, Thinker>, s: State) -> State:
   match todo:
     case []:
@@ -1019,7 +1020,7 @@ def Sim.thinkers.go(todo: List<&2, Thinker>, s: State) -> State:
 
 def Sim.thinkers(s: State) -> State:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  Sim.thinkers.go(thinkers, State{player, level, things, sidetex, [], rnd, clock, ended, usedown})
+  Sim.thinkers.go(thinkers, State{player, level, H.Thing.tics(things), sidetex, [], rnd, clock, ended, usedown})
 
 # The sectors across a sector's two-sided lines, as Doom's getNextSector
 # answers them line by line: the back of a line whose front is the
@@ -1447,8 +1448,8 @@ def Sim.tic.kept(geo: L.Level.Geo, moved: Player, clock: U32, use: Bool, +after:
 
 # One tic in Doom's order: the player thinks (the move, the eye, then
 # use on the press), the XY and the vertical movement, the lines that
-# movement crossed, the thinkers in the order they were started, the
-# clock. An ended level stands still.
+# movement crossed, the things through their states, the thinkers in
+# the order they were started, the clock. An ended level stands still.
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
     case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown}:
