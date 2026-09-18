@@ -54,12 +54,13 @@ def main [
       ^chocolate-doom -iwad $wad -config default.cfg -extraconfig chocolate-doom.cfg -warp 1 1 -nomonsters -nosfx e> ($dir | path join stderr) | ignore
     }
   }
+  mut first: any = null
   try {
     loop {
       sleep 1sec
       if $game not-in (job list | get id) { error make {msg: "Chocolate Doom stopped"} }
       let bytes = if ($capture | path exists) { ls $capture | get 0.size | into int } else { 0 }
-      let first = if $bytes > 0 { open --raw $capture | lead }
+      if $first == null and $bytes > 0 { $first = open --raw $capture | lead }
       if $first == null and $bytes > 10 * 44100 * 4 { error make {msg: "no note in the capture's first 10 s"} }
       if $first != null and $bytes >= ($first + $frames) * 4 { break }
     }
