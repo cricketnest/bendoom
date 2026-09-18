@@ -1206,3 +1206,33 @@ def Laws.key_reach():
 
 def Laws.key_through_door():
   {==}
+
+def Laws.health_bonus():
+  {==}
+
+def Laws.stimpack():
+  {==}
+
+def Laws.medikit():
+  {==}
+
+def Laws.soul_sphere():
+  {==}
+
+def Laws.berserk():
+  {==}
+
+def Laws.armour_bonus():
+  {==}
+
+def Laws.green_armour():
+  {==}
+
+def Laws.blue_armour():
+  {==}
+
+def Laws.bonus_counted_once():
+  {==}
+
+def Laws.strength_counts():
+  {==}

@@ -12,12 +12,19 @@
 # stride, riding the lift down, off its east edge, the first door half
 # open, the special 23 switch pressed, the exit switch pressed, a
 # blinking wall at its dark level, the water on a later frame of its
-# cycle, and the blue key on the tic before the player strafing past it
-# takes it and on the tic it does; each script is beside its frame
-# below. Every frame holds the things E1M1 spawns on Hurt Me Plenty.
+# cycle, the blue key on the tic before the player strafing past it
+# takes it and on the tic it does, a health bonus on a step 24 up on the
+# tic before a walk reaches it and on the tic it does, green armour
+# before and after a walk across it and back, and a stimpack and a
+# medikit before and after the same walk at 100 health, which leaves
+# both; each script is beside its frame below. Every frame holds the
+# things E1M1 spawns on Hurt Me Plenty.
 # tools/oracle.nu finds no pixel off vanilla's in the dark, water, sky,
-# stride, switch, blink and key frames; the key is 44 compared pixels of
-# the first and would be 347 of the second.
+# stride, switch, blink, key, bonus, stimpack and medikit frames. The
+# key is 44 compared pixels of the first and would be 347 of the second;
+# a bonus never taken would be 1465 of the second bonus frame, green
+# armour never taken 2137 of its second frame, and a stimpack and a
+# medikit taken at 100 health 2744 of theirs.
 # The others differ where a thing animates or is full-bright, which
 # ticket 05 brings, or where the big trees behind the grate overlap
 # unsorted, ticket 03's: with the animated and full-bright things taken
@@ -116,6 +123,12 @@ def strafe(n: Nat) -> List<&2, K.Cmd>:
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
 
+def walk(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(25, 0, 0, False{}))
+
+def back(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, False{}))
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
@@ -132,11 +145,11 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), m9)
     m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
     m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
-    m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
-      List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
+    m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n), walk(20n),
+      [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
       at(level, east(832), east(384), 90)), m12)
-    m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n),
-      List.replicate(K.Cmd, 10n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
+    m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n), walk(10n),
+      [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
       at(level, east(2064), west(260), 90)), m13)
     m15 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
       idle(10n)], at(level, west(352), east(1296), 180)), m14)
@@ -147,6 +160,18 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       strafe(12n)], at(level, east(2246), east(592), 180)), m17)
     m19 : Array<U32> <- frame("key after", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 4294967280, False{})],
       strafe(13n)], at(level, east(2246), east(592), 180)), m18)
+    m20 : Array<U32> <- frame("bonus before", tables, gfx, after([idle(20n), walk(18n)],
+      at(level, east(2590), east(780), 90)), m19)
+    m21 : Array<U32> <- frame("bonus after", tables, gfx, after([idle(20n), walk(19n)],
+      at(level, east(2590), east(780), 90)), m20)
+    m22 : Array<U32> <- frame("green armour before", tables, gfx, after([idle(20n)],
+      at(level, east(1631), east(1008), 90)), m21)
+    m23 : Array<U32> <- frame("green armour after", tables, gfx, after([idle(20n), walk(16n), back(24n)],
+      at(level, east(1631), east(1008), 90)), m22)
+    m24 : Array<U32> <- frame("stimpack and medikit before", tables, gfx, after([idle(20n)],
+      at(level, east(0), east(400), 90)), m23)
+    m25 : Array<U32> <- frame("stimpack and medikit refused", tables, gfx, after([idle(20n), walk(16n), back(24n)],
+      at(level, east(0), east(400), 90)), m24)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -177,4 +202,10 @@ def main() -> IO(Unit):
 #|water moving hash 1934760231 pixels 2 6 77 6 covered True
 #|key before hash 331051703 pixels 6 10 5 89 covered True
 #|key after hash 1474234797 pixels 105 10 2 89 covered True
+#|bonus before hash 4048638776 pixels 11 79 78 6 covered True
+#|bonus after hash 3882055195 pixels 10 78 2 11 covered True
+#|green armour before hash 2677098288 pixels 6 111 243 2 covered True
+#|green armour after hash 1873783878 pixels 8 2 109 2 covered True
+#|stimpack and medikit before hash 1922567378 pixels 111 109 7 111 covered True
+#|stimpack and medikit refused hash 442016221 pixels 110 108 2 107 covered True
 #|end

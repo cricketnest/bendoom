@@ -329,8 +329,11 @@ def Sim.touch.one(th: H.Thing, +x: U32, +y: U32, +z: U32, got: I.Inventory & Lis
 # The pickups of a position check with the player's feet at z: each
 # special thing the player at (x, y) touches is offered to the
 # inventory, and one the grant takes is gone. They are offered the last
-# first, the order within one blockmap cell; the things kept keep their
-# order and their names.
+# spawned first. That is Doom's order within one blockmap cell only:
+# Doom walks the cells column by column, west to east and south to
+# north, so two touched things in different cells whose grants interact
+# can go the other way. The things kept keep their order and their
+# names.
 def Sim.touch(things: List<&2, H.Thing>, +x: U32, +y: U32, +z: U32, inv: I.Inventory) ->
   I.Inventory & List<&2, H.Thing>:
   match things:
@@ -1445,7 +1448,7 @@ def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: State) -> State
     case 117:
       Sim.door(L.Level.line(State.level(s), i), 524288, s)
     case 26:
-      Sim.door.locked(I.Inventory.has(inv, 9), L.Level.line(State.level(s), i), s)
+      Sim.door.locked(I.Inventory.blue(inv), L.Level.line(State.level(s), i), s)
     case 23:
       Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
     case 62:

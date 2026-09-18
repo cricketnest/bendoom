@@ -691,6 +691,147 @@ law key_through_door:
   {(Closed.held(Closed.shut_out()), F.Fixed.le(S.Player.x(S.State.player(Closed.shut_out())), 3145728))
     == (([], 1, 12), True{}) : (List<&2, H.Thing> & U32 & U32) & Bool}
 
+# The health, armour and power laws' expected values are p_inter.c's
+# P_TouchSpecialThing, P_GiveBody, P_GiveArmor and P_GivePower and
+# p_user.c's P_PlayerThink in Chocolate Doom 3.1.1, by hand.
+
+# An inventory as G_PlayerReborn's but for its health, armour points and
+# type, strength counter, tally and flash.
+def Closed.inv(health: U32, armour: U32, armourtype: U32, strength: U32, items: U32, bonus: U32) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
+    False{}, 3, V.Vec.of_list([0, strength, 0, 0, 0, 0], 6), items, bonus}
+
+# A thing of a type named id, on the floor at (0, y).
+def Closed.item(id: U32, kind: U32, y: U32) -> H.Thing:
+  H.Thing{id, kind, 0, y, 0, 0, 0, 4294967295}
+
+# The thing of a type named 8, 200 north of the origin, out of reach.
+def Closed.far(kind: U32) -> List<&2, H.Thing>:
+  [Closed.item(8, kind, 13107200)]
+
+# Both things of a type: one named 7, 16 north of the origin and in
+# reach, and the one out of reach.
+def Closed.both(+kind: U32) -> List<&2, H.Thing>:
+  Closed.item(7, kind, 1048576) <> Closed.far(kind)
+
+# What a position check leaves: the inventory and the things.
+type Closed.Left is Data:
+  Left{inv: I.Inventory, things: List<&2, H.Thing>}
+
+def Closed.left(p: I.Inventory & List<&2, H.Thing>) -> Closed.Left:
+  (inv, things) = p
+  Left{inv, things}
+
+# The position check of a player with its feet on the floor at the
+# origin, holding an inventory, among both things of a type.
+def Closed.offered(kind: U32, inv: I.Inventory) -> Closed.Left:
+  Closed.left(S.Sim.touch(Closed.both(kind), 0, 0, 0, inv))
+
+# LAW: the health bonus is always taken and counted. From 100 it makes
+# 101, from 199 200, and at 200 it adds nothing and still goes. Only
+# the thing touched, 7, goes; the flash is 6 (sanity).
+law health_bonus:
+  {[Closed.offered(2014, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2014, Closed.inv(199, 0, 0, 0, 0, 0)),
+    Closed.offered(2014, Closed.inv(200, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(101, 0, 0, 0, 1, 6), Closed.far(2014)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2014)},
+      Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2014)}] : List<&2, Closed.Left>}
+
+# LAW: the stimpack heals 10 up to 100 and is not counted: 89 makes 99,
+# 99 makes 100, and at 100 it stays, the inventory untouched (sanity).
+law stimpack:
+  {[Closed.offered(2011, Closed.inv(89, 0, 0, 0, 0, 0)), Closed.offered(2011, Closed.inv(99, 0, 0, 0, 0, 0)),
+    Closed.offered(2011, Closed.inv(100, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(99, 0, 0, 0, 0, 6), Closed.far(2011)}, Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2011)},
+      Left{Closed.inv(100, 0, 0, 0, 0, 0), Closed.both(2011)}] : List<&2, Closed.Left>}
+
+# LAW: the medikit heals 25 up to 100 and is not counted: 74 makes 99,
+# 75 and 99 make 100, and at 100, or at 150 from bonuses, it stays
+# (sanity).
+law medikit:
+  {[Closed.offered(2012, Closed.inv(74, 0, 0, 0, 0, 0)), Closed.offered(2012, Closed.inv(75, 0, 0, 0, 0, 0)),
+    Closed.offered(2012, Closed.inv(99, 0, 0, 0, 0, 0)), Closed.offered(2012, Closed.inv(100, 0, 0, 0, 0, 0)),
+    Closed.offered(2012, Closed.inv(150, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(99, 0, 0, 0, 0, 6), Closed.far(2012)}, Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2012)},
+      Left{Closed.inv(100, 0, 0, 0, 0, 6), Closed.far(2012)}, Left{Closed.inv(100, 0, 0, 0, 0, 0), Closed.both(2012)},
+      Left{Closed.inv(150, 0, 0, 0, 0, 0), Closed.both(2012)}] : List<&2, Closed.Left>}
+
+# LAW: the soul sphere adds 100 up to 200 and is always taken and
+# counted: 99 makes 199, 100 and 101 make 200, and 200 stays 200
+# (sanity).
+law soul_sphere:
+  {[Closed.offered(2013, Closed.inv(99, 0, 0, 0, 0, 0)), Closed.offered(2013, Closed.inv(100, 0, 0, 0, 0, 0)),
+    Closed.offered(2013, Closed.inv(101, 0, 0, 0, 0, 0)), Closed.offered(2013, Closed.inv(200, 0, 0, 0, 0, 0))]
+    == [Left{Closed.inv(199, 0, 0, 0, 1, 6), Closed.far(2013)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)},
+      Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)}, Left{Closed.inv(200, 0, 0, 0, 1, 6), Closed.far(2013)}]
+    : List<&2, Closed.Left>}
+
+# LAW: the berserk pack is always taken and counted, and sets the
+# strength counter to 1, even over one already running at 40. It heals
+# 1 to 100, leaves 100 at 100, and does not lower 150 (sanity).
+law berserk:
+  {[Closed.offered(2023, Closed.inv(1, 0, 0, 0, 0, 0)), Closed.offered(2023, Closed.inv(100, 0, 0, 0, 0, 0)),
+    Closed.offered(2023, Closed.inv(150, 0, 0, 0, 0, 0)), Closed.offered(2023, Closed.inv(100, 0, 0, 40, 0, 0))]
+    == [Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)}, Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)},
+      Left{Closed.inv(150, 0, 0, 1, 1, 6), Closed.far(2023)}, Left{Closed.inv(100, 0, 0, 1, 1, 6), Closed.far(2023)}]
+    : List<&2, Closed.Left>}
+
+# LAW: the armour bonus is always taken and counted: no armour makes 1
+# point of green armour's type, 199 points of blue make 200 and stay
+# blue, and 200 points of green take nothing more (sanity).
+law armour_bonus:
+  {[Closed.offered(2015, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2015, Closed.inv(100, 199, 2, 0, 0, 0)),
+    Closed.offered(2015, Closed.inv(100, 200, 1, 0, 0, 0))]
+    == [Left{Closed.inv(100, 1, 1, 0, 1, 6), Closed.far(2015)}, Left{Closed.inv(100, 200, 2, 0, 1, 6), Closed.far(2015)},
+      Left{Closed.inv(100, 200, 1, 0, 1, 6), Closed.far(2015)}] : List<&2, Closed.Left>}
+
+# LAW: green armour gives 100 points of type 1 over fewer points of any
+# type, blue's 99 among them, and is not counted; with 100 points of
+# green, or 150 of blue, it stays (sanity).
+law green_armour:
+  {[Closed.offered(2018, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2018, Closed.inv(100, 99, 2, 0, 0, 0)),
+    Closed.offered(2018, Closed.inv(100, 100, 1, 0, 0, 0)), Closed.offered(2018, Closed.inv(100, 150, 2, 0, 0, 0))]
+    == [Left{Closed.inv(100, 100, 1, 0, 0, 6), Closed.far(2018)}, Left{Closed.inv(100, 100, 1, 0, 0, 6), Closed.far(2018)},
+      Left{Closed.inv(100, 100, 1, 0, 0, 0), Closed.both(2018)}, Left{Closed.inv(100, 150, 2, 0, 0, 0), Closed.both(2018)}]
+    : List<&2, Closed.Left>}
+
+# LAW: blue armour gives 200 points of type 2 over fewer, 199 among
+# them, and is not counted; with 200 points of either type it stays
+# (sanity).
+law blue_armour:
+  {[Closed.offered(2019, Closed.inv(100, 0, 0, 0, 0, 0)), Closed.offered(2019, Closed.inv(100, 199, 1, 0, 0, 0)),
+    Closed.offered(2019, Closed.inv(100, 200, 1, 0, 0, 0)), Closed.offered(2019, Closed.inv(100, 200, 2, 0, 0, 0))]
+    == [Left{Closed.inv(100, 200, 2, 0, 0, 6), Closed.far(2019)}, Left{Closed.inv(100, 200, 2, 0, 0, 6), Closed.far(2019)},
+      Left{Closed.inv(100, 200, 1, 0, 0, 0), Closed.both(2019)}, Left{Closed.inv(100, 200, 2, 0, 0, 0), Closed.both(2019)}]
+    : List<&2, Closed.Left>}
+
+# A thing of a type named 9 at (32, y) on the literal level's floor.
+def Closed.placed(kind: U32, y: U32) -> H.Thing:
+  H.Thing{9, kind, 2097152, y, 0, 0, 0, 4294967295}
+
+# The inventory held and the things left.
+def Closed.kept(+s: S.State) -> Closed.Left:
+  Left{S.Player.inv(S.State.player(s)), S.State.things(s)}
+
+# LAW: a move of 20 a tic is tried in halves, to 74 and then 84, and a
+# health bonus at (32, 100) is in reach of both: the first takes it and
+# the second finds it gone, so health is 101, the tally 1 and the flash
+# 6, not 102, 2 and 12 (sanity).
+law bonus_counted_once:
+  {Closed.kept(Closed.idled(1n, Closed.among(2097152, 0, 1310720, [Closed.placed(2014, 6553600)])))
+    == Left{Closed.inv(101, 0, 0, 0, 1, 6), []} : Closed.Left}
+
+# LAW: P_PlayerThink counts strength up a tic before it counts the flash
+# down, and both before the mobj moves: a berserk pack at (32, 80), 8
+# from where the first tic moves the player, is taken on that tic with
+# the counter at 1 and the flash at 6; the next two tics make 2 and 5,
+# then 3 and 4 (sanity).
+law strength_counts:
+  {[Closed.kept(Closed.idled(1n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)]))),
+    Closed.kept(Closed.idled(2n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)]))),
+    Closed.kept(Closed.idled(3n, Closed.among(2097152, 0, 524288, [Closed.placed(2023, 5242880)])))]
+    == [Left{Closed.inv(100, 0, 0, 1, 1, 6), []}, Left{Closed.inv(100, 0, 0, 2, 1, 5), []},
+      Left{Closed.inv(100, 0, 0, 3, 1, 4), []}] : List<&2, Closed.Left>}
+
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
 law replay_append:

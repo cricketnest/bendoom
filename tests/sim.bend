@@ -35,6 +35,20 @@
 # and the pickup's 6 make 12, one less a tic after. Door 71's top is 4
 # under the ceilings of 0 beside it in the WAD, reached at 2 a tic on
 # tic 92.
+# Last, a health, armour or berserk pickup of each type Freedoom's E1M1
+# spawns, walked at alone from 80 short, holding the start's inventory
+# or one with other health or armour: the tic before contact, 41.61
+# short, and the tic of it, 35.84 short, inside the reach of 36. Each
+# prints the inventory, which of records 268 (a health bonus), 215 (the
+# stimpack), 259 (the medikit), 291 (the berserk pack), 204 (an armour
+# bonus) and 6 (the green armour) are left, and how many things are. The
+# grants are Chocolate Doom's P_TouchSpecialThing, P_GiveBody,
+# P_GiveArmor and P_GivePower: the health bonus makes 101 and counts, and
+# at 200 is taken for nothing; the stimpack and medikit stay at 100
+# health, walked across or not, and heal 60 to 70 and 85; the berserk
+# pack counts, heals 60 to 100, and its strength counts up from 1 on the
+# tic after, 11 ten tics on; the armour bonus makes 1 point of type 1
+# and counts; green armour makes 100 of type 1 and stays for 100.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -363,6 +377,57 @@ def free(+s: S.State) -> IO(S.State):
     things([2, 6, 29, 87, 245, 291], s)
     return s
 
+# The names in a list that some thing still has.
+def left(ids: List<&2, U32>, +things: List<&2, H.Thing>) -> String:
+  match ids:
+    case []:
+      ""
+    case +id <> rest:
+      Bool.pick(String, present(things, id), " " ++ U32.show(id), "") ++ left(rest, things)
+
+# A run, then the tic, the player's place, the inventory, which of the
+# pickups the cases touch are left and how many things are.
+def picked(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  do IO<S.State>:
+    IO.print(line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
+    IO.print("  " ++ inventory(S.Player.inv(S.State.player(q))) ++ " left"
+      ++ left([268, 215, 259, 291, 204, 6], S.State.things(q)) ++ " things "
+      ++ Nat.show(List.length(&2, H.Thing, S.State.things(q))))
+    return q
+
+# The start's inventory with other health and armour.
+def worn(health: U32, armour: U32, armourtype: U32, inv: I.Inventory) -> I.Inventory:
+  I.Inventory{h, a, t, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+
+# Walking at a pickup from 80 short of it, holding an inventory: the
+# tic before contact and the tic of it.
+def reach(tag: String, inv: I.Inventory, +level: L.Level, x: U32, y: U32, degrees: U32) -> IO(S.State):
+  do IO<S.State>:
+    w0 : S.State <- picked(tag, 11n, forward(), holding(inv, at(level, x, y, degrees)))
+    picked("-", 1n, forward(), w0)
+
+# Health, armour and berserk, a pickup of each type Freedoom's E1M1
+# spawns but the key, each walked at alone: taken when it improves the
+# inventory, left when it cannot.
+def pickups(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    h0 : S.State <- reach("health bonus", I.Inventory.start(), level, 432, 256, 0)
+    h1 : S.State <- reach("health bonus at 200", worn(200, 0, 0, I.Inventory.start()), level, 432, 256, 0)
+    s0 : S.State <- reach("stimpack at 100", I.Inventory.start(), level, 4294967264, 400, 90)
+    s1 : S.State <- picked("-", 10n, forward(), s0)
+    s2 : S.State <- reach("stimpack at 60", worn(60, 0, 0, I.Inventory.start()), level, 4294967264, 400, 90)
+    m0 : S.State <- reach("medikit at 100", I.Inventory.start(), level, 32, 400, 90)
+    m1 : S.State <- reach("medikit at 60", worn(60, 0, 0, I.Inventory.start()), level, 32, 400, 90)
+    b0 : S.State <- reach("berserk at 100", I.Inventory.start(), level, 608, 400, 90)
+    b1 : S.State <- picked("-", 10n, idle(), b0)
+    b2 : S.State <- reach("berserk at 60", worn(60, 0, 0, I.Inventory.start()), level, 608, 400, 90)
+    a0 : S.State <- reach("armour bonus", I.Inventory.start(), level, 624, 4294966576, 270)
+    g0 : S.State <- reach("green armour", I.Inventory.start(), level, 1664, 1008, 90)
+    g1 : S.State <- reach("green armour at 100", worn(100, 100, 1, I.Inventory.start()), level, 1664, 1008, 90)
+    IO.print("-")
+
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
@@ -389,6 +454,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     door(level)
+    pickups(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -532,3 +598,52 @@ def main() -> IO(Unit):
 #|lights tic 142 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|lights tic 143 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|end
+#|health bonus tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 476.164627 256.015945 0.000 z -128.000000 floor -128.000000 eye 39.730026
+#|  inventory health 101 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 left 215 259 291 204 6 things 179
+#|health bonus at 200 tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
+#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 476.164627 256.015945 0.000 z -128.000000 floor -128.000000 eye 39.730026
+#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 left 215 259 291 204 6 things 179
+#|stimpack at 100 tic 11 -32.015335 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 -32.017639 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 22 -32.040420 495.976776 90.000 z 0.000000 floor 0.000000 eye 41.022888
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|stimpack at 60 tic 11 -32.015335 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 -32.017639 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
+#|  inventory health 70 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 left 268 259 291 204 6 things 179
+#|medikit at 100 tic 11 31.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 31.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|medikit at 60 tic 11 31.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 31.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
+#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 left 268 215 291 204 6 things 179
+#|berserk at 100 tic 11 607.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 607.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 left 268 215 259 204 6 things 179
+#|- tic 22 607.968032 479.134338 90.000 z 0.000000 floor 0.000000 eye 41.174743
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 11 0 0 0 0 items 1 flash 0 left 268 215 259 204 6 things 179
+#|berserk at 60 tic 11 607.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 607.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 left 268 215 259 204 6 things 179
+#|armour bonus tic 11 624.013870 -758.390090 270.000 z 0.000000 floor 0.000000 eye 41.015975
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 624.015945 -764.166107 270.000 z 0.000000 floor 0.000000 eye 39.729934
+#|  inventory health 100 armour 1 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 left 268 215 259 291 6 things 179
+#|green armour tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 left 268 215 259 291 204 things 179
+#|green armour at 100 tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 left 268 215 259 291 204 6 things 180
+#|-
