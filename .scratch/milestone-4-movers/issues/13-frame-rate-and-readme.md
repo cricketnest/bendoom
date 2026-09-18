@@ -11,7 +11,7 @@
 - [x] No comment in the sim, the level, the renderer or the tools describes the level as unchanging, keys as the sim's input, or specials as unread
 - [x] Every oracle count recorded in tickets 02 to 12 is zero or has its cause written beside it
 - [ ] The spec's status line says done
-- [ ] The flake check is green
+- [x] The flake check is green
 
 ## Comments
 
