@@ -211,6 +211,9 @@ def Laws.arrows_wasd(down, keys):
 def Laws.tic_rest(level, x, y, floorz):
   {==}
 
+def Laws.tic_from_rest():
+  {==}
+
 def Laws.replay_append(a, b, level, p):
   match a:
     case []:

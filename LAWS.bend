@@ -160,6 +160,22 @@ law tic_rest:
   {S.Sim.tic(level, K.Keys.none(), S.Player{x, y, 0, 0, 0, floorz, 0})
     == S.Player{x, y, 0, 0, 0, floorz, 0} : S.Player}
 
+# LAW: one tic forward from rest at angle zero, on a level with no lines
+# and room to stand, thrusts 25 * 2048 along the facing (51199 along x
+# through the cosine 65535, 19 along y through the sine 25) and then
+# decays it by 0.90625: momentum 46399, 17, position 0.78125, 0.000290
+# (sanity; the numbers of milestone 2's ticket 08 hand check).
+law tic_from_rest:
+  {S.Sim.tic(L.Level{L.Lines{0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}}, V.Leaf{0},
+    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{8388608},
+    L.Bsp{32768, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
+      V.Leaf{0}, V.Leaf{0}},
+    L.Blockmap{V.Leaf{0}, 0, 0, 0, 0}, L.Start{0, 0, 0},
+    V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0}},
+    K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}},
+    S.Player{0, 0, 0, 0, 0, 0, 0})
+    == S.Player{51199, 19, 0, 46399, 17, 0, 0} : S.Player}
+
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts, levels and players.
 law replay_append:

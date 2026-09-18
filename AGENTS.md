@@ -40,4 +40,4 @@ Read `docs/bend.md` before writing Bend code or proofs: what the checker refuses
 
 ### Seeing the game
 
-`tools/screenshot.sh [binary] [seconds] [keys...]` runs the game, holds keys, and screenshots its window through niri; the X root is black under Xwayland, so X capture tools show nothing.
+`tools/screenshot.nu [keys...] [--binary path] [--wait duration]` runs the game, holds keys, and screenshots its window through niri; the X root is black under Xwayland, so X capture tools show nothing.

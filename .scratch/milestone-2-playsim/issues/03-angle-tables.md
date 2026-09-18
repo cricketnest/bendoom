@@ -15,6 +15,6 @@
 
 ## Comments
 
-Done. The formula `int(sin((i + 0.5) * 2pi / 8192) * 65536)` reproduces all but 33 sine and 204 tangent entries of vanilla, so `tools/gen_tables.py` reads Doom's published `tables.c` (Chocolate Doom's copy, GPL like this project) and writes `src/tables.bend` with the sine, tangent and arctangent tables as 1024-entry list defs concatenated per table; a list literal past about four thousand entries overflows Bend's parser. The level loader turns the lists into `Vec` trees once at load. The arctangent table is there too because Doom's `R_PointToAngle2` (the slide's line angle) needs it.
+Done. The formula `int(sin((i + 0.5) * 2pi / 8192) * 65536)` reproduces all but 33 sine and 204 tangent entries of vanilla, so `tools/gen_tables.nu` reads Doom's published `tables.c` (Chocolate Doom's copy, GPL like this project) and writes `src/tables.bend` with the sine, tangent and arctangent tables as 1024-entry list defs concatenated per table; a list literal past about four thousand entries overflows Bend's parser. The level loader turns the lists into `Vec` trees once at load. The arctangent table is there too because Doom's `R_PointToAngle2` (the slide's line angle) needs it.
 
 Compile times on the x86_64 benchmark host: the proof gate 2.7 s (the `tables_vanilla` law builds the 10240-entry tree in the checker), the sim test 3.6 s on the JS lane and 14.6 s to a native binary, the game 15 s. No fallback needed.
