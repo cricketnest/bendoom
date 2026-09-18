@@ -29,14 +29,16 @@ type Level.Start is Data:
 # two children (a subsector when bit 15 is set). The names are the
 # sides' top, bottom and middle textures and the sectors' floor and
 # ceiling flats, as the lumps spell them. A sector's box is the top,
-# bottom, left and right of its lines' ends, in fixed point.
+# bottom, left and right of its lines' ends, in fixed point. The
+# counts are of lines and of sectors.
 type Level.Geo is Data:
   Geo{lines: V.Vec, sides: V.Vec, verts: V.Vec, segs: V.Vec, subs: V.Vec, nodes: V.Vec, root: U32,
     blockmap: Level.Blockmap, start: Level.Start, texnames: List<&2, String>,
-    flatnames: List<&2, String>, sine: V.Vec, tanto: V.Vec, boxes: V.Vec}
+    flatnames: List<&2, String>, sine: V.Vec, tanto: V.Vec, boxes: V.Vec, nlines: U32, nsectors: U32}
 
-# The geometry, the sectors (floor, ceiling and light a sector) and the
-# lines' specials (special and tag a line).
+# The geometry, the sectors (floor and ceiling in fixed point, as a
+# mover leaves them, and light) and the lines' specials (special and tag
+# a line).
 type Level is Data:
   Level{geo: Level.Geo, sectors: V.Vec, specials: V.Vec}
 
@@ -75,22 +77,22 @@ def Level.word(v: V.Vec, i: U32, n: U32, f: U32) -> U32:
   V.Vec.get(v, (i * n + f : U32))
 
 def Level.side.sector(+l: Level, +side: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Bool.pick(U32, U32.is_eq(side, Level.none()), Level.none(), Level.word(sides, side, 3, 2))
 
 def Level.vertex.x(+l: Level, v: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   F.Fixed.of_map(Level.word(verts, v, 2, 0))
 
 def Level.vertex.y(+l: Level, v: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   F.Fixed.of_map(Level.word(verts, v, 2, 1))
 
 def Level.line(+l: Level, +i: U32) -> Level.Line:
-  Level{Geo{+lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{+lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   +a = Level.word(lines, i, 5, 0)
   +b = Level.word(lines, i, 5, 1)
@@ -100,14 +102,14 @@ def Level.line(+l: Level, +i: U32) -> Level.Line:
 
 # A line's side number: 0 the right one, 1 the left.
 def Level.line.side(+l: Level, line: U32, side: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Level.word(lines, line, 5, (3 + side : U32))
 
 # Doom's P_LoadSegs: the angle and offset as the lump stores them, the
 # back sector only behind a line flagged two-sided.
 def Level.seg(+l: Level, +i: U32) -> Level.Seg:
-  Level{Geo{+lines, sides, verts, +segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{+lines, sides, verts, +segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   +a = Level.word(segs, i, 6, 0)
   +b = Level.word(segs, i, 6, 1)
@@ -122,13 +124,13 @@ def Level.seg(+l: Level, +i: U32) -> Level.Seg:
       Level.side.sector(l, Level.line.side(l, line, (side .^. 1 : U32))))}
 
 def Level.sub(+l: Level, +i: U32) -> Level.Sub:
-  Level{Geo{lines, sides, verts, segs, +subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, +subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Sub{Level.word(subs, i, 2, 0), Level.word(subs, i, 2, 1)}
 
 # A node's bounding box on a side: 0 the right child's, 1 the left's.
 def Level.box(+l: Level, +n: U32, +side: U32) -> Level.Box:
-  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Box{F.Fixed.of_map(Level.word(nodes, n, 14, (4 + side * 4 : U32))),
     F.Fixed.of_map(Level.word(nodes, n, 14, (5 + side * 4 : U32))),
@@ -136,23 +138,22 @@ def Level.box(+l: Level, +n: U32, +side: U32) -> Level.Box:
     F.Fixed.of_map(Level.word(nodes, n, 14, (7 + side * 4 : U32)))}
 
 def Level.floor(+l: Level, s: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
-  F.Fixed.of_map(Level.word(sectors, s, 3, 0))
+  Level.word(sectors, s, 3, 0)
 
 def Level.ceil(+l: Level, s: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
-  F.Fixed.of_map(Level.word(sectors, s, 3, 1))
+  Level.word(sectors, s, 3, 1)
 
 def Level.sector(+l: Level, +s: U32) -> Level.Sector:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     +sectors, specials} = l
-  Sector{F.Fixed.of_map(Level.word(sectors, s, 3, 0)), F.Fixed.of_map(Level.word(sectors, s, 3, 1)),
-    Level.word(sectors, s, 3, 2)}
+  Sector{Level.word(sectors, s, 3, 0), Level.word(sectors, s, 3, 1), Level.word(sectors, s, 3, 2)}
 
 def Level.sector.light(+l: Level, s: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Level.word(sectors, s, 3, 2)
 
@@ -164,9 +165,38 @@ def Level.tag(+l: Level, line: U32) -> U32:
   Level{geo, sectors, specials} = l
   Level.word(specials, line, 2, 1)
 
+def Level.nlines(+l: Level) -> U32:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
+    sectors, specials} = l
+  nlines
+
+def Level.nsectors(+l: Level) -> U32:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
+    sectors, specials} = l
+  nsectors
+
+# A sector's plane: its ceiling or its floor.
+def Level.plane(+l: Level, s: U32, ceiling: Bool) -> U32:
+  Level{geo, sectors, specials} = l
+  Level.word(sectors, s, 3, Bool.to_u32(ceiling))
+
+# The writes a tic makes, each a new tree sharing all but one path with
+# the old: a sector's plane, and a line's special.
+def Level.plane.put(l: Level, s: U32, ceiling: Bool, height: U32) -> Level:
+  Level{geo, sectors, specials} = l
+  Level{geo, V.Vec.set(sectors, (s * 3 + Bool.to_u32(ceiling) : U32), height), specials}
+
 def Level.geo(l: Level) -> Level.Geo:
   Level{geo, sectors, specials} = l
   geo
+
+def Level.sectors(l: Level) -> V.Vec:
+  Level{geo, sectors, specials} = l
+  sectors
+
+def Level.specials(l: Level) -> V.Vec:
+  Level{geo, sectors, specials} = l
+  specials
 
 # Doom's P_GroupLines block box: the blockmap cells a sector's box
 # touches, widened by the largest radius, 32 units, and held to the map:
@@ -181,23 +211,23 @@ def Level.blockbox.at(+bm: Level.Blockmap, +boxes: V.Vec, +at: U32) -> Level.Box
     F.Fixed.min(F.Fixed.sarn((V.Vec.get(boxes, (at + 3 : U32)) - ox + 2097152 : U32), 23n), (cols - 1 : U32))}
 
 def Level.blockbox(+l: Level, s: U32) -> Level.Box:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Level.blockbox.at(blockmap, boxes, (s * 4 : U32))
 
 def Level.side(+l: Level, +i: U32) -> Level.Side:
-  Level{Geo{lines, +sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, +sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Side{F.Fixed.of_map(Level.word(sides, i, 3, 0)), F.Fixed.of_map(Level.word(sides, i, 3, 1)),
     Level.word(sides, i, 3, 2)}
 
 def Level.texnames(+l: Level) -> List<&2, String>:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   texnames
 
 def Level.flatnames(+l: Level) -> List<&2, String>:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   flatnames
 
@@ -210,27 +240,27 @@ def Level.flat_names(+l: Level, s: U32) -> List<&2, String>:
   List.take(&2, String, List.drop(&2, String, Level.flatnames(l), U32.to_nat((s * 2 : U32))), 2n)
 
 def Level.sine(+l: Level) -> V.Vec:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   sine
 
 def Level.tanto(+l: Level) -> V.Vec:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   tanto
 
 def Level.start_of(+l: Level) -> Level.Start:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   start
 
 def Level.blockmap_of(+l: Level) -> Level.Blockmap:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   blockmap
 
 def Level.root(+l: Level) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   root
 
@@ -263,9 +293,6 @@ def Level.cell.at(+bm: Level.Blockmap, +bx: U32, +by: U32) -> List<&2, U32>:
   Level.cell.list(Bool.and(U32.is_lt(bx, cols), U32.is_lt(by, rows)), words,
     (4 + by * cols + bx : U32))
 
-def Level.cell(+l: Level, bx: U32, by: U32) -> List<&2, U32>:
-  Level.cell.at(Level.blockmap_of(l), bx, by)
-
 # The sector under a point
 # ------------------------
 
@@ -292,13 +319,13 @@ def Level.node_side(+x: U32, +y: U32, +nx: U32, +ny: U32, +dx: U32, +dy: U32) ->
 
 # A node's child on the side of a point: 0 the right, 1 the left.
 def Level.node.child(+l: Level, n: U32, side: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Level.word(nodes, n, 14, (12 + side : U32))
 
 # Doom's R_PointOnSide against node n: 1 on the back (left) side.
 def Level.side_of(+l: Level, +n: U32, +x: U32, +y: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   Bool.to_u32(Level.node_side(x, y, F.Fixed.of_map(Level.word(nodes, n, 14, 0)),
     F.Fixed.of_map(Level.word(nodes, n, 14, 1)), F.Fixed.of_map(Level.word(nodes, n, 14, 2)),
@@ -309,7 +336,7 @@ def Level.is_leaf(+n: U32) -> Bool:
 
 # A subsector's sector: its first seg's front sector.
 def Level.leaf_sector(+l: Level, ss: U32) -> U32:
-  Level{Geo{lines, sides, verts, +segs, +subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, +segs, +subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials} = l
   +seg = Level.word(subs, ss, 2, 1)
   Level.side.sector(l, Level.line.side(l, Level.word(segs, seg, 6, 3), Level.word(segs, seg, 6, 4)))
@@ -424,8 +451,8 @@ def Level.blockmap(+bm: V.Vec) -> Level.Blockmap:
 def Level.room(floor: U32, ceil: U32) -> Level:
   Level{Geo{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 32768,
     Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Start{0, 0, 0}, [], [],
-    V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}},
-    V.Vec.of_list([floor, ceil, 0], 3), V.Leaf{0}}
+    V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 0, 1},
+    V.Vec.of_list([F.Fixed.of_map(floor), F.Fixed.of_map(ceil), 0], 3), V.Leaf{0}}
 
 # Doom's P_GroupLines box: each line's ends widen the box of the sector
 # on either side of it, from a box turned inside out.
@@ -463,15 +490,25 @@ def Level.inside_out(n: Nat) -> List<&2, U32>:
       2147483648 <> 2147483647 <> 2147483647 <> 2147483648 <> Level.inside_out(m)
 
 def Level.boxed(+l: Level, boxes: V.Vec) -> Level:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, none},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, none, nlines, nsectors},
     sectors, specials} = l
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
     sectors, specials}
 
+# A sector's floor and ceiling as the lump's 16-bit words made fixed
+# point.
+def Level.fixed(n: Nat, +i: U32, +sectors: V.Vec) -> V.Vec:
+  match n:
+    case 0n:
+      sectors
+    case 1n+m:
+      Level.fixed(m, (i + 3 : U32), V.Vec.set(V.Vec.set(sectors, i, F.Fixed.of_map(V.Vec.get(sectors, i))),
+        (i + 1 : U32), F.Fixed.of_map(V.Vec.get(sectors, (i + 1 : U32)))))
+
 # The level with its sectors' boxes, from its lines.
-def Level.grouped(+l: Level, +lines: U32, +sectors: U32) -> Level:
-  Level.boxed(l, Level.boxes(U32.to_nat(lines), l, 0,
-    V.Vec.of_list(Level.inside_out(U32.to_nat(sectors)), (sectors * 4 : U32))))
+def Level.grouped(+l: Level) -> Level:
+  Level.boxed(l, Level.boxes(U32.to_nat(Level.nlines(l)), l, 0,
+    V.Vec.of_list(Level.inside_out(U32.to_nat(Level.nsectors(l))), (Level.nsectors(l) * 4 : U32))))
 
 def Level.pack.go(+map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>, texnames: List<&2, String>,
   flatnames: List<&2, String>) -> Level:
@@ -480,8 +517,9 @@ def Level.pack.go(+map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>, texnames: Lis
       Level.grouped(Level{Geo{lines, sides, verts, segs, subs, nodes,
         (Level.count(map, "NODES", 28) - 1 : U32), Level.blockmap(bm),
         Level.start(Level.count(map, "THINGS", 10), things), texnames, flatnames,
-        V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}},
-        sectors, specials}, Level.count(map, "LINEDEFS", 14), Level.count(map, "SECTORS", 26))
+        V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0},
+        Level.count(map, "LINEDEFS", 14), Level.count(map, "SECTORS", 26)},
+        Level.fixed(U32.to_nat(Level.count(map, "SECTORS", 26)), 0, sectors), specials})
     case _:
       Level.room(0, 0)
 

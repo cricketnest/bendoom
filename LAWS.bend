@@ -167,7 +167,7 @@ law turn_script:
 
 # A level's first state with the player as given, at a clock.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
-  S.State{p, level, V.Leaf{0}, 0, clock, False{}}
+  S.State{p, level, V.Leaf{0}, [], 0, clock, False{}, False{}}
 
 # LAW: one tic of the idle command from rest leaves the player where it
 # was, on any level, at any position.
@@ -189,8 +189,8 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, V.Leaf{0}, 0, clock, True{}}))
-    == ((clock + 1 : U32), S.State{p, level, V.Leaf{0}, 0, clock, True{}}) : U32 & S.State}
+    S.Sim.tic(cmd, S.State{p, level, V.Leaf{0}, [], 0, clock, True{}, False{}}))
+    == ((clock + 1 : U32), S.State{p, level, V.Leaf{0}, [], 0, clock, True{}, False{}}) : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
 # floor at 0 and the ceiling at 128 map units. Every number is computed
@@ -256,6 +256,86 @@ law bob_run_and_cap:
 law step_up_dip:
   {Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0}, 0)
     == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976} : S.Player}
+
+# The movers' closed laws stand on a literal level: a west room (sector
+# 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
+# 2, ceiling 72), all floors at 0, 16 units of door from x 64 to x 80.
+# Line 0 is the door's west face, its front to the west, special 1; line
+# 1 its east face, its front to the east, special 117. One blockmap
+# cell lists both, and one subsector stands for every point. Every
+# number below is computed by hand from vanilla's constants.
+def Closed.doors() -> L.Level:
+  L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
+    V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
+    V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
+    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), 0, 0, 1, 1}, L.Start{0, 0, 0}, [], [],
+    V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3},
+    V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
+
+# A player at rest on the floor at 0, under a ceiling.
+def Closed.player(x: U32, y: U32, angle: U32, ceilz: U32) -> S.Player:
+  S.Player{x, y, 0, angle, 0, 0, 0, 0, ceilz, 2686976, 0, 2686976}
+
+# The west room's player, 32 units from the door and facing it, and the
+# east room's.
+def Closed.west() -> S.State:
+  Closed.state(Closed.player(2097152, 4194304, 0, 8388608), Closed.doors(), 0)
+
+def Closed.east() -> S.State:
+  Closed.state(Closed.player(7340032, 4194304, 2147483648, 4718592), Closed.doors(), 0)
+
+# The state after a tic of use and then idle tics.
+def Closed.used(idle: Nat, s: S.State) -> S.State:
+  S.Sim.replay(K.Cmd{0, 0, 0, True{}} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
+
+def Closed.ceil(s: S.State, sector: U32) -> U32:
+  L.Level.ceil(S.State.level(s), sector)
+
+# LAW: a manual door, vanilla's T_VerticalDoor. The top is 4 under the
+# lower ceiling beside it, 68. Used on tic 1 it is 2 up after that tic
+# and at 68 after tic 34; tic 35 would pass, so it lands and the wait
+# starts; the count reaches zero on tic 185, which only turns the door;
+# tic 186 is the first step down, tic 219 shuts it, and tic 220 passes
+# the floor and ends the thinker (sanity).
+law door_timeline:
+  {(Closed.ceil(Closed.used(0n, Closed.west()), 1), Closed.ceil(Closed.used(32n, Closed.west()), 1),
+    Closed.ceil(Closed.used(33n, Closed.west()), 1), Closed.ceil(Closed.used(184n, Closed.west()), 1),
+    Closed.ceil(Closed.used(185n, Closed.west()), 1), Closed.ceil(Closed.used(217n, Closed.west()), 1),
+    Closed.ceil(Closed.used(218n, Closed.west()), 1), S.State.thinkers(Closed.used(218n, Closed.west())),
+    S.State.thinkers(Closed.used(219n, Closed.west())))
+    == (131072, 4325376, 4456448, 4456448, 4325376, 131072, 0,
+      [S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}],
+        [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]}], [])
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & List<&2, S.Thinker> & List<&2, S.Thinker>}
+
+# LAW: the blazing door moves 8 a tic: 64 after tic 8, tic 9 would pass
+# and lands on 68; the wait ends on tic 159, tic 160 is 60, tic 167 is
+# 4, and tic 168 lands on the floor and ends the thinker (sanity).
+law blazing_door_timeline:
+  {(Closed.ceil(Closed.used(0n, Closed.east()), 1), Closed.ceil(Closed.used(7n, Closed.east()), 1),
+    Closed.ceil(Closed.used(8n, Closed.east()), 1), Closed.ceil(Closed.used(158n, Closed.east()), 1),
+    Closed.ceil(Closed.used(159n, Closed.east()), 1), Closed.ceil(Closed.used(166n, Closed.east()), 1),
+    Closed.ceil(Closed.used(167n, Closed.east()), 1), S.State.thinkers(Closed.used(167n, Closed.east())))
+    == (524288, 4194304, 4456448, 4456448, 3932160, 262144, 0, [])
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & List<&2, S.Thinker>}
+
+# LAW: use held across two tics fires on the first alone: after a live
+# tic whose command holds use, no command is a press, whatever the
+# state was.
+law use_fires_once:
+  for forward: U32
+  for side: U32
+  for turn: U32
+  for +next: K.Cmd
+  for player: S.Player
+  for level: L.Level
+  for sidetex: V.Vec
+  for thinkers: List<&2, S.Thinker>
+  for rnd: U32
+  for clock: U32
+  for usedown: Bool
+  {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
+    S.State{player, level, sidetex, thinkers, rnd, clock, False{}, usedown}))) == False{} : Bool}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.

@@ -6,13 +6,38 @@ The player's re-clip under a moving plane is ticket 05; here nobody stands in th
 
 **Blocked by:** 02 (The oracle plays a demo), 03 (One state the tic maps)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The door's heights and tics are computed by hand first, from the sector heights read out of the WAD in nushell and vanilla's constants, and written into the comments before the Bend code answers
-- [ ] The sim test walks to the first door, uses it, and prints the door's ceiling at chosen tics through open, wait and close; a second run uses it again while it closes and again while it waits, and prints the reversal
-- [ ] A run holding use for many tics prints one opening; a universal law states that use held across two tics fires on the first alone, and it is proven
-- [ ] A run uses a blue key door and prints that nothing moved
-- [ ] Closed laws on a literal level of two rooms with a door sector between them pin the ceiling after the first tic, the tic it reaches the top, the tic it starts down and the tic it is shut, for the normal and the blazing door
-- [ ] The render test gains a frame with the door half open; the oracle compares it and the door fully open, counts recorded, target zero
-- [ ] The player walks through the open door in the sim test, and is stopped by it when shut
-- [ ] The wall law and the geometry law still prove; both lanes pass; the flake check stays green
+- [x] The door's heights and tics are computed by hand first, from the sector heights read out of the WAD in nushell and vanilla's constants, and written into the comments before the Bend code answers
+- [x] The sim test walks to the first door, uses it, and prints the door's ceiling at chosen tics through open, wait and close; a second run uses it again while it closes and again while it waits, and prints the reversal
+- [x] A run holding use for many tics prints one opening; a universal law states that use held across two tics fires on the first alone, and it is proven
+- [x] A run uses a blue key door and prints that nothing moved
+- [x] Closed laws on a literal level of two rooms with a door sector between them pin the ceiling after the first tic, the tic it reaches the top, the tic it starts down and the tic it is shut, for the normal and the blazing door
+- [x] The render test gains a frame with the door half open; the oracle compares it and the door fully open, counts recorded, target zero
+- [x] The player walks through the open door in the sim test, and is stopped by it when shut
+- [x] The wall law and the geometry law still prove; both lanes pass; the flake check stays green
+
+## Comments
+
+Computed by hand before the Bend code answered, from Freedoom's E1M1 read in nushell and linuxdoom's `p_doors.c` and `p_floor.c` (`VDOORSPEED` 2, `VDOORWAIT` 150, the top 4 under the lowest neighbouring ceiling; `T_MovePlane` lands on a destination a step would pass and reports it, a step that lands exactly does not):
+
+- The first door is sector 10, floor and ceiling -128, between sectors 9 and 93 whose ceilings are 0, so its top is -4. Its lines are 55 (front north, sector 9) and 577 (front south, sector 93), both special 1. With the use on tic 1: the ceiling is -128 + 2t after tic t, -4 after tic 62; tic 63 would pass, so it lands and the wait starts; the count reaches zero on tic 213, which only turns the door; tic 214 is the first step down, -6; tic 275 is -128; tic 276 passes the floor and the thinker ends.
+- The blazing door is sector 84 (line 1162, special 117), floor and ceiling 0, its one neighbour's ceiling 64, so its top is 60 at 8 a tic: 56 after tic 7, tic 8 would pass and lands on 60, the wait ends on tic 158, tic 159 is 52, tic 165 is 4, tic 166 passes and lands on 0 and the thinker ends.
+- The blue key doors are sectors 71 (lines 421 and 423) and 51 (lines 520 and 522), all special 26.
+- The laws' literal level: a door sector with floor and ceiling 0 between rooms with ceilings 128 and 72, so the top is 68. Normal: 2 after tic 1, 68 after tic 34, tic 35 lands, the wait ends on tic 185, 66 after tic 186, 0 after tic 219, gone on tic 220. Blazing: 8 after tic 1, 64 after tic 8, tic 9 would pass and lands on 68, the wait ends on tic 159, 60 after tic 160, 4 after tic 167, tic 168 lands on 0 and ends.
+
+Done. The sim answered every number above as computed: on Freedoom the first door reads -126 on the tic of the use, -86 twenty tics on, -4 on the 62nd, holds through the 213th, -6 on the 214th, -128 on the 275th, and its thinker is gone on the 276th; a use while it closes at -26 sends it to -24 that tic and back to -4; a use while it waits puts it at -6 that tic; use held for 300 tics opens it once and leaves it shut with no thinker; the blue door starts nothing. The two closed laws check with the literal level's numbers.
+
+The door stands in the pit south of the walkway, at -128, so the runs start from a place in the pit (832, 384, facing north), which the oracle's PWAD can give a player; the route from the real start is ticket 12's, since it needs the lift. `tools/walk.bend` prints where a script leaves the sim, run by run, with chosen sectors' heights; it is how these runs were found, and how ticket 12's route will be. The tools share their script parsing in `tools/script.bend`.
+
+Oracle, one shot each: the door half open, 21 tics after its use (`832 384 90`, `20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0`): 0 differing. The door fully open (`... 1,0,0,0,1 115,0,0,0,0`): 0. The render test pins the first (hash 1284933713, which is also the hash of the frame dump's output for that script, worked out in nushell, so the pinned frame is the compared one).
+
+What was built, and where it differs from the ticket's words:
+
+- One mover for doors, lifts and floors. A `Mover` is a sector's ceiling or floor, a speed, the steps left and the whole plan; a step is `Travel{down, dest}` or `Hold{tics}`. A door is up, hold 150, down; ticket 07's open-and-stay door is its first step alone, ticket 08's lift is down, hold 105, up, a floor is one travel. A travel that would pass its destination lands on it and the step ends; a hold counts down and the tic it reaches zero does nothing else, which is vanilla's turn; a mover with no step left is dropped from the list on that tic. The direction is the step's own flag, not read off the heights, because vanilla's turbo floor (ticket 07) travels "down" to a destination that can be above it and so jumps there, which a direction inferred from the heights would not do. The plan is kept so that ticket 05's crushed mover starts it again, which is what vanilla's door (back up, wait, down) and lift (back down, wait, up) both do.
+- The second use is `Sim.door.turned`: a door whose next step travels down goes back to its plan, any other goes to one travel down to its floor. Vanilla leaves an open-and-stay door that is sent down with its thinker alive on the floor for good; neither E1M1 puts a manual door line on a sector that a special 2 opens, so that is not reproduced.
+- Special 26 has no branch: `Sim.use.special` knows 1 and 117, and anything else does nothing, which is also what the spec asks of every unknown special. Milestone 5 adds its case with the keys.
+- Use is `Sim.use`: the trace's meets sorted by fraction, first gathered first among equals, then the first special line or shut line decides. The slide and use share `Sim.meets` (the nudge, the lines from the trace's box, the intercept); the slide's own near test and per-line hit went with it, and every walk of the sim test still prints the same lines. Vanilla orders equal fractions by its cell walk and ours by the box's cells; a trace through a vertex shared by a special and a plain line could pick differently, and nothing in the tests does.
+- `usedown` is in the state, not the player, so that the press law needs no fact about the movement: `use_fires_once` says that after any live tic whose command holds use, no command is a press.
+- The tic keeps the geometry by construction. It runs the player, use and the thinkers on whole states, then packs the state it answers from the geometry it began with and only the sectors and specials of what the thinkers left (`Sim.tic.kept`), so `tic_keeps_geometry` is proven by opening the state. The wall law needed one new fact, `free_geo`: free is the same in two levels of one geometry, by induction over the gathered lines (a line's condition reads the geometry alone; its heights pass never touches the verdict). For that the line gathering takes the blockmap and no longer the level.
+- Sector heights are fixed point in the tree, converted once at load, as vanilla's sector_t holds them, so a mover writes what it computes and a future fractional speed needs nothing. `Level.Geo` gained the line and sector counts, which the search for a sector's neighbours runs over.

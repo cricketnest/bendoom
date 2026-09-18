@@ -18,6 +18,10 @@ def Keys.none() -> Keys:
 def Cmd.idle() -> Cmd:
   Cmd{0, 0, 0, False{}}
 
+def Cmd.use(cmd: Cmd) -> Bool:
+  Cmd{forward, side, turn, use} = cmd
+  use
+
 # A command in a demo file's units: the moves as they are, the turn in
 # steps of 256, the byte a demo keeps of it.
 def Cmd.demo(forward: U32, side: U32, turn: U32, use: Bool) -> Cmd:

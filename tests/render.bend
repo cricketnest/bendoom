@@ -13,7 +13,10 @@
 # wall of the sky's own texture, and the railed pit under the ledge.
 # Then three frames from the sim's run east off the ledge, which no
 # player start can express: mid-stride with the eye bobbing, in the air,
-# and just landed with the view dipping. Each frame is drawn twice, over
+# and just landed with the view dipping. Then frames the movers
+# make, each after a script from a place, the oracle's zero recorded in
+# milestone 4's tickets: the first door half open, 21 tics after its use
+# (832 384 90, "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0"). Each frame is drawn twice, over
 # a view blanked to 0 and to 255: equal hashes mean every pixel of the
 # view was written. Pinned to Freedoom.
 import Base
@@ -94,6 +97,14 @@ def ran(gfx: G.Gfx, +level: L.Level, tics: Nat) -> S.State:
   S.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, False{})),
     S.State.start(level, G.Gfx.sidetex(gfx)))
 
+# The state after runs of commands in a demo's units from a place: the
+# scripts the oracle plays.
+def after(runs: List<&2, List<&2, K.Cmd>>, s: S.State) -> S.State:
+  S.Sim.replay(List.concat(&2, K.Cmd, runs), s)
+
+def idle(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.idle())
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
@@ -109,6 +120,9 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m9 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(gfx, level, 34n), m8)
     m10 : Array<U32> <- frame("air U!:56", tables, gfx, ran(gfx, level, 56n), m9)
     m11 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(gfx, level, 66n), m10)
+    m12 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n),
+      List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})), [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
+      at(gfx, level, east(832), east(384), 90)), m11)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -131,4 +145,5 @@ def main() -> IO(Unit):
 #|stride U!:34 hash 4182473275 pixels 2 109 164 6 covered True
 #|air U!:56 hash 1020890737 pixels 6 0 8 6 covered True
 #|landed U!:66 hash 577452768 pixels 79 110 111 6 covered True
+#|door half open hash 1284933713 pixels 107 6 74 111 covered True
 #|end

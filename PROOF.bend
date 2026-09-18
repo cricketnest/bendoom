@@ -250,10 +250,14 @@ def Laws.arrows_wasd(down, keys):
       {==}
 
 def Laws.tic_rest(level, x, y):
-  {==}
+  match level:
+    case L.Level{geo, sectors, specials}:
+      {==}
 
 def Laws.tic_counts(cmd, p, level, clock):
-  {==}
+  match level:
+    case L.Level{geo, sectors, specials}:
+      {==}
 
 def Laws.tic_from_rest():
   {==}
@@ -272,6 +276,19 @@ def Laws.bob_run_and_cap():
 
 def Laws.step_up_dip():
   {==}
+
+def Laws.door_timeline():
+  {==}
+
+def Laws.blazing_door_timeline():
+  {==}
+
+def Laws.use_fires_once(forward, side, turn, next, player, level, sidetex, thinkers, rnd, clock, usedown):
+  match next level:
+    case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
+      {==}
+    case K.Cmd{f, s, t, False{}} L.Level{geo, sectors, specials}:
+      {==}
 
 def Laws.replay_append(a, b, s):
   match a:
@@ -688,21 +705,128 @@ def z_free(+level: L.Level, p: S.Player, hp: Free(level, p)) ->
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz}:
       z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz}, hp)
 
+# Free reads the geometry alone
+# -----------------------------
+
+# A line's pass ands its condition onto the verdict and changes nothing
+# else of it, stated value first.
+def narrow_ok(hit: Bool, +level: L.Level, +line: L.Level.Line, f: S.Sim.Fit) ->
+  {S.Sim.Fit.ok(f) == S.Sim.Fit.ok(S.Sim.fit.narrow(hit, level, line, f)) : Bool}:
+  match hit f:
+    case True{} S.Fit{ok, floor, ceil}:
+      {==}
+    case False{} S.Fit{ok, floor, ceil}:
+      {==}
+
+def heights_ok(+level: L.Level, +x: U32, +y: U32, line: L.Level.Line, f: S.Sim.Fit) ->
+  {S.Sim.Fit.ok(f) == S.Sim.Fit.ok(S.Sim.fit.heights(level, x, y, line, f)) : Bool}:
+  match line:
+    case L.Line{+x1, +y1, +x2, +y2, +flags, +front, +back}:
+      narrow_ok(Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
+        Bool.and(S.Sim.box_touches(x, y, L.Line{x1, y1, x2, y2, flags, front, back}),
+          S.Sim.box_crosses(x, y, L.Line{x1, y1, x2, y2, flags, front, back}))),
+        level, L.Line{x1, y1, x2, y2, flags, front, back}, f)
+
+def and_ok(+b: Bool, g: S.Sim.Fit) ->
+  {Bool.and(S.Sim.Fit.ok(g), b) == S.Sim.Fit.ok(S.Sim.fit.and(b, g)) : Bool}:
+  match g:
+    case S.Fit{ok, floor, ceil}:
+      {==}
+
+def line_ok_eq(+level: L.Level, +x: U32, +y: U32, +i: U32, +f: S.Sim.Fit) ->
+  {Bool.and(S.Sim.Fit.ok(f), S.Sim.line_ok(level, x, y, i))
+    == S.Sim.Fit.ok(S.Sim.fit.line(level, x, y, i, f)) : Bool}:
+  %and_ok(S.Sim.line_ok(level, x, y, i), S.Sim.fit.heights(level, x, y, L.Level.line(level, i), f))
+    : {Bool.and(S.Sim.Fit.ok(f), S.Sim.line_ok(level, x, y, i)) == _ : Bool}
+  %heights_ok(level, x, y, L.Level.line(level, i), f)
+    : {Bool.and(S.Sim.Fit.ok(f), S.Sim.line_ok(level, x, y, i))
+      == Bool.and(_, S.Sim.line_ok(level, x, y, i)) : Bool}
+  {==}
+
+# A line's condition reads its ends, flags and sides, which two levels
+# of one geometry share whatever their sectors and specials hold.
+def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +i: U32) ->
+  {S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, i) == S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, i) : Bool}:
+  match geo:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}:
+      {==}
+
+def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +i: U32,
+  +fa: S.Sim.Fit, +fb: S.Sim.Fit, e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
+  {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, i, fa))
+    == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, i, fb)) : Bool}:
+  %line_ok_eq(L.Level{geo, sa, pa}, x, y, i, fa)
+    : {_ == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, i, fb)) : Bool}
+  %line_ok_eq(L.Level{geo, sb, pb}, x, y, i, fb)
+    : {Bool.and(S.Sim.Fit.ok(fa), S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, i)) == _ : Bool}
+  %e : {Bool.and(S.Sim.Fit.ok(fa), S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, i))
+    == Bool.and(_, S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, i)) : Bool}
+  %cond_same(geo, sa, pa, sb, pb, x, y, i)
+    : {Bool.and(S.Sim.Fit.ok(fa), S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, i))
+      == Bool.and(S.Sim.Fit.ok(fa), _) : Bool}
+  {==}
+
+def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
+  +x: U32, +y: U32, +fa: S.Sim.Fit, +fb: S.Sim.Fit, e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
+  {S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sa, pa}, x, y, fa))
+    == S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sb, pb}, x, y, fb)) : Bool}:
+  match lines:
+    case []:
+      e
+    case +i <> rest:
+      go_same(rest, geo, sa, pa, sb, pb, x, y, S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, i, fa),
+        S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, i, fb), line_same(geo, sa, pa, sb, pb, x, y, i, fa, fb, e))
+
+# Free is the same in two levels of one geometry: the lines gathered
+# are the blockmap's, and each one's condition is the geometry's.
+def free_geo(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
+  {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.free(L.Level{geo, sb, pb}, x, y) : Bool}:
+  match geo:
+    case L.Geo{+lines, +sides, +verts, +segs, +subs, +nodes, +root, +blockmap, +start, +texnames, +flatnames, +sine, +tanto, +boxes, +nlines, +nsectors}:
+      go_same(S.Sim.lines.at(blockmap, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+        (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)),
+        L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors},
+        sa, pa, sb, pb, x, y,
+        S.Fit{True{}, L.Level.floor(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa},
+            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa}, x, y)),
+          L.Level.ceil(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa},
+            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sa, pa}, x, y))},
+        S.Fit{True{}, L.Level.floor(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb},
+            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb}, x, y)),
+          L.Level.ceil(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb},
+            L.Level.sector_at(L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, start, texnames, flatnames, sine, tanto, boxes, nlines, nsectors}, sb, pb}, x, y))},
+        {==})
+
+# What the tic keeps is free where the player it moved was: the level
+# it packs has the geometry the move was checked against.
+def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Player, clock: U32, use: Bool,
+  +after: S.State, h: Free(L.Level{geo, sectors, specials}, moved)) ->
+  Laws.Free(S.Sim.tic.kept(geo, moved, clock, use, after)):
+  %free_geo(geo, sectors, specials, L.Level.sectors(S.State.level(after)),
+    L.Level.specials(S.State.level(after)), S.Player.x(moved), S.Player.y(moved))
+    : {True{} == _ : Bool}
+  h
+
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, level, sidetex, rnd, clock, True{}}:
+    case S.State{player, L.Level{geo, sectors, specials}, sidetex, thinkers, rnd, clock, True{}, usedown}:
       {==}
-    case S.State{player, level, sidetex, rnd, clock, False{}}:
+    case S.State{player, L.Level{geo, sectors, specials}, sidetex, thinkers, rnd, clock, False{}, usedown}:
       {==}
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, level, sidetex, rnd, clock, True{}}:
+    case S.State{player, L.Level{geo, sectors, specials}, sidetex, thinkers, rnd, clock, True{}, usedown}:
       free
-    case S.State{+player, +level, sidetex, rnd, +clock, False{}}:
-      z_free(level, S.Sim.xy(level, cmd, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
-        xy_free(level, cmd, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
-          eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free))))
+    case S.State{+player, L.Level{+geo, +sectors, +specials}, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown}:
+      +level = {L.Level{geo, sectors, specials} : L.Level}
+      +thought = S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))
+      +moved = S.Sim.z(S.Sim.xy(level, cmd, thought))
+      kept_free(geo, sectors, specials, moved, clock, K.Cmd.use(cmd),
+        S.Sim.thinkers(S.Sim.use(S.Sim.pressed(cmd, usedown), thought,
+          S.State{moved, level, sidetex, thinkers, rnd, clock, False{}, usedown})),
+        z_free(level, S.Sim.xy(level, cmd, thought), xy_free(level, cmd, thought,
+          eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free)))))
 
 def Laws.replay_keeps_free(script, s, free):
   match script:

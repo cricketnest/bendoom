@@ -27,6 +27,6 @@ def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) ->
 
 # The sectors' heights and light come from the state's level, the
 # sides' textures from the state.
-def Render.frame(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, mem: Array<U32>) -> Array<U32>:
-  S.State{player, level, sidetex, rnd, clock, ended} = s
-  Render.view(Render.eye(tables, player), level, G.Gfx.sided(gfx, sidetex), mem)
+def Render.frame(tables: P.Project.Tables, gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> Array<U32>:
+  Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
+    G.Gfx.sided(gfx, S.State.sidetex(s)), mem)
