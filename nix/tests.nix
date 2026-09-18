@@ -23,10 +23,12 @@ llvmPackages_19.stdenv.mkDerivation {
       sed -n 's/^#|//p' $t > $name.want
       bend $t -o $name
       ./$name > $name.native.got
-      diff $name.want $name.native.got && echo "PASS $name native"
+      diff $name.want $name.native.got
+      echo "PASS $name native"
       bend $t -o $name.js
       bun $name.js > $name.js.got
-      diff $name.want $name.js.got && echo "PASS $name js"
+      diff $name.want $name.js.got
+      echo "PASS $name js"
     done
     runHook postBuild
   '';
