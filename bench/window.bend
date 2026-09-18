@@ -28,7 +28,7 @@ def Bench.rate(+t0: Nat, +t1: Nat) -> String:
 def Bench.run(+t0: Nat, input: K.Input, script: List<&2, K.Cmd>, world: Array<U32> & G.Gfx & L.Level) ->
   IO(Unit):
   do IO<Unit>:
-    M.Game.start(600n, input, script, t0, world)
+    M.Game.start(600n, input, script, None{}, t0, world)
     t1 : Nat <- IO.now()
     IO.print(Bench.rate(t0, t1))
 
