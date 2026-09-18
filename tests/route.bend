@@ -1,15 +1,19 @@
-# Freedoom's E1M1 from the player 1 start to the exit switch, with no
-# key: a command script in a demo's units, leg by leg, and after each
+# Freedoom's E1M1 from the player 1 start toward the exit switch, with
+# no key: a command script in a demo's units, leg by leg, and after each
 # leg the clock, the player, the thinkers running and whether the level
 # has ended; then the time Doom's tally would show. The route: east onto
 # the lift its west line calls and down with it; across the pit to the
 # first door; through it and over the big room to the door in its west
 # wall; through that, north over the walk-over line and along the north
-# room; south through the exit room's door; west to the exit switch. The
-# oracle plays the same script: one tic before the exit vanilla's frame
-# is ours pixel for pixel, and one tic after it has left the level
-# (milestone 4's ticket 12). The positions are regression pins; the
-# ending is the claim.
+# room; south toward the exit room's door; west toward the exit switch.
+# Milestone 4 wrote it for an empty map. The tech column at -192, 1600,
+# record 59, stands in the run south, so the player reaches the exit
+# room late, uses its door short of it and never reaches the switch.
+# Chocolate Doom, with every thing kept, plays the same script to the
+# same frames: none of its pixels differs after the south run or at the
+# end, where the ticket 06 build differs in 47586 after the south run.
+# The positions are regression pins until ticket 11 routes around the
+# column.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -72,9 +76,9 @@ def main() -> IO(Unit):
 #|through it tic 243 837.883972 690.665405 90.000 z -128.000000 thinkers 10 ended False
 #|west door tic 285 576.143997 1053.525039 180.000 z -128.000000 thinkers 10 ended False
 #|north room tic 454 -191.832733 1711.947463 180.000 z -128.000000 thinkers 10 ended False
-#|exit door tic 487 -227.908691 1416.213073 270.000 z -128.000000 thinkers 10 ended False
-#|exit room tic 554 -228.547744 1292.948730 270.000 z -128.000000 thinkers 11 ended False
-#|exit switch tic 584 -365.325164 1283.349258 180.000 z -128.000000 thinkers 10 ended False
-#|exit tic 585 -366.564590 1283.299453 180.000 z -128.000000 thinkers 10 ended True
-#|after tic 585 -366.564590 1283.299453 180.000 z -128.000000 thinkers 10 ended True
+#|exit door tic 487 -227.955474 1488.071182 270.000 z -128.000000 thinkers 10 ended False
+#|exit room tic 554 -229.367279 1416.050430 270.000 z -128.000000 thinkers 10 ended False
+#|exit switch tic 584 -239.953552 1416.029861 180.000 z -128.000000 thinkers 9 ended False
+#|exit tic 585 -239.953552 1416.029861 180.000 z -128.000000 thinkers 9 ended False
+#|after tic 590 -239.953552 1416.029861 180.000 z -128.000000 thinkers 9 ended False
 #|Time 0:16

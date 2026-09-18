@@ -34,7 +34,8 @@
 # bar first shows the card on the same script; P_GiveCard's flash of 6
 # and the pickup's 6 make 12, one less a tic after. Door 71's top is 4
 # under the ceilings of 0 beside it in the WAD, reached at 2 a tic on
-# tic 92.
+# tic 92. Last, solid things stop the player and movers, and carried
+# things ride them, as solids says.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -145,7 +146,7 @@ def present(things: List<&2, H.Thing>, +id: U32) -> Bool:
   match things:
     case []:
       False{}
-    case H.Thing{i, kind, x, y, z, sector, state, tics} <> rest:
+    case H.Thing{i, kind, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
       Bool.or(U32.is_eq(i, id), present(rest, id))
 
 # A run, then the blue key door's heights, whether the blue key (record
@@ -154,8 +155,8 @@ def keyed(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
   +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   +inv = S.Player.inv(S.State.player(q))
   do IO<S.State>:
-    IO.print(watch(tag, [71], q) ++ " key " ++ Bool.show(present(S.State.things(q), 87)) ++ " things "
-      ++ Nat.show(List.length(&2, H.Thing, S.State.things(q))) ++ " cards " ++ U32.show(I.Inventory.cards(inv))
+    IO.print(watch(tag, [71], q) ++ " key " ++ Bool.show(present(H.Things.list(S.State.things(q)), 87)) ++ " things "
+      ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(q)))) ++ " cards " ++ U32.show(I.Inventory.cards(inv))
       ++ " flash " ++ U32.show(I.Inventory.bonus(inv)))
     return q
 
@@ -269,6 +270,101 @@ def used(+before: S.State) -> IO(Unit):
     h2 : S.State <- run("use", 200n, use(), [10], h1)
     IO.print("-")
 
+def bounds(hit: Bool, t: H.Thing, rest: String) -> String:
+  match hit:
+    case False{}:
+      rest
+    case True{}:
+      H.Thing{id, kind, x, y, z, floorz, ceilz, sector, state, tics} = t
+      " thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " z " ++ F.Fixed.show(z) ++ " floor "
+        ++ F.Fixed.show(floorz) ++ " ceiling " ++ F.Fixed.show(ceilz) ++ " state " ++ U32.show(state) ++ " tics "
+        ++ U32.show(tics) ++ rest
+
+# The thing named id: its type, height, floor and ceiling, state and
+# tics.
+def bounded(things: List<&2, H.Thing>, +id: U32) -> String:
+  match things:
+    case []:
+      ""
+    case H.Thing{+i, kind, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
+      bounds(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, floorz, ceilz, sector, state, tics}, bounded(rest, id))
+
+# A run, then some sectors' floors and ceilings and the thing named id.
+def carry(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, +id: U32, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  do IO<S.State>:
+    IO.print(watch(tag, sectors, q) ++ bounded(H.Things.list(S.State.things(q)), id))
+    return q
+
+# Whether a thing named id goes before a list sorted by name.
+def placed.before(+id: U32, things: List<&2, H.Thing>) -> Bool:
+  match things:
+    case []:
+      True{}
+    case H.Thing{i, kind, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
+      U32.is_lt(id, i)
+
+def placed.go(+th: H.Thing, +id: U32, things: List<&2, H.Thing>, first: Bool) -> List<&2, H.Thing>:
+  match things first:
+    case [] _:
+      [th]
+    case h <> rest True{}:
+      th <> h <> rest
+    case H.Thing{i, kind, x, y, z, floorz, ceilz, sector, state, tics} <> +rest False{}:
+      H.Thing{i, kind, x, y, z, floorz, ceilz, sector, state, tics} <> placed.go(th, id, rest, placed.before(id, rest))
+
+# The state with one more thing in its place among the others by name: a
+# monster record neither game spawns, which tools/oracle.nu's --wad copy
+# of the IWAD turns into the same thing for both.
+def placed(+th: H.Thing, +id: U32, +s: S.State) -> S.State:
+  +things = H.Things.list(S.State.things(s))
+  S.State.populated(placed.go(th, id, things, placed.before(id, things)), L.Level.nthings(S.State.level(s)), s)
+
+# The solid things, after 20 idle tics as the oracle's scripts start.
+# Walking south at 25 from 1712 under the tech column at -192, 1600,
+# record 59, radius 16: tic 37 leaves the player 35.78 north of it, and
+# tic 38's step of 6.92, the free walk's, would bring it to 28.86, under
+# the 32 of the two radii, so the player stays, tic after tic. From 432
+# over the dead former human at 128, 384, record 171, which is not
+# solid, the player walks the free walk the column walk began with,
+# 432 less its distance, over the corpse's box by tic 30 and on. A tech
+# column, radius 16, stood at 96, 216 on the lift, sector 98, as record
+# 3: the lift's switch from the pit starts it down 4 a tic, and the
+# column's height, floor and ceiling are the lift's floor and ceiling on
+# every tic, its name, type, state and tics kept, down to -124 and back
+# to 12. A barrel, radius 10, height 42, stood at 800, 528 inside the
+# first door, sector 10, as record 35, where it does not fit under the
+# shut door: the door opens over it as on nothing, and when it closes,
+# the barrel under its ceiling, the tic it would leave 40 of the
+# barrel's 42 is undone at -86, tic 295, and the door goes back up.
+def solids(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    c0 : S.State <- run("column walk", 17n, forward(), [],
+      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 65344, 1712, 270)))
+    c1 : S.State <- run("-", 1n, forward(), [], c0)
+    c2 : S.State <- run("-", 10n, forward(), [], c1)
+    k0 : S.State <- run("corpse walk", 10n, forward(), [],
+      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 128, 432, 270)))
+    k1 : S.State <- run("-", 8n, forward(), [], k0)
+    l0 : S.State <- carry("column lift switch walk", 10n, forward(), [98], 3,
+      placed(H.Thing{3, 48, 6291456, 14155776, 786432, 786432, 8388608, 98, 14, 4294967295}, 3, at(level, 240, 256, 180)))
+    l1 : S.State <- carry("use", 1n, use(), [98], 3, l0)
+    l2 : S.State <- carry("-", 1n, idle(), [98], 3, l1)
+    l3 : S.State <- carry("-", 32n, idle(), [98], 3, l2)
+    l4 : S.State <- carry("-", 1n, idle(), [98], 3, l3)
+    l5 : S.State <- carry("-", 105n, idle(), [98], 3, l4)
+    l6 : S.State <- carry("-", 34n, idle(), [98], 3, l5)
+    b0 : S.State <- carry("barrel door walk", 40n, forward(), [10], 35,
+      placed(H.Thing{35, 2035, 52428800, 34603008, 4286578688, 4286578688, 4286578688, 10, 34, 6}, 35, at(level, 832, 384, 90)))
+    b1 : S.State <- carry("use", 1n, use(), [10], 35, b0)
+    b2 : S.State <- carry("-", 61n, idle(), [10], 35, b1)
+    b3 : S.State <- carry("-", 192n, idle(), [10], 35, b2)
+    b4 : S.State <- carry("-", 1n, idle(), [10], 35, b3)
+    b5 : S.State <- carry("-", 1n, idle(), [10], 35, b4)
+    b6 : S.State <- carry("-", 1n, idle(), [10], 35, b5)
+    b7 : S.State <- carry("-", 4n, idle(), [10], 35, b6)
+    IO.print("-")
+
 def door(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     d0 : S.State <- run("door walk", 40n, forward(), [10], at(level, 832, 384, 90))
@@ -279,12 +375,13 @@ def door(+level: L.Level) -> IO(Unit):
     blue(level)
     exits(level)
     lights([1n, 34n, 1n, 4n, 1n, 23n, 1n, 1n, 1n, 2n, 2n, 60n, 1n, 2n, 1n, 1n, 1n, 1n, 4n, 1n, 0n], S.State.start(level))
+    solids(level)
 
 def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
   match things:
     case []:
       0
-    case H.Thing{id, k, x, y, z, sector, state, tics} <> rest:
+    case H.Thing{id, k, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
       (Bool.to_u32(U32.is_eq(k, kind)) + count(rest, kind) : U32)
 
 # How many things of each type Bendoom defines.
@@ -299,7 +396,7 @@ def ids(things: List<&2, H.Thing>) -> String:
   match things:
     case []:
       ""
-    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
       " " ++ U32.show(id) ++ ids(rest)
 
 def described(d: Maybe<&2, H.Thing.Def>) -> String:
@@ -314,7 +411,7 @@ def shown(hit: Bool, t: H.Thing, rest: String) -> String:
     case False{}:
       rest
     case True{}:
-      H.Thing{id, +kind, x, y, z, sector, state, tics} = t
+      H.Thing{id, +kind, x, y, z, floorz, ceilz, sector, state, tics} = t
       "thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
         ++ " z " ++ F.Fixed.show(z) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ " tics "
         ++ U32.show(tics) ++ described(H.Thing.def(kind))
@@ -324,8 +421,8 @@ def thing(things: List<&2, H.Thing>, +id: U32) -> String:
   match things:
     case []:
       ""
-    case H.Thing{+i, kind, x, y, z, sector, state, tics} <> rest:
-      shown(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, sector, state, tics}, thing(rest, id))
+    case H.Thing{+i, kind, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
+      shown(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, floorz, ceilz, sector, state, tics}, thing(rest, id))
 
 def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
   match chosen:
@@ -333,7 +430,7 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
       IO.pure(Unit, Unit{})
     case id <> rest:
       do IO<Unit>:
-        IO.print(thing(S.State.things(s), id))
+        IO.print(thing(H.Things.list(S.State.things(s)), id))
         things(rest, s)
 
 def words(+v: V.Vec, n: Nat, +i: U32) -> String:
@@ -352,7 +449,7 @@ def inventory(inv: I.Inventory) -> String:
 
 def free(+s: S.State) -> IO(S.State):
   +p = S.State.player(s)
-  +spawned = S.State.things(s)
+  +spawned = H.Things.list(S.State.things(s))
   do IO<S.State>:
     IO.print("free at start " ++ Bool.show(S.Sim.free(S.State.level(s), S.Player.x(p), S.Player.y(p))))
     IO.print(inventory(S.Player.inv(p)))
@@ -532,3 +629,24 @@ def main() -> IO(Unit):
 #|lights tic 142 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|lights tic 143 sector 32 176 sector 33 140 sector 48 120 sector 90 160
 #|end
+#|column walk tic 37 -191.972503 1635.776504 270.000 z -128.000000 floor -128.000000 eye 35.523132 thinkers 9
+#|- tic 38 -191.970001 1635.776504 270.000 z -128.000000 floor -128.000000 eye 36.104217 thinkers 9
+#|- tic 48 -191.942932 1635.776504 270.000 z -128.000000 floor -128.000000 eye 47.252609 thinkers 9
+#|corpse walk tic 30 128.011886 399.121368 270.000 z 0.000000 floor 0.000000 eye 42.094177 thinkers 9
+#|- tic 38 128.029998 348.859802 270.000 z 0.000000 floor 0.000000 eye 36.104217 thinkers 9
+#|column lift switch walk tic 10 208.160308 255.986923 180.000 z -124.000000 floor -124.000000 eye 40.314453 thinkers 9 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 14 tics 4294967295
+#|use tic 11 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 40.500000 thinkers 10 sector 98 8.000000 128.000000 thing 3 type 48 z 8.000000 floor 8.000000 ceiling 128.000000 state 14 tics 4294967295
+#|- tic 12 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 4.000000 128.000000 thing 3 type 48 z 4.000000 floor 4.000000 ceiling 128.000000 state 14 tics 4294967295
+#|- tic 44 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 14 tics 4294967295
+#|- tic 45 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 14 tics 4294967295
+#|- tic 150 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 14 tics 4294967295
+#|- tic 184 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 14 tics 4294967295
+#|barrel door walk tic 40 831.926605 495.977203 90.000 z -128.000000 floor -128.000000 eye 40.975143 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 34 tics 6
+#|use tic 41 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -126.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -126.000000 state 34 tics 6
+#|- tic 102 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 34 tics 6
+#|- tic 294 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 34 tics 6
+#|- tic 295 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 34 tics 6
+#|- tic 296 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -84.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -84.000000 state 34 tics 6
+#|- tic 297 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -82.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -82.000000 state 34 tics 6
+#|- tic 301 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -74.000000 state 34 tics 6
+#|-

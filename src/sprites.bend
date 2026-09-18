@@ -48,7 +48,7 @@ def Sprites.project.if(shows: Bool, vis: Sprites.Vis, rest: List<&2, Sprites.Vis
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing, rest: List<&2, Sprites.Vis>) ->
   List<&2, Sprites.Vis>:
   P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
-  H.Thing{id, kind, +x, +y, +z, sector, +state, tics} = thing
+  H.Thing{id, kind, +x, +y, +z, floorz, ceilz, sector, +state, tics} = thing
   +trx = (x - vx : U32)
   +try = (y - vy : U32)
   +tz = (F.Fixed.mul(trx, cos) + F.Fixed.mul(try, sin) : U32)
@@ -81,9 +81,9 @@ def Sprites.gather(things: List<&2, H.Thing>, +seen: V.Vec, +view: P.View, +leve
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, +sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, +sector, state, tics} <> rest:
       Sprites.gather.if(U32.is_eq(V.Vec.get(seen, sector), 1), view, level, gfx,
-        H.Thing{id, kind, x, y, z, sector, state, tics}, Sprites.gather(rest, seen, view, level, gfx))
+        H.Thing{id, kind, x, y, z, floorz, ceilz, sector, state, tics}, Sprites.gather(rest, seen, view, level, gfx))
 
 # Clipping
 # --------

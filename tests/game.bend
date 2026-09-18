@@ -45,7 +45,7 @@ def line(tag: String, +s: S.State) -> String:
     ++ " thinkers " ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ " sector 64 "
     ++ F.Fixed.show(L.Level.floor(level, 64)) ++ " " ++ F.Fixed.show(L.Level.ceil(level, 64)) ++ " special "
     ++ U32.show(L.Level.special(level, 407)) ++ " pressed " ++ Bool.show(pressed(level, S.State.sidetex(s)))
-    ++ " things " ++ Nat.show(List.length(&2, H.Thing, S.State.things(s))) ++ " random " ++ U32.show(S.State.rnd(s))
+    ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(s)))) ++ " random " ++ U32.show(S.State.rnd(s))
     ++ " cards " ++ U32.show(I.Inventory.cards(S.Player.inv(p)))
 
 def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):

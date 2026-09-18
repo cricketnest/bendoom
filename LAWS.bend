@@ -169,9 +169,13 @@ law turn_script:
 # The sim
 # -------
 
+# No things.
+def Closed.none() -> H.Things:
+  H.Things.of([], 0, 4294967295)
+
 # A level's first state with the player as given, at a clock.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
-  S.State{p, level, [], V.Leaf{0}, [], 0, clock, False{}, False{}}
+  S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, False{}, False{}}
 
 # LAW: one tic of the idle command from rest leaves the player where it
 # was, on any level, at any position.
@@ -193,8 +197,8 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, [], V.Leaf{0}, [], 0, clock, True{}, False{}}))
-    == ((clock + 1 : U32), S.State{p, level, [], V.Leaf{0}, [], 0, clock, True{}, False{}}) : U32 & S.State}
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}}))
+    == ((clock + 1 : U32), S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}}) : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
 # floor at 0 and the ceiling at 128 map units. Every number is computed
@@ -276,7 +280,7 @@ def Closed.level(ox: U32) -> L.Level:
   L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
     V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
-    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Things{V.Leaf{0}, 0}, [], [],
+    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Things{V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
@@ -334,7 +338,7 @@ law blazing_door_timeline:
 # A state of the literal level with one mover running and a player at
 # rest at a place under a ceiling.
 def Closed.moving(level: L.Level, t: S.Thinker, x: U32, y: U32, ceilz: U32) -> S.State:
-  S.State{Closed.player(x, y, 0, ceilz), level, [], V.Leaf{0}, [t], 0, 0, False{}, False{}}
+  S.State{Closed.player(x, y, 0, ceilz), level, Closed.none(), V.Leaf{0}, [t], 0, 0, False{}, False{}}
 
 def Closed.idled(n: Nat, s: S.State) -> S.State:
   S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
@@ -390,7 +394,7 @@ law door_crushed:
 def Closed.turbo(x: U32, momx: U32) -> S.State:
   S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
     L.Level.special.put(L.Level.plane.put(L.Level.plane.put(L.Level.plane.put(Closed.doors(), 1, False{},
-      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), [], V.Leaf{0}, [], 0, 0, False{}, False{}}
+      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}}
 
 def Closed.floors(+s: S.State) -> U32 & U32 & U32:
   (L.Level.floor(S.State.level(s), 0), L.Level.floor(S.State.level(s), 1), L.Level.floor(S.State.level(s), 2))
@@ -425,7 +429,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728), 1, False{},
       4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    [], V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}}
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -506,7 +510,7 @@ law use_fires_once:
   for +next: K.Cmd
   for player: S.Player
   for level: L.Level
-  for things: List<&2, H.Thing>
+  for things: H.Things
   for sidetex: V.Vec
   for thinkers: List<&2, S.Thinker>
   for rnd: U32
@@ -532,7 +536,7 @@ def Closed.exit() -> L.Level:
 # The west room's player after two idle tics and then a tic of use.
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    Closed.exit(), [], L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}})
+    Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}})
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -558,7 +562,7 @@ law random_table:
 # spawned the player.
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    L.Level.light.put(Closed.doors(), 0, west), [], V.Leaf{0}, [], 1, 0, False{}, False{}})
+    L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, [], 1, 0, False{}, False{}})
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -620,25 +624,26 @@ law blue_door_locked:
     == (0, 0, 131072, 131072) : U32 & U32 & U32 & U32}
 
 # The west room's player at (x, 64), on the floor under a ceiling at
-# 128, moving by a momentum a tic, among things, on the literal level.
+# 128, moving by a momentum a tic, among things named under 128, on the
+# literal level.
 def Closed.among(x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
-  S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start()},
-    Closed.doors(), things, V.Leaf{0}, [], 0, 0, False{}, False{}}
+  S.State.populated(things, 128, S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [],
+    I.Inventory.start()}, Closed.doors(), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}})
 
-# A blue card named id at (x, y) and z, as spawned.
+# A blue card named id at (x, y) and z, as spawned in the west room.
 def Closed.key(id: U32, x: U32, y: U32, z: U32) -> H.Thing:
-  H.Thing{id, 5, x, y, z, 0, 0, 3}
+  H.Thing{id, 5, x, y, z, 0, 8388608, 0, 0, 3}
 
 # The things left, and the cards and the pickup flash held.
 def Closed.held(+s: S.State) -> List<&2, H.Thing> & U32 & U32:
-  (S.State.things(s), I.Inventory.cards(S.Player.inv(S.State.player(s))),
+  (H.Things.list(S.State.things(s)), I.Inventory.cards(S.Player.inv(S.State.player(s))),
     I.Inventory.bonus(S.Player.inv(S.State.player(s))))
 
 # Moving north at 8 a tic from (32, 64) past a bloody mess (record 3)
 # and a blue card (record 87), both at (32, 112), toward another blue
 # card (record 90) at (32, 400).
 def Closed.passing() -> S.State:
-  Closed.among(2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 2, 4294967295},
+  Closed.among(2097152, 0, 524288, [H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295},
     Closed.key(87, 2097152, 7340032, 0), Closed.key(90, 2097152, 26214400, 0)])
 
 # LAW: P_TouchSpecialThing for the blue card. Tic 1 moves the player to
@@ -651,10 +656,10 @@ def Closed.passing() -> S.State:
 law key_taken:
   {(Closed.held(Closed.idled(1n, Closed.passing())), Closed.held(Closed.idled(2n, Closed.passing())),
     Closed.held(Closed.idled(3n, Closed.passing())))
-    == (([H.Thing{3, 10, 2097152, 7340032, 0, 0, 2, 4294967295}, Closed.key(87, 2097152, 7340032, 0),
+    == (([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(87, 2097152, 7340032, 0),
       Closed.key(90, 2097152, 26214400, 0)], 0, 0),
-      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 12),
-      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 11))
+      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 12),
+      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 11))
     : (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32)}
 
 # LAW: a move of 20 a tic is tried in halves, to 74 and then 84, and a
@@ -712,27 +717,39 @@ law free_pins_lines:
     (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), k)
     : Maybe<&2, U32>}
   for free: {True{} == S.Sim.free(level, x, y) : Bool}
-  {True{} == S.Sim.line_ok(level, x, y, i) : Bool}
+  {True{} == S.Sim.line_ok(level, x, y, S.Sim.radius(), 1, i) : Bool}
 
 # LAW: the distance condition on numbers: a one-sided wall from (0, 0)
 # to (0, 128) is touched and crossed by the player's box at (8, 64), and
-# neither at (40, 64); a two-sided line without the blocking flag is not
-# solid, one with it is (sanity).
+# neither at (40, 64); at (24, 64) a barrel's box of radius 10 is clear
+# of it and the big tree's of 32 crosses it. A two-sided line without the
+# blocking flag is not solid, one with it is; one blocking monsters
+# stops a thing's box and not the player's (sanity).
 law line_geometry:
-  {(S.Sim.box_touches(524288, 4194304, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
-    S.Sim.box_crosses(524288, 4194304, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
-    S.Sim.box_touches(2621440, 4194304, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
-    S.Sim.box_crosses(2621440, 4194304, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
-    S.Sim.solid(L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
-    S.Sim.solid(L.Line{0, 0, 0, 8388608, 4, 0, 1}),
-    S.Sim.solid(L.Line{0, 0, 0, 8388608, 5, 0, 1}))
-    == (True{}, True{}, False{}, False{}, True{}, False{}, True{})
-    : Bool & Bool & Bool & Bool & Bool & Bool & Bool}
+  {(S.Sim.box_touches(524288, 4194304, 1048576, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.box_crosses(524288, 4194304, 1048576, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.box_touches(2621440, 4194304, 1048576, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.box_crosses(2621440, 4194304, 1048576, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.box_crosses(1572864, 4194304, 655360, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.box_crosses(1572864, 4194304, 2097152, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.solid(1, L.Line{0, 0, 0, 8388608, 0, 0, 65535}),
+    S.Sim.solid(1, L.Line{0, 0, 0, 8388608, 4, 0, 1}),
+    S.Sim.solid(1, L.Line{0, 0, 0, 8388608, 5, 0, 1}),
+    S.Sim.solid(1, L.Line{0, 0, 0, 8388608, 6, 0, 1}),
+    S.Sim.solid(3, L.Line{0, 0, 0, 8388608, 6, 0, 1}))
+    == (True{}, True{}, False{}, False{}, False{}, True{}, True{}, False{}, True{}, False{}, True{})
+    : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool}
 
-# A state whose player is free in its level.
+# A state whose player passes its level's position check: free of solid
+# lines and of solid things.
 def Free(+s: S.State) -> Type:
   {True{} == S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
     : Bool}
+
+# A state whose player's box is clear of the solid things near it.
+def Clear(+s: S.State) -> Type:
+  {True{} == S.Sim.clear(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)),
+    S.Sim.radius(), L.Level.none()) : Bool}
 
 # LAW: a tic leaves the geometry as it was: the lines, sides, vertices,
 # nodes and blockmap that free reads are the same trees after it, for
@@ -751,12 +768,188 @@ law tic_keeps_free:
   Free(S.Sim.tic(cmd, s))
 
 # LAW: the wall law: replaying any script from a free state, the start
-# included, leaves the player free of solid walls.
+# included, leaves the player free.
 law replay_keeps_free:
   for script: List<&2, K.Cmd>
   for +s: S.State
   for free: Free(s)
   Free(S.Sim.replay(script, s))
+
+# LAW: the freedom law: replaying any script from a free state, the start
+# included, leaves the player's box clear of every solid thing linked
+# near it (free_pins_things below reads that on each of them).
+law replay_keeps_clear:
+  for +script: List<&2, K.Cmd>
+  for +s: S.State
+  for free: Free(s)
+  Clear(S.Sim.replay(script, s))
+
+# LAW: clear is pinned to the things: when the player's box is clear,
+# every thing the blockmap links in the cells around it, whichever
+# position in the list it holds, is not solid or has its box apart from
+# the player's (blocker_geometry shows the numbers), and since no type's
+# radius passes the widening (radius_within), no thing linked further
+# can reach the box.
+law clear_pins_things:
+  for +level: L.Level
+  for +x: U32
+  for +y: U32
+  for k: Nat
+  for id: U32
+  for listed: {Some{id} == List.get(&2, U32, S.Sim.near(level, x, y, S.Sim.radius()), k) : Maybe<&2, U32>}
+  for clear: {True{} == S.Sim.clear(level, x, y, S.Sim.radius(), L.Level.none()) : Bool}
+  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), id) : Bool}
+
+def Closed.within(defs: List<&2, H.Thing.Def>) -> Bool:
+  match defs:
+    case []:
+      True{}
+    case H.Def{kind, state, radius, height, flags} <> rest:
+      Bool.and(U32.is_le(F.Fixed.of_map(radius), S.Sim.maxradius()), Closed.within(rest))
+
+# LAW: no type Bendoom spawns is wider than Doom's MAXRADIUS, 32, which
+# the thing check widens its box by (sanity).
+law radius_within:
+  {Closed.within(H.Thing.defs()) == True{} : Bool}
+
+# Solid things
+# ------------
+
+# A floor lamp (type 2028: radius 16, solid), a dead player (type 15:
+# no flags) and a barrel (type 2035: radius 10, height 42, solid and
+# shootable) of the literal level, on the floor at 0 under the ceiling
+# at 128.
+def Closed.lamp(id: U32, x: U32, y: U32, z: U32) -> H.Thing:
+  H.Thing{id, 2028, x, y, z, 0, 8388608, 0, 33, 4294967295}
+
+def Closed.corpse(id: U32, x: U32, y: U32) -> H.Thing:
+  H.Thing{id, 15, x, y, 0, 0, 8388608, 0, 3, 4294967295}
+
+def Closed.barrel(id: U32, x: U32, y: U32) -> H.Thing:
+  H.Thing{id, 2035, x, y, 0, 0, 8388608, 0, 34, 6}
+
+# The literal level with a lamp at (32, 112), a corpse at (32, 32) and a
+# barrel at (96, 112), linked in that order into its one cell.
+def Closed.linked() -> L.Level:
+  H.Thing.linked(Closed.doors(), [Closed.lamp(8, 2097152, 7340032, 0), Closed.corpse(15, 2097152, 2097152),
+    Closed.barrel(24, 6291456, 7340032)], 128)
+
+# LAW: vanilla's PIT_CheckThing on numbers. The lamp stops the player's
+# box when their centres are under 32 apart, 16 and 16: at 32 it does
+# not, 1/65536 closer it does, and it never stops its own. The corpse is
+# not solid, so it stops nothing even where it stands. The barrel's
+# reach is 26. The cell lists the three things the last linked first
+# (sanity).
+law blocker_geometry:
+  {(S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242880, 1048576, 65535, 8),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242881, 1048576, 65535, 8),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242881, 1048576, 8, 8),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 2097152, 1048576, 65535, 15),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 4587520, 7340032, 1048576, 65535, 24),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 4587521, 7340032, 1048576, 65535, 24),
+    S.Sim.near(Closed.linked(), 2097152, 4194304, 1048576))
+    == (False{}, True{}, False{}, False{}, False{}, True{}, [24, 15, 8])
+    : Bool & Bool & Bool & Bool & Bool & Bool & List<&2, U32>}
+
+# LAW: the player's link among its cell's things for P_ChangeSector: at
+# its start record's rank 6 it goes after the things spawned later, 9,
+# and before those spawned earlier; once it has moved it goes first; at
+# rank 1 last; outside its cell nowhere (sanity).
+law link_order:
+  {(S.Sim.you.in(True{}, [9, 5, 2], 6), S.Sim.you.in(True{}, [9, 5, 2], 4294967295), S.Sim.you.in(True{}, [9, 5, 2], 1),
+    S.Sim.you.in(False{}, [9, 5, 2], 6))
+    == ([9, 4294967295, 5, 2], [4294967295, 9, 5, 2], [9, 5, 2, 4294967295], [9, 5, 2])
+    : List<&2, U32> & List<&2, U32> & List<&2, U32> & List<&2, U32>}
+
+def Closed.north(things: List<&2, H.Thing>, n: Nat) -> U32:
+  S.Player.y(S.State.player(Closed.idled(n, Closed.among(2097152, 0, 524288, things))))
+
+# LAW: a solid thing stops the player and a corpse does not. Moving north
+# at 8 a tic from (32, 64), friction leaves 7.25 and then 6.57: tic 2
+# ends at 79.25, 32.75 short of a lamp at (32, 112), and tic 3's move to
+# 85.82 would overlap it. The slide finds no line and stairsteps; its
+# move north overlaps too, its move by the momentum east is no move, so
+# the player stays at 79.25. Doom's things are as tall as the map: the
+# lamp raised 100 units stops it all the same. Over a dead player at the
+# same place tic 3 reaches 85.82 (sanity).
+law thing_blocks:
+  {(Closed.north([Closed.lamp(8, 2097152, 7340032, 0)], 2n), Closed.north([Closed.lamp(8, 2097152, 7340032, 0)], 3n),
+    Closed.north([Closed.lamp(8, 2097152, 7340032, 6553600)], 3n), Closed.north([Closed.corpse(15, 2097152, 7340032)], 3n))
+    == (5193728, 5193728, 5193728, 5624320) : U32 & U32 & U32 & U32}
+
+# A state of the literal level with one mover and a player at rest at
+# (x, 64) under the west room's ceiling, among things.
+def Closed.moving.among(level: L.Level, t: S.Thinker, x: U32, things: List<&2, H.Thing>) -> S.State:
+  S.State.populated(things, 128, Closed.moving(level, t, x, 4194304, 8388608))
+
+def Closed.things(s: S.State) -> List<&2, H.Thing>:
+  H.Things.list(S.State.things(s))
+
+def Closed.lowering(n: Nat) -> List<&2, H.Thing>:
+  Closed.things(Closed.idled(n, Closed.moving.among(Closed.doors(),
+    S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}]}, 13107200,
+    [H.Thing{29, 60, 2097152, 6553600, 3932160, 0, 8388608, 0, 16, 4294967295}, Closed.barrel(24, 2097152, 1048576)])))
+
+# LAW: a moving floor carries the things on it, vanilla's
+# P_ThingHeightClip through P_ChangeSector. The west room's floor goes
+# down 4 a tic; the player at (200, 64) is out of its block box. The
+# barrel standing at (32, 16) follows the floor, -4 after a tic and -8
+# after two, its name, type, state and tics as they were. A leg hung 68
+# under the ceiling at 128 stays at 60, over its floor at -4 (sanity).
+law floor_carries_things:
+  {(Closed.lowering(1n), Closed.lowering(2n))
+    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 34, 6},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 16, 4294967295}],
+      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 34, 6},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 16, 4294967295}])
+    : List<&2, H.Thing> & List<&2, H.Thing>}
+
+# The door open at 68 and closing, 2 a tic, over a thing, the west room's
+# player at (32, 64) in the one cell.
+def Closed.closing(th: H.Thing) -> S.State:
+  Closed.moving.among(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]},
+    2097152, [th])
+
+# LAW: a door closing on a barrel goes back up, vanilla's
+# PIT_ChangeSector for a shootable thing that no longer fits, and no
+# damage is done. The barrel at (72, 16) stands across both of the
+# door's faces, so its ceiling is the door's: 42 after 13 tics, which
+# fits its height of 42; the 14th would leave 40, so the step is undone,
+# the barrel clipped again under 42, and the door back on its plan; 44
+# after the 15th (sanity).
+law barrel_stops_door:
+  {(Closed.ceil(Closed.idled(13n, Closed.closing(Closed.barrel(24, 4718592, 1048576))), 1),
+    Closed.ceil(Closed.idled(14n, Closed.closing(Closed.barrel(24, 4718592, 1048576))), 1),
+    S.State.thinkers(Closed.idled(14n, Closed.closing(Closed.barrel(24, 4718592, 1048576)))),
+    Closed.things(Closed.idled(14n, Closed.closing(Closed.barrel(24, 4718592, 1048576)))),
+    Closed.ceil(Closed.idled(15n, Closed.closing(Closed.barrel(24, 4718592, 1048576))), 1))
+    == (2752512, 2752512,
+      [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
+        [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}]}],
+      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 34, 6}], 2883584)
+    : U32 & U32 & List<&2, S.Thinker> & List<&2, H.Thing> & U32}
+
+# LAW: a lamp is solid but not shootable, and vanilla's PIT_ChangeSector
+# passes over it: the door closes on the lamp at (72, 16) as on nothing,
+# shut after 34 tics, its thinker ended on the 35th, the lamp still on
+# its floor under a ceiling at 0 (sanity).
+law lamp_under_door:
+  {(Closed.ceil(Closed.idled(34n, Closed.closing(Closed.lamp(8, 4718592, 1048576, 0))), 1),
+    S.State.thinkers(Closed.idled(35n, Closed.closing(Closed.lamp(8, 4718592, 1048576, 0)))),
+    Closed.things(Closed.idled(35n, Closed.closing(Closed.lamp(8, 4718592, 1048576, 0)))))
+    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 33, 4294967295}])
+    : U32 & List<&2, S.Thinker> & List<&2, H.Thing>}
+
+# LAW: vanilla's T_MovePlane lets a ceiling rise short of its
+# destination whatever it leaves unfit. A barrel at (72, 100) across the
+# shut door does not fit under it, yet the door used on tic 1 is 2 up
+# after it and 4 after the second, the barrel's ceiling rising with it
+# (sanity).
+law door_opens_over_barrel:
+  {(Closed.ceil(Closed.used(0n, S.State.populated([Closed.barrel(24, 4718592, 6553600)], 128, Closed.west())), 1),
+    Closed.things(Closed.used(1n, S.State.populated([Closed.barrel(24, 4718592, 6553600)], 128, Closed.west()))))
+    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 34, 6}]) : U32 & List<&2, H.Thing>}
 
 # The renderer
 # ------------

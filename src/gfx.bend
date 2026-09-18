@@ -645,12 +645,12 @@ def Gfx.sprite.states.go(things: List<&2, H.Thing>) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, sector, state, tics} <> rest:
       state <> Gfx.sprite.states.go(rest)
 
 # The state rows the level's things spawn in.
 def Gfx.sprite.states(s: H.Thing.Spawn) -> List<&2, U32>:
-  H.Spawn{things, rnd} = s
+  H.Spawn{things, rnd, you} = s
   Gfx.sprite.states.go(things)
 
 def Gfx.sprite.names(states: List<&2, U32>) -> List<&2, String>:
