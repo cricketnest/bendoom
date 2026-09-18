@@ -4,14 +4,16 @@
 # made the level's first things.
 import Base
 import ./fixed.bend as F
+import ./angle.bend as A
 import ./level.bend as L
 import ./random.bend as M
 
 # A thing, Doom's mobj: its THINGS record's index, which names it for
 # good, its DoomEd type, its position with z on the floor or under the
-# ceiling, the sector under it, its state row, and the tics left in it.
+# ceiling, its facing, the sector under it, its state row, and the tics
+# left in it.
 type Thing is Data:
-  Thing{id: U32, kind: U32, x: U32, y: U32, z: U32, sector: U32, state: U32, tics: U32}
+  Thing{id: U32, kind: U32, x: U32, y: U32, z: U32, angle: U32, sector: U32, state: U32, tics: U32}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), and its tics, -1 for a state that lasts.
@@ -92,8 +94,10 @@ type Thing.Spawn is Data:
 # Doom's P_SpawnMobj and the rest of P_SpawnMapThing: one random number
 # drawn for the thing, and one more for a state that runs out, which
 # lasts that number modulo its tics, plus one. It stands on the floor of
-# the sector under it, or hangs its height under the ceiling.
-def Thing.spawn.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, s: Thing.Spawn) -> Thing.Spawn:
+# the sector under it, or hangs its height under the ceiling, and faces
+# the record's angle.
+def Thing.spawn.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, angle: U32, s: Thing.Spawn) ->
+  Thing.Spawn:
   Def{kind, +state, radius, height, flags} = d
   Spawn{things, rnd} = s
   +tics = Thing.Row.tics(Thing.row(state))
@@ -102,17 +106,17 @@ def Thing.spawn.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, s
   +after = Bool.pick(U32, runs, M.Random.next(drawn), drawn)
   +sector = L.Level.sector_at(level, x, y)
   Spawn{Thing{id, kind, x, y, Bool.pick(U32, U32.is_zero((flags .&. 256 : U32)), L.Level.floor(level, sector),
-      (L.Level.ceil(level, sector) - F.Fixed.of_map(height) : U32)), sector, state,
+      (L.Level.ceil(level, sector) - F.Fixed.of_map(height) : U32)), A.Angle.of_thing(angle), sector, state,
       Bool.pick(U32, runs, (M.Random.at(after) % tics + 1 : U32), tics)} <> things, after}
 
 def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level: L.Level, id: U32, +x: U32,
-  +y: U32, s: Thing.Spawn) -> Thing.Spawn:
+  +y: U32, angle: U32, s: Thing.Spawn) -> Thing.Spawn:
   match player skill info:
     case True{} _ _:
       Spawn{things, rnd} = s
       Spawn{things, M.Random.next(rnd)}
     case False{} True{} Some{d}:
-      Thing.spawn.mobj(d, level, id, x, y, s)
+      Thing.spawn.mobj(d, level, id, x, y, angle, s)
     case _ _ _:
       s
 
@@ -123,7 +127,7 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
 def Thing.spawn.one(+level: L.Level, id: U32, record: L.Level.Thing, s: Thing.Spawn) -> Thing.Spawn:
   L.Thing{x, y, angle, +kind, +options} = record
   Thing.spawn.if(U32.is_eq(kind, 1), Bool.and(Bool.not(U32.is_zero((options .&. 2 : U32))),
-    U32.is_zero((options .&. 16 : U32))), Thing.def(kind), level, id, x, y, s)
+    U32.is_zero((options .&. 16 : U32))), Thing.def(kind), level, id, x, y, angle, s)
 
 def Thing.spawn.go(n: Nat, +level: L.Level, +i: U32, s: Thing.Spawn) -> Thing.Spawn:
   match n:

@@ -61,6 +61,9 @@ def Laws.tables_vanilla():
 def Laws.angle_of_axes():
   {==}
 
+def Laws.sprite_rotation():
+  {==}
+
 def Laws.cmd_tables():
   {==}
 

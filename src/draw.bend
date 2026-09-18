@@ -40,13 +40,18 @@ type Draw.Plane is Data:
 type Draw.Planes is Type:
   Planes{heads: List<&2, Draw.Plane>, count: U32, cols: Array<U32>, depth: Nat, floor: U32, ceil: U32}
 
+# The sectors the walk has seen, Doom's validcount: for each, its rank
+# among them in the order the walk first reached them, from 1, and 0
+# for one not reached; and the rank the next subsector would give.
+type Draw.Seen is Data:
+  Seen{ranks: V.Vec, next: U32}
+
 # mem: the frame, the clip arrays and the graphics. solid: the solid
 # columns. walls: the stored ranges, newest first. tasks: the walk's
-# stack. planes: the visplanes. seen: 1 for each sector the walk has
-# visited, Doom's validcount.
+# stack. planes: the visplanes. seen: the sectors the walk has seen.
 type Draw is Type:
   Draw{mem: Array<U32>, solid: List<&2, C.Clip.Range>, walls: List<&2, Draw.Wall>,
-    tasks: List<&2, Draw.Task>, planes: Draw.Planes, seen: V.Vec}
+    tasks: List<&2, Draw.Task>, planes: Draw.Planes, seen: Draw.Seen}
 
 # Drawing
 # -------

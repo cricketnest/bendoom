@@ -1,8 +1,8 @@
-# Doom's R_AddSprites, R_ProjectSprite, R_DrawSprite and
-# R_DrawVisSprite: the things in the sectors the walk saw, projected
-# from the eye, clipped by the stored ranges in front of them, and drawn
-# post by post, so the gaps between posts leave the frame as it was.
-# They are drawn in the order of the things.
+# Doom's R_AddSprites, R_ProjectSprite, R_SortVisSprites, R_DrawSprite
+# and R_DrawVisSprite: the things in the sectors the walk saw, projected
+# from the eye, drawn farthest first, each clipped by the stored ranges
+# in front of it and drawn post by post, so the gaps between posts leave
+# the frame as it was.
 import Base
 import ./bytes.bend as B
 import ./vec.bend as V
@@ -18,11 +18,13 @@ import ./masked.bend as M
 # A thing as the eye sees it, Doom's vissprite: its first and last
 # columns, its scale, its origin's x, y and z and its top's z, its
 # patch's row at the eye's height, the patch's column at the first
-# column as a fraction with its step a column (the reciprocal scale),
-# the patch's index in the array, and the colormap.
+# column as a fraction with its step a column (the reciprocal scale,
+# negative for a mirrored patch), the patch's index in the array, the
+# colormap, and its place in Doom's list of vissprites: the rank of its
+# sector in the walk, and its thing's id.
 type Sprites.Vis is Data:
   Vis{x1: U32, x2: U32, scale: U32, gx: U32, gy: U32, gz: U32, gzt: U32, mid: U32, frac: U32, step: U32,
-    patch: U32, cmap: U32}
+    patch: U32, cmap: U32, rank: U32, id: U32}
 
 # Doom's -2 in the sprite's clips: a column no range has clipped yet.
 def Sprites.unclipped() -> U32:
@@ -38,52 +40,79 @@ def Sprites.project.if(shows: Bool, vis: Sprites.Vis, rest: List<&2, Sprites.Vis
     case False{}:
       rest
 
+# The rotation a thing shows, 0 for its front, from the angle of the
+# thing from the eye and the thing's facing: each rotation spans the
+# eighth of a turn centred on its own angle.
+def Sprites.rotation(seen: U32, facing: U32) -> U32:
+  ((seen - facing + 2415919104 : U32) >> 29n : U32)
+
 # Doom's R_ProjectSprite: the thing's origin turned into the view, its
-# depth tz and its offset tx across it. It shows unless it is nearer than
-# 4 units, farther aside than four times its depth, or its patch's edges,
-# placed by its offsets and scaled, fall wholly off the screen. The
-# columns are held to the screen, and the patch's fraction starts that
-# far in. Its sector's light, with no fake contrast, and its scale pick
-# the colormap.
-def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing, rest: List<&2, Sprites.Vis>) ->
-  List<&2, Sprites.Vis>:
+# depth tz and its offset tx across it, and the rotation of its frame it
+# shows. It shows unless it is nearer than 4 units, farther aside than
+# four times its depth, or its patch's edges, placed by its offsets and
+# scaled, fall wholly off the screen. The columns are held to the
+# screen, and the patch's fraction starts that far in, from its last
+# column stepping back for a mirrored patch. Its sector's light, with no
+# fake contrast, and its scale pick the colormap.
+def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, thing: H.Thing,
+  rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
   P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
-  H.Thing{id, kind, +x, +y, +z, sector, +state, tics} = thing
+  H.Thing{id, kind, +x, +y, +z, facing, sector, +state, tics} = thing
   +trx = (x - vx : U32)
   +try = (y - vy : U32)
   +tz = (F.Fixed.mul(trx, cos) + F.Fixed.mul(try, sin) : U32)
   +tx = (F.Fixed.mul(trx, sin) - F.Fixed.mul(try, cos) : U32)
   +xscale = F.Fixed.div(P.Project.centerx(), tz)
-  +left = (tx - G.Gfx.sprite(gfx, state, 2) : U32)
+  +rot = Sprites.rotation(P.View.angle_to(view, x, y), facing)
+  +width = G.Gfx.sprite(gfx, state, rot, 1)
+  +left = (tx - G.Gfx.sprite(gfx, state, rot, 2) : U32)
   +x1 = F.Fixed.sarn((P.Project.centerx() + F.Fixed.mul(left, xscale) : U32), 16n)
-  +x2 = (F.Fixed.sarn((P.Project.centerx() + F.Fixed.mul((left + G.Gfx.sprite(gfx, state, 1) : U32), xscale)
-    : U32), 16n) - 1 : U32)
-  +gzt = (z + G.Gfx.sprite(gfx, state, 3) : U32)
-  +step = F.Fixed.div(65536, xscale)
+  +x2 = (F.Fixed.sarn((P.Project.centerx() + F.Fixed.mul((left + width : U32), xscale) : U32), 16n) - 1 : U32)
+  +gzt = (z + G.Gfx.sprite(gfx, state, rot, 3) : U32)
+  +flip = U32.is_eq(G.Gfx.sprite(gfx, state, rot, 4), 1)
+  +iscale = F.Fixed.div(65536, xscale)
+  +step = Bool.pick(U32, flip, F.Fixed.neg(iscale), iscale)
   +first = F.Fixed.max(x1, 0)
   Sprites.project.if(Bool.and(F.Fixed.ge(tz, 262144), Bool.and(F.Fixed.le(F.Fixed.abs(tx), (tz << 2n : U32)),
       Bool.and(F.Fixed.le(x1, 320), F.Fixed.ge(x2, 0)))),
-    Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32), (step * (first - x1) : U32), step,
-      G.Gfx.sprite(gfx, state, 0), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale)},
+    Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32),
+      (Bool.pick(U32, flip, (width - 1 : U32), 0) + step * (first - x1) : U32), step,
+      G.Gfx.sprite(gfx, state, rot, 0), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale),
+      rank, id},
     rest)
 
-def Sprites.gather.if(seen: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing,
+def Sprites.gather.if(seen: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, thing: H.Thing,
   rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
   match seen:
     case True{}:
-      Sprites.project(view, level, gfx, thing, rest)
+      Sprites.project(view, level, gfx, rank, thing, rest)
     case False{}:
       rest
 
-# Doom's R_AddSprites: the things of each sector the walk saw.
-def Sprites.gather(things: List<&2, H.Thing>, +seen: V.Vec, +view: P.View, +level: L.Level, +gfx: G.Gfx) ->
+def Sprites.gather.at(+rank: U32, +view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing,
+  rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
+  Sprites.gather.if(Bool.not(U32.is_zero(rank)), view, level, gfx, rank, thing, rest)
+
+# Doom's R_AddSprites: the things of each sector the walk saw, each
+# once, since each thing is met once.
+def Sprites.gather(things: List<&2, H.Thing>, +ranks: V.Vec, +view: P.View, +level: L.Level, +gfx: G.Gfx) ->
   List<&2, Sprites.Vis>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, +sector, state, tics} <> rest:
-      Sprites.gather.if(U32.is_eq(V.Vec.get(seen, sector), 1), view, level, gfx,
-        H.Thing{id, kind, x, y, z, sector, state, tics}, Sprites.gather(rest, seen, view, level, gfx))
+    case H.Thing{id, kind, x, y, z, angle, +sector, state, tics} <> rest:
+      Sprites.gather.at(V.Vec.get(ranks, sector), view, level, gfx,
+        H.Thing{id, kind, x, y, z, angle, sector, state, tics}, Sprites.gather(rest, ranks, view, level, gfx))
+
+# Doom's R_SortVisSprites: whether a sprite is drawn before another. The
+# smaller scale goes first; of equal scales, the one earlier in Doom's
+# list, which holds the walk's sectors in the order it reached them,
+# and each sector's things newest first, as a sector's list does.
+def Sprites.before(a: Sprites.Vis, b: Sprites.Vis) -> Bool:
+  Vis{x1, x2, +sa, gx, gy, gz, gzt, mid, frac, step, patch, cmap, +ra, +ia} = a
+  Vis{y1, y2, +sb, hx, hy, hz, hzt, bmid, bfrac, bstep, bpatch, bcmap, +rb, +ib} = b
+  Bool.or(F.Fixed.lt(sa, sb), Bool.and(U32.is_eq(sa, sb),
+    Bool.or(U32.is_lt(ra, rb), Bool.and(U32.is_eq(ra, rb), U32.is_gt(ia, ib)))))
 
 # Clipping
 # --------
@@ -125,7 +154,7 @@ def Sprites.behind(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
 # over the height it clips below, above unless the sprite's top is at or
 # under the height it clips above.
 def Sprites.clip.range(+level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, mem: Array<U32>) -> Array<U32>:
-  Vis{+sx1, +sx2, +scale, +gx, +gy, +gz, +gzt, mid, frac, step, patch, cmap} = vis
+  Vis{+sx1, +sx2, +scale, +gx, +gy, +gz, +gzt, mid, frac, step, patch, cmap, rank, id} = vis
   D.Wall{seg, +x1, +x2, +scale1, +scale2, wstep, +sil, +bsil, +tsil, texcols, tops, bottoms} = wall
   +bottom = Bool.and(Bool.not(U32.is_zero((sil .&. 1 : U32))), F.Fixed.lt(gz, bsil))
   +top = Bool.and(Bool.not(U32.is_zero((sil .&. 2 : U32))), F.Fixed.gt(gzt, tsil))
@@ -137,7 +166,7 @@ def Sprites.clip.range(+level: L.Level, +vis: Sprites.Vis, wall: D.Draw.Wall, me
 # Whether a range can clip the sprite at all, the test vanilla makes
 # first: it has a silhouette and shares a column with the sprite.
 def Sprites.clip.meets(+vis: Sprites.Vis, +wall: D.Draw.Wall) -> Bool:
-  Vis{+sx1, +sx2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap} = vis
+  Vis{+sx1, +sx2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
   D.Wall{seg, +x1, +x2, scale1, scale2, wstep, sil, bsil, tsil, texcols, tops, bottoms} = wall
   Bool.and(Bool.not(U32.is_zero(sil)), Bool.and(U32.is_le(x1, sx2), U32.is_ge(x2, sx1)))
 
@@ -174,7 +203,7 @@ def Sprites.Col.mem(st: Sprites.Col) -> Array<U32>:
 # drawn through the clips, those no range set being the screen's edges.
 def Sprites.col.draw(+x: U32, +vis: Sprites.Vis, frac: U32, +cc: U32, +fc: U32, p: Array<U32> & U32) ->
   Sprites.Col:
-  Vis{x1, x2, +scale, gx, gy, gz, gzt, +mid, f, +step, +patch, cmap} = vis
+  Vis{x1, x2, +scale, gx, gy, gz, gzt, +mid, f, +step, +patch, cmap, rank, id} = vis
   (mem, offset) = p
   Col{G.Gfx.posts(~M.Masked.Col, ~M.Masked.post, 256n, G.Post{False{}, mem, (patch + offset : U32)},
       M.Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, step, cmap,
@@ -183,7 +212,7 @@ def Sprites.col.draw(+x: U32, +vis: Sprites.Vis, frac: U32, +cc: U32, +fc: U32, 
     vis, (frac + step : U32)}
 
 def Sprites.col.bottom(+x: U32, +vis: Sprites.Vis, +frac: U32, cc: U32, p: Array<U32> & U32) -> Sprites.Col:
-  Vis{x1, x2, scale, gx, gy, gz, gzt, mid, f, step, +patch, cmap} = vis
+  Vis{x1, x2, scale, gx, gy, gz, gzt, mid, f, step, +patch, cmap, rank, id} = vis
   (mem, fc) = p
   Sprites.col.draw(x, vis, frac, cc, fc, B.Bytes.u32(mem, (patch + 8 + (frac >> 16n) * 4 : U32)))
 
@@ -200,7 +229,7 @@ def Sprites.col(i: Nat, st: Sprites.Col) -> Sprites.Col:
 # stored range, then drawn.
 def Sprites.sprite(+walls: List<&2, D.Draw.Wall>, +level: L.Level, +vis: Sprites.Vis, mem: Array<U32>) ->
   Array<U32>:
-  Vis{+x1, +x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap} = vis
+  Vis{+x1, +x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
   +n = D.Draw.rows(x1, x2)
   Sprites.Col.mem(D.Draw.each(~Sprites.Col, ~Sprites.col, n, U32.to_nat(x1),
     Col{Sprites.clip.walls(walls, level, vis, D.Draw.set(n, D.Draw.set(n, mem, (G.Gfx.cliptop() + x1 : U32),
@@ -213,3 +242,11 @@ def Sprites.draw(sprites: List<&2, Sprites.Vis>, +walls: List<&2, D.Draw.Wall>, 
       mem
     case vis <> rest:
       Sprites.draw(rest, walls, level, Sprites.sprite(walls, level, vis, mem))
+
+# Doom's R_DrawMasked, the sprites' half: the things of the sectors the
+# walk saw, drawn farthest first.
+def Sprites.masked(things: List<&2, H.Thing>, seen: D.Draw.Seen, +view: P.View, +level: L.Level, +gfx: G.Gfx,
+  +walls: List<&2, D.Draw.Wall>, mem: Array<U32>) -> Array<U32>:
+  D.Seen{ranks, next} = seen
+  Sprites.draw(List.sort(~Sprites.Vis, ~Sprites.before, Sprites.gather(things, ranks, view, level, gfx)), walls,
+    level, mem)

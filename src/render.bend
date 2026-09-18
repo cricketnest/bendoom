@@ -23,8 +23,8 @@ def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
 def Render.rest(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, st: D.Draw) ->
   Array<U32>:
   D.Draw{mem, solid, +walls, tasks, planes, seen} = st
-  M.Masked.draw(walls, view, level, gfx, T.Sprites.draw(T.Sprites.gather(things, seen, view, level, gfx), walls,
-    level, N.Planes.draw(view, gfx, mem, planes)))
+  M.Masked.draw(walls, view, level, gfx, T.Sprites.masked(things, seen, view, level, gfx, walls,
+    N.Planes.draw(view, gfx, mem, planes)))
 
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, mem: Array<U32>) ->
   Array<U32>:

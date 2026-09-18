@@ -22,9 +22,19 @@
 # Hurt Me Plenty, and a record west of the origin. Its sprite, SPOSL0
 # between S_START and S_END, is 52 wide with offsets 26 and 20; column
 # 0 is one post at row 16, one texel long, and column 26's first post
-# starts at row 1, 17 long, its column offsets being 216 and 659.
+# starts at row 1, 17 long, its column offsets being 216 and 659. Then
+# sprite definitions built from the sprite namespace by the rules of
+# R_InitSpriteDefs and R_InstallSpriteLump, each rotation's lump and 1
+# if mirrored, rotation 1 first. No spawn state of milestone 5 has a
+# rotated frame, so they are read here: PLAY's frame A, whose rotations
+# 2 to 4 are mirrored to 8 to 6 (PLAYA1, PLAYA2A8, PLAYA3A7, PLAYA4A6,
+# PLAYA5 in the WAD); POSS's frame A, eight lumps; SPOS's frame L, one
+# lump for every side; PLAY's frame X, past its last, W; and four
+# namespaces that vanilla refuses, written here.
 import Base
 import ../src/bytes.bend as B
+import ../src/wad.bend as W
+import ../src/things.bend as H
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
@@ -142,9 +152,44 @@ def thing(+i: U32, t: L.Level.Thing) -> String:
 # offsets, then the header and first texel of column 0's post, the end
 # marker after it, and column 26's first post's header and first texel.
 def sprite(+gfx: G.Gfx) -> List<&2, U32>:
-  +patch = G.Gfx.sprite(gfx, 6, 0)
+  +patch = G.Gfx.sprite(gfx, 6, 0, 0)
   [(patch + 216 : U32), (patch + 217 : U32), (patch + 219 : U32), (patch + 221 : U32), (patch + 659 : U32),
     (patch + 660 : U32), (patch + 662 : U32)]
+
+def installs(vs: List<&2, G.Gfx.Install>) -> List<&2, String>:
+  match vs:
+    case []:
+      []
+    case G.Install{frame, rot, name, flip} <> rest:
+      (name ++ " " ++ U32.show(flip)) <> installs(rest)
+
+def views(r: Result<&1, &1, U32 & String, List<&2, G.Gfx.Install>>) -> String:
+  match r:
+    case Fail{e}:
+      Pair.snd(U32, String, e)
+    case Done{vs}:
+      String.join(installs(vs), " ")
+
+def test(names: List<&2, String>) -> List<&2, W.Wad.Lump>:
+  match names:
+    case []:
+      []
+    case name <> rest:
+      W.Lump{0, 0, name} <> test(rest)
+
+def defs(p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
+  (bytes, lumps) = p
+  +space = G.Gfx.sprite.space(lumps, False{})
+  do IO<Unit>:
+    IO.print("PLAY A " ++ views(G.Gfx.sprite.def(space, H.Row{"PLAY", 0, 0})))
+    IO.print("POSS A " ++ views(G.Gfx.sprite.def(space, H.Row{"POSS", 0, 0})))
+    IO.print("SPOS L " ++ views(G.Gfx.sprite.def(space, H.Row{"SPOS", 11, 0})))
+    IO.print("PLAY X " ++ views(G.Gfx.sprite.def(space, H.Row{"PLAY", 23, 0})))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA1"]), H.Row{"TEST", 0, 0})))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA0"]), H.Row{"TEST", 0, 0})))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA1", "TESTA2", "TESTA3", "TESTA4", "TESTA5", "TESTA6", "TESTA7"]),
+      H.Row{"TEST", 0, 0})))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTC0"]), H.Row{"TEST", 0, 0})))
 
 def blocks(b: L.Level.Box) -> String:
   L.Box{top, bottom, left, right} = b
@@ -168,8 +213,8 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(thing(157, L.Level.thing(level, 157)))
     IO.print(thing(245, L.Level.thing(level, 245)))
     IO.print(thing(42, L.Level.thing(level, 42)))
-    IO.print("sprite of state 6 width " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 1)) ++ " offset "
-      ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 3)))
+    IO.print("sprite of state 6 width " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 0, 1)) ++ " offset "
+      ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 0, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, 6, 0, 3)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -195,6 +240,9 @@ def main() -> IO(Unit):
   do IO<Unit>:
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     report(world)
+    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
+    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
+    defs(W.Wad.dir(bytes))
 
 #|seg 0 from 448.000000 896.000000 to 256.000000 896.000000 angle 180.000 offset 0.000000 flags 4 side 344 front 122 back 8
 #|seg 75 from -208.000000 1472.000000 to 0.000000 1472.000000 angle 0.000 offset 112.000000 flags 4 side 337 front 135 back 36
@@ -222,3 +270,11 @@ def main() -> IO(Unit):
 #|switches 105 121 105 0
 #|animations 0 3 1 5, 2 4 3 7, 2 4 3 7, 0 5 4 8, 1 5 4 8
 #|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207 16 1 64 255 1 17 8
+#|PLAY A PLAYA1 0 PLAYA2A8 0 PLAYA3A7 0 PLAYA4A6 0 PLAYA5 0 PLAYA4A6 1 PLAYA3A7 1 PLAYA2A8 1
+#|POSS A POSSA1 0 POSSA2 0 POSSA3 0 POSSA4 0 POSSA5 0 POSSA6 0 POSSA7 0 POSSA8 0
+#|SPOS L SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0
+#|PLAY X R_ProjectSprite: no frame X of sprite PLAY
+#|R_InitSprites: Sprite TEST frame A has rotations and a rot=0 lump
+#|R_InitSprites: Sprite TEST frame A has multip rot=0 lump
+#|R_InitSprites: Sprite TEST frame A is missing rotations
+#|R_InitSprites: Sprite TEST frame B has no patches

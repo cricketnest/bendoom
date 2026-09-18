@@ -17,6 +17,7 @@ import ./src/draw.bend as D
 import ./src/segs.bend as R
 import ./src/planes.bend as N
 import ./src/gfx.bend as G
+import ./src/sprites.bend as Z
 
 # Bytes and the WAD
 # -----------------
@@ -119,6 +120,19 @@ law angle_of_axes:
   {(A.Angle.of(V.Vec.of_list(T.Tables.tantoangle(), 2049), 65536, 0),
     A.Angle.of(V.Vec.of_list(T.Tables.tantoangle(), 2049), 0, 65536))
     == (0, 1073741823) : U32 & U32}
+
+# LAW: the rotation a thing shows, by R_ProjectSprite's rule from the
+# angle of the thing from the eye and the thing's facing, 0 for its
+# front. Facing east, it shows its front to an eye east of it (the angle
+# 180), its back to one west (0), 2 to one north (270) and 6 to one
+# south (90); facing north, its front to one north. A rotation spans
+# the eighth of a turn centred on its angle, so the front runs from
+# 157.5 degrees (0x70000000) and one less is 7 (sanity).
+law sprite_rotation:
+  {(Z.Sprites.rotation(A.Angle.ang180(), 0), Z.Sprites.rotation(0, 0), Z.Sprites.rotation(A.Angle.ang270(), 0),
+    Z.Sprites.rotation(A.Angle.ang90(), 0), Z.Sprites.rotation(A.Angle.ang270(), A.Angle.ang90()),
+    Z.Sprites.rotation(1879048192, 0), Z.Sprites.rotation(1879048191, 0))
+    == (0, 4, 2, 6, 0, 0, 7) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # Keys
 # ----

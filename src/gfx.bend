@@ -4,8 +4,8 @@
 # holds the frame and the draw's per-column scratch first, then the
 # palette as RGB words, the colormaps, and the lumps: the flats the
 # sectors name, then the patches of the textures the sides name, then
-# the composed columns, then the sprites of the states the map's things
-# spawn in; with the map's names go every frame of the animations they
+# the composed columns, then the sprite lumps of the frames the map's
+# things spawn in, every rotation; with the map's names go every frame of the animations they
 # touch and the partners of their switches. Gfx is the directory into
 # it: Data, so the draw takes it by copy. Every other flat, texture and
 # sprite stays a name in the WAD.
@@ -34,10 +34,10 @@ type Gfx.Anims is Data:
 # column), texture 0 being none. cols: every texture's columns, each the
 # index of its texels in the array. sidetex: a side's top, bottom and
 # middle texture numbers, three a side. skytex: the sky's texture.
-# sprites: four words a state row, for the rows the map's things spawn
-# in: the index of its sprite's patch, and the patch's width, left
+# sprites: for each rotation of each state row the map's things spawn
+# in, five words: the index of its lump's patch, the patch's width, left
 # offset and top offset in fixed point (Doom's spritewidth, spriteoffset
-# and spritetopoffset).
+# and spritetopoffset), and 1 when it is mirrored.
 type Gfx is Data:
   Gfx{flats: V.Vec, pics: V.Vec, sky: U32, texs: V.Vec, cols: V.Vec, sidetex: V.Vec, skytex: U32,
     sprites: V.Vec, anims: Gfx.Anims}
@@ -635,49 +635,248 @@ def Gfx.sprite.space(lumps: List<&2, W.Wad.Lump>, inside: Bool) -> List<&2, W.Wa
     case W.Lump{pos, size, +name} <> rest True{}:
       W.Lump{pos, size, name} <> Gfx.sprite.space(rest, Bool.not(String.eq(name, "S_END")))
 
-# The lump of a state row's frame, seen from every side: the sprite's
-# name, the frame's letter and rotation 0.
-def Gfx.sprite.name(r: H.Thing.Row) -> String:
-  H.Row{sprite, frame, tics} = r
-  sprite ++ String.from_list([Char.from_u32((65 + frame : U32)), Char.from_u32(48)])
+# What a sprite lump installs, the arguments of Doom's
+# R_InstallSpriteLump: a frame, 0 for A; a rotation, 0 for a lump seen
+# from every side, else 1 (the front) to 8; the lump's name; and 1 when
+# it is mirrored.
+type Gfx.Install is Data:
+  Install{frame: U32, rot: U32, name: String, flip: U32}
 
-def Gfx.sprite.states.go(things: List<&2, H.Thing>) -> List<&2, U32>:
+# The character at k of a lump's name, 0 past its end, as in the
+# directory's NUL-padded bytes.
+def Gfx.char(name: String, k: Nat) -> U32:
+  Char.to_u32(Maybe.default(&2, Char, String.get(name, k), Char.from_u32(0)))
+
+def Gfx.install(+name: String, +k: Nat, flip: U32) -> Gfx.Install:
+  Install{(Gfx.char(name, k) - 65 : U32), (Gfx.char(name, 1n+k) - 48 : U32), name, flip}
+
+def Gfx.installs.if(hit: Bool, mirrored: Bool, +name: String, rest: List<&2, Gfx.Install>) ->
+  List<&2, Gfx.Install>:
+  match hit mirrored:
+    case True{} True{}:
+      Gfx.install(name, 4n, 0) <> Gfx.install(name, 6n, 1) <> rest
+    case True{} False{}:
+      Gfx.install(name, 4n, 0) <> rest
+    case False{} _:
+      rest
+
+# Doom's R_InitSpriteDefs' scan for one sprite: each lump whose name
+# starts with the sprite's four letters installs the frame and rotation
+# its fifth and sixth characters name, and, when it has a seventh, the
+# seventh and eighth's mirrored.
+def Gfx.installs(lumps: List<&2, W.Wad.Lump>, +sprite: String) -> List<&2, Gfx.Install>:
+  match lumps:
+    case []:
+      []
+    case W.Lump{pos, size, +name} <> rest:
+      Gfx.installs.if(String.starts_with(name, sprite), Bool.not(U32.is_zero(Gfx.char(name, 6n))), name,
+        Gfx.installs(rest, sprite))
+
+# How many frames a sprite's installs name: one past the last.
+def Gfx.frames(installs: List<&2, Gfx.Install>) -> U32:
+  match installs:
+    case []:
+      0
+    case Install{frame, rot, name, flip} <> rest:
+      U32.max((frame + 1 : U32), Gfx.frames(rest))
+
+# A frame's installs: how many are seen from every side, and how many
+# are rotations with the rotations as bits 1 to 8 (one past 8 sets a
+# bit past 8).
+type Gfx.Tally is Data:
+  Tally{zeros: U32, rotated: U32, rots: U32}
+
+def Gfx.tally(installs: List<&2, Gfx.Install>, +frame: U32, t: Gfx.Tally) -> Gfx.Tally:
+  match installs:
+    case []:
+      t
+    case Install{+f, +rot, name, flip} <> rest:
+      Tally{zeros, rotated, rots} = t
+      +here = U32.is_eq(f, frame)
+      +turned = Bool.and(here, Bool.not(U32.is_zero(rot)))
+      Gfx.tally(rest, frame, Tally{(zeros + Bool.to_u32(Bool.and(here, U32.is_zero(rot))) : U32),
+        (rotated + Bool.to_u32(turned) : U32),
+        (rots .|. Bool.pick(U32, turned, U32.shln(1, U32.to_nat(U32.min(rot, 10))), 0) : U32)})
+
+# Vanilla takes a frame of one lump for every side or of eight lumps,
+# one a rotation.
+def Gfx.tally.right(t: Gfx.Tally) -> Bool:
+  Tally{+zeros, +rotated, +rots} = t
+  Bool.or(Bool.and(U32.is_eq(zeros, 1), U32.is_zero(rotated)),
+    Bool.and(U32.is_zero(zeros), Bool.and(U32.is_eq(rotated, 8), U32.is_eq(rots, 510))))
+
+# Doom's words for what is wrong with a frame.
+def Gfx.tally.fault(t: Gfx.Tally) -> String:
+  Tally{+zeros, +rotated, rots} = t
+  Bool.pick(String, Bool.and(U32.is_zero(zeros), U32.is_zero(rotated)), "has no patches",
+    Bool.pick(String, U32.is_zero(zeros), "is missing rotations",
+      Bool.pick(String, U32.is_zero(rotated), "has multip rot=0 lump", "has rotations and a rot=0 lump")))
+
+# The first of n frames from f that vanilla refuses, or none.
+def Gfx.frames.wrong(n: Nat, +f: U32, +installs: List<&2, Gfx.Install>) -> U32:
+  match n:
+    case 0n:
+      Gfx.none()
+    case 1n+m:
+      Bool.pick(U32, Gfx.tally.right(Gfx.tally(installs, f, Tally{0, 0, 0})),
+        Gfx.frames.wrong(m, (f + 1 : U32), installs), f)
+
+def Gfx.letter(f: U32) -> String:
+  String.from_list([Char.from_u32((65 + f : U32))])
+
+# The install of a frame seen at a rotation: the frame's one for every
+# side, or the rotation's own.
+def Gfx.view(installs: List<&2, Gfx.Install>, +frame: U32, +rot: U32) -> Gfx.Install:
+  match installs:
+    case []:
+      Install{0, 0, "", 0}
+    case Install{+f, +r, name, flip} <> rest:
+      Bool.pick(Gfx.Install, Bool.and(U32.is_eq(f, frame), Bool.or(U32.is_zero(r), U32.is_eq(r, rot))),
+        Install{f, r, name, flip}, Gfx.view(rest, frame, rot))
+
+def Gfx.views(n: Nat, +rot: U32, +installs: List<&2, Gfx.Install>, +frame: U32) -> List<&2, Gfx.Install>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      Gfx.view(installs, frame, rot) <> Gfx.views(m, (rot + 1 : U32), installs, frame)
+
+def Gfx.sprite.frames(fine: Bool, +wrong: U32, +sprite: String, +frame: U32, +installs: List<&2, Gfx.Install>) ->
+  Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
+  match fine:
+    case True{}:
+      Done{Gfx.views(8n, 1, installs, frame)}
+    case False{}:
+      Fail{(1, "R_InitSprites: Sprite " ++ sprite ++ " frame " ++ Gfx.letter(wrong) ++ " "
+        ++ Gfx.tally.fault(Gfx.tally(installs, wrong, Tally{0, 0, 0})))}
+
+def Gfx.sprite.wrong(+wrong: U32, +sprite: String, +frame: U32, +installs: List<&2, Gfx.Install>) ->
+  Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
+  Gfx.sprite.frames(U32.is_eq(wrong, Gfx.none()), wrong, sprite, frame, installs)
+
+def Gfx.sprite.check(fits: Bool, +sprite: String, +frame: U32, +count: U32,
+  +installs: List<&2, Gfx.Install>) -> Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
+  match fits:
+    case True{}:
+      Gfx.sprite.wrong(Gfx.frames.wrong(U32.to_nat(count), 0, installs), sprite, frame, installs)
+    case False{}:
+      Fail{(1, Bool.pick(String, U32.is_gt(count, 29), "R_InstallSpriteLump: Bad frame characters in sprite ",
+        "R_ProjectSprite: no frame " ++ Gfx.letter(frame) ++ " of sprite ") ++ sprite)}
+
+# Doom's R_InitSpriteDefs for the sprite of a state row: its frames,
+# from A to the last its lumps name, and no more than 29, are each one
+# lump for every side or eight rotations, as vanilla requires; then the
+# row's frame seen at each rotation, 1 first. Or the error for a sprite
+# vanilla refuses or that lacks the row's frame.
+def Gfx.sprite.def(+space: List<&2, W.Wad.Lump>, r: H.Thing.Row) ->
+  Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
+  H.Row{+sprite, +frame, tics} = r
+  +installs = Gfx.installs(space, sprite)
+  +count = Gfx.frames(installs)
+  Gfx.sprite.check(Bool.and(U32.is_lt(frame, count), U32.is_le(count, 29)), sprite, frame, count, installs)
+
+def Gfx.sprite.defs.cons(d: Result<&1, &1, U32 & String, List<&2, Gfx.Install>>,
+  rest: Result<&1, &1, U32 & String, List<&2, Gfx.Install>>) -> Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
+  match d rest:
+    case Fail{e} _:
+      Fail{e}
+    case Done{x} Fail{e}:
+      Fail{e}
+    case Done{x} Done{xs}:
+      Done{List.append(&2, Gfx.Install, x, xs)}
+
+# The eight views of each row's frame, rows in turn.
+def Gfx.sprite.defs(rows: List<&2, U32>, +space: List<&2, W.Wad.Lump>) ->
+  Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
+  match rows:
+    case []:
+      Done{[]}
+    case row <> rest:
+      Gfx.sprite.defs.cons(Gfx.sprite.def(space, H.Thing.row(row)), Gfx.sprite.defs(rest, space))
+
+def Gfx.sprite.marks(things: List<&2, H.Thing>, marks: V.Vec) -> V.Vec:
   match things:
     case []:
+      marks
+    case H.Thing{id, kind, x, y, z, angle, sector, state, tics} <> rest:
+      Gfx.sprite.marks(rest, V.Vec.set(marks, state, 1))
+
+def Gfx.sprite.keep(kept: Bool, row: U32, rest: List<&2, U32>) -> List<&2, U32>:
+  match kept:
+    case True{}:
+      row <> rest
+    case False{}:
+      rest
+
+def Gfx.sprite.rows.go(n: Nat, +row: U32, +marks: V.Vec) -> List<&2, U32>:
+  match n:
+    case 0n:
       []
-    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
-      state <> Gfx.sprite.states.go(rest)
+    case 1n+m:
+      Gfx.sprite.keep(U32.is_eq(V.Vec.get(marks, row), 1), row, Gfx.sprite.rows.go(m, (row + 1 : U32), marks))
 
-# The state rows the level's things spawn in.
-def Gfx.sprite.states(s: H.Thing.Spawn) -> List<&2, U32>:
+# The state rows the level's things spawn in, each once, in order.
+def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd} = s
-  Gfx.sprite.states.go(things)
+  +n = List.length(&2, H.Thing.Row, H.Thing.rows())
+  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, V.Vec.of_list([], U32.from_nat(n))))
 
-def Gfx.sprite.names(states: List<&2, U32>) -> List<&2, String>:
-  match states:
+def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
+  match views:
     case []:
       []
-    case state <> rest:
-      Gfx.sprite.name(H.Thing.row(state)) <> Gfx.sprite.names(rest)
+    case Install{frame, rot, name, flip} <> rest:
+      name <> Gfx.install.names(rest)
 
-# The sprite lumps to copy, each once, and each spawned thing's state
-# row and the number of its lump among them.
+def Gfx.install.flips(views: List<&2, Gfx.Install>) -> List<&2, U32>:
+  match views:
+    case []:
+      []
+    case Install{frame, rot, name, flip} <> rest:
+      flip <> Gfx.install.flips(rest)
+
+# The sprite lumps to copy, each once; the state rows the things spawn
+# in; and for each row's eight views the number of its lump among them
+# and whether it is mirrored.
 type Gfx.Sprites is Data:
-  Sprites{lumps: List<&2, W.Wad.Lump>, states: List<&2, U32>, numbers: List<&2, U32>}
+  Sprites{lumps: List<&2, W.Wad.Lump>, rows: List<&2, U32>, numbers: List<&2, U32>, flips: List<&2, U32>}
 
-# Doom's R_InitSpriteLumps for the lumps copied: each spawned thing's
-# state row gets its lump's index in the array and the lump's width,
-# left offset and top offset (three words a lump in heads).
-def Gfx.sprite.table(states: List<&2, U32>, numbers: List<&2, U32>, +bases: V.Vec, +heads: V.Vec,
-  table: V.Vec) -> V.Vec:
-  match states numbers:
-    case +s <> ss +n <> ns:
-      Gfx.sprite.table(ss, ns, bases, heads, V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(table,
-        (s * 4 : U32), V.Vec.get(bases, n)),
-        (s * 4 + 1 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 : U32)))),
-        (s * 4 + 2 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 1 : U32)))),
-        (s * 4 + 3 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 2 : U32)))))
-    case _ _:
+def Gfx.sprites.found(rows: List<&2, U32>, +space: List<&2, W.Wad.Lump>, +views: List<&2, Gfx.Install>) ->
+  Result<&1, &1, U32 & String, Gfx.Sprites>:
+  +sn = Gfx.names(Gfx.install.names(views), {Names{Map.new(&2, U32), 0, [], []} : Gfx.Names})
+  Result.map(&1, &1, U32 & String, List<&2, W.Wad.Lump>, Gfx.Sprites,
+    lumps => Sprites{lumps, rows, Gfx.Names.numbers(sn), Gfx.install.flips(views)},
+    Gfx.lookup(Gfx.Names.distinct(sn), Gfx.dir(space, Map.new(&2, W.Wad.Lump)), "R_InitSprites"))
+
+# The sprites of the rows the level's things spawn in, from the WAD's
+# sprite namespace.
+def Gfx.sprites(+rows: List<&2, U32>, +space: List<&2, W.Wad.Lump>) -> Result<&1, &1, U32 & String, Gfx.Sprites>:
+  Result.bind(&1, &1, U32 & String, List<&2, Gfx.Install>, Gfx.Sprites, Gfx.sprite.defs(rows, space),
+    views => Gfx.sprites.found(rows, space, views))
+
+# Each row's eight slots in the table, row * 8 on.
+def Gfx.sprite.slots(rows: List<&2, U32>) -> List<&2, U32>:
+  match rows:
+    case []:
+      []
+    case row <> rest:
+      List.append(&2, U32, Gfx.upto(8n, (row * 8 : U32)), Gfx.sprite.slots(rest))
+
+# Doom's R_InitSpriteLumps for the lumps copied: each slot gets five
+# words from slot * 5: its lump's index in the array; the lump's width,
+# left offset and top offset in fixed point (from heads, three words a
+# lump); and 1 when it is mirrored.
+def Gfx.sprite.table(slots: List<&2, U32>, numbers: List<&2, U32>, flips: List<&2, U32>, +bases: V.Vec,
+  +heads: V.Vec, table: V.Vec) -> V.Vec:
+  match slots numbers flips:
+    case +s <> ss +n <> ns flip <> fs:
+      Gfx.sprite.table(ss, ns, fs, bases, heads, V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(table,
+        (s * 5 : U32), V.Vec.get(bases, n)),
+        (s * 5 + 1 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 : U32)))),
+        (s * 5 + 2 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 1 : U32)))),
+        (s * 5 + 3 : U32), F.Fixed.of_map(V.Vec.get(heads, (n * 3 + 2 : U32)))),
+        (s * 5 + 4 : U32), flip))
+    case _ _ _:
       table
 
 # Loading
@@ -756,7 +955,7 @@ def Gfx.plan(lumps: List<&2, W.Wad.Lump>, +fields: List<&2, U32>) -> List<&2, U3
 # pasted. heads: each sprite lump's width, left and top offsets.
 def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: List<&2, W.Wad.Lump>,
   +asm: Gfx.Asm, p: Array<U32> & List<&2, U32>) -> Array<U32> & Gfx & L.Level:
-  Base{level, +fl, pal, cmap, flats, Sprites{+slumps, states, numbers}, anims} = base
+  Base{level, +fl, pal, cmap, flats, Sprites{+slumps, rows, numbers, flips}, anims} = base
   (a, heads) = p
   +sidetex = V.Vec.of(Gfx.Names.numbers(tn))
   +sbases = Gfx.starts(Gfx.sizes(slumps), Gfx.Asm.comp(asm))
@@ -768,8 +967,8 @@ def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: Li
         Copy{a, Array.new(U32, V.Vec.depth((Gfx.last(sbases) + 128 : U32)), 0)})))),
     Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
       Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"),
-      Gfx.sprite.table(states, numbers, V.Vec.of(sbases), V.Vec.of(heads),
-        V.Vec.of_list([], (U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())) * 4 : U32))), anims},
+      Gfx.sprite.table(Gfx.sprite.slots(rows), numbers, flips, V.Vec.of(sbases), V.Vec.of(heads),
+        V.Vec.of_list([], (U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())) * 40 : U32))), anims},
     L.Level.textured(level, sidetex,
       Gfx.switch.table(Gfx.switch.pairs(), tn, V.Vec.of_list([], Gfx.Names.next(tn)))))
 
@@ -779,7 +978,7 @@ def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: Li
 def Gfx.layout(a: Array<U32>, +base: Gfx.Base, tn: Gfx.Names, headers: List<&2, U32>,
   words: List<&2, U32>, indices: List<&2, U32>, +plumps: List<&2, W.Wad.Lump>, widths: List<&2, U32>,
   +colofs: List<&2, List<&2, U32>>) -> Array<U32> & Gfx & L.Level:
-  Base{level, +fl, pal, cmap, flats, Sprites{slumps, states, numbers}, anims} = base
+  Base{level, +fl, pal, cmap, flats, Sprites{slumps, rows, numbers, flips}, anims} = base
   +fbases = Gfx.starts(Gfx.sizes(Gfx.flat.lumps(flats)), Gfx.lumps())
   +pbases = Gfx.starts(Gfx.sizes(plumps), Gfx.last(fbases))
   +ws = widths
@@ -952,17 +1151,14 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
   +frames = Gfx.anim.wanted(Gfx.anim.flats(), Gfx.flats.wad(lumps, False{}),
     Gfx.names(L.Level.flatnames(level), unnamed))
   +fl = Gfx.names.after(frames, L.Level.flatnames(level), unnamed)
-  +states = Gfx.sprite.states(H.Thing.spawn(level))
-  +sn = Gfx.names(Gfx.sprite.names(states), unnamed)
   do Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
     pal : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PLAYPAL")
     cmap : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "COLORMAP")
     flats : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.Names.distinct(fl), dir, "R_FlatNumForName")
     pnames : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PNAMES")
     texture1 : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "TEXTURE1")
-    sprites : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.Names.distinct(sn),
-      Gfx.dir(Gfx.sprite.space(lumps, False{}), Map.new(&2, W.Wad.Lump)), "R_InitSprites")
-    Gfx.load.textures(Base{level, fl, pal, cmap, flats, Sprites{sprites, states, Gfx.Names.numbers(sn)},
+    sprites : Gfx.Sprites <- Gfx.sprites(Gfx.sprite.rows(H.Thing.spawn(level)), Gfx.sprite.space(lumps, False{}))
+    Gfx.load.textures(Base{level, fl, pal, cmap, flats, sprites,
       Anims{Gfx.anim.of(frames, 0, Gfx.Names.next(fl)), Gfx.anim.of([], 1, 0), 0}}, dir, a, pnames, texture1)
 
 # The level and its graphics from the WAD's bytes and directory, or
@@ -1067,8 +1263,9 @@ def Gfx.of_state(g: Gfx, sidetex: V.Vec, +clock: U32) -> Gfx:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites,
     Anims{Gfx.Anim.at(flatanim, clock), Gfx.Anim.at(texanim, clock), clock}}
 
-# Word k of a state row's sprite: 0 its patch's index, 1 its width, 2
-# its left offset, 3 its top offset.
-def Gfx.sprite(+g: Gfx, state: U32, k: U32) -> U32:
+# Word k of a state row's sprite seen at rotation index rot (0 for
+# rotation 1): 0 its patch's index, 1 its width, 2 its left offset, 3
+# its top offset, 4 whether it is mirrored.
+def Gfx.sprite(+g: Gfx, state: U32, rot: U32, k: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims} = g
-  V.Vec.get(sprites, (state * 4 + k : U32))
+  V.Vec.get(sprites, ((state * 8 + rot) * 5 + k : U32))

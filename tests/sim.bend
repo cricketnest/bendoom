@@ -14,7 +14,8 @@
 # monster and 7 for multiplayer), and six records: the first, animated
 # armour, a leg hung from its ceiling, the blue key, the dead former
 # sergeant and the last, each with the sector under it (tools/wad.nu's
-# sector-at), its z, its state row, its tics and its definition.
+# sector-at), its z, its facing (its record's angle), its state row,
+# its tics and its definition.
 # Then the movers and the lights, as runs of one command in a demo's
 # units from a place, each line with the clock, the thinkers running
 # and chosen sectors' floors and ceilings: the first door used, turned
@@ -233,7 +234,7 @@ def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
   match things:
     case []:
       0
-    case H.Thing{id, k, x, y, z, sector, state, tics} <> rest:
+    case H.Thing{id, k, x, y, z, angle, sector, state, tics} <> rest:
       (Bool.to_u32(U32.is_eq(k, kind)) + count(rest, kind) : U32)
 
 # How many things of each type Bendoom defines.
@@ -248,7 +249,7 @@ def ids(things: List<&2, H.Thing>) -> String:
   match things:
     case []:
       ""
-    case H.Thing{id, kind, x, y, z, sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, angle, sector, state, tics} <> rest:
       " " ++ U32.show(id) ++ ids(rest)
 
 def described(d: Maybe<&2, H.Thing.Def>) -> String:
@@ -263,9 +264,9 @@ def shown(hit: Bool, t: H.Thing, rest: String) -> String:
     case False{}:
       rest
     case True{}:
-      H.Thing{id, +kind, x, y, z, sector, state, tics} = t
+      H.Thing{id, +kind, x, y, z, angle, sector, state, tics} = t
       "thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
-        ++ " z " ++ F.Fixed.show(z) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ " tics "
+        ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ " tics "
         ++ U32.show(tics) ++ described(H.Thing.def(kind))
 
 # The line of the thing named id, empty when none has that name.
@@ -273,8 +274,8 @@ def thing(things: List<&2, H.Thing>, +id: U32) -> String:
   match things:
     case []:
       ""
-    case H.Thing{+i, kind, x, y, z, sector, state, tics} <> rest:
-      shown(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, sector, state, tics}, thing(rest, id))
+    case H.Thing{+i, kind, x, y, z, angle, sector, state, tics} <> rest:
+      shown(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, angle, sector, state, tics}, thing(rest, id))
 
 def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
   match chosen:
@@ -335,12 +336,12 @@ def main() -> IO(Unit):
 #|things at start 180 random 1
 #|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1
 #|first 2 6 8 9 10 11 12 13 14 15 16 17
-#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 sector 139 state 21 tics 4294967295 radius 20 height 16 flags 1
-#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 sector 130 state 30 tics 5 radius 20 height 16 flags 1
-#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 sector 153 state 16 tics 4294967295 radius 20 height 68 flags 768
-#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 sector 35 state 0 tics 3 radius 20 height 16 flags 33554433
-#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 sector 170 state 6 tics 4294967295 radius 20 height 16 flags 0
-#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 sector 150 state 32 tics 4294967295 radius 20 height 16 flags 8388609
+#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 21 tics 4294967295 radius 20 height 16 flags 1
+#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 angle 270.000 sector 130 state 30 tics 5 radius 20 height 16 flags 1
+#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 angle 90.000 sector 153 state 16 tics 4294967295 radius 20 height 68 flags 768
+#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 angle 270.000 sector 35 state 0 tics 3 radius 20 height 16 flags 33554433
+#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 angle 90.000 sector 170 state 6 tics 4294967295 radius 20 height 16 flags 0
+#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 angle 270.000 sector 150 state 32 tics 4294967295 radius 20 height 16 flags 8388609
 #|U:1 -415.218765 256.000289 0.000 z 0.000000 floor 0.000000 eye 41.000015
 #|U!:34 3.282882 256.157440 0.000 z 0.000000 floor 0.000000 eye 33.430175
 #|L:20 137.245544 256.206893 61.523 z -48.000000 floor -48.000000 eye 44.403701

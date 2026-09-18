@@ -32,10 +32,17 @@ def Bsp.plane(wanted: Bool, isfloor: Bool, height: U32, +pic: U32, light: U32, +
   +sky = U32.is_eq(pic, G.Gfx.sky(gfx))
   N.Planes.claim(wanted, isfloor, Bool.pick(U32, sky, 0, height), pic, Bool.pick(U32, sky, 0, light), ps)
 
+# A sector seen: ranked when the walk first reaches it, where Doom's
+# R_AddSprites gathers its things, once however many subsectors it is
+# split into.
+def Bsp.see(seen: D.Draw.Seen, +s: U32) -> D.Draw.Seen:
+  D.Seen{+ranks, +next} = seen
+  +was = V.Vec.get(ranks, s)
+  D.Seen{V.Vec.set(ranks, s, Bool.pick(U32, U32.is_zero(was), next, was)), (next + 1 : U32)}
+
 # The floor's plane when the eye is above it, the ceiling's when the eye
 # is below it or it is the sky, then the segs, in order; and the sector
-# seen, whose things Doom's R_AddSprites gathers once however many
-# subsectors it is split into.
+# seen.
 def Bsp.sub.planes(+view: P.View, +gfx: G.Gfx, s: U32, sector: L.Level.Sector, floorpic: U32, +ceilpic: U32,
   sub: L.Level.Sub, st: D.Draw) -> D.Draw:
   L.Sector{+floor, +ceil, +light} = sector
@@ -45,7 +52,7 @@ def Bsp.sub.planes(+view: P.View, +gfx: G.Gfx, s: U32, sector: L.Level.Sector, f
     Bsp.plane(Bool.or(F.Fixed.gt(ceil, P.View.z(view)), U32.is_eq(ceilpic, G.Gfx.sky(gfx))), False{}, ceil,
       ceilpic, light, gfx,
       Bsp.plane(F.Fixed.lt(floor, P.View.z(view)), True{}, floor, floorpic, light, gfx, planes)),
-    V.Vec.set(seen, s, 1)}
+    Bsp.see(seen, s)}
 
 # Doom's R_Subsector.
 def Bsp.sub(+view: P.View, +level: L.Level, +gfx: G.Gfx, +ss: U32, st: D.Draw) -> D.Draw:
@@ -127,4 +134,4 @@ def Bsp.go(fuel: Nat, st: D.Draw, +view: P.View, +level: L.Level, +gfx: G.Gfx) -
 # map's nodes and segs) spent.
 def Bsp.walk(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) -> D.Draw:
   Bsp.go(U32.to_nat(16777216), D.Draw{mem, [], [], [D.Visit{L.Level.root(level)}], N.Planes.start(),
-    V.Vec.of_list([], L.Level.nsectors(level))}, view, level, gfx)
+    D.Seen{V.Vec.of_list([], L.Level.nsectors(level)), 1}}, view, level, gfx)
