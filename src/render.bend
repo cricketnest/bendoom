@@ -26,7 +26,8 @@ def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, mem: Array<U32>) ->
   Render.rest(view, level, gfx, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem)))
 
 # The sectors' heights and light come from the state's level, the
-# sides' textures from the state.
+# sides' textures from the state, and the animations' frames and the
+# walls' scroll from its clock.
 def Render.frame(tables: P.Project.Tables, gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> Array<U32>:
   Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
-    G.Gfx.sided(gfx, S.State.sidetex(s)), mem)
+    G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), mem)

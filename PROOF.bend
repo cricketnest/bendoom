@@ -1149,3 +1149,6 @@ def Laws.each_in_order(n, i):
       %add_succ(m, i)
         : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{True{}, 1n+i}) == Laws.Seq{True{}, _} : Laws.Seq}
       Laws.each_in_order(m, 1n+i)
+
+def Laws.animation_frames():
+  {==}

@@ -26,7 +26,7 @@ The oracle (headless, about 10 s plus the script's length):
     nix develop -c bash -c 'unset LD_LIBRARY_PATH; bend tools/frame.bend -o /tmp/frame'
     nix develop -c nu -c 'hide-env --ignore-errors LD_LIBRARY_PATH; nu tools/oracle.nu 832 384 90 "20,0,0,0,0 20,25,0,0,0 1,0,0,0,1 20,0,0,0,0" --frame /tmp/frame'
 
-A script is runs of `count,forward,side,turn,use` in a demo's units; the place is where the PWAD starts the player. `tools/walk.bend` prints where a script leaves the sim, run by run, with chosen sectors' heights (`FRAME`, `SCRIPT`, `SECTORS` in the environment); it is how runs are found. Until ticket 11 lands, a compared frame with animated flats in view must fall where they show the map's frame: total tics 57 to 64 modulo 96 for Freedoom's water and nukage (ticket 02's comments have the arithmetic). Idle first to get there; both sides run the same script.
+A script is runs of `count,forward,side,turn,use` in a demo's units; the place is where the PWAD starts the player. `tools/walk.bend` prints where a script leaves the sim, run by run, with chosen sectors' heights (`FRAME`, `SCRIPT`, `SECTORS` in the environment); it is how runs are found.
 
 ## The shape of the sim
 

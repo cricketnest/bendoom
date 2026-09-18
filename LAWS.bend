@@ -14,6 +14,7 @@ import ./src/project.bend as P
 import ./src/draw.bend as D
 import ./src/segs.bend as R
 import ./src/planes.bend as N
+import ./src/gfx.bend as G
 
 # Bytes and the WAD
 # -----------------
@@ -812,3 +813,22 @@ law each_in_order:
   for n: Nat
   for +i: Nat
   {D.Draw.each(~Seq, ~Seq.see, n, i, Seq{True{}, i}) == Seq{True{}, Nat.add(n, i)} : Seq}
+
+# Animations
+# ----------
+
+# LAW: P_UpdateSpecials' translation, on Freedoom's numbers. FWATER1 is
+# the WAD's flat 141, the first of 4, numbered 3 here: before the first
+# tic it shows itself; the first tic runs with the level's time 0 and
+# sets 3 + (0 + 141) mod 4 = 4, which holds through the 8th; the 9th
+# runs with time 8 and sets 3 + (1 + 141) mod 4 = 5; and 32 tics on,
+# one full cycle, it is 5 again. NUKAGE3 is flat 124, the last of 3,
+# numbered 2 with NUKAGE1 at 0: 0 + (0 + 124) mod 3 = 1 after tics 1 to
+# 8, then 2 after the 9th and, 24 tics on, after the 33rd (sanity).
+law animation_frames:
+  {(G.Gfx.anim.shown(0, 3, 4, 141, 0), G.Gfx.anim.shown(1, 3, 4, 141, 0), G.Gfx.anim.shown(8, 3, 4, 141, 0),
+    G.Gfx.anim.shown(9, 3, 4, 141, 0), G.Gfx.anim.shown(41, 3, 4, 141, 0),
+    G.Gfx.anim.shown(0, 2, 3, 124, 2), G.Gfx.anim.shown(1, 2, 3, 124, 2), G.Gfx.anim.shown(8, 2, 3, 124, 2),
+    G.Gfx.anim.shown(9, 2, 3, 124, 2), G.Gfx.anim.shown(33, 2, 3, 124, 2))
+    == (3, 4, 4, 5, 5, 2, 1, 1, 2, 2)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
