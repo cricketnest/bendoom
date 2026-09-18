@@ -36,3 +36,14 @@ What changed, each measured:
 What I learned about the cost model, for whoever optimises next: a lookup in a small `Vec` is about 15 ns (the 350 ns of ticket 06's bench was cache misses in a two-million-entry tree), and a pixel costs about 25 ns, so neither is the render's cost. perf puts half the BSP walk in the runtime's `term_drop` and a fifth in `span_fade`, its reference counting: destructuring an owned record that is still shared bumps every boxed field and drops the unused ones. Its symbols for our own defs are unreliable, since the generated code is inlined. The render is now 5.5 ms of a 26 ms frame; the next real gain is in the runtime's window fill, not here.
 
 `bench/frames.bend`: a hundred headless frames, render and fold, 1.05 s with the load on one thread, about 9 ms a frame.
+
+Addendum from the code review (ticket 12). The review was right that the first "walking" run was not one: holding run and up, the player is in the pit by tic 66 and stands there for the other nine tenths of the sample. `WALK=1` now holds run, up and left, so the player runs circles some 135 units across through the start room and the hall beyond its gate for all 600 frames. And the fold now merges four quadrants of one colour into one pixel, which a quadtree is for: the runtime's fill pays for every level under each window pixel, and the black band under the view alone is a sixth of the window. That is worth about 2 ms a frame.
+
+Re-measured the same way (Xvfb, 600 frames, one thread as the package runs it), this time on battery with the powersave governor, which by itself costs about a tenth:
+
+| | at rest | circling the rooms |
+| --- | --- | --- |
+| before the merge, on battery | 35 to 36 | 41 |
+| after the merge, on battery | 38 to 39 | 44 to 45 |
+
+The first table above was on mains. So the game holds 35 frames a second on the dev machine in either power state, with 3 to 4 to spare at the start on battery, the heaviest view measured. The figure on the desktop under niri is not measured: automated checks were kept off the desktop. To take it, run `bench/window.bend`'s binary from the dev shell on the desktop, at rest and with `WALK=1`.

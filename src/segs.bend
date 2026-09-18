@@ -55,22 +55,29 @@ def Segs.wall(+view: P.View, index: U32, +start: U32, +stop: U32, geo: Segs.Geo,
   D.Wall{index, start, stop, scale1, scale2, Segs.step(start, stop, scale1, scale2), s, b, t, [], [], []}
 
 # Doom's silhouette of a range, with the heights it clips sprites below
-# and above: a one-sided wall clips both ways at any height; a floor
-# stepping down toward the eye clips below the front's floor, a back
-# floor above the eye below any height; ceilings likewise upward; a shut
-# door and a masked middle texture clip both ways at any height.
+# and above. A one-sided wall clips both ways at any height. Below: a
+# floor stepping down toward the eye clips under the front's floor, a
+# back floor above the eye at any height. Above, ceilings likewise. A
+# door shut below or above clips that way at any height whatever else
+# holds, and a masked middle texture fills in, at any height, only a
+# way nothing else clips.
 def Segs.sil.of(onesided: Bool, +masked: Bool, f: L.Level.Sector, b: L.Level.Sector, +vz: U32) ->
   U32 & U32 & U32:
   L.Sector{+ffloor, +fceil, flight} = f
   L.Sector{+bfloor, +bceil, blight} = b
   +under = F.Fixed.gt(ffloor, bfloor)
-  +wholebottom = Bool.or(masked, Bool.or(F.Fixed.le(bceil, ffloor), Bool.and(Bool.not(under), F.Fixed.gt(bfloor, vz))))
   +over = F.Fixed.lt(fceil, bceil)
-  +wholetop = Bool.or(masked, Bool.or(F.Fixed.ge(bfloor, fceil), Bool.and(Bool.not(over), F.Fixed.lt(bceil, vz))))
+  +shutbottom = F.Fixed.le(bceil, ffloor)
+  +shuttop = F.Fixed.ge(bfloor, fceil)
+  +anybottom = Bool.or(masked, Bool.and(Bool.not(under), F.Fixed.gt(bfloor, vz)))
+  +anytop = Bool.or(masked, Bool.and(Bool.not(over), F.Fixed.lt(bceil, vz)))
   Bool.pick(U32 & U32 & U32, onesided, (3, 2147483647, 2147483648),
-    ((Bool.to_u32(Bool.or(under, wholebottom)) + Bool.to_u32(Bool.or(over, wholetop)) * 2 : U32),
-      Bool.pick(U32, wholebottom, 2147483647, Bool.pick(U32, under, ffloor, 0)),
-      Bool.pick(U32, wholetop, 2147483648, Bool.pick(U32, over, fceil, 0))))
+    ((Bool.to_u32(Bool.or(under, Bool.or(shutbottom, anybottom)))
+      + Bool.to_u32(Bool.or(over, Bool.or(shuttop, anytop))) * 2 : U32),
+      Bool.pick(U32, shutbottom, 2147483647, Bool.pick(U32, under, ffloor,
+        Bool.pick(U32, anybottom, 2147483647, 0))),
+      Bool.pick(U32, shuttop, 2147483648, Bool.pick(U32, over, fceil,
+        Bool.pick(U32, anytop, 2147483648, 0)))))
 
 def Segs.sil(+view: P.View, +level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg) -> U32 & U32 & U32:
   L.Seg{x1, y1, x2, y2, angle, offset, flags, side, front, +back} = seg
@@ -375,42 +382,50 @@ def Segs.stores(gaps: List<&2, C.Clip.Range>, +view: P.View, +level: L.Level, +g
 # Adding
 # ------
 
-# Doom's R_AddLine's verdict on a seg in view: 1 a solid wall (one-sided
-# or a closed door), 2 a window, 0 a line with the same sector on both
+# Doom's R_AddLine's verdict on a seg in view: a solid wall (one-sided
+# or a closed door), a window, or a line with the same sector on both
 # sides and no middle texture, which draws nothing.
-def Segs.kind(f: L.Level.Sector, b: L.Level.Sector, onesided: Bool, samepics: Bool, nomid: Bool) -> U32:
+type Segs.Kind is Data:
+  Solid{}
+  Window{}
+  Nothing{}
+
+def Segs.kind(f: L.Level.Sector, b: L.Level.Sector, onesided: Bool, samepics: Bool, nomid: Bool) -> Segs.Kind:
   L.Sector{+ffloor, +fceil, flight} = f
   L.Sector{+bfloor, +bceil, blight} = b
-  Bool.pick(U32, Bool.or(onesided, Bool.or(F.Fixed.le(bceil, ffloor), F.Fixed.ge(bfloor, fceil))), 1,
-    Bool.pick(U32, Bool.not(Bool.and(U32.is_eq(bceil, fceil), U32.is_eq(bfloor, ffloor))), 2,
-      Bool.pick(U32, Bool.and(samepics, Bool.and(U32.is_eq(blight, flight), nomid)), 0, 2)))
+  Bool.pick(Segs.Kind, Bool.or(onesided, Bool.or(F.Fixed.le(bceil, ffloor), F.Fixed.ge(bfloor, fceil))), Solid{},
+    Bool.pick(Segs.Kind, Bool.not(Bool.and(U32.is_eq(bceil, fceil), U32.is_eq(bfloor, ffloor))), Window{},
+      Bool.pick(Segs.Kind, Bool.and(samepics, Bool.and(U32.is_eq(blight, flight), nomid)), Nothing{}, Window{})))
 
-def Segs.kind.of(+level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg) -> U32:
+def Segs.kind.of(+level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg) -> Segs.Kind:
   L.Seg{x1, y1, x2, y2, angle, offset, flags, side, +front, +back} = seg
   Segs.kind(L.Level.sector(level, front), L.Level.sector(level, back), U32.is_eq(back, L.Level.none()),
     Bool.and(U32.is_eq(G.Gfx.ceilpic(gfx, back), G.Gfx.ceilpic(gfx, front)),
       U32.is_eq(G.Gfx.floorpic(gfx, back), G.Gfx.floorpic(gfx, front))),
     U32.is_zero(G.Gfx.mid(gfx, side)))
 
-# The gaps are stored, and a solid wall's columns join the solid list.
-def Segs.clip(draws: Bool, solid: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx,
-  +seg: L.Level.Seg, index: U32, angle1: U32, +first: Nat, +last: Nat, st: D.Draw) -> D.Draw:
-  match draws:
-    case False{}:
+# The gaps the solid columns leave are stored; a solid wall's columns
+# then join them.
+def Segs.clip(kind: Segs.Kind, +view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, index: U32,
+  angle1: U32, +first: Nat, +last: Nat, st: D.Draw) -> D.Draw:
+  match kind:
+    case Nothing{}:
       st
-    case True{}:
-      D.Draw{mem, +cols, walls, tasks, planes} = st
-      Segs.stores(C.Clip.gaps(first, last, cols), view, level, gfx, seg, index, angle1,
-        D.Draw{mem, Bool.pick(List<&2, C.Clip.Range>, solid, C.Clip.add(first, last, cols), cols), walls,
-          tasks, planes})
+    case Window{}:
+      D.Draw{mem, +solids, walls, tasks, planes} = st
+      Segs.stores(C.Clip.gaps(first, last, solids), view, level, gfx, seg, index, angle1,
+        D.Draw{mem, solids, walls, tasks, planes})
+    case Solid{}:
+      D.Draw{mem, +solids, walls, tasks, planes} = st
+      Segs.stores(C.Clip.gaps(first, last, solids), view, level, gfx, seg, index, angle1,
+        D.Draw{mem, C.Clip.add(first, last, solids), walls, tasks, planes})
 
 def Segs.add.span(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, index: U32,
   angle1: U32, span: P.View.Span, st: D.Draw) -> D.Draw:
   match span:
     case P.Span{False{}, True{}, x1, x2}:
-      +kind = Segs.kind.of(level, gfx, seg)
-      Segs.clip(Bool.not(U32.is_zero(kind)), U32.is_eq(kind, 1), view, level, gfx, seg, index, angle1,
-        U32.to_nat(x1), U32.to_nat((x2 - 1 : U32)), st)
+      Segs.clip(Segs.kind.of(level, gfx, seg), view, level, gfx, seg, index, angle1, U32.to_nat(x1),
+        U32.to_nat((x2 - 1 : U32)), st)
     case _:
       st
 

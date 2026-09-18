@@ -38,10 +38,28 @@ def Show.leaf(mem: Array<U32>, x: U32, y: U32, tasks: List<&2, Show.Task>, image
   Show.leaf.index(tasks, images, B.Bytes.at(mem,
     (G.Gfx.frame() + ((y >> 2n) * 5 / 6) * 320 + (x >> 2n) : U32)))
 
+def Show.quad.if(same: Bool, tl: Image, tr: Image, bl: Image, br: Image) -> Image:
+  match same:
+    case True{}:
+      tl
+    case False{}:
+      Qua{tl, tr, bl, br}
+
+# Four quadrants as one image: a single pixel when all four are one
+# colour, since the window's fill pays for every level it descends, and
+# the black band under the view alone is a sixth of the window.
+def Show.quad(tl: Image, tr: Image, bl: Image, br: Image) -> Image:
+  match tl tr bl br:
+    case Pix{+a} Pix{+b} Pix{+c} Pix{+d}:
+      Show.quad.if(Bool.and(U32.is_eq(a, b), Bool.and(U32.is_eq(a, c), U32.is_eq(a, d))), Pix{a}, Pix{b},
+        Pix{c}, Pix{d})
+    case tl tr bl br:
+      Qua{tl, tr, bl, br}
+
 def Show.join(mem: Array<U32>, tasks: List<&2, Show.Task>, images: List<&2, Image>) -> Show.State:
   match images:
     case br <> bl <> tr <> tl <> rest:
-      State{mem, tasks, Qua{tl, tr, bl, br} <> rest}
+      State{mem, tasks, Show.quad(tl, tr, bl, br) <> rest}
     case _:
       State{mem, tasks, images}
 

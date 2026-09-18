@@ -5,16 +5,15 @@
 # no wall scrolls; Bendoom reads neither yet), runs Chocolate Doom on it
 # in a scratch directory, at screen size 10, on a headless X server of
 # its own, waits for the pistol to finish rising, takes its paletted
-# screenshot eight times about 0.2 s apart, and compares the first
-# settled one with the frame tools/frame.bend dumps, outside the status
-# bar rows and the pixels the resting pistol covers. Pixels that differ
-# among Chocolate Doom's own shots are its animated textures and flats,
-# which Bendoom does not animate yet, and are counted apart. An
-# animation changes frame every 8 tics, 0.23 s, and none has more than
-# four frames, so the shots see every frame of every cycle; Bendoom
-# draws the first frame, which is one of them, so a pixel of an animated
-# surface that differs from ours differs among the shots too, and none
-# leaks into the count.
+# screenshot eight times about 0.2 s apart, and compares them with the
+# frame tools/frame.bend dumps, outside the status bar rows and the
+# pixels the resting pistol covers. A pixel of ours passes when it is
+# that pixel in any of the shots. Chocolate Doom animates textures and
+# flats, which Bendoom does not yet: an animation changes frame every 8
+# tics, 0.23 s, and none has more than four frames, so the shots show
+# every frame of every cycle, and Bendoom draws the first, which is one
+# of them. How many pixels vary among the shots is reported beside the
+# count that differ.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built:
@@ -87,15 +86,29 @@ def start-map [wad: binary, x: int, y: int, angle: int]: nothing -> binary {
 }
 
 # The palette indices of a Chocolate Doom screenshot, row by row, as
-# hex pairs a space apart. It
-# writes every byte of 0xc0 and over as 0xc1 then the byte, and no other
-# runs, so dropping each marker left to right decodes it.
+# hex pairs a space apart. It writes every byte of 0xc0 and over as 0xc1
+# then the byte, and no other runs, so dropping each marker left to
+# right decodes it.
 def pcx-indices []: binary -> string {
   let pcx = $in
   $pcx | bytes at 128..<(($pcx | bytes length) - 769) | encode hex | str lowercase
   | str replace --all --regex '(..)' '$1 '
   | str replace --all --regex 'c1 (..)' '$1'
   | str trim
+}
+
+# The posts of the patch column whose first is at the offset piped in:
+# each one's first row in the patch and its length, up to the column's
+# 255.
+def posts [wad: binary]: int -> table<delta: int, length: int> {
+  let first = $in
+  generate {|at|
+    let delta = $wad | bytes at $at..$at | into int
+    if $delta != 255 {
+      let length = $wad | bytes at ($at + 1)..($at + 1) | into int
+      {out: {delta: $delta, length: $length}, next: ($at + $length + 4)}
+    }
+  } $first
 }
 
 # The pixels the resting pistol covers, as frame indices: Doom draws a
@@ -110,17 +123,10 @@ def pistol-mask [wad: binary]: nothing -> list<int> {
   let top = $wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed
   let first_row = 84 - 100 + 32 - $top
   0..<$width | each {|c|
-    mut at = $patch + ($wad | bytes at ($patch + 8 + $c * 4)..($patch + 11 + $c * 4) | into int --endian little)
-    mut pixels = []
-    loop {
-      let delta = $wad | bytes at $at..$at | into int
-      if $delta == 255 { break }
-      let length = $wad | bytes at ($at + 1)..($at + 1) | into int
-      $pixels = $pixels | append (0..<$length | each {|k| ($first_row + $delta + $k) * 320 + 1 - $left + $c })
-      $at = $at + $length + 4
-    }
-    $pixels
-  } | flatten | where $it < 168 * 320
+    $patch + ($wad | bytes at ($patch + 8 + $c * 4)..($patch + 11 + $c * 4) | into int --endian little)
+    | posts $wad
+    | each {|post| 0..<$post.length | each {|k| ($first_row + $post.delta + $k) * 320 + 1 - $left + $c } }
+  } | flatten | flatten | where $it < 168 * 320
 }
 
 # The first X display number with no server's lock file.
@@ -131,12 +137,16 @@ def free-display []: nothing -> int {
 # Chocolate Doom's frame at the start the PWAD gives, eight times. It
 # can only take a screenshot while it runs, so it runs on an X server of
 # its own with no screen, Xvfb, where nothing shows on the desktop and
-# no window takes the focus, and xdotool presses its screenshot key.
+# no window takes the focus, and xdotool presses its screenshot key
+# once the screen wipe and the pistol's rise have had four seconds (it
+# looks the window up again then, since Chocolate Doom may remake it
+# while it starts). Its
+# config sets screen size 10, the full 320 by 168 view over the status
+# bar that Bendoom draws (Doom's default 9 borders a 288 by 144 view),
+# and turns messages off, so no "screen shot" is written over the later
+# shots.
 def vanilla [wad: path, map: binary, dir: path]: nothing -> list<string> {
   $map | save --force ($dir | path join start.wad)
-  # Doom's default screen size 9 borders a 288 by 144 view; 10 is the
-  # full 320 by 168 over the status bar, which is what Bendoom draws.
-  # With messages off, no "screen shot" is written over the later shots.
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
   let display = $":(free-display)"
   let server = job spawn { ^Xvfb $display -screen 0 1024x768x24 | ignore }
@@ -148,16 +158,16 @@ def vanilla [wad: path, map: binary, dir: path]: nothing -> list<string> {
     }
   }
   with-env {DISPLAY: $display} {
-    let found = 0..<50 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
+    let opened = 0..<50 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
       | where ($it | is-not-empty) | first 1 | flatten
-    if ($found | is-empty) { error make {msg: "Chocolate Doom's window did not open"} }
-    # The screen wipe and the pistol's rise.
+    if ($opened | is-empty) { error make {msg: "Chocolate Doom's window did not open"} }
     sleep 4sec
+    let target = ^xdotool search --name "Chocolate Doom" | lines | last
     for _ in 0..<16 {
       if ($dir | path join DOOM07.pcx | path exists) { break }
-      ^xdotool keydown --window ($found | first) F1
+      ^xdotool keydown --window $target F1
       sleep 30ms
-      ^xdotool keyup --window ($found | first) F1
+      ^xdotool keyup --window $target F1
       sleep 140ms
     }
   }
@@ -169,6 +179,17 @@ def vanilla [wad: path, map: binary, dir: path]: nothing -> list<string> {
 # The left hundred columns of a frame's status bar rows.
 def bar-left []: list<string> -> list<string> {
   $in | skip (168 * 320) | chunks 320 | each {|row| $row | first 100 } | flatten
+}
+
+# The views of the shots worth comparing. A shot taken while the screen
+# wipe still ran shows it in the status bar too, whose left hundred
+# columns (the ammo and health, clear of the face, which looks about)
+# hold still afterwards: the shots before they settle are dropped. Eight
+# shots of a four-frame cycle repeat, and the repeats are dropped.
+def settled []: list<string> -> list<list<string>> {
+  let taken = $in | each {|shot| $shot | split row ' ' }
+  let still = $taken | last | bar-left
+  $taken | skip while {|shot| ($shot | bar-left) != $still } | each {|shot| $shot | first (168 * 320) } | uniq
 }
 
 def main [
@@ -183,29 +204,20 @@ def main [
   let wad = $wad | default $env.BENDOOM_IWAD
   let bytes = open --raw $wad
   let dir = mktemp --directory
-  # A shot taken while the screen wipe still ran shows it in the status
-  # bar too, whose left hundred columns (the ammo and health, clear of
-  # the face, which looks about) hold still afterwards: the shots before
-  # they settle are dropped. Eight shots of a four-frame cycle repeat,
-  # and the repeats are dropped.
-  let taken = vanilla $wad (start-map $bytes $x $y $angle) $dir | each {|shot| $shot | split row ' ' }
-  let settled = $taken | last | bar-left
-  let shots = $taken | skip while {|shot| ($shot | bar-left) != $settled }
-    | each {|shot| $shot | first (168 * 320) } | uniq
-  let first = $shots | first
+  let shots = vanilla $wad (start-map $bytes $x $y $angle) $dir | settled
   let ours = with-env {BENDOOM_IWAD: $wad, FRAME: $"($x) ($y) ($angle)"} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let masked = pistol-mask $bytes
-  let animated = 0..<(168 * 320)
-    | where {|i| $shots | skip 1 | any {|shot| ($shot | get $i) != ($first | get $i) } }
-  let differing = 0..<(168 * 320) | where {|i| ($first | get $i) != ($ours | get $i) } | where $it not-in $masked
+  let differing = 0..<(168 * 320)
+    | where {|i| $shots | all {|shot| ($shot | get $i) != ($ours | get $i) } }
+    | where $it not-in $masked
   if not $keep { rm --recursive $dir }
   {
     place: $"($x) ($y) ($angle)"
-    differing: ($differing | where $it not-in $animated | length)
-    animated: ($differing | where $it in $animated | length)
+    differing: ($differing | length)
+    varying: (0..<(168 * 320) | where {|i| $shots | skip 1 | any {|shot| ($shot | get $i) != ($shots.0 | get $i) } } | length)
     pistol: ($masked | length)
-    first: ($differing | where $it not-in $animated | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($first | get $i), ours: ($ours | get $i)} })
+    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shots.0 | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })
   }
 }

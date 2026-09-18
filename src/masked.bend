@@ -4,7 +4,6 @@
 # its posts, so its gaps show what is behind it. Milestone 5's sprites
 # join this pass.
 import Base
-import ./bytes.bend as B
 import ./fixed.bend as F
 import ./level.bend as L
 import ./gfx.bend as G
@@ -18,44 +17,16 @@ import ./segs.bend as S
 type Masked.Col is Data:
   Col{x: U32, top: U32, scale: U32, mid: U32, iscale: U32, cmap: U32, cc: U32, fc: U32}
 
-# The post walk's state: done at the column's 255.
-type Masked.Post is Type:
-  Post{done: Bool, mem: Array<U32>, src: U32}
-
 # Doom's R_DrawMaskedColumn for one post: its rows on the screen from
 # its row in the texture and its length, held inside the clips, and its
 # texels drawn from its own first row.
-def Masked.post.len(+src: U32, +delta: U32, col: Masked.Col, p: Array<U32> & U32) -> Masked.Post:
+def Masked.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +col: Masked.Col) -> Array<U32>:
   Col{x, +top, +scale, mid, iscale, cmap, cc, fc} = col
-  (mem, +len) = p
   +topscreen = (top + scale * delta : U32)
-  Post{False{}, D.Draw.column(mem, x,
+  D.Draw.column(mem, x,
     F.Fixed.max(F.Fixed.sarn((topscreen + 65535 : U32), 16n), (cc + 1 : U32)),
     F.Fixed.min(F.Fixed.sarn((topscreen + scale * len - 1 : U32), 16n), (fc - 1 : U32)),
-    (src + 3 : U32), (mid - (delta << 16n) : U32), iscale, cmap), (src + len + 4 : U32)}
-
-def Masked.post.if(end: Bool, mem: Array<U32>, +src: U32, delta: U32, col: Masked.Col) -> Masked.Post:
-  match end:
-    case True{}:
-      Post{True{}, mem, src}
-    case False{}:
-      Masked.post.len(src, delta, col, B.Bytes.at(mem, (src + 1 : U32)))
-
-def Masked.post.top(src: U32, col: Masked.Col, p: Array<U32> & U32) -> Masked.Post:
-  (mem, +delta) = p
-  Masked.post.if(U32.is_eq(delta, 255), mem, src, delta, col)
-
-def Masked.post(mem: Array<U32>, +src: U32, col: Masked.Col) -> Masked.Post:
-  Masked.post.top(src, col, B.Bytes.at(mem, src))
-
-def Masked.posts(fuel: Nat, st: Masked.Post, +col: Masked.Col) -> Array<U32>:
-  match fuel st:
-    case _ Post{True{}, mem, src}:
-      mem
-    case 0n Post{False{}, mem, src}:
-      mem
-    case 1n+f Post{False{}, mem, src}:
-      Masked.posts(f, Masked.post(mem, src, col), col)
+    (src + 3 : U32), (mid - (delta << 16n) : U32), iscale, cmap)
 
 # What a range's masked columns share: the graphics, the texture, the
 # range's first column with its scale and step, the texture's row at
@@ -69,7 +40,7 @@ def Masked.column(mem: Array<U32>, +x: U32, texcol: U32, cc: U32, fc: U32, range
   Array<U32>:
   Range{gfx, tex, x1, scale1, step, +mid, lightnum} = range
   +scale = (scale1 + (x - x1) * step : U32)
-  Masked.posts(256n, Post{False{}, mem, (G.Gfx.column(gfx, tex, texcol) - 3 : U32)},
+  G.Gfx.posts(~Masked.Col, ~Masked.post, 256n, G.Post{False{}, mem, (G.Gfx.column(gfx, tex, texcol) - 3 : U32)},
     Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, S.Segs.iscale(scale),
       S.Segs.colormap(lightnum, scale), cc, fc})
 

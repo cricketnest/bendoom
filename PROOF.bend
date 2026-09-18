@@ -88,6 +88,9 @@ def Laws.light_tables():
 def Laws.wall_column():
   {==}
 
+def Laws.silhouettes():
+  {==}
+
 def Laws.plane_span():
   {==}
 

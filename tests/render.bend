@@ -18,7 +18,6 @@
 # view was written. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
@@ -118,9 +117,7 @@ def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
 #|start hash 2160814949 pixels 1 1 7 5 covered True

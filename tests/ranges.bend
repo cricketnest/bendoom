@@ -5,8 +5,6 @@
 # the step a column. Then the solid columns, which in a closed map end
 # as the whole width. Pinned to Freedoom.
 import Base
-import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ../src/fixed.bend as F
 import ../src/clip.bend as C
 import ../src/level.bend as L
@@ -54,9 +52,7 @@ def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
 #|seg 431 columns 0 0 scale 1.666976 step 0.000000

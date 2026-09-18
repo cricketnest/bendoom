@@ -5,7 +5,6 @@
 # composed there by vanilla's rule, patches pasted in order.
 import Base
 import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
@@ -112,9 +111,7 @@ def report(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     report(world)
 
 #|seg 0 from 448.000000 896.000000 to 256.000000 896.000000 angle 180.000 offset 0.000000 flags 4 side 344 front 122 back 8

@@ -14,12 +14,9 @@ import ./gfx.bend as G
 import ./project.bend as P
 import ./draw.bend as D
 
-def Planes.none() -> U32:
-  4294967295
-
 # Room for 128 planes, Doom's limit, before the first doubling.
 def Planes.start() -> D.Draw.Planes:
-  D.Planes{[], 0, Array.new(U32, 17n, 0), 17n, Planes.none(), Planes.none()}
+  D.Planes{[], 0, Array.new(U32, 17n, 0), 17n, G.Gfx.none(), G.Gfx.none()}
 
 # Finding
 # -------
@@ -61,7 +58,7 @@ def Planes.claim.new(isfloor: Bool, head: D.Draw.Plane, ps: D.Draw.Planes) -> D.
 def Planes.search(heads: List<&2, D.Draw.Plane>, +height: U32, +pic: U32, +light: U32, +i: U32) -> U32:
   match heads:
     case []:
-      Planes.none()
+      G.Gfx.none()
     case D.Plane{h, p, l, minx, maxx} <> rest:
       Bool.pick(U32, Bool.and(U32.is_eq(h, height), Bool.and(U32.is_eq(p, pic), U32.is_eq(l, light))), i,
         Planes.search(rest, height, pic, light, (i + 1 : U32)))
@@ -80,11 +77,11 @@ def Planes.claim(wanted: Bool, isfloor: Bool, +height: U32, +pic: U32, +light: U
   D.Draw.Planes:
   match wanted:
     case False{}:
-      Planes.slot(isfloor, Planes.none(), ps)
+      Planes.slot(isfloor, G.Gfx.none(), ps)
     case True{}:
       D.Planes{+heads, count, cols, depth, floor, ceil} = ps
       +found = Planes.search(heads, height, pic, light, 0)
-      Planes.claim.put(U32.is_eq(found, Planes.none()), isfloor, D.Plane{height, pic, light, 320, 4294967295},
+      Planes.claim.put(U32.is_eq(found, G.Gfx.none()), isfloor, D.Plane{height, pic, light, 320, 4294967295},
         found, D.Planes{heads, count, cols, depth, floor, ceil})
 
 # Checking

@@ -213,6 +213,38 @@ type Gfx.Paste is Data:
 type Gfx.Post is Type:
   Post{done: Bool, mem: Array<U32>, src: U32}
 
+def Gfx.posts.len(~C: Data, ~act: Array<U32> -> @+src: U32 -> @+delta: U32 -> @+len: U32 -> @+ctx: C -> Array<U32>,
+  +src: U32, delta: U32, ctx: C, p: Array<U32> & U32) -> Gfx.Post:
+  (mem, +len) = p
+  Post{False{}, act(mem, src, delta, len, ctx), (src + len + 4 : U32)}
+
+def Gfx.posts.if(~C: Data, ~act: Array<U32> -> @+src: U32 -> @+delta: U32 -> @+len: U32 -> @+ctx: C -> Array<U32>,
+  end: Bool, mem: Array<U32>, +src: U32, delta: U32, ctx: C) -> Gfx.Post:
+  match end:
+    case True{}:
+      Post{True{}, mem, src}
+    case False{}:
+      Gfx.posts.len(~C, ~act, src, delta, ctx, B.Bytes.at(mem, (src + 1 : U32)))
+
+def Gfx.posts.top(~C: Data, ~act: Array<U32> -> @+src: U32 -> @+delta: U32 -> @+len: U32 -> @+ctx: C -> Array<U32>,
+  src: U32, ctx: C, p: Array<U32> & U32) -> Gfx.Post:
+  (mem, +delta) = p
+  Gfx.posts.if(~C, ~act, U32.is_eq(delta, 255), mem, src, delta, ctx)
+
+# A patch column's posts walked from the first's header, in the array:
+# act on each, given the post's header index, its first row in the patch
+# and its length; the composer pastes them, the masked pass draws them.
+# The fuel outlasts any column.
+def Gfx.posts(~C: Data, ~act: Array<U32> -> @+src: U32 -> @+delta: U32 -> @+len: U32 -> @+ctx: C -> Array<U32>,
+  fuel: Nat, st: Gfx.Post, +ctx: C) -> Array<U32>:
+  match fuel st:
+    case _ Post{True{}, mem, src}:
+      mem
+    case 0n Post{False{}, mem, src}:
+      mem
+    case 1n+f Post{False{}, mem, +src}:
+      Gfx.posts(~C, ~act, f, Gfx.posts.top(~C, ~act, src, ctx, B.Bytes.at(mem, src)), ctx)
+
 def Gfx.move.put(to: U32, p: Array<U32> & U32) -> Array<U32>:
   (mem, v) = p
   Array.set(U32, mem, to, v)
@@ -228,37 +260,12 @@ def Gfx.move(n: Nat, +from: U32, +to: U32, mem: Array<U32>) -> Array<U32>:
 # Doom's R_DrawColumnInCache for one post: pasted at the patch's row
 # plus the post's, cut to the texture's height. A post cut at the top
 # keeps its first texels, not its last, as Doom's memcpy does.
-def Gfx.post.len(+src: U32, +top: U32, +paste: Gfx.Paste, p: Array<U32> & U32) -> Gfx.Post:
+def Gfx.paste.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +paste: Gfx.Paste) -> Array<U32>:
   Paste{psrc, +dst, +oy, +height} = paste
-  (mem, +len) = p
-  +at = (oy + top : U32)
+  +at = (oy + delta : U32)
   +row = F.Fixed.max(at, 0)
-  +count = F.Fixed.min((len + F.Fixed.min(at, 0) : U32), (height - row : U32))
-  Post{False{}, Gfx.move(U32.to_nat(F.Fixed.max(count, 0)), (src + 3 : U32), (dst + row : U32), mem),
-    (src + len + 4 : U32)}
-
-def Gfx.post.if(end: Bool, mem: Array<U32>, +src: U32, top: U32, paste: Gfx.Paste) -> Gfx.Post:
-  match end:
-    case True{}:
-      Post{True{}, mem, src}
-    case False{}:
-      Gfx.post.len(src, top, paste, B.Bytes.at(mem, (src + 1 : U32)))
-
-def Gfx.post.top(src: U32, paste: Gfx.Paste, p: Array<U32> & U32) -> Gfx.Post:
-  (mem, +top) = p
-  Gfx.post.if(U32.is_eq(top, 255), mem, src, top, paste)
-
-def Gfx.post(mem: Array<U32>, +src: U32, paste: Gfx.Paste) -> Gfx.Post:
-  Gfx.post.top(src, paste, B.Bytes.at(mem, src))
-
-def Gfx.paste.go(fuel: Nat, st: Gfx.Post, +paste: Gfx.Paste) -> Array<U32>:
-  match fuel st:
-    case _ Post{True{}, mem, src}:
-      mem
-    case 0n Post{False{}, mem, src}:
-      mem
-    case 1n+f Post{False{}, mem, src}:
-      Gfx.paste.go(f, Gfx.post(mem, src, paste), paste)
+  Gfx.move(U32.to_nat(F.Fixed.max(F.Fixed.min((len + F.Fixed.min(at, 0) : U32), (height - row : U32)), 0)),
+    (src + 3 : U32), (dst + row : U32), mem)
 
 def Gfx.paste.src(p: Gfx.Paste) -> U32:
   Paste{src, dst, oy, height} = p
@@ -271,7 +278,7 @@ def Gfx.pastes(ps: List<&2, Gfx.Paste>, mem: Array<U32>) -> Array<U32>:
     case []:
       mem
     case +p <> rest:
-      Gfx.pastes(rest, Gfx.paste.go(256n, Post{False{}, mem, Gfx.paste.src(p)}, p))
+      Gfx.pastes(rest, Gfx.posts(~Gfx.Paste, ~Gfx.paste.post, 256n, Post{False{}, mem, Gfx.paste.src(p)}, p))
 
 # Textures
 # --------
@@ -658,6 +665,14 @@ def Gfx.load(p: Array<U32> & List<&2, W.Wad.Lump>) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, +lumps) = p
   Gfx.load.go(lumps, L.Level.load((a, lumps)))
+
+# The level and its graphics from the WAD BENDOOM_IWAD names; a WAD that
+# cannot be read, or a name it lacks, ends the program with the error.
+def Gfx.open() -> IO(Array<U32> & Gfx & L.Level):
+  do IO<Array<U32> & Gfx & L.Level>:
+    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
+    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
+    IO.pass(Array<U32> & Gfx & L.Level, Gfx.load(W.Wad.dir(bytes)))
 
 # Lookups
 # -------

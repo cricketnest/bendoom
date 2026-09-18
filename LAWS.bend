@@ -168,8 +168,8 @@ law tic_rest:
     == (x, y) : U32 & U32}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
-# floor at 0 and the ceiling at 128 map units. Every number is computed by hand
-# from vanilla's formulas.
+# floor at 0 and the ceiling at 128 map units. Every number is computed
+# by hand from vanilla's formulas.
 
 # LAW: one tic forward from rest at angle zero thrusts 25 * 2048 along
 # the facing (51199 along x through the cosine 65535, 19 along y through
@@ -406,6 +406,21 @@ law wall_column:
     R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
     == (63, 4294967199, 65535, 1023, 16777215, 70912, 67072)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# LAW: a range's silhouette, with the eye 41 over a floor at 8 under a
+# ceiling at 128. A one-sided wall clips both ways at any height. A
+# masked texture over a floor stepping down to 0 keeps the front's floor
+# as the height it clips under, and fills in the top at any height. A
+# window between two like sectors clips nothing. A door shut at the
+# floor clips below at any height, and above since its ceiling is under
+# the eye (sanity).
+law silhouettes:
+  {(R.Segs.sil.of(True{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 0, 0}, 3211264),
+    R.Segs.sil.of(False{}, True{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 8388608, 160}, 3211264),
+    R.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 8388608, 160}, 3211264),
+    R.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 524288, 160}, 3211264))
+    == ((3, 2147483647, 2147483648), (3, 524288, 2147483648), (0, 0, 0), (3, 2147483647, 2147483648))
+    : (U32 & U32 & U32) & (U32 & U32 & U32) & (U32 & U32 & U32) & (U32 & U32 & U32)}
 
 # LAW: a plane's arithmetic, looking east from the origin. The sky turns
 # a column every 2^22 of angle: column 0's view angle is column 128 of

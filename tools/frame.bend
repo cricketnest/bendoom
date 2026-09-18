@@ -9,7 +9,6 @@
 #   FRAME="-416 256 0" ./frame
 import Base
 import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
@@ -73,8 +72,6 @@ def Frame.start(place: L.Level.Start, w: Array<U32> & G.Gfx & L.Level) -> IO(Uni
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     spot : String <- IO.try(String, IO.get_env("FRAME"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(W.Wad.dir(bytes)))
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     Frame.start(Frame.place(String.split(spot, ' ')), world)
