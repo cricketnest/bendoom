@@ -720,9 +720,17 @@ def Gfx.tex.mask(+g: Gfx, t: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex} = g
   V.Vec.get(texs, (t * 5 + 3 : U32))
 
-# Doom's R_GetColumn: the index of a texture column's texels, the column
-# wrapped by the width mask. A patch column's first post header sits
-# three before it.
+# Where a texture's columns start in the column table.
+def Gfx.tex.first(+g: Gfx, t: U32) -> U32:
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex} = g
+  V.Vec.get(texs, (t * 5 + 4 : U32))
+
+# Doom's R_GetColumn, the texture's part looked up beforehand: the index
+# of a texture column's texels, the column wrapped by the width mask. A
+# patch column's first post header sits three before it.
+def Gfx.column.at(+g: Gfx, first: U32, mask: U32, col: U32) -> U32:
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex} = g
+  V.Vec.get(cols, (first + (col .&. mask) : U32))
+
 def Gfx.column(+g: Gfx, +t: U32, col: U32) -> U32:
-  Gfx{flats, pics, sky, +texs, cols, sidetex, skytex} = g
-  V.Vec.get(cols, (V.Vec.get(texs, (t * 5 + 4 : U32)) + (col .&. V.Vec.get(texs, (t * 5 + 3 : U32))) : U32))
+  Gfx.column.at(g, Gfx.tex.first(g, t), Gfx.tex.mask(g, t), col)

@@ -398,10 +398,10 @@ law light_tables:
 law wall_column:
   {(R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
       V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}},
-      R.Geo{0, 10485760, 4194304, 1073741824}, 0),
+      10485760, 4194304, 1073741824, 0),
     R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
       V.Leaf{0}, V.Leaf{0}, V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}},
-      R.Geo{0, 10485760, 4194304, 1073741824}, 0),
+      10485760, 4194304, 1073741824, 0),
     R.Segs.iscale(65536), R.Segs.iscale(4194304), R.Segs.iscale(256),
     R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
     == (63, 4294967199, 65535, 1023, 16777215, 70912, 67072)

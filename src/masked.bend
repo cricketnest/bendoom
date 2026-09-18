@@ -102,12 +102,16 @@ def Masked.range(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg,
 
 def Masked.wall(+view: P.View, +level: L.Level, +gfx: G.Gfx, wall: D.Draw.Wall, mem: Array<U32>) ->
   Array<U32>:
-  D.Wall{seg, +x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms} = wall
-  Masked.columns(texcols, tops, bottoms, x1, Masked.range(view, level, gfx, L.Level.seg(level, seg), x1,
-    scale1, step), mem)
+  match wall:
+    case D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, [], tops, bottoms}:
+      mem
+    case D.Wall{seg, +x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms}:
+      Masked.columns(texcols, tops, bottoms, x1, Masked.range(view, level, gfx, L.Level.seg(level, seg), x1,
+        scale1, step), mem)
 
 # Every stored range, newest first; one with no middle texture has no
-# texture columns and draws nothing.
+# texture columns, and is passed over before anything is worked out
+# for it.
 def Masked.draw(walls: List<&2, D.Draw.Wall>, +view: P.View, +level: L.Level, +gfx: G.Gfx,
   mem: Array<U32>) -> Array<U32>:
   match walls:
