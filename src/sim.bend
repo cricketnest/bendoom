@@ -24,9 +24,11 @@ type Player is Data:
     floorz: U32, ceilz: U32, viewheight: U32, deltaview: U32, viewz: U32, crossed: List<&2, U32>,
     inv: I.Inventory}
 
-# What a position check answers of the lines: whether it is clear of
-# solid ones, and the floor and ceiling there, from the sector under the
-# point narrowed by every two-sided line the player's box crosses.
+# What Doom's P_CheckPosition answers for a box of some radius: whether
+# no solid thing overlaps it and no line stops it, and the floor and
+# ceiling there. A thing in the way leaves the sector's under the point;
+# otherwise each two-sided line the box crosses narrows them, up to the
+# first line that stops the box.
 type Sim.Fit is Data:
   Fit{ok: Bool, floor: U32, ceil: U32}
 
@@ -36,6 +38,11 @@ type Sim.Fit is Data:
 # taken.
 type Sim.Try is Data:
   Try{ok: Bool, player: Player, things: H.Things}
+
+# The pickup loop's state: whether a solid thing has ended the check,
+# and the inventory and things so far.
+type Sim.Touch is Data:
+  Touch{stop: Bool, inv: I.Inventory, things: H.Things}
 
 # The XY movement loop's state: done when no move is left, and the last
 # move tried.
@@ -244,54 +251,44 @@ def Sim.fit.go(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32,
 # The blockmap
 # ------------
 
-# A blockmap cell, by column and row.
-type Sim.Cell is Data:
-  Cell{bx: U32, by: U32}
-
-def Sim.block(v: U32, +org: U32) -> U32:
-  F.Fixed.sarn((v - org : U32), 23n)
-
-def Sim.column(m: Nat, +bx: U32, +by: U32) -> List<&2, Sim.Cell>:
+def Sim.column(m: Nat, +bx: U32, +by: U32) -> List<&2, L.Level.Cell>:
   match m:
     case 0n:
       []
     case 1n+k:
-      Cell{bx, by} <> Sim.column(k, bx, (by + 1 : U32))
+      L.Cell{bx, by} <> Sim.column(k, bx, (by + 1 : U32))
 
 # The cells of n columns of m, column by column from the west, each from
 # the south: the order Doom walks a box's cells in.
-def Sim.cells(n: Nat, +m: Nat, +bx: U32, +by: U32) -> List<&2, Sim.Cell>:
+def Sim.cells(n: Nat, +m: Nat, +bx: U32, +by: U32) -> List<&2, L.Level.Cell>:
   match n:
     case 0n:
       []
     case 1n+k:
-      List.append(&2, Sim.Cell, Sim.column(m, bx, by), Sim.cells(k, m, (bx + 1 : U32), by))
+      List.append(&2, L.Level.Cell, Sim.column(m, bx, by), Sim.cells(k, m, (bx + 1 : U32), by))
+
+def Sim.box.of(lo: L.Level.Cell, hi: L.Level.Cell) -> List<&2, L.Level.Cell>:
+  L.Cell{+xl, +yl} = lo
+  L.Cell{xh, yh} = hi
+  Sim.cells(U32.to_nat((xh - xl + 1 : U32)), U32.to_nat((yh - yl + 1 : U32)), xl, yl)
 
 # The cells a box from (x0, y0) to (x1, y1) touches.
-def Sim.box(+bm: L.Level.Blockmap, +x0: U32, +y0: U32, +x1: U32, +y1: U32) -> List<&2, Sim.Cell>:
-  L.Blockmap{words, +ox, +oy, cols, rows} = bm
-  +xl = Sim.block(x0, ox)
-  +yl = Sim.block(y0, oy)
-  Sim.cells(U32.to_nat((Sim.block(x1, ox) - xl + 1 : U32)), U32.to_nat((Sim.block(y1, oy) - yl + 1 : U32)), xl, yl)
+def Sim.box(+bm: L.Level.Blockmap, x0: U32, y0: U32, x1: U32, y1: U32) -> List<&2, L.Level.Cell>:
+  Sim.box.of(L.Level.cell_of(bm, x0, y0), L.Level.cell_of(bm, x1, y1))
 
-def Sim.lines.go(cells: List<&2, Sim.Cell>, +bm: L.Level.Blockmap) -> List<&2, U32>:
+# What a reader finds in each of some cells of the geometry, in turn.
+def Sim.gather(~at: @+geo: L.Level.Geo -> @+c: L.Level.Cell -> List<&2, U32>, cells: List<&2, L.Level.Cell>,
+  +geo: L.Level.Geo) -> List<&2, U32>:
   match cells:
     case []:
       []
-    case Cell{bx, by} <> rest:
-      List.append(&2, U32, L.Level.cell.at(bm, bx, by), Sim.lines.go(rest, bm))
+    case c <> rest:
+      List.append(&2, U32, at(geo, c), Sim.gather(~at, rest, geo))
 
 # The lines of the cells a box touches, as one list (a line in two cells
-# is listed twice).
+# is listed twice, and line 0 in each).
 def Sim.lines(+level: L.Level, x0: U32, y0: U32, x1: U32, y1: U32) -> List<&2, U32>:
-  Sim.lines.go(Sim.box(L.Level.blockmap_of(level), x0, y0, x1, y1), L.Level.blockmap_of(level))
-
-def Sim.near.go(cells: List<&2, Sim.Cell>, +bm: L.Level.Blockmap, +links: L.Level.Things) -> List<&2, U32>:
-  match cells:
-    case []:
-      []
-    case Cell{bx, by} <> rest:
-      List.append(&2, U32, L.Level.linked.cell(links, L.Level.cell_number(bm, bx, by)), Sim.near.go(rest, bm, links))
+  Sim.gather(~L.Level.cell.lines, Sim.box(L.Level.blockmap_of(level), x0, y0, x1, y1), L.Level.geo(level))
 
 # Doom's MAXRADIUS, 32, the largest radius a thing has.
 def Sim.maxradius() -> U32:
@@ -302,22 +299,23 @@ def Sim.maxradius() -> U32:
 # P_CheckPosition looks at, since a thing is linked by its centre alone.
 def Sim.near(+level: L.Level, +x: U32, +y: U32, +r: U32) -> List<&2, U32>:
   +reach = (r + Sim.maxradius() : U32)
-  +bm = L.Level.blockmap_of(level)
-  Sim.near.go(Sim.box(bm, (x - reach : U32), (y - reach : U32), (x + reach : U32), (y + reach : U32)), bm,
-    L.Level.things_of(level))
+  Sim.gather(~L.Level.cell.things, Sim.box(L.Level.blockmap_of(level), (x - reach : U32), (y - reach : U32),
+    (x + reach : U32), (y + reach : U32)), L.Level.geo(level))
 
 # Things
 # ------
 
-# Whether two boxes whose centres are dx and dy apart overlap: their
-# radii's sum is the reach.
-def Sim.overlap(+dx: U32, +dy: U32, +reach: U32) -> Bool:
-  Bool.and(F.Fixed.lt(F.Fixed.abs(dx), reach), F.Fixed.lt(F.Fixed.abs(dy), reach))
+# Doom's PIT_CheckThing's first test: boxes of radius q at (tx, ty) and
+# r at (x, y) meet when their centres are nearer than the two radii
+# along both axes.
+def Sim.overlap(+q: U32, +tx: U32, +ty: U32, +x: U32, +y: U32, +r: U32) -> Bool:
+  +reach = (q + r : U32)
+  Bool.and(F.Fixed.lt(F.Fixed.abs((tx - x : U32)), reach), F.Fixed.lt(F.Fixed.abs((ty - y : U32)), reach))
 
 def Sim.blocker.def(d: H.Thing.Def, +tx: U32, +ty: U32, +x: U32, +y: U32, +r: U32, other: Bool) -> Bool:
   H.Def{kind, state, +radius, height, +flags} = d
   Bool.and(Bool.not(U32.is_zero((flags .&. 2 : U32))),
-    Bool.and(other, Sim.overlap((tx - x : U32), (ty - y : U32), (F.Fixed.of_map(radius) + r : U32))))
+    Bool.and(other, Sim.overlap(F.Fixed.of_map(radius), tx, ty, x, y, r)))
 
 def Sim.blocker.link(link: L.Level.Link, +x: U32, +y: U32, +r: U32, other: Bool) -> Bool:
   L.Link{next, +tx, +ty, +kind} = link
@@ -338,8 +336,8 @@ def Sim.clear.go(ids: List<&2, U32>, +links: L.Level.Things, +x: U32, +y: U32, +
       Bool.and(Bool.not(Sim.blocker(links, x, y, r, self, id)), Sim.clear.go(rest, links, x, y, r, self))
 
 # The thing half of Doom's P_CheckPosition: whether the box of radius r
-# at (x, y) is clear of every solid thing near it but self's (none for
-# the player's box).
+# at (x, y) is clear of every solid thing near it but self's, the
+# player's name for the player's box.
 def Sim.clear(+level: L.Level, +x: U32, +y: U32, +r: U32, +self: U32) -> Bool:
   Sim.clear.go(Sim.near(level, x, y, r), L.Level.things_of(level), x, y, r, self)
 
@@ -362,7 +360,7 @@ def Sim.fit.at(clear: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U
 
 # Doom's P_CheckPosition for the player's box at (x, y).
 def Sim.fit(+level: L.Level, +x: U32, +y: U32) -> Sim.Fit:
-  Sim.fit.at(Sim.clear(level, x, y, Sim.radius(), L.Level.none()), level, x, y, Sim.radius(), 1)
+  Sim.fit.at(Sim.clear(level, x, y, Sim.radius(), H.Thing.you()), level, x, y, Sim.radius(), 1)
 
 def Sim.Fit.ok(f: Sim.Fit) -> Bool:
   Fit{ok, floor, ceil} = f
@@ -415,30 +413,36 @@ def Sim.touch.special(hit: Bool, +id: U32, +kind: U32, counted: Bool, +z: U32,
       (inv, +things) = got
       Sim.touch.alive(H.Things.get(things, id), id, kind, counted, z, inv, things)
 
-# Doom's PIT_CheckThing for a special thing: its box and the player's
-# overlap, and it is offered to the inventory.
+# Doom's PIT_CheckThing for the player's box at (x, y) with its feet at
+# z and a thing near it: a special thing the box overlaps is offered to
+# the inventory, and a solid one ends the check.
+def Sim.touch.stop(stop: Bool, got: I.Inventory & H.Things) -> Sim.Touch:
+  (inv, things) = got
+  Touch{stop, inv, things}
+
 def Sim.touch.def(d: H.Thing.Def, +id: U32, +tx: U32, +ty: U32, +x: U32, +y: U32, +z: U32,
-  got: I.Inventory & H.Things) -> I.Inventory & H.Things:
+  got: I.Inventory & H.Things) -> Sim.Touch:
   H.Def{+kind, state, +radius, height, +flags} = d
-  Sim.touch.special(Bool.and(Bool.not(U32.is_zero((flags .&. 1 : U32))),
-    Sim.overlap((tx - x : U32), (ty - y : U32), (F.Fixed.of_map(radius) + Sim.radius() : U32))), id, kind,
-    Bool.not(U32.is_zero((flags .&. 8388608 : U32))), z, got)
+  +hit = Sim.overlap(F.Fixed.of_map(radius), tx, ty, x, y, Sim.radius())
+  Sim.touch.stop(Bool.and(Bool.not(U32.is_zero((flags .&. 2 : U32))), hit),
+    Sim.touch.special(Bool.and(Bool.not(U32.is_zero((flags .&. 1 : U32))), hit), id, kind,
+      Bool.not(U32.is_zero((flags .&. 8388608 : U32))), z, got))
 
 def Sim.touch.link(link: L.Level.Link, +id: U32, +x: U32, +y: U32, +z: U32, got: I.Inventory & H.Things) ->
-  I.Inventory & H.Things:
+  Sim.Touch:
   L.Link{next, +tx, +ty, +kind} = link
   Sim.touch.def(H.Thing.info(kind), id, tx, ty, x, y, z, got)
 
-def Sim.touch.go(ids: List<&2, U32>, stop: Bool, +level: L.Level, +x: U32, +y: U32, +z: U32,
-  got: I.Inventory & H.Things) -> I.Inventory & H.Things:
-  match ids stop:
-    case [] _:
-      got
-    case _ True{}:
-      got
-    case +id <> rest False{}:
-      Sim.touch.go(rest, Sim.blocker(L.Level.things_of(level), x, y, Sim.radius(), L.Level.none(), id), level, x, y, z,
-        Sim.touch.link(L.Level.linked.in(L.Level.things_of(level), id), id, x, y, z, got))
+def Sim.touch.go(ids: List<&2, U32>, st: Sim.Touch, +level: L.Level, +x: U32, +y: U32, +z: U32) ->
+  I.Inventory & H.Things:
+  match ids st:
+    case [] Touch{stop, inv, things}:
+      (inv, things)
+    case _ Touch{True{}, inv, things}:
+      (inv, things)
+    case +id <> rest Touch{False{}, inv, things}:
+      Sim.touch.go(rest, Sim.touch.link(L.Level.linked.in(L.Level.things_of(level), id), id, x, y, z, (inv, things)),
+        level, x, y, z)
 
 # The pickups of the player's position check at (x, y) with its feet at
 # z: each special thing near is offered to the inventory in the
@@ -446,7 +450,7 @@ def Sim.touch.go(ids: List<&2, U32>, stop: Bool, +level: L.Level, +x: U32, +y: U
 # takes is gone, and the things kept keep their names.
 def Sim.touch(+level: L.Level, +x: U32, +y: U32, +z: U32, got: I.Inventory & H.Things) ->
   I.Inventory & H.Things:
-  Sim.touch.go(Sim.near(level, x, y, Sim.radius()), False{}, level, x, y, z, got)
+  Sim.touch.go(Sim.near(level, x, y, Sim.radius()), Sim.touch.stop(False{}, got), level, x, y, z)
 
 # Moving
 # ------
@@ -1171,8 +1175,7 @@ def Sim.reclip.def(d: H.Thing.Def, +level: L.Level, +p: Player, th: H.Thing) -> 
   Sim.reclip.fin(H.Thing{id, k, x, y, z, floorz, ceilz, sector, st, tics}, F.Fixed.of_map(height),
     Bool.not(U32.is_zero((flags .&. 4 : U32))),
     Sim.fit.at(Bool.and(Sim.clear(level, x, y, r, id),
-      Bool.not(Sim.overlap((Player.x(p) - x : U32), (Player.y(p) - y : U32), (r + Sim.radius() : U32)))),
-      level, x, y, r, 3))
+      Bool.not(Sim.overlap(Sim.radius(), Player.x(p), Player.y(p), x, y, r))), level, x, y, r, 3))
 
 def Sim.reclip.thing(+level: L.Level, +p: Player, th: H.Thing) -> Bool & H.Thing:
   H.Thing{id, +kind, x, y, z, floorz, ceilz, sector, state, tics} = th
@@ -1194,8 +1197,8 @@ def Sim.change.player(ok: Bool, t: Sim.Try) -> Sim.Try:
   Try{fits, p, things} = t
   Try{Bool.and(ok, fits), p, things}
 
-# A mobj clipped again: the player's link, 4294967295, or a thing's,
-# which has nothing to clip once gone.
+# A mobj clipped again: the player's, or a thing's, which has nothing
+# to clip once gone.
 def Sim.change.one(you: Bool, +id: U32, +level: L.Level, t: Sim.Try) -> Sim.Try:
   match you:
     case True{}:
@@ -1210,7 +1213,7 @@ def Sim.change.go(ids: List<&2, U32>, +level: L.Level, t: Sim.Try) -> Sim.Try:
     case []:
       t
     case +id <> rest:
-      Sim.change.go(rest, level, Sim.change.one(U32.is_eq(id, 4294967295), id, level, t))
+      Sim.change.go(rest, level, Sim.change.one(U32.is_eq(id, H.Thing.you()), id, level, t))
 
 # Whether the player's link goes before a cell's things: before the
 # first linked before it, whose id is under its rank.
@@ -1224,9 +1227,9 @@ def Sim.you.before(ids: List<&2, U32>, +you: U32) -> Bool:
 def Sim.you.go(ids: List<&2, U32>, first: Bool, +you: U32) -> List<&2, U32>:
   match ids first:
     case [] _:
-      [4294967295]
+      [H.Thing.you()]
     case h <> rest True{}:
-      4294967295 <> h <> rest
+      H.Thing.you() <> h <> rest
     case h <> +rest False{}:
       h <> Sim.you.go(rest, Sim.you.before(rest, you), you)
 
@@ -1239,27 +1242,22 @@ def Sim.you.in(here: Bool, +ids: List<&2, U32>, +you: U32) -> List<&2, U32>:
     case True{}:
       Sim.you.go(ids, Sim.you.before(ids, you), you)
 
-def Sim.change.cells(cells: List<&2, Sim.Cell>, +level: L.Level, +px: U32, +py: U32, +you: U32) ->
+def Sim.change.cells(cells: List<&2, L.Level.Cell>, +geo: L.Level.Geo, +pc: L.Level.Cell, +you: U32) ->
   List<&2, U32>:
   match cells:
     case []:
       []
-    case Cell{+bx, +by} <> rest:
-      List.append(&2, U32, Sim.you.in(Bool.and(U32.is_eq(bx, px), U32.is_eq(by, py)), L.Level.linked.cell(L.Level.things_of(level),
-        L.Level.cell_number(L.Level.blockmap_of(level), bx, by)),
-        you), Sim.change.cells(rest, level, px, py, you))
-
-def Sim.change.in(+level: L.Level, cells: List<&2, Sim.Cell>, pc: U32 & U32, t: Sim.Try) -> Sim.Try:
-  (+px, +py) = pc
-  Try{ok, p, +things} = t
-  Sim.change.go(Sim.change.cells(cells, level, px, py, H.Things.you(things)), level, Try{ok, p, things})
+    case +c <> rest:
+      List.append(&2, U32, Sim.you.in(L.Level.cell.is(c, pc), L.Level.cell.things(geo, c), you),
+        Sim.change.cells(rest, geo, pc, you))
 
 def Sim.change.box(b: L.Level.Box, +level: L.Level, t: Sim.Try) -> Sim.Try:
   L.Box{+top, +bottom, +left, +right} = b
-  Try{ok, +p, things} = t
-  Sim.change.in(level, Sim.cells(U32.to_nat(F.Fixed.max((right - left + 1 : U32), 0)),
-    U32.to_nat(F.Fixed.max((top - bottom + 1 : U32), 0)), left, bottom),
-    L.Level.cell_of(L.Level.blockmap_of(level), Player.x(p), Player.y(p)), Try{ok, p, things})
+  Try{ok, +p, +things} = t
+  Sim.change.go(Sim.change.cells(Sim.cells(U32.to_nat(F.Fixed.max((right - left + 1 : U32), 0)),
+    U32.to_nat(F.Fixed.max((top - bottom + 1 : U32), 0)), left, bottom), L.Level.geo(level),
+    L.Level.cell_of(L.Level.blockmap_of(level), Player.x(p), Player.y(p)), H.Things.you(things)), level,
+    Try{ok, p, things})
 
 # Doom's P_ChangeSector: the player and every thing linked in the cells
 # of the sector's block box, touching the sector or not, clipped again
@@ -1306,8 +1304,9 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
   +next = Bool.pick(U32, down, (was - speed : U32), (was + speed : U32))
   +past = Bool.pick(Bool, down, F.Fixed.lt(next, dest), F.Fixed.gt(next, dest))
   +moved = L.Level.plane.put(level, sector, ceiling, Bool.pick(U32, past, dest, next))
-  Sim.mover.fitted(Sim.Try.or(Bool.and(ceiling, Bool.not(Bool.or(down, past))), Sim.change(moved, sector, player, things)),
-    sector, ceiling, speed, was, past, rest, Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan,
+  Sim.mover.fitted(Sim.Try.or(Bool.and(ceiling, Bool.not(Bool.or(down, past))),
+    Sim.change(moved, sector, player, things)), sector, ceiling, speed, was, past, rest,
+    Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan,
     State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown})
 
 # Doom's button in P_UpdateSpecials: the tic its count reaches zero the
@@ -1433,22 +1432,23 @@ def Sim.lights(n: Nat, +sector: U32, +s: State) -> State:
       Sim.lights(m, (sector + 1 : U32),
         Sim.light.spawn(L.Level.sector.special(State.level(s), sector), sector, s))
 
+# A state with other things, their ids under count, linked in its
+# level's blockmap as they come, the player's link where it was.
+def State.populated(+things: List<&2, H.Thing>, +count: U32, s: State) -> State:
+  State{player, +level, old, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, H.Thing.linked(level, things, count), H.Things.of(things, count, H.Things.you(old)), sidetex,
+    thinkers, rnd, clock, ended, usedown}
+
 # The state a level starts in, from the map as loaded, with the player
 # at rest at a place, the things spawned with the random numbers they
 # draw, and then the lights in sector order. Use counts as down, as
 # Doom's G_PlayerReborn leaves it, so a key held since before the level
 # does nothing.
-# A state with other things, their ids under count, linked in its
-# level's blockmap as they come, the player's link where it was.
-def State.populated(+things: List<&2, H.Thing>, +count: U32, s: State) -> State:
-  State{player, +level, old, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  State{player, H.Thing.linked(level, things, count), H.Things.of(things, count, H.Things.you(old)), sidetex, thinkers,
-    rnd, clock, ended, usedown}
-
 def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn) -> State:
   H.Spawn{things, rnd, you} = spawn
   Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0, State.populated(things, L.Level.nthings(level),
-    State{Player.at(level, place), level, H.Things.of([], 0, you), L.Level.sidetex(level), [], rnd, 0, False{}, True{}}))
+    State{Player.at(level, place), level, H.Things.of([], 0, you), L.Level.sidetex(level), [], rnd, 0, False{},
+      True{}}))
 
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
   State.at.spawned(level, place, H.Thing.spawn(level))

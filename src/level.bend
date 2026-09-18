@@ -34,6 +34,10 @@ type Level.Things is Data:
 type Level.Link is Data:
   Link{next: U32, x: U32, y: U32, kind: U32}
 
+# A blockmap cell, by column and row.
+type Level.Cell is Data:
+  Cell{bx: U32, by: U32}
+
 # A THINGS record: its position in fixed point, its angle in degrees,
 # its DoomEd type and its options.
 type Level.Thing is Data:
@@ -367,8 +371,9 @@ def Level.root(+l: Level) -> U32:
     sectors, specials} = l
   root
 
-# The lines listed in a blockmap cell (none outside the map): the words
-# after the cell's offset, past its leading zero, up to the 65535.
+# The lines listed in a blockmap cell: the words from the cell's offset
+# up to the 65535, the leading 0 included, since Doom's
+# P_BlockLinesIterator checks line 0 in every cell it walks.
 def Level.cell.go(k: Nat, end: Bool, +words: V.Vec, +i: U32, +w: U32) ->
   List<&2, U32>:
   match k end:
@@ -385,7 +390,7 @@ def Level.cell.list(inside: Bool, +words: V.Vec, +i: U32) -> List<&2, U32>:
     case False{}:
       []
     case True{}:
-      +off = (V.Vec.get(words, i) + 1 : U32)
+      +off = V.Vec.get(words, i)
       +w = V.Vec.get(words, off)
       Level.cell.go(U32.to_nat(4096), U32.is_eq(w, 65535), words, off, w)
 
@@ -395,65 +400,46 @@ def Level.things_of(+l: Level) -> Level.Things:
   things
 
 # The level with other blocklinks.
-def Level.relinked(l: Level, heads: V.Vec, links: V.Vec) -> Level:
+def Level.relinked(l: Level, hk: V.Vec & V.Vec) -> Level:
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count, h, k}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
+  (heads, links) = hk
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count, heads, links}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials}
 
 # The level with no thing linked, room for n.
 def Level.unlinked.in(l: Level, bm: Level.Blockmap, n: U32) -> Level:
   Blockmap{words, ox, oy, +cols, +rows} = bm
-  Level.relinked(l, V.Vec.of_list([], (cols * rows : U32)), V.Vec.of_list([], (n * 4 : U32)))
+  Level.relinked(l, (V.Vec.of_list([], (cols * rows : U32)), V.Vec.of_list([], (n * 4 : U32))))
 
 def Level.unlinked(+l: Level, n: U32) -> Level:
   Level.unlinked.in(l, Level.blockmap_of(l), n)
 
-# The cell a point is in, as signed column and row.
-def Level.cell_of(+bm: Level.Blockmap, x: U32, y: U32) -> U32 & U32:
-  Blockmap{words, ox, oy, cols, rows} = bm
-  (F.Fixed.sarn((x - ox : U32), 23n), F.Fixed.sarn((y - oy : U32), 23n))
+# The cell a point is in, by signed column and row.
+def Level.cell_of(+bm: Level.Blockmap, x: U32, y: U32) -> Level.Cell:
+  Blockmap{words, +ox, +oy, cols, rows} = bm
+  Cell{F.Fixed.sarn((x - ox : U32), 23n), F.Fixed.sarn((y - oy : U32), 23n)}
 
-# The number of cell (bx, by), or none for a cell off the map. Cell
-# coordinates are signed: a negative one reads as a huge unsigned one, so
-# the unsigned bound checks both ends.
-def Level.cell_number(+bm: Level.Blockmap, +bx: U32, +by: U32) -> U32:
-  Blockmap{words, ox, oy, +cols, +rows} = bm
-  Bool.pick(U32, Bool.and(U32.is_lt(bx, cols), U32.is_lt(by, rows)), (by * cols + bx : U32), Level.none())
+def Level.cell.is(a: Level.Cell, b: Level.Cell) -> Bool:
+  Cell{ax, ay} = a
+  Cell{bx, by} = b
+  Bool.and(U32.is_eq(ax, bx), U32.is_eq(ay, by))
 
-def Level.cell.at(+bm: Level.Blockmap, +bx: U32, +by: U32) -> List<&2, U32>:
-  Blockmap{+words, ox, oy, cols, rows} = bm
-  +n = Level.cell_number(bm, bx, by)
-  Level.cell.list(Bool.not(U32.is_eq(n, Level.none())), words, (4 + n : U32))
+# Whether a cell is on a map of so many columns and rows. Its
+# coordinates are signed: a negative one reads as a huge unsigned one,
+# so the unsigned bound checks both ends.
+def Level.cell.inside(+cols: U32, +rows: U32, +c: Level.Cell) -> Bool:
+  Cell{+bx, +by} = c
+  Bool.and(U32.is_lt(bx, cols), U32.is_lt(by, rows))
 
-def Level.link.head(+heads: V.Vec, +cell: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(cell, Level.none()), 0, V.Vec.get(heads, cell))
+def Level.cell.number(+cols: U32, +c: Level.Cell) -> U32:
+  Cell{+bx, +by} = c
+  (by * cols + bx : U32)
 
-def Level.link.fin(+cell: U32, +id: U32, x: U32, y: U32, kind: U32, +heads: V.Vec, links: V.Vec) ->
-  V.Vec & V.Vec:
-  (Bool.pick(V.Vec, U32.is_eq(cell, Level.none()), heads, V.Vec.set(heads, cell, (id + 1 : U32))),
-    V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(links, (id * 4 : U32), Level.link.head(heads, cell)),
-      (id * 4 + 1 : U32), x), (id * 4 + 2 : U32), y), (id * 4 + 3 : U32), kind))
-
-def Level.link.put(l: Level, hk: V.Vec & V.Vec) -> Level:
-  (h, k) = hk
-  Level.relinked(l, h, k)
-
-def Level.link.cell(+id: U32, x: U32, y: U32, kind: U32, +l: Level, t: Level.Things, c: U32 & U32) -> Level:
-  Things{words, count, +heads, links} = t
-  (+bx, +by) = c
-  Level.link.put(l, Level.link.fin(Level.cell_number(Level.blockmap_of(l), bx, by), id, x, y, kind, heads, links))
-
-# The level with a thing linked first in the cell its centre is in, as
-# Doom's P_SetThingPosition links it; a thing off the map is in none.
-def Level.link(+l: Level, +id: U32, +x: U32, +y: U32, kind: U32) -> Level:
-  Level.link.cell(id, x, y, kind, l, Level.things_of(l), Level.cell_of(Level.blockmap_of(l), x, y))
-
-# Thing id as the blockmap links it; its next is plus one, 0 for none.
-def Level.linked.in(t: Level.Things, +id: U32) -> Level.Link:
-  Things{words, count, heads, +links} = t
-  Link{V.Vec.get(links, (id * 4 : U32)), V.Vec.get(links, (id * 4 + 1 : U32)), V.Vec.get(links, (id * 4 + 2 : U32)),
-    V.Vec.get(links, (id * 4 + 3 : U32))}
+# The lines of a cell of the geometry's blockmap.
+def Level.cell.lines(+geo: Level.Geo, +c: Level.Cell) -> List<&2, U32>:
+  Geo{lines, sides, verts, segs, subs, nodes, root, Blockmap{+words, ox, oy, +cols, +rows}, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches} = geo
+  Level.cell.list(Level.cell.inside(cols, rows, c), words, (4 + Level.cell.number(cols, c) : U32))
 
 def Level.linked.go(k: Nat, +links: V.Vec, +next: U32) -> List<&2, U32>:
   match k next:
@@ -465,11 +451,49 @@ def Level.linked.go(k: Nat, +links: V.Vec, +next: U32) -> List<&2, U32>:
       +id = (next - 1 : U32)
       id <> Level.linked.go(j, links, V.Vec.get(links, (id * 4 : U32)))
 
-# The things linked in a blockmap cell, the last linked first: Doom's
-# blocklinks, none off the map.
-def Level.linked.cell(t: Level.Things, +cell: U32) -> List<&2, U32>:
-  Things{words, count, +heads, +links} = t
-  Level.linked.go(U32.to_nat(4096), links, Level.link.head(heads, cell))
+def Level.cell.linked(inside: Bool, +heads: V.Vec, +links: V.Vec, +cell: U32) -> List<&2, U32>:
+  match inside:
+    case False{}:
+      []
+    case True{}:
+      Level.linked.go(U32.to_nat(4096), links, V.Vec.get(heads, cell))
+
+# The things linked in a cell of the geometry's blockmap, the last
+# linked first: Doom's blocklinks.
+def Level.cell.things(+geo: Level.Geo, +c: Level.Cell) -> List<&2, U32>:
+  Geo{lines, sides, verts, segs, subs, nodes, root, Blockmap{words, ox, oy, +cols, +rows}, Things{tw, count, +heads, +links}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches} = geo
+  Level.cell.linked(Level.cell.inside(cols, rows, c), heads, links, Level.cell.number(cols, c))
+
+def Level.links.words(links: V.Vec, +id: U32, next: U32, x: U32, y: U32, kind: U32) -> V.Vec:
+  V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(links, (id * 4 : U32), next), (id * 4 + 1 : U32), x), (id * 4 + 2 : U32),
+    y), (id * 4 + 3 : U32), kind)
+
+def Level.link.fin(inside: Bool, +cell: U32, +id: U32, x: U32, y: U32, kind: U32, +heads: V.Vec, links: V.Vec) ->
+  V.Vec & V.Vec:
+  match inside:
+    case False{}:
+      (heads, Level.links.words(links, id, 0, x, y, kind))
+    case True{}:
+      (V.Vec.set(heads, cell, (id + 1 : U32)), Level.links.words(links, id, V.Vec.get(heads, cell), x, y, kind))
+
+def Level.link.cell(+id: U32, x: U32, y: U32, kind: U32, +l: Level, bm: Level.Blockmap, t: Level.Things,
+  +c: Level.Cell) -> Level:
+  Blockmap{words, ox, oy, +cols, +rows} = bm
+  Things{tw, count, +heads, links} = t
+  Level.relinked(l, Level.link.fin(Level.cell.inside(cols, rows, c), Level.cell.number(cols, c), id, x, y, kind, heads,
+    links))
+
+# The level with a thing linked first in the cell its centre is in, as
+# Doom's P_SetThingPosition links it; a thing off the map is in none.
+def Level.link(+l: Level, +id: U32, +x: U32, +y: U32, kind: U32) -> Level:
+  Level.link.cell(id, x, y, kind, l, Level.blockmap_of(l), Level.things_of(l),
+    Level.cell_of(Level.blockmap_of(l), x, y))
+
+# Thing id as the blockmap links it; its next is plus one, 0 for none.
+def Level.linked.in(t: Level.Things, +id: U32) -> Level.Link:
+  Things{words, count, heads, +links} = t
+  Link{V.Vec.get(links, (id * 4 : U32)), V.Vec.get(links, (id * 4 + 1 : U32)), V.Vec.get(links, (id * 4 + 2 : U32)),
+    V.Vec.get(links, (id * 4 + 3 : U32))}
 
 # The sector under a point
 # ------------------------

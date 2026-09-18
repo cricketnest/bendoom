@@ -10,6 +10,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **Scrutinees follow binder order.** Destructuring lets and matches must take parameters in declaration order, and a let may not precede a match on a parameter, so put the flags matched on first and the records opened after.
 - **`[]` last before a case's colon reads as indexing:** `case False{} []:` is a parse error, so put the list scrutinee first (`case [] _:`).
 - **A pair is not Data:** `List<&2, U32 & U32>` is refused; a list of pairs takes a small `is Data` record.
+- **A case cannot open a pair:** `case [] (stop, got):` is refused, so a loop state of several values is a small record matched as `Touch{stop, ..}` (`Sim.Touch`).
 - **A call result is not a pattern.** `(a, b) = f(x)` and `match f(x)` are refused: pass the result to a def that destructures its parameter. A let-bound variable is refused the same way.
 - **Templates take their function first,** with an affine parameter (`x: U32`, not `+x`).
 - **Reuse needs `+` everywhere:** on parameters, on pattern fields (`Player{+x, ..}`, `case 1n++p`, `(+a, b) = p`), and in laws (`for +level`).
@@ -29,5 +30,5 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **Orient equations value-first.** `%e : P` with `e : {a == b}` marks `b` in the goal with `_` and puts `a` there, so to replace a computed term by its answer the equation reads `{answer == computed}`.
 - **Refute through a motive:** `%e : BD(_, Unit, goal)` then `Unit{}`, where `BD` picks `goal` for the impossible side (proof_numerics' pattern).
 - **Match what the code opens.** A proof about `f(p)` matches `p` into its constructor first, or `f` stays stuck; a lemma is universally quantified over any flag the code computes and instantiated with that term at the call, so no equation is needed for flags the code already takes as parameters.
-- **Pass a recursion the parts it reads.** A symbolic list leaves a fold stuck, so the arguments it carries stay in the term: two levels that differ only in sectors compare unequal when the fold carries the whole level, and equal when it carries the blockmap and links alone (`Sim.near.go`).
+- **Pass a recursion the parts it reads.** A symbolic list leaves a fold stuck, so the arguments it carries stay in the term: two levels that differ only in sectors compare unequal when the fold carries the whole level, and equal when it carries the geometry alone (`Sim.gather`).
 - **Wildcards block reduction in proofs:** a lemma's `case _ Try{True{}, p}` leaves the code's `slide.go(fuel, ..)` stuck on `fuel`; the lemma splits the fuel even where the code need not.

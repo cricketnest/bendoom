@@ -427,7 +427,8 @@ def go_keeps(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +
     case []:
       e
     case +i <> rest:
-      fit_of(level, x, y, r, mask, i, f, go_keeps(rest, level, x, y, r, mask, S.Sim.fit.line(level, x, y, r, mask, i, f), e))
+      fit_of(level, x, y, r, mask, i, f,
+        go_keeps(rest, level, x, y, r, mask, S.Sim.fit.line(level, x, y, r, mask, i, f), e))
 
 def some_eq(+i: U32, +h: U32, e: {Some{i} == Some{h} : Maybe<&2, U32>}) -> {h == i : U32}:
   Equal.cong(Maybe<&2, U32>, U32, m => Maybe.default(&2, U32, m, 0), Some{h}, Some{i},
@@ -466,7 +467,7 @@ def at_pins(c: Bool, +level: L.Level, +x: U32, +y: U32, k: Nat, +i: U32,
         e)
 
 def Laws.free_pins_lines(level, x, y, k, i, listed, free):
-  at_pins(S.Sim.clear(level, x, y, S.Sim.radius(), L.Level.none()), level, x, y, k, i, listed, free)
+  at_pins(S.Sim.clear(level, x, y, S.Sim.radius(), H.Thing.you()), level, x, y, k, i, listed, free)
 
 # Clear pins the things
 # ---------------------
@@ -483,20 +484,22 @@ def not_blocker(b: Bool, -c: Bool, e: {True{} == Bool.and(Bool.not(b), c) : Bool
 # box, by its position.
 def clear_pins(ids: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, k: Nat, +id: U32,
   listed: {Some{id} == List.get(&2, U32, ids, k) : Maybe<&2, U32>},
-  e: {True{} == S.Sim.clear.go(ids, L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none()) : Bool}) ->
-  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), id) : Bool}:
+  e: {True{} == S.Sim.clear.go(ids, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()) : Bool}) ->
+  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool}:
   match ids k:
     case [] _:
-      %listed : MD(_, Unit, {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), id) : Bool})
+      %listed : MD(_, Unit,
+        {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool})
       Unit{}
     case +h <> rest 0n:
-      %some_eq(id, h, listed) : {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), _) : Bool}
-      not_blocker(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), h),
-        S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none()), e)
+      %some_eq(id, h, listed)
+        : {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), _) : Bool}
+      not_blocker(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), h),
+        S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()), e)
     case +h <> rest 1n+j:
       clear_pins(rest, level, x, y, j, id, listed,
-        and_true_right(Bool.not(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), h)),
-          S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none()), e))
+        and_true_right(Bool.not(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), h)),
+          S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()), e))
 
 def Laws.clear_pins_things(level, x, y, k, id, listed, clear):
   clear_pins(S.Sim.near(level, x, y, S.Sim.radius()), level, x, y, k, id, listed, clear)
@@ -848,7 +851,8 @@ def heights_ok(+level: L.Level, +x: U32, +y: U32, +r: U32, line: L.Level.Line, f
 # of one geometry share whatever their sectors and specials hold.
 def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +r: U32, +mask: U32,
   +i: U32) ->
-  {S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i) == S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, r, mask, i) : Bool}:
+  {S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i) == S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, r, mask, i)
+    : Bool}:
   match geo:
     case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
       {==}
@@ -875,8 +879,8 @@ def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
       {==}
     case S.Fit{True{}, +fl, +cl} S.Fit{True{}, +gl, +hl}:
       %cond_same(geo, sa, pa, sb, pb, x, y, r, mask, i)
-        : {S.Sim.Fit.ok(S.Sim.fit.cross(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa}, x, y,
-          r, L.Level.line(L.Level{geo, sa, pa}, i), fl, cl))
+        : {S.Sim.Fit.ok(S.Sim.fit.cross(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa},
+          x, y, r, L.Level.line(L.Level{geo, sa, pa}, i), fl, cl))
           == S.Sim.Fit.ok(S.Sim.fit.cross(_, L.Level{geo, sb, pb}, x, y, r, L.Level.line(L.Level{geo, sb, pb}, i), gl,
             hl)) : Bool}
       cross_same(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa}, L.Level{geo, sb, pb}, x,
@@ -891,7 +895,8 @@ def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
       Unit{}
 
 def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
-  +x: U32, +y: U32, +r: U32, +mask: U32, +fa: S.Sim.Fit, +fb: S.Sim.Fit, e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
+  +x: U32, +y: U32, +r: U32, +mask: U32, +fa: S.Sim.Fit, +fb: S.Sim.Fit,
+  e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
   {S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sa, pa}, x, y, r, mask, fa))
     == S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sb, pb}, x, y, r, mask, fb)) : Bool}:
   match lines:
@@ -899,7 +904,8 @@ def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb
       e
     case +i <> rest:
       go_same(rest, geo, sa, pa, sb, pb, x, y, r, mask, S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, fa),
-        S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb), line_same(geo, sa, pa, sb, pb, x, y, r, mask, i, fa, fb, e))
+        S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb),
+        line_same(geo, sa, pa, sb, pb, x, y, r, mask, i, fa, fb, e))
 
 # The lines gathered for a box are the blockmap's, and the things near it
 # its links, which two levels of one geometry share.
@@ -912,8 +918,8 @@ def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
       {==}
 
 def clear_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
-  {S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), L.Level.none())
-    == S.Sim.clear(L.Level{geo, sb, pb}, x, y, S.Sim.radius(), L.Level.none()) : Bool}:
+  {S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you())
+    == S.Sim.clear(L.Level{geo, sb, pb}, x, y, S.Sim.radius(), H.Thing.you()) : Bool}:
   match geo:
     case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
       {==}
@@ -928,7 +934,8 @@ def at_same(c: Bool, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb:
       %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
         (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
         : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32),
-          (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa}, x, y,
+          (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa},
+          x, y,
           S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y)))
           == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1,
             S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y))) : Bool}
@@ -942,10 +949,10 @@ def at_same(c: Bool, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb:
 def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
   {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.free(L.Level{geo, sb, pb}, x, y) : Bool}:
   %clear_same(geo, sa, pa, sb, pb, x, y)
-    : {S.Sim.Fit.ok(S.Sim.fit.at(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), L.Level.none()),
+    : {S.Sim.Fit.ok(S.Sim.fit.at(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you()),
       L.Level{geo, sa, pa}, x, y, S.Sim.radius(), 1))
       == S.Sim.Fit.ok(S.Sim.fit.at(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1)) : Bool}
-  at_same(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), L.Level.none()), geo, sa, pa, sb, pb, x, y)
+  at_same(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you()), geo, sa, pa, sb, pb, x, y)
 
 # A mover's re-clip moves the player up and down alone.
 def stood_x(moved: S.Player, +q: S.Player) -> {S.Player.x(moved) == S.Player.x(S.Player.stood(moved, q)) : U32}:
@@ -1019,7 +1026,7 @@ def free_clear(c: Bool, +level: L.Level, +x: U32, +y: U32,
 def Laws.replay_keeps_clear(script, s, free):
   +after = S.Sim.replay(script, s)
   free_clear(S.Sim.clear(S.State.level(after), S.Player.x(S.State.player(after)), S.Player.y(S.State.player(after)),
-    S.Sim.radius(), L.Level.none()), S.State.level(after), S.Player.x(S.State.player(after)),
+    S.Sim.radius(), H.Thing.you()), S.State.level(after), S.Player.x(S.State.player(after)),
     S.Player.y(S.State.player(after)), Laws.replay_keeps_free(script, s, free))
 
 # The solid columns stay sorted

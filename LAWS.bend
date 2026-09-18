@@ -280,7 +280,8 @@ def Closed.level(ox: U32) -> L.Level:
   L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
     V.Vec.of_list([0, 1, 0, 0, 0, 0], 6), V.Vec.of_list([1, 0], 2), V.Leaf{0}, 32768,
-    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1}, L.Things{V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}}, [], [],
+    L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1},
+    L.Things{V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
@@ -658,8 +659,10 @@ law key_taken:
     Closed.held(Closed.idled(3n, Closed.passing())))
     == (([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(87, 2097152, 7340032, 0),
       Closed.key(90, 2097152, 26214400, 0)], 0, 0),
-      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 12),
-      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1, 11))
+      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1,
+        12),
+      ([H.Thing{3, 10, 2097152, 7340032, 0, 0, 8388608, 0, 2, 4294967295}, Closed.key(90, 2097152, 26214400, 0)], 1,
+        11))
     : (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32) & (List<&2, H.Thing> & U32 & U32)}
 
 # LAW: a move of 20 a tic is tried in halves, to 74 and then 84, and a
@@ -749,7 +752,7 @@ def Free(+s: S.State) -> Type:
 # A state whose player's box is clear of the solid things near it.
 def Clear(+s: S.State) -> Type:
   {True{} == S.Sim.clear(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)),
-    S.Sim.radius(), L.Level.none()) : Bool}
+    S.Sim.radius(), H.Thing.you()) : Bool}
 
 # LAW: a tic leaves the geometry as it was: the lines, sides, vertices,
 # nodes and blockmap that free reads are the same trees after it, for
@@ -776,8 +779,8 @@ law replay_keeps_free:
   Free(S.Sim.replay(script, s))
 
 # LAW: the freedom law: replaying any script from a free state, the start
-# included, leaves the player's box clear of every solid thing linked
-# near it (free_pins_things below reads that on each of them).
+# included, leaves the player's box clear of every solid thing linked in
+# the cells around it (clear_pins_things reads that on each of them).
 law replay_keeps_clear:
   for +script: List<&2, K.Cmd>
   for +s: S.State
@@ -787,9 +790,10 @@ law replay_keeps_clear:
 # LAW: clear is pinned to the things: when the player's box is clear,
 # every thing the blockmap links in the cells around it, whichever
 # position in the list it holds, is not solid or has its box apart from
-# the player's (blocker_geometry shows the numbers), and since no type's
-# radius passes the widening (radius_within), no thing linked further
-# can reach the box.
+# the player's (blocker_geometry shows the numbers). That the links are
+# the living solid things, and that none linked in a further cell can
+# reach the box, rests on the ticket's argument: the checker cannot
+# compute the cell arithmetic.
 law clear_pins_things:
   for +level: L.Level
   for +x: U32
@@ -797,8 +801,8 @@ law clear_pins_things:
   for k: Nat
   for id: U32
   for listed: {Some{id} == List.get(&2, U32, S.Sim.near(level, x, y, S.Sim.radius()), k) : Maybe<&2, U32>}
-  for clear: {True{} == S.Sim.clear(level, x, y, S.Sim.radius(), L.Level.none()) : Bool}
-  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), L.Level.none(), id) : Bool}
+  for clear: {True{} == S.Sim.clear(level, x, y, S.Sim.radius(), H.Thing.you()) : Bool}
+  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool}
 
 def Closed.within(defs: List<&2, H.Thing.Def>) -> Bool:
   match defs:
@@ -841,12 +845,12 @@ def Closed.linked() -> L.Level:
 # reach is 26. The cell lists the three things the last linked first
 # (sanity).
 law blocker_geometry:
-  {(S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242880, 1048576, 65535, 8),
-    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242881, 1048576, 65535, 8),
+  {(S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242880, 1048576, H.Thing.you(), 8),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242881, 1048576, H.Thing.you(), 8),
     S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 5242881, 1048576, 8, 8),
-    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 2097152, 1048576, 65535, 15),
-    S.Sim.blocker(L.Level.things_of(Closed.linked()), 4587520, 7340032, 1048576, 65535, 24),
-    S.Sim.blocker(L.Level.things_of(Closed.linked()), 4587521, 7340032, 1048576, 65535, 24),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 2097152, 2097152, 1048576, H.Thing.you(), 15),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 4587520, 7340032, 1048576, H.Thing.you(), 24),
+    S.Sim.blocker(L.Level.things_of(Closed.linked()), 4587521, 7340032, 1048576, H.Thing.you(), 24),
     S.Sim.near(Closed.linked(), 2097152, 4194304, 1048576))
     == (False{}, True{}, False{}, False{}, False{}, True{}, [24, 15, 8])
     : Bool & Bool & Bool & Bool & Bool & Bool & List<&2, U32>}
@@ -874,7 +878,8 @@ def Closed.north(things: List<&2, H.Thing>, n: Nat) -> U32:
 # same place tic 3 reaches 85.82 (sanity).
 law thing_blocks:
   {(Closed.north([Closed.lamp(8, 2097152, 7340032, 0)], 2n), Closed.north([Closed.lamp(8, 2097152, 7340032, 0)], 3n),
-    Closed.north([Closed.lamp(8, 2097152, 7340032, 6553600)], 3n), Closed.north([Closed.corpse(15, 2097152, 7340032)], 3n))
+    Closed.north([Closed.lamp(8, 2097152, 7340032, 6553600)], 3n),
+    Closed.north([Closed.corpse(15, 2097152, 7340032)], 3n))
     == (5193728, 5193728, 5193728, 5624320) : U32 & U32 & U32 & U32}
 
 # A state of the literal level with one mover and a player at rest at

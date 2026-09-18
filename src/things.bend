@@ -15,6 +15,11 @@ import ./vec.bend as V
 type Thing is Data:
   Thing{id: U32, kind: U32, x: U32, y: U32, z: U32, floorz: U32, ceilz: U32, sector: U32, state: U32, tics: U32}
 
+# The player among the mobjs: a name no record has, above every record's,
+# so the player's link ranked by it heads its cell.
+def Thing.you() -> U32:
+  4294967295
+
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), and its tics, -1 for a state that lasts.
 type Thing.Row is Data:
@@ -91,7 +96,8 @@ def Thing.info(+kind: U32) -> Thing.Def:
   Maybe.default(&2, Thing.Def, Thing.def(kind), Def{kind, 0, 0, 0, 0})
 
 # The things spawned, the last first while they spawn, the random
-# index, and player 1's start record, 4294967295 before one spawns.
+# index, and player 1's start record, the player's own name before one
+# spawns.
 type Thing.Spawn is Data:
   Spawn{things: List<&2, Thing>, rnd: U32, you: U32}
 
@@ -127,8 +133,10 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
 
 # Doom's P_SpawnMapThing on Hurt Me Plenty with one player and no
 # monsters: player 1's start spawns the player, who draws a random number
-# too, the first to spawn kept as the one the game follows; another record spawns when its options set that skill's bit, 2,
-# and not the multiplayer bit, 16, and its type has a definition.
+# too and ranks among the things of its cell by the first such record,
+# the start Level.start_of places it at; another record spawns when its
+# options set that skill's bit, 2, and not the multiplayer bit, 16, and
+# its type has a definition.
 def Thing.spawn.one(+level: L.Level, id: U32, record: L.Level.Thing, s: Thing.Spawn) -> Thing.Spawn:
   L.Thing{x, y, angle, +kind, +options} = record
   Thing.spawn.if(U32.is_eq(kind, 1), Bool.and(Bool.not(U32.is_zero((options .&. 2 : U32))),
@@ -148,7 +156,7 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
 # The level's first things, in the order of their records, and the
 # random index once they have spawned, from 0.
 def Thing.spawn(+level: L.Level) -> Thing.Spawn:
-  Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, 4294967295}))
+  Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
 
 # The population
 # --------------
@@ -163,8 +171,8 @@ type Thing.Tree is Data:
 # link stands among the things of its cell. Doom links a thing first in
 # its cell when it spawns or moves, so the things are linked the last
 # spawned first, and the player after those spawned after its start
-# record, you, until its first move puts it before them all, at
-# 4294967295.
+# record, you, until its first move puts it before them all, at the
+# player's own name.
 type Things is Data:
   Things{tree: Thing.Tree, count: U32, you: U32}
 
@@ -208,7 +216,7 @@ def Things.you(ts: Things) -> U32:
 # The things after the player's first move.
 def Things.moved(ts: Things) -> Things:
   Things{tree, count, you} = ts
-  Things{tree, count, 4294967295}
+  Things{tree, count, Thing.you()}
 
 def Things.of.go(things: List<&2, Thing>, ts: Things) -> Things:
   match things:
