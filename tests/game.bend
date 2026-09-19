@@ -16,6 +16,12 @@
 # the door shut, the switch's special back, the things and the random
 # index as they spawned (tests/route.bend restarts a level whose things
 # the route took). Esc quits.
+# Before the game, what a tic of use beside the switch is heard to
+# start, and M_Random's index after it. P_ChangeSwitchTexture clears the
+# line's special before it looks for the exit's 11, so the click is
+# sfx_swtchn, and it comes from nobody, since no button runs. The index
+# is 64 after the wipe, one more for the route's door, one for the
+# click.
 # Then the time of a few clocks, worked out by hand in milestone 4's
 # ticket 09. The door's height is the hand computation's (4 under
 # sector 68's ceiling of -56); the positions are regression pins.
@@ -30,6 +36,7 @@ import ../src/sim.bend as S
 import ../src/things.bend as H
 import ../src/project.bend as P
 import ../src/game.bend as M
+import ../src/sound.bend as Sn
 
 def pressed(+level: L.Level, sidetex: V.Vec) -> Bool:
   U32.is_eq(V.Vec.get(sidetex, (615 * 3 + 2 : U32)),
@@ -45,6 +52,16 @@ def line(tag: String, +s: S.State) -> String:
     ++ U32.show(L.Level.special(level, 407)) ++ " pressed " ++ Bool.show(pressed(level, S.State.sidetex(s)))
     ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(s)))) ++ " random "
     ++ U32.show(S.State.rnd(s))
+
+def heard(es: List<&2, Sn.Sound.Event>) -> String:
+  match es:
+    case []:
+      ""
+    case e <> rest:
+      " " ++ Sn.Sound.Event.show(e) ++ heard(rest)
+
+def clicked(+s: S.State) -> String:
+  "use heard" ++ heard(S.State.sounds(s)) ++ " drew to " ++ U32.show(S.State.mrnd(s))
 
 def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
   do IO<Maybe<M.Game>>:
@@ -88,6 +105,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   do IO<Unit>:
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
+    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, True{}), beside)))
     g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
       P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g2 : Maybe<M.Game> <- frame("repeat", 400n, [Key{32, False{}}, Key{32, True{}}], g1)
@@ -107,6 +125,7 @@ def main() -> IO(Unit):
 
 #|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 1
 #|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 180 random 5
+#|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 66
 #|Time 0:01
 #|space tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
 #|repeat tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5

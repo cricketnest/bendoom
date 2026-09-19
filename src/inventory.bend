@@ -2,6 +2,7 @@
 # P_TouchSpecialThing's grants for the types Bendoom takes.
 import Base
 import ./vec.bend as V
+import ./sound.bend as Sn
 
 # Health; armour points and type (0 none, 1 green, 2 blue); the cards,
 # a bit each in card_t order (blue, yellow and red card, then blue,
@@ -250,6 +251,13 @@ def Inventory.grant(kind: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
       Inventory.ammo(Inventory.am_shell(), 5, inv)
     case _:
       None{}
+
+# P_TouchSpecialThing's sound for a type taken: the weapons' (2001 to
+# 2005), the power's for the soul sphere and the berserk pack, and the
+# item's for the rest.
+def Inventory.sound(+kind: U32) -> U32:
+  Bool.pick(U32, Bool.and(U32.is_ge(kind, 2001), U32.is_le(kind, 2005)), Sn.Sound.wpnup(),
+    Bool.pick(U32, Bool.or(U32.is_eq(kind, 2013), U32.is_eq(kind, 2023)), Sn.Sound.getpow(), Sn.Sound.itemup()))
 
 # The end of P_TouchSpecialThing for a thing taken: the tally counts an
 # item flagged for it, and the flash grows by 6.
