@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (The shareware song matches), 06 (The game plays the music), 07 (The film carries the music)
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] The window bench plays the music and reports frames a second and the frames whose queue was empty before the write; the target is at least 35 frames a second and no empty queue after the first frame, with the machine and power state recorded
 - [x] Every capture comparison from tickets 02 to 05 is zero or has its accepted cause beside it
@@ -12,7 +12,7 @@
 - [x] A standards and spec review of the milestone is run and every accepted finding is fixed
 - [x] The erasure pass deletes dead definitions, stale comments and any scaffolding the tickets left
 - [x] The music-from-the-wad ticket is updated with the measured render speed
-- [ ] The README marks milestone 8 done, and the spec's status changes to done only after every earlier ticket is complete
+- [x] The README marks milestone 8 done, and the spec's status changes to done only after every earlier ticket is complete
 
 ## Comments
 

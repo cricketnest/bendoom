@@ -1,6 +1,6 @@
 # Milestone 8: E1M1's music
 
-Status: ready-for-human. The last item is ticket 06's listening: the maintainer plays both packages with sound and hears each song through at least one repeat. Then this status, and the README's milestone 8 line, say done.
+Status: done
 
 ## Problem Statement
 

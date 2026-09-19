@@ -4,14 +4,14 @@
 
 **Blocked by:** 05 (The repeat and the render node)
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] `tests/stream.bend` streams the Freedoom render in pieces of varying frame counts on both lanes and prints the samples at the start, on either side of the first-pass boundary and on either side of the second pass's wrap, with expected values read from the files in nushell
 - [x] `nix/tests.nix` gets the Freedoom render and sets `BENDOOM_MUSIC`
 - [x] No law over a position: the open file is the song's place, so there is none to drift (review, below)
 - [x] F32 appears only where samples go to `Audio.write`
 - [x] No automated check opens a sound device
-- [ ] Both packages play their song on the dev machine, heard through at least one repeat
+- [x] Both packages play their song on the dev machine, heard through at least one repeat
 
 ## Comments
 
@@ -49,3 +49,5 @@ For ticket 08:
 - The bench counts no empty queues yet. `Stream.frame` reads the queue in `Stream.topped` and throws the count away; that is where the count the bench reports comes from, and it will have to travel out of `Game.loop` with the frame rate.
 - `Stream.top()` is the one place the 3072 lives.
 - The music render's derivation takes all of `src/`, so any change to the game's sources rebuilds it. Not this ticket's to fix, but it costs 25 s on every touched source.
+
+19 Sep 2026. The maintainer played both packages with sound, heard each song through a repeat, and compared them by ear with recordings of the songs on OPL hardware. Milestone 8 is done.

@@ -48,5 +48,5 @@ for bug.
 5. Decorations, items, pickups and sprites: every thing of both E1M1s but the monsters, spawned as on Hurt Me Plenty and drawn as vanilla's sprites behind walls, ledges and grates, animated on its tics; health, armour, ammo, weapons and the blue key taken as vanilla takes them; solid things in the way. Its frames Chocolate Doom's tic for tic. Done.
 6. Monsters, weapons, damage, the status bar.
 7. Sound effects.
-8. E1M1's music: the song and the instruments of the package's WAD played in Bend as Chocolate Doom's OPL music plays them, sample for sample, rendered while the flake builds and streamed by the game on repeat, so each package plays the song of the WAD it was built with. Done once both packages are heard through a repeat.
+8. E1M1's music: the song and the instruments of the package's WAD played in Bend as Chocolate Doom's OPL music plays them, sample for sample, rendered while the flake builds and streamed by the game on repeat, so each package plays the song of the WAD it was built with. Done.
 9. Hellbent: the game as one λ-expression.
