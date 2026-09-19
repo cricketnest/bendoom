@@ -17,9 +17,30 @@
 # numbered first, flats from 0 and textures from 1, and what each shows
 # at a clock is worked out by P_UpdateSpecials' rule; the flats' texels
 # 0 and 2077 are NUKAGE1's and FWATER1's at clock 0, NUKAGE3's and
-# FWATER2's at clock 1.
+# FWATER2's at clock 1. THINGS has 292 records, kept as the lump stores
+# them: player 1's start, the dead former sergeant (type 19) spawned on
+# Hurt Me Plenty, and a record west of the origin. Its sprite, SPOSL0
+# between S_START and S_END, is 52 wide with offsets 26 and 20; column
+# 0 is one post at row 16, one texel long, and column 26's first post
+# starts at row 1, 17 long, its column offsets being 216 and 659. The
+# twitching impaled body's second state, S_LIVESTICK2, is reached only by
+# animation; its POL6B0 is 28 wide with offsets 15 and 62, where POL6A0's
+# left offset is 14. Of info.c's frames, S_ARM1A's is full-bright and
+# the sergeant's is not. Then sprite definitions built from the sprite
+# namespace by the rules of R_InitSpriteDefs and R_InstallSpriteLump,
+# each rotation's lump and 1 if mirrored, rotation 1 first. No spawn
+# state of milestone 5 has a rotated frame, so they are read here:
+# PLAY's frame A, whose rotations 2 to 4 are mirrored to 8 to 6 (PLAYA1,
+# PLAYA2A8, PLAYA3A7, PLAYA4A6, PLAYA5 in the WAD); POSS's frame A, eight
+# lumps; SPOS's frame L, one lump for every side; PLAY's frame X, past
+# its last, W; and four namespaces that vanilla refuses, written here,
+# each refused in vanilla's I_Error words. PLAY's frame X fails the load,
+# where vanilla's R_ProjectSprite would fail drawing it and name the
+# sprite and frame by number, so its line is a regression pin.
 import Base
 import ../src/bytes.bend as B
+import ../src/wad.bend as W
+import ../src/things.bend as H
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
@@ -128,6 +149,62 @@ def specials(+level: L.Level, which: List<&2, U32>) -> List<&2, String>:
     case +k <> rest:
       (U32.show(k) ++ ":" ++ U32.show(carrying(U32.to_nat(1175), level, k, 0))) <> specials(level, rest)
 
+def thing(+i: U32, t: L.Level.Thing) -> String:
+  L.Thing{x, y, angle, kind, options} = t
+  "thing " ++ U32.show(i) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y) ++ " angle " ++ U32.show(angle)
+    ++ " type " ++ U32.show(kind) ++ " options " ++ U32.show(options)
+
+# The sprite of state row 3, the dead former sergeant's: its width and
+# offsets, then the header and first texel of column 0's post, the end
+# marker after it, and column 26's first post's header and first texel.
+def sprite(+gfx: G.Gfx) -> List<&2, U32>:
+  +patch = G.Gfx.sprite(gfx, 3, 0, 0)
+  [(patch + 216 : U32), (patch + 217 : U32), (patch + 219 : U32), (patch + 221 : U32), (patch + 659 : U32),
+    (patch + 660 : U32), (patch + 662 : U32)]
+
+def sprite.head(+gfx: G.Gfx, +state: U32) -> String:
+  "sprite of state " ++ U32.show(state) ++ " width " ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 0, 1)) ++ " offset "
+    ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 0, 2)) ++ " top " ++ F.Fixed.show(G.Gfx.sprite(gfx, state, 0, 3))
+
+def installs(vs: List<&2, G.Gfx.Install>) -> List<&2, String>:
+  match vs:
+    case []:
+      []
+    case G.Install{frame, rot, name, flip} <> rest:
+      (name ++ " " ++ U32.show(flip)) <> installs(rest)
+
+def views(r: Result<&1, &1, U32 & String, List<&2, G.Gfx.Install>>) -> String:
+  match r:
+    case Fail{e}:
+      Pair.snd(U32, String, e)
+    case Done{vs}:
+      String.join(installs(vs), " ")
+
+def test(names: List<&2, String>) -> List<&2, W.Wad.Lump>:
+  match names:
+    case []:
+      []
+    case name <> rest:
+      W.Lump{0, 0, name} <> test(rest)
+
+# A row of a sprite's frame; the definition reads nothing else of it.
+def row(sprite: String, frame: U32) -> H.Thing.Row:
+  H.Row{sprite, frame, False{}, 0, 0}
+
+def defs(p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
+  (bytes, lumps) = p
+  +space = G.Gfx.sprite.space(lumps, False{})
+  do IO<Unit>:
+    IO.print("PLAY A " ++ views(G.Gfx.sprite.def(space, row("PLAY", 0))))
+    IO.print("POSS A " ++ views(G.Gfx.sprite.def(space, row("POSS", 0))))
+    IO.print("SPOS L " ++ views(G.Gfx.sprite.def(space, row("SPOS", 11))))
+    IO.print("PLAY X " ++ views(G.Gfx.sprite.def(space, row("PLAY", 23))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA1"]), row("TEST", 0))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTA0"]), row("TEST", 0))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA1", "TESTA2", "TESTA3", "TESTA4", "TESTA5", "TESTA6", "TESTA7"]),
+      row("TEST", 0))))
+    IO.print(views(G.Gfx.sprite.def(test(["TESTA0", "TESTC0"]), row("TEST", 0))))
+
 def blocks(b: L.Level.Box) -> String:
   L.Box{top, bottom, left, right} = b
   "top " ++ U32.show(top) ++ " bottom " ++ U32.show(bottom) ++ " left " ++ U32.show(left) ++ " right "
@@ -146,6 +223,14 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(side(level, 5, L.Level.side(level, 5)))
     IO.print("specials " ++ names(specials(level, [1, 2, 11, 23, 26, 62, 88, 117, 48, 36])))
     IO.print("line 528 special " ++ U32.show(L.Level.special(level, 528)) ++ " tag " ++ U32.show(L.Level.tag(level, 528)))
+    IO.print("things " ++ U32.show(L.Level.nthings(level)))
+    IO.print(thing(157, L.Level.thing(level, 157)))
+    IO.print(thing(245, L.Level.thing(level, 245)))
+    IO.print(thing(42, L.Level.thing(level, 42)))
+    IO.print(sprite.head(gfx, 3))
+    IO.print(sprite.head(gfx, 52))
+    IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
+      ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -161,7 +246,7 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       animated(at(gfx, level, 8)), animated(at(gfx, level, 9)), animated(at(gfx, level, 41))], ", "))
     IO.print("palette colormap flats texels " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
       B.Bytes.each(~U32, ~B.Bytes.at, List.concat(&2, U32, [peeks(gfx), texels(gfx), moving(at(gfx, level, 0)),
-        moving(at(gfx, level, 1))]), mem))))
+        moving(at(gfx, level, 1)), sprite(gfx)]), mem))))
 
 def report(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -171,6 +256,9 @@ def main() -> IO(Unit):
   do IO<Unit>:
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     report(world)
+    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
+    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
+    defs(W.Wad.dir(bytes))
 
 #|seg 0 from 448.000000 896.000000 to 256.000000 896.000000 angle 180.000 offset 0.000000 flags 4 side 344 front 122 back 8
 #|seg 75 from -208.000000 1472.000000 to 0.000000 1472.000000 angle 0.000 offset 112.000000 flags 4 side 337 front 135 back 36
@@ -182,6 +270,13 @@ def main() -> IO(Unit):
 #|side 5 offset 94.000000 0.000000 sector 46 textures - MC18 -
 #|specials 1:20 2:6 11:1 23:1 26:4 62:4 88:5 117:1 48:0 36:0
 #|line 528 special 2 tag 5
+#|things 292
+#|thing 157 at -416.000000 256.000000 angle 0 type 1 options 7
+#|thing 245 at 1248.000000 224.000000 angle 90 type 19 options 15
+#|thing 42 at -160.000000 1328.000000 angle 225 type 2048 options 23
+#|sprite of state 3 width 52.000000 offset 26.000000 top 20.000000
+#|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
+#|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127
@@ -192,4 +287,12 @@ def main() -> IO(Unit):
 #|texture SW2GRAY 64x128.000000 patches 3 mask 63
 #|switches 105 121 105 0
 #|animations 0 3 1 5, 2 4 3 7, 2 4 3 7, 0 5 4 8, 1 5 4 8
-#|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207
+#|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207 16 1 64 255 1 17 8
+#|PLAY A PLAYA1 0 PLAYA2A8 0 PLAYA3A7 0 PLAYA4A6 0 PLAYA5 0 PLAYA4A6 1 PLAYA3A7 1 PLAYA2A8 1
+#|POSS A POSSA1 0 POSSA2 0 POSSA3 0 POSSA4 0 POSSA5 0 POSSA6 0 POSSA7 0 POSSA8 0
+#|SPOS L SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0
+#|PLAY X R_ProjectSprite: no frame X of sprite PLAY
+#|R_InitSprites: Sprite TEST frame A has rotations and a rot=0 lump
+#|R_InitSprites: Sprite TEST frame A has multip rot=0 lump
+#|R_InitSprites: Sprite TEST frame A is missing rotations
+#|R_InitSprites: No patches found for TEST frame B

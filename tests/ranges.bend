@@ -37,7 +37,7 @@ def ranges(rs: List<&2, C.Clip.Range>) -> String:
       " " ++ Nat.show(first) ++ " " ++ Nat.show(last) ++ ranges(rest)
 
 def report(st: D.Draw) -> IO(Unit):
-  D.Draw{mem, solid, ws, tasks, planes} = st
+  D.Draw{mem, solid, ws, tasks, planes, seen} = st
   do IO<Unit>:
     walls(List.reverse(&2, D.Draw.Wall, ws))
     IO.print("solid" ++ ranges(solid))

@@ -2,6 +2,7 @@
 # static arrays, here with no limit. One value threaded through the BSP
 # walk, since every step reads what the last wrote.
 import Base
+import ./vec.bend as V
 import ./bytes.bend as B
 import ./fixed.bend as F
 import ./clip.bend as C
@@ -18,9 +19,10 @@ type Draw.Task is Data:
 # column, and its scale at each with the step between; its silhouette (1
 # clips sprites behind it at the bottom, 2 at the top) with the heights
 # it clips below and above; and, a column each from the first, the
-# texture columns of a two-sided middle texture (none without one) and
-# the ceiling and floor clips the range left, which clip what is drawn
-# behind it later.
+# texture columns of a two-sided middle texture (none without one), a
+# column already drawn holding Masked.drawn() instead, and the ceiling
+# and floor clips the range left, which clip what is drawn behind it
+# later.
 type Draw.Wall is Data:
   Wall{seg: U32, x1: U32, x2: U32, scale1: U32, scale2: U32, step: U32, sil: U32, bsil: U32, tsil: U32,
     texcols: List<&2, U32>, tops: List<&2, U32>, bottoms: List<&2, U32>}
@@ -39,12 +41,18 @@ type Draw.Plane is Data:
 type Draw.Planes is Type:
   Planes{heads: List<&2, Draw.Plane>, count: U32, cols: Array<U32>, depth: Nat, floor: U32, ceil: U32}
 
+# The sectors the walk has seen, Doom's validcount: for each, its rank
+# among them in the order the walk first reached them, from 1, and 0
+# for one not reached; and the rank the next subsector would give.
+type Draw.Seen is Data:
+  Seen{ranks: V.Vec, next: U32}
+
 # mem: the frame, the clip arrays and the graphics. solid: the solid
 # columns. walls: the stored ranges, newest first. tasks: the walk's
-# stack. planes: the visplanes.
+# stack. planes: the visplanes. seen: the sectors the walk has seen.
 type Draw is Type:
   Draw{mem: Array<U32>, solid: List<&2, C.Clip.Range>, walls: List<&2, Draw.Wall>,
-    tasks: List<&2, Draw.Task>, planes: Draw.Planes}
+    tasks: List<&2, Draw.Task>, planes: Draw.Planes, seen: Draw.Seen}
 
 # Drawing
 # -------

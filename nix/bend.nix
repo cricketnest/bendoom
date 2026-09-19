@@ -1,11 +1,16 @@
 # Bend is a TypeScript program bun runs as is; clang 19 serves its C
-# backend (14 suffices on the CPU, 19 for the GPU lane).
+# backend (14 suffices on the CPU, 19 for the GPU lane). The patch
+# paints the window by walking the frame's tree once, where the pin
+# walks it from the root for every pixel
+# (.scratch/upstream-bend/issues/01-slow-window-fill.md).
 { lib, stdenvNoCC, makeWrapper, bun, llvmPackages_19, src }:
 
 stdenvNoCC.mkDerivation {
   pname = "bend";
   version = "2.0.5";
   inherit src;
+
+  patches = [ ./window-fill.patch ];
 
   nativeBuildInputs = [ makeWrapper ];
 
