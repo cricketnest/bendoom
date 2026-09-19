@@ -25,8 +25,10 @@
 # starts at row 1, 17 long, its column offsets being 216 and 659. The
 # twitching impaled body's second state, S_LIVESTICK2, is reached only by
 # animation; its POL6B0 is 28 wide with offsets 15 and 62, where POL6A0's
-# left offset is 14. Of info.c's frames, S_ARM1A's is full-bright and
-# the sergeant's is not. Then sprite definitions built from the sprite
+# left offset is 14. The pistol's ready and raise states, rows 59 and
+# 60, no thing's, load PISGA0, 82 wide with offsets -125 and -97. Of
+# info.c's frames, S_ARM1A's is full-bright and the sergeant's is not.
+# Then sprite definitions built from the sprite
 # namespace by the rules of R_InitSpriteDefs and R_InstallSpriteLump,
 # each rotation's lump and 1 if mirrored, rotation 1 first. No spawn
 # state of milestone 5 has a rotated frame, so they are read here:
@@ -189,7 +191,7 @@ def test(names: List<&2, String>) -> List<&2, W.Wad.Lump>:
 
 # A row of a sprite's frame; the definition reads nothing else of it.
 def row(sprite: String, frame: U32) -> H.Thing.Row:
-  H.Row{sprite, frame, False{}, 0, 0}
+  H.Row{sprite, frame, False{}, 0, 0, H.Null{}}
 
 def defs(p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
   (bytes, lumps) = p
@@ -229,6 +231,8 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(thing(42, L.Level.thing(level, 42)))
     IO.print(sprite.head(gfx, 3))
     IO.print(sprite.head(gfx, 52))
+    IO.print(sprite.head(gfx, 59))
+    IO.print(sprite.head(gfx, 60))
     IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
       ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
@@ -276,6 +280,8 @@ def main() -> IO(Unit):
 #|thing 42 at -160.000000 1328.000000 angle 225 type 2048 options 23
 #|sprite of state 3 width 52.000000 offset 26.000000 top 20.000000
 #|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
+#|sprite of state 59 width 82.000000 offset -125.000000 top -97.000000
+#|sprite of state 60 width 82.000000 offset -125.000000 top -97.000000
 #|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7

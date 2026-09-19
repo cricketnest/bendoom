@@ -291,6 +291,12 @@ def Laws.bob_run_and_cap():
 def Laws.step_up_dip():
   {==}
 
+def Laws.pistol_rises():
+  {==}
+
+def Laws.pistol_bobs():
+  {==}
+
 def Laws.door_timeline():
   {==}
 
@@ -533,7 +539,7 @@ def Xy.player(s: S.Sim.Xy) -> S.Player:
 def holding_free(+level: L.Level, p: S.Player, held: I.Inventory, hp: Free(level, p)) ->
   Free(level, S.Player.holding(p, held)):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
 def fin_free(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32,
@@ -541,9 +547,9 @@ def fin_free(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, 
   hf: {S.Fit{ok, fl, cl} == S.Sim.fit(level, x, y) : S.Sim.Fit}, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, p, things, x, y, floor, ceil, over))):
   match go p:
-    case False{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case False{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
-    case True{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case True{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
       and_true_left(ok, h, e)
 
@@ -582,25 +588,25 @@ def stairstep_fin_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.
 def stairstep_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.stairstep(level, things, p))):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      stairstep_fin_free(level, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, x, (y + momy : U32)),
-        try_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, x, (y + momy : U32), hp))
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      stairstep_fin_free(level, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, x, (y + momy : U32)),
+        try_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, x, (y + momy : U32), hp))
 
 def wall_go_free(+level: L.Level, things: H.Things, p: S.Player, m: U32 & U32, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.slide.wall.go(level, things, p, m))):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       (+mx, +my) = m
       try_free(level, things, S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz,
-        crossed, inv}, (x + mx : U32), (y + my : U32), hp)
+        crossed, inv, psprites}, (x + mx : U32), (y + my : U32), hp)
 
 def wall_free(left: Bool, +level: L.Level, things: H.Things, p: S.Player, +frac: U32, i: U32,
   hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.slide.wall(left, level, things, p, frac, i))):
   match left p:
-    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
-    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      wall_go_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, S.Sim.along(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, i, F.Fixed.mul(momx, frac), F.Fixed.mul(momy, frac)), hp)
+    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      wall_go_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, S.Sim.along(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, i, F.Fixed.mul(momx, frac), F.Fixed.mul(momy, frac)), hp)
 
 def rest_free(+level: L.Level, things: H.Things, p: S.Player, +frac: U32, i: U32, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.slide.rest(level, things, p, frac, i))):
@@ -619,12 +625,12 @@ def upto_fin_free(+level: L.Level, +frac: U32, i: U32, t: S.Sim.Try,
 def upto_free(some: Bool, +level: L.Level, +things: H.Things, p: S.Player, +frac: U32, i: U32,
   hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.slide.upto(some, level, things, p, frac, i))):
   match some p:
-    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      rest_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, frac, i, hp)
-    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      upto_fin_free(level, frac, i, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
+    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      rest_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, frac, i, hp)
+    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      upto_fin_free(level, frac, i, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
         (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32)),
-        try_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32), hp))
+        try_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32), hp))
 
 def found_free(hit: Bool, +level: L.Level, +things: H.Things, p: S.Player, +frac: U32, i: U32,
   hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.slide.found(hit, level, things, p, frac, i))):
@@ -642,15 +648,15 @@ def hit_free(+level: L.Level, +things: H.Things, p: S.Player, best: U32 & U32, h
 def once_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.slide.once(level, things, p))):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      hit_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
-        S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      hit_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
+        S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
           S.Sim.lead(x, momx), S.Sim.trail(y, momy), (S.Sim.lead(x, momx) + momx : U32),
           (S.Sim.trail(y, momy) + momy : U32),
-          S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
+          S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
             S.Sim.trail(x, momx), S.Sim.lead(y, momy), (S.Sim.trail(x, momx) + momx : U32),
             (S.Sim.lead(y, momy) + momy : U32),
-            S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
+            S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
               S.Sim.lead(x, momx), S.Sim.lead(y, momy), (S.Sim.lead(x, momx) + momx : U32),
               (S.Sim.lead(y, momy) + momy : U32), ((F.Fixed.unit() + 1 : U32), 0)))), hp)
 
@@ -707,18 +713,18 @@ def xy_go_free(fuel: Nat, +level: L.Level, st: S.Sim.Xy, hs: Free(level, Xy.play
 def slow_free(stop: Bool, +level: L.Level, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.slow(stop, p)):
   match stop p:
-    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
-    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
 def ground_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.friction.ground(cmd, p)):
   match cmd p:
-    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       slow_free(Bool.and(S.Sim.crawling(momx), Bool.and(S.Sim.crawling(momy),
         Bool.and(U32.is_zero(forward), U32.is_zero(side)))), level,
-        S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, hp)
+        S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, hp)
 
 def friction_if_free(ground: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
   Free(level, Bool.pick(S.Player, ground, S.Sim.friction.ground(cmd, p), p)):
@@ -741,27 +747,27 @@ def slowed_free(+level: L.Level, +cmd: K.Cmd, t: S.Sim.Try, ht: Free(level, S.Si
 def moving_free(moving: Bool, +level: L.Level, +things: H.Things, +cmd: K.Cmd, p: S.Player,
   hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.xy.moving(moving, level, things, cmd, p))):
   match moving p:
-    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
-    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       slowed_free(level, cmd, S.Sim.xy.go(2n, level, S.Xy{False{}, S.Try{False{},
         S.Player{x, y, z, angle, S.Sim.clamp(momx), S.Sim.clamp(momy), momz, floorz, ceilz, viewheight,
-          deltaview, viewz, crossed, inv}, things}, S.Sim.clamp(momx), S.Sim.clamp(momy)}),
+          deltaview, viewz, crossed, inv, psprites}, things}, S.Sim.clamp(momx), S.Sim.clamp(momy)}),
         xy_go_free(2n, level, S.Xy{False{}, S.Try{False{},
           S.Player{x, y, z, angle, S.Sim.clamp(momx), S.Sim.clamp(momy), momz, floorz, ceilz,
-            viewheight, deltaview, viewz, crossed, inv}, things}, S.Sim.clamp(momx), S.Sim.clamp(momy)}, hp))
+            viewheight, deltaview, viewz, crossed, inv, psprites}, things}, S.Sim.clamp(momx), S.Sim.clamp(momy)}, hp))
 
 def xy_free(+level: L.Level, +things: H.Things, +cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.xy(level, things, cmd, p))):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      moving_free(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, things, cmd, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, hp)
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      moving_free(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, things, cmd, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, hp)
 
 # Thrust, turning, the eye and the vertical move keep the position.
 def thrust_free(+level: L.Level, p: S.Player, +angle: U32, +move: U32, hp: Free(level, p)) ->
   Free(level, S.Sim.thrust(level, p, angle, move)):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
 def push_if_free(skip: Bool, +level: L.Level, +p: S.Player, +angle: U32, +move: U32,
@@ -780,49 +786,54 @@ def push_free(+level: L.Level, +p: S.Player, +angle: U32, +move: U32, hp: Free(l
 def move_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.move(level, cmd, p)):
   match cmd p:
-    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      push_free(level, S.Sim.push(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
+    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      push_free(level, S.Sim.push(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
         (angle + (turn << 16n) : U32), forward),
         ((angle + (turn << 16n) : U32) - A.Angle.ang90() : U32), side,
-        push_free(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
+        push_free(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
           (angle + (turn << 16n) : U32), forward, hp))
 
 def eye_if_free(ground: Bool, +level: L.Level, p: S.Player, swing: U32, hp: Free(level, p)) ->
   Free(level, S.Sim.eye.if(ground, p, swing)):
   match ground p:
-    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
-    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
 def eye_free(+level: L.Level, clock: U32, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.eye(level, clock, p)):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      eye_if_free(S.Player.onground(S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv},
-        F.Fixed.mul((F.Fixed.min(S.Sim.maxbob(),
-          ((F.Fixed.mul(momx, momx) + F.Fixed.mul(momy, momy) : U32) >> 2n : U32)) >> 1n : U32),
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      eye_if_free(S.Player.onground(S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
+        F.Fixed.mul((S.Sim.bob(momx, momy) >> 1n : U32),
           A.Angle.sin(L.Level.sine(level), ((409 * clock : U32) .&. 8191 : U32))), hp)
 
 def z_if_free(still: Bool, +level: L.Level, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.z.if(still, p)):
   match still p:
-    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
-    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
 def z_free(+level: L.Level, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.z(p)):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
-      z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}, hp)
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+      z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, hp)
 
-# The counters, the vertical move and the state the mobj leaves keep
-# the place too.
+# The player sprites, the counters, the vertical move and the state the
+# mobj leaves keep the place too.
+def psprites_free(+level: L.Level, clock: U32, p: S.Player, hp: Free(level, p)) ->
+  Free(level, S.Sim.psprites(level, clock, p)):
+  match p:
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, S.Psprites{+weapon, +flash}}:
+      hp
+
 def counters_free(+level: L.Level, p: S.Player, hp: Free(level, p)) -> Free(level, S.Sim.counters(p)):
   match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv}:
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
 def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
@@ -969,12 +980,12 @@ def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, 
 # A mover's re-clip moves the player up and down alone.
 def stood_x(moved: S.Player, +q: S.Player) -> {S.Player.x(moved) == S.Player.x(S.Player.stood(moved, q)) : U32}:
   match moved:
-    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}:
       {==}
 
 def stood_y(moved: S.Player, +q: S.Player) -> {S.Player.y(moved) == S.Player.y(S.Player.stood(moved, q)) : U32}:
   match moved:
-    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}:
       {==}
 
 # What the tic keeps is free where the player it moved was: the level
@@ -1008,7 +1019,7 @@ def Laws.tic_keeps_free(cmd, s, free):
       free
     case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
-      +thought = S.Sim.counters(S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)))
+      +thought = S.Sim.counters(S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))))
       +before = {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown} : S.State}
       +went = S.Sim.mobj(cmd, before)
       kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
@@ -1016,8 +1027,9 @@ def Laws.tic_keeps_free(cmd, s, free):
           S.Sim.use(S.Sim.pressed(cmd, usedown), thought, went))),
         moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, things, cmd, thought)), level, before,
           mobj_z_free(level, S.Sim.xy(level, things, cmd, thought), xy_free(level, things, cmd, thought,
-            counters_free(level, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
-              eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free)))))))
+            counters_free(level, S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
+              psprites_free(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
+                eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free))))))))
 
 def Laws.replay_keeps_free(script, s, free):
   match script:

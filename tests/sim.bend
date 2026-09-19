@@ -20,6 +20,14 @@
 # types' counts in ticket 02's nushell inventory), none at another
 # place, type or cell than its thing's, and no thing missing from the
 # cell of its centre. The player's inventory, G_PlayerReborn's.
+# Then the pistol from the start: the weapon sprite's state row, tics and
+# place on the screen, and the flash's, after chosen tics. It rises 6 a
+# tic from 122 for 15 tics, rests at column 1, row 32, bobs on a walk
+# east begun on tic 21, and is at rest again 60 tics after the walk
+# ends: a nushell replay of p_pspr.c's P_SetupPsprites, P_MovePsprites,
+# A_Raise and A_WeaponReady over the bob that p_user.c's thrust and
+# p_mobj.c's friction give on open ground, with Chocolate Doom's
+# finesine.
 # Then the pickups, each run printed with the tic, the player's place,
 # the inventory, the things left and the records taken since the case
 # began: a clip, three shells in a row and the rocket walked into, with
@@ -688,6 +696,38 @@ def pickups(+level: L.Level) -> IO(Unit):
       holding(stocked(100, 100, 1, [50, 0, 0, 0], I.Inventory.start()), at(level, 1664, 1008, 90)))
     IO.print("-")
 
+def psprite(psp: S.Psprite) -> String:
+  S.Psprite{state, tics, sx, sy} = psp
+  Maybe.show(~&2, ~U32, ~U32.show, state) ++ " tics " ++ U32.show(tics) ++ " at " ++ F.Fixed.show(sx) ++ " "
+    ++ F.Fixed.show(sy)
+
+def psprites(ps: S.Psprites) -> String:
+  S.Psprites{weapon, flash} = ps
+  " state " ++ psprite(weapon) ++ " flash " ++ psprite(flash)
+
+def armed(n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  do IO<S.State>:
+    IO.print("weapon tic " ++ U32.show(S.State.clock(q)) ++ psprites(S.Player.psprites(S.State.player(q))))
+    return q
+
+# The pistol from the start: up from the bottom, at rest, bobbing on a
+# walk east, and at rest again once the momentum is gone.
+def weapon(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    w0 : S.State <- armed(0n, idle(), S.State.start(level))
+    w1 : S.State <- armed(1n, idle(), w0)
+    w2 : S.State <- armed(13n, idle(), w1)
+    w3 : S.State <- armed(1n, idle(), w2)
+    w4 : S.State <- armed(5n, idle(), w3)
+    w5 : S.State <- armed(1n, forward(), w4)
+    w6 : S.State <- armed(1n, forward(), w5)
+    w7 : S.State <- armed(26n, forward(), w6)
+    w8 : S.State <- armed(16n, forward(), w7)
+    w9 : S.State <- armed(1n, idle(), w8)
+    w10 : S.State <- armed(59n, idle(), w9)
+    IO.print("-")
+
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
@@ -713,6 +753,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
+    weapon(level)
     pickups(level)
     door(level)
     patched.cases(level, patched(W.Wad.dir(a)))
@@ -756,6 +797,18 @@ def main() -> IO(Unit):
 #|U!:15 492.898864 256.341476 0.000 z -128.000000 floor -128.000000 eye 42.834960
 #|-:1 509.055541 256.347518 0.000 z -128.000000 floor -128.000000 eye 43.033325
 #|-:40 662.189941 256.402572 0.000 z -128.000000 floor -128.000000 eye 41.011581
+#|weapon tic 0 state Some(60) tics 1 at 0.000000 122.000000 flash None tics 0 at 0.000000 0.000000
+#|weapon tic 1 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000
+#|weapon tic 14 state Some(60) tics 1 at 0.000000 38.000000 flash None tics 0 at 0.000000 38.000000
+#|weapon tic 15 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000
+#|weapon tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000
+#|weapon tic 21 state Some(59) tics 1 at 0.941558 32.140930 flash None tics 0 at 0.941558 32.140930
+#|weapon tic 22 state Some(59) tics 1 at 0.738449 32.488861 flash None tics 0 at 0.738449 32.488861
+#|weapon tic 48 state Some(59) tics 1 at -0.486312 47.151641 flash None tics 0 at -0.486312 47.151641
+#|weapon tic 64 state Some(59) tics 1 at 16.923339 33.562011 flash None tics 0 at 16.923339 33.562011
+#|weapon tic 65 state Some(59) tics 1 at 14.884948 32.005294 flash None tics 0 at 14.884948 32.005294
+#|weapon tic 124 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000
+#|-
 #|clip walk tic 9 644.340896 991.988937 180.000 z -128.000000 floor -128.000000 eye 42.770172
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 180 taken
 #|- tic 10 639.121368 991.986862 180.000 z -128.000000 floor -128.000000 eye 42.064453

@@ -5,8 +5,9 @@
 # palette as RGB words, the colormaps, and the lumps: the flats the
 # sectors name, then the patches of the textures the sides name, then
 # the composed columns, then the sprite lumps of the frames the map's
-# things spawn in or reach, every rotation; with the map's names go every
-# frame of the animations they touch and the partners of their switches.
+# things spawn in or reach and of the weapon's, every rotation; with the
+# map's names go every frame of the animations they touch and the
+# partners of their switches.
 # Gfx is the directory into it: Data, so the draw takes it by copy.
 # Every other flat, texture and sprite stays a name in the WAD.
 import Base
@@ -34,11 +35,10 @@ type Gfx.Anims is Data:
 # column), texture 0 being none. cols: every texture's columns, each the
 # index of its texels in the array. sidetex: a side's top, bottom and
 # middle texture numbers, three a side. skytex: the sky's texture.
-# sprites: for each rotation of each state row the map's things spawn
-# in or reach, six words: the index of its lump's patch, the patch's
-# width, left offset and top offset in fixed point (Doom's spritewidth,
-# spriteoffset and spritetopoffset), 1 when it is mirrored, and 1 for a
-# full-bright frame.
+# sprites: for each rotation of each state row loaded, six words: the
+# index of its lump's patch, the patch's width, left offset and top
+# offset in fixed point (Doom's spritewidth, spriteoffset and
+# spritetopoffset), 1 when it is mirrored, and 1 for a full-bright frame.
 type Gfx is Data:
   Gfx{flats: V.Vec, pics: V.Vec, sky: U32, texs: V.Vec, cols: V.Vec, sidetex: V.Vec, skytex: U32,
     sprites: V.Vec, anims: Gfx.Anims}
@@ -780,7 +780,7 @@ def Gfx.sprite.check(fits: Bool, +sprite: String, +frame: U32, +count: U32,
 # vanilla refuses or that lacks the row's frame.
 def Gfx.sprite.def(+space: List<&2, W.Wad.Lump>, r: H.Thing.Row) ->
   Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
-  H.Row{+sprite, +frame, bright, tics, next} = r
+  H.Row{+sprite, +frame, bright, tics, next, action} = r
   +installs = Gfx.installs(space, sprite)
   +count = Gfx.frames(installs)
   Gfx.sprite.check(Bool.and(U32.is_lt(frame, count), U32.is_le(count, 29)), sprite, frame, count, installs)
@@ -835,12 +835,18 @@ def Gfx.sprite.rows.go(n: Nat, +row: U32, +marks: V.Vec) -> List<&2, U32>:
     case 1n+m:
       Gfx.sprite.keep(U32.is_eq(V.Vec.get(marks, row), 1), row, Gfx.sprite.rows.go(m, (row + 1 : U32), marks))
 
-# The state rows the level's things spawn in and those they lead to, each
-# once, in order.
+# A weapon's rows and those they lead to, marked.
+def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
+  H.Weapon{+up, +ready} = w
+  Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks))
+
+# The state rows the level's things spawn in, the pistol's, and those
+# they lead to, each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
-  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, V.Vec.of_list([], U32.from_nat(n))))
+  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n,
+    Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.of_list([], U32.from_nat(n)))))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
   match views:
@@ -856,9 +862,9 @@ def Gfx.install.flips(views: List<&2, Gfx.Install>) -> List<&2, U32>:
     case Install{frame, rot, name, flip} <> rest:
       flip <> Gfx.install.flips(rest)
 
-# The sprite lumps to copy, each once; the state rows the things spawn
-# in or reach; and for each row's eight views the number of its lump
-# among them and whether it is mirrored.
+# The sprite lumps to copy, each once; the state rows they are for; and
+# for each row's eight views the number of its lump among them and
+# whether it is mirrored.
 type Gfx.Sprites is Data:
   Sprites{lumps: List<&2, W.Wad.Lump>, rows: List<&2, U32>, numbers: List<&2, U32>, flips: List<&2, U32>}
 
@@ -869,8 +875,7 @@ def Gfx.sprites.found(rows: List<&2, U32>, +space: List<&2, W.Wad.Lump>, +views:
     lumps => Sprites{lumps, rows, Gfx.Names.numbers(sn), Gfx.install.flips(views)},
     Gfx.lookup(Gfx.Names.distinct(sn), Gfx.dir(space, Map.new(&2, W.Wad.Lump)), "R_InitSprites"))
 
-# The sprites of the rows the level's things spawn in or reach, from the
-# WAD's sprite namespace.
+# The sprites of some state rows, from the WAD's sprite namespace.
 def Gfx.sprites(+rows: List<&2, U32>, +space: List<&2, W.Wad.Lump>) -> Result<&1, &1, U32 & String, Gfx.Sprites>:
   Result.bind(&1, &1, U32 & String, List<&2, Gfx.Install>, Gfx.Sprites, Gfx.sprite.defs(rows, space),
     views => Gfx.sprites.found(rows, space, views))
