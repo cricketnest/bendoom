@@ -1429,3 +1429,9 @@ def Laws.song_faults():
 
 def Laws.buffer_spills():
   {==}
+
+def Laws.sfx_refusals():
+  {==}
+
+def Laws.sfx_rates_unserved(count, bytes):
+  {==}
