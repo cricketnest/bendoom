@@ -20,6 +20,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **`Bool.pick` evaluates both branches.** It is a function, and calls are strict, so a pick between a costly value and a cheap one pays for the costly one every time; a branch that builds something is a `match`.
 - **No def named `exit`.** The native runtime has one of its own, and a build that gives the def a function of its own fails with "two names mangle to FID_EXIT"; whether it does depends on what the compiler inlines, so the name can pass for a while.
 - **`type` is a keyword,** refused as a field or parameter name; a thing's DoomEd type is its `kind`.
+- **A big `+` let inside a function with a `do` block is inlined at its use:** binding a whole scripted state beside another one and handing each to a frame fails the native build with "an arity over 255", with no location. The same expression as a def of its own passes, so a state a case needs is built by a def (`tests/game.bend`'s `killed`).
 - **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun. Base's `List.length` recurses once an element, so it may not measure a WAD lump there; `List.drop` is a loop.
 
 ## Proofs

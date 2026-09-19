@@ -297,6 +297,12 @@ def Laws.pistol_rises():
 def Laws.pistol_bobs():
   {==}
 
+def Laws.armour_absorbs():
+  {==}
+
+def Laws.damage_count():
+  {==}
+
 def Laws.door_timeline():
   {==}
 

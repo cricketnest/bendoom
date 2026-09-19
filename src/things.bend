@@ -25,12 +25,16 @@ type Thing is Data:
 def Thing.you() -> U32:
   4294967295
 
-# What a state row does as it is entered, Doom's action pointers:
-# nothing, A_Raise, A_WeaponReady.
+# What a state row does as it is entered, Doom's action pointers: a
+# weapon's A_Raise, A_WeaponReady and A_Lower, a mobj's A_Pain and
+# A_PlayerScream, or nothing. A row of one kind never holds the other's.
 type Thing.Action is Data:
   Null{}
   Raise{}
   WeaponReady{}
+  Lower{}
+  Pain{}
+  Scream{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, and
@@ -41,8 +45,9 @@ type Thing.Row is Data:
   Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32, action: Thing.Action}
 
 # The state rows by Bendoom's number: every state the spawn states of the
-# types below lead to, in vanilla's order, then the pistol's ready and
-# raise states. None has 0 tics.
+# types below lead to, in vanilla's order, then the pistol's ready, raise
+# and down states and the player mobj's own, whose death ends in row 0,
+# the corpse a dead marine record spawns in. None has 0 tics.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}},
@@ -73,7 +78,12 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"GOR4", 0, False{}, 4294967295, 53, Null{}}, Row{"SMIT", 0, False{}, 4294967295, 54, Null{}},
     Row{"CBRA", 0, True{}, 4294967295, 55, Null{}}, Row{"TRE1", 0, False{}, 4294967295, 56, Null{}},
     Row{"TRE2", 0, False{}, 4294967295, 57, Null{}}, Row{"ELEC", 0, False{}, 4294967295, 58, Null{}},
-    Row{"PISG", 0, False{}, 1, 59, WeaponReady{}}, Row{"PISG", 0, False{}, 1, 60, Raise{}}]
+    Row{"PISG", 0, False{}, 1, 59, WeaponReady{}}, Row{"PISG", 0, False{}, 1, 60, Raise{}},
+    Row{"PISG", 0, False{}, 1, 61, Lower{}}, Row{"PLAY", 0, False{}, 4294967295, 62, Null{}},
+    Row{"PLAY", 6, False{}, 4, 64, Null{}}, Row{"PLAY", 6, False{}, 4, 62, Pain{}},
+    Row{"PLAY", 7, False{}, 10, 66, Null{}}, Row{"PLAY", 8, False{}, 10, 67, Scream{}},
+    Row{"PLAY", 9, False{}, 10, 68, Null{}}, Row{"PLAY", 10, False{}, 10, 69, Null{}},
+    Row{"PLAY", 11, False{}, 10, 70, Null{}}, Row{"PLAY", 12, False{}, 10, 0, Null{}}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, False{}, 0, 0, Null{}})
@@ -94,13 +104,29 @@ def Thing.Row.action(r: Thing.Row) -> Thing.Action:
   Row{sprite, frame, bright, tics, next, action} = r
   action
 
-# A weapon's rows in Doom's weaponinfo: the state it rises in and the
-# state it is ready in.
+# A weapon's rows in Doom's weaponinfo: the states it rises, is ready
+# and sinks in.
 type Thing.Weapon is Data:
-  Weapon{up: U32, ready: U32}
+  Weapon{up: U32, ready: U32, down: U32}
 
 def Thing.pistol() -> Thing.Weapon:
-  Weapon{60, 59}
+  Weapon{60, 59, 61}
+
+def Thing.Weapon.down(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down} = w
+  down
+
+# The player mobj's rows in Doom's mobjinfo: the state it stands in,
+# the one it flinches in and the one its death begins with. Its spawn
+# health, 100, is the inventory's.
+def Thing.play() -> U32:
+  62
+
+def Thing.play.pain() -> U32:
+  63
+
+def Thing.play.death() -> U32:
+  65
 
 # Doom's P_MobjThinker for a thing that does not move: a lasting state
 # stays as it is; another counts its tics down, and the tic they run out
