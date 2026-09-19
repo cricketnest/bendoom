@@ -1,10 +1,10 @@
 # The game's frame, from the WAD named by BENDOOM_IWAD: a clock reading
 # and the frame's key events in, the state and what it prints out. No
 # window opens. Each line is the clock, whether the level has ended, the
-# player, the thinkers running, the floor and ceiling of sector 64 (the
-# exit room's door), line 407's special (the exit switch, 11 as loaded),
-# whether its side shows the switch's partner, how many things there
-# are and the random index.
+# player, the thinkers running that are no mobj's, the floor and ceiling
+# of sector 64 (the exit room's door), line 407's special (the exit
+# switch, 11 as loaded), whether its side shows the switch's partner, how
+# many things there are and the random index.
 # First the state the game starts with. Then a game handed the state
 # a script leaves beside Freedoom's exit switch with the room's door
 # open behind the player, 50 tics in. A frame 200 ms on with Space
@@ -35,12 +35,22 @@ def pressed(+level: L.Level, sidetex: V.Vec) -> Bool:
   U32.is_eq(V.Vec.get(sidetex, (615 * 3 + 2 : U32)),
     L.Level.switch(level, V.Vec.get(L.Level.sidetex(level), (615 * 3 + 2 : U32))))
 
+# How many thinkers are not mobjs': the lights, movers and buttons.
+def specials(ts: List<&2, S.Thinker>) -> U32:
+  match ts:
+    case []:
+      0
+    case S.Mobj{id} <> rest:
+      specials(rest)
+    case _ <> rest:
+      (1 + specials(rest) : U32)
+
 def line(tag: String, +s: S.State) -> String:
   +p = S.State.player(s)
   +level = S.State.level(s)
   tag ++ " tic " ++ U32.show(S.State.clock(s)) ++ " ended " ++ Bool.show(S.State.ended(s)) ++ " at "
     ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " " ++ A.Angle.show(S.Player.angle(p))
-    ++ " thinkers " ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ " sector 64 "
+    ++ " thinkers " ++ U32.show(specials(S.State.thinkers(s))) ++ " sector 64 "
     ++ F.Fixed.show(L.Level.floor(level, 64)) ++ " " ++ F.Fixed.show(L.Level.ceil(level, 64)) ++ " special "
     ++ U32.show(L.Level.special(level, 407)) ++ " pressed " ++ Bool.show(pressed(level, S.State.sidetex(s)))
     ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(s)))) ++ " random "

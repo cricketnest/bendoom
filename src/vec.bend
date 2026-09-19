@@ -105,3 +105,56 @@ def Vec.show(+v: Vec, n: Nat, +i: U32) -> String:
       ""
     case 1n+m:
       " " ++ U32.show(Vec.get(v, i)) ++ Vec.show(v, m, (i + 1 : U32))
+
+# A list with x before it when it is kept.
+def Vec.keep(keep: Bool, x: U32, rest: List<&2, U32>) -> List<&2, U32>:
+  match keep:
+    case False{}:
+      rest
+    case True{}:
+      x <> rest
+
+# A copyable array of any Data with the same shape, a slot holding its
+# element or none. It grows: each slot becomes a fork of itself and an
+# empty one, so twice the indices fit and the old ones read as before.
+type Tree<-A: Data> is Data:
+  Slot{x: Maybe<&2, A>}
+  Fork{l: Tree<A>, r: Tree<A>}
+
+def Tree.empty(-A: Data, d: Nat) -> Tree<A>:
+  match d:
+    case 0n:
+      Slot{None{}}
+    case 1n++p:
+      Fork{Tree.empty(A, p), Tree.empty(A, p)}
+
+def Tree.get.go(-A: Data, t: Tree<A>, odd: Bool, +i: U32) -> Maybe<&2, A>:
+  match t odd:
+    case Slot{x} _:
+      x
+    case Fork{l, r} False{}:
+      Tree.get.go(A, l, Vec.odd((i >> 1n : U32)), (i >> 1n : U32))
+    case Fork{l, r} True{}:
+      Tree.get.go(A, r, Vec.odd((i >> 1n : U32)), (i >> 1n : U32))
+
+def Tree.get(-A: Data, t: Tree<A>, +i: U32) -> Maybe<&2, A>:
+  Tree.get.go(A, t, Vec.odd(i), i)
+
+def Tree.set.go(-A: Data, t: Tree<A>, odd: Bool, +i: U32, x: Maybe<&2, A>) -> Tree<A>:
+  match t odd:
+    case Slot{old} _:
+      Slot{x}
+    case Fork{l, r} False{}:
+      Fork{Tree.set.go(A, l, Vec.odd((i >> 1n : U32)), (i >> 1n : U32), x), r}
+    case Fork{l, r} True{}:
+      Fork{l, Tree.set.go(A, r, Vec.odd((i >> 1n : U32)), (i >> 1n : U32), x)}
+
+def Tree.set(-A: Data, t: Tree<A>, +i: U32, x: Maybe<&2, A>) -> Tree<A>:
+  Tree.set.go(A, t, Vec.odd(i), i, x)
+
+def Tree.grown(-A: Data, t: Tree<A>) -> Tree<A>:
+  match t:
+    case Slot{x}:
+      Fork{Slot{x}, Slot{None{}}}
+    case Fork{l, r}:
+      Fork{Tree.grown(A, l), Tree.grown(A, r)}
