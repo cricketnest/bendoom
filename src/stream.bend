@@ -5,15 +5,18 @@
 # right. The open file is the song's place, and nothing but the queue's
 # top-up is ever held.
 import Base
+import ./bytes.bend as B
 
 # A pass being read: the open file and the path of second.raw, which
 # opens again at every pass's end.
 type Stream.Tape is Type:
   Tape{file: File, path: String}
 
-# The music being played: the device and the pass feeding it.
+# The music being played: the device, the pass feeding it, and the
+# game frames whose top-up found the device's queue empty, which the
+# window bench reports.
 type Stream is Type:
-  Stream{audio: Audio, tape: Stream.Tape}
+  Stream{audio: Audio, tape: Stream.Tape, dry: U32}
 
 # A 16-bit sample as the device takes it: its sign bit flipped is its
 # value over 32768, offset by a half.
@@ -25,7 +28,7 @@ def Stream.sample(+x: U32) -> F32:
 def Stream.samples(bytes: List<&2, U32>) -> List<&2, F32>:
   match bytes:
     case lo <> hi <> rest:
-      Stream.sample((lo .|. (hi << 8n) : U32)) <> Stream.samples(rest)
+      Stream.sample(B.Bytes.le16(lo, hi)) <> Stream.samples(rest)
     case _:
       []
 
@@ -60,30 +63,31 @@ def Stream.pull(+want: U32, tape: Stream.Tape) -> IO(Stream.Tape & List<&2, U32>
   IO.bind(File & Result<&1, &1, U32 & String, List<&2, U32>>, Stream.Tape & List<&2, U32>,
     File.read_bytes(file, (want * 4 : U32)), p => Stream.got(want, path, p))
 
-# The frames the device holds between top-ups, of the ring's 4096: 70 ms
-# at 44100 Hz, which a frame rate above 14 a second never runs dry.
+# The frames the device holds between top-ups, of the ring's 4096: 69.7
+# ms at 44100 Hz, so a game frame longer than that lets the ring run
+# dry.
 def Stream.top() -> U32:
   3072
 
-def Stream.wrote(tape: Stream.Tape, p: Audio & U32) -> IO(Stream):
+def Stream.wrote(tape: Stream.Tape, dry: U32, p: Audio & U32) -> IO(Stream):
   (audio, queued) = p
-  IO.pure(Stream, Stream{audio, tape})
+  IO.pure(Stream, Stream{audio, tape, dry})
 
-def Stream.filled(audio: Audio, p: Stream.Tape & List<&2, U32>) -> IO(Stream):
+def Stream.filled(audio: Audio, dry: U32, p: Stream.Tape & List<&2, U32>) -> IO(Stream):
   (tape, frames) = p
-  IO.bind(Audio & U32, Stream, Audio.write(audio, Stream.samples(frames)), q => Stream.wrote(tape, q))
+  IO.bind(Audio & U32, Stream, Audio.write(audio, Stream.samples(frames)), q => Stream.wrote(tape, dry, q))
 
-def Stream.topped(tape: Stream.Tape, p: Audio & U32) -> IO(Stream):
+def Stream.topped(tape: Stream.Tape, +dry: U32, p: Audio & U32) -> IO(Stream):
   (audio, +queued) = p
   IO.bind(Stream.Tape & List<&2, U32>, Stream, Stream.pull((Stream.top() - queued : U32), tape),
-    r => Stream.filled(audio, r))
+    r => Stream.filled(audio, (dry + Bool.to_u32(U32.is_zero(queued)) : U32), r))
 
 # A frame of music: a write of no samples reads the queue, and the
 # frames that bring it back to the top follow it. The song's place
 # therefore follows the device's clock, not the tic clock.
 def Stream.frame(m: Stream) -> IO(Stream):
-  Stream{audio, tape} = m
-  IO.bind(Audio & U32, Stream, Audio.write(audio, []), p => Stream.topped(tape, p))
+  Stream{audio, tape, dry} = m
+  IO.bind(Audio & U32, Stream, Audio.write(audio, []), p => Stream.topped(tape, dry, p))
 
 def Stream.play(m: Maybe<Stream>) -> IO(Maybe<Stream>):
   match m:
@@ -105,20 +109,30 @@ def Stream.rolled(+dir: String, file: Result<&1, &1, U32 & String, File>) -> May
     case Done{f}:
       Some{Tape{f, dir ++ "/second.raw"}}
 
+def Stream.probed(+dir: String, second: Result<&1, &1, U32 & String, File>) -> IO(Maybe<Stream.Tape>):
+  match second:
+    case Fail{e}:
+      IO.pure(Maybe<Stream.Tape>, None{})
+    case Done{f}:
+      do IO<Maybe<Stream.Tape>>:
+        File.close(f)
+        first : Result<&1, &1, U32 & String, File> <- File.open(dir ++ "/first.raw", "r")
+        return Stream.rolled(dir, first)
+
 # The first pass of the render in the given directory, open at its
-# first frame.
+# first frame, if the second opens too.
 def Stream.tape(+dir: String) -> IO(Maybe<Stream.Tape>):
-  IO.bind(Result<&1, &1, U32 & String, File>, Maybe<Stream.Tape>, File.open(dir ++ "/first.raw", "r"),
-    f => IO.pure(Maybe<Stream.Tape>, Stream.rolled(dir, f)))
+  IO.bind(Result<&1, &1, U32 & String, File>, Maybe<Stream.Tape>, File.open(dir ++ "/second.raw", "r"),
+    s => Stream.probed(dir, s))
 
 def Stream.first(audio: Audio, tape: Maybe<Stream.Tape>) -> IO(Maybe<Stream>):
   match tape:
     case None{}:
       do IO<Maybe<Stream>>:
         Audio.close(audio)
-        Stream.silent("BENDOOM_MUSIC holds no first.raw")
+        Stream.silent("BENDOOM_MUSIC holds no first.raw and second.raw")
     case Some{t}:
-      IO.pure(Maybe<Stream>, Some{Stream{audio, t}})
+      IO.pure(Maybe<Stream>, Some{Stream{audio, t, 0}})
 
 def Stream.device(dir: String, audio: Result<&1, &1, U32 & String, Audio>) -> IO(Maybe<Stream>):
   match audio:
@@ -139,11 +153,14 @@ def Stream.start(dir: Result<&1, &1, U32 & String, String>) -> IO(Maybe<Stream>)
 def Stream.open() -> IO(Maybe<Stream>):
   IO.bind(Result<&1, &1, U32 & String, String>, Maybe<Stream>, IO.get_env("BENDOOM_MUSIC"), Stream.start)
 
-def Stream.stop(m: Maybe<Stream>) -> IO(Unit):
+# The device and the file closed; the frames that found the queue
+# empty, if the music played.
+def Stream.stop(m: Maybe<Stream>) -> IO(Maybe<U32>):
   match m:
     case None{}:
-      IO.pure(Unit, Unit{})
-    case Some{Stream{audio, Tape{file, path}}}:
-      do IO<Unit>:
+      IO.pure(Maybe<U32>, None{})
+    case Some{Stream{audio, Tape{file, path}, dry}}:
+      do IO<Maybe<U32>>:
         Audio.close(audio)
         File.close(file)
+        return Some{dry}

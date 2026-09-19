@@ -18,4 +18,5 @@ def main() -> IO(Unit):
     record : Result<&1, &1, U32 & String, String> <- IO.get_env("RECORD")
     demo : Maybe<D.Demo.Rec> <- D.Demo.open(record)
     now : Nat <- IO.now()
-    M.Game.start(U32.to_nat(4294967295), K.Input{K.Keys.none(), 0}, [], demo, now, world)
+    dry : Maybe<U32> <- M.Game.start(U32.to_nat(4294967295), K.Input{K.Keys.none(), 0}, [], demo, now, world)
+    return Unit{}

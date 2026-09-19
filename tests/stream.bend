@@ -1,6 +1,7 @@
 # The render named by BENDOOM_MUSIC streamed as the game streams it, in
 # pieces of varying frame counts, printing the frames where the song
-# begins, at each end of a pass and at each start after one. Freedoom's
+# begins, at each end of a pass and at each start after one, each
+# sample as Audio.write takes it, turned back into 16 bits. Freedoom's
 # passes are 5,759,883 and 5,759,888 frames, so the pull after the last
 # three frames of a pass reads none: that empty read is the pass's end,
 # and the second pass opens again on it. The expected frames are read
@@ -17,19 +18,29 @@
 #   frames $"($env.BENDOOM_MUSIC)/first.raw" (23039532 - 12) 3
 #   frames $"($env.BENDOOM_MUSIC)/second.raw" 0 3
 #   frames $"($env.BENDOOM_MUSIC)/second.raw" (23039552 - 12) 3
+#
+# Then the samples of the bytes 00 80, FF 7F, FF FF and 00 00: -32768,
+# 32767, -1 and 0, the ends of the range and either side of zero.
 import Base
 import ../src/stream.bend as A
 
-def int(+x: U32) -> String:
-  Bool.pick(String, U32.is_lt(x, 32768), U32.show(x), "-" ++ U32.show((65536 - x : U32)))
+# A sample as the device takes it, back in 16 bits: x times 32768,
+# offset by 32768 so that it converts as a Nat.
+def int(+x: F32) -> String:
+  +half = U32.to_f32(32768)
+  +n = U32.from_nat(F32.to_nat(((x * half : F32) + half : F32)))
+  Bool.pick(String, U32.is_ge(n, 32768), U32.show((n - 32768 : U32)), "-" ++ U32.show((32768 - n : U32)))
 
-# The samples of a read, left then right.
-def samples(bytes: List<&2, U32>) -> String:
-  match bytes:
-    case lo <> hi <> rest:
-      " " ++ int((lo .|. (hi << 8n) : U32)) ++ samples(rest)
-    case _:
+def ints(samples: List<&2, F32>) -> String:
+  match samples:
+    case x <> rest:
+      " " ++ int(x) ++ ints(rest)
+    case []:
       ""
+
+# The samples of a read as Audio.write takes them, left then right.
+def samples(bytes: List<&2, U32>) -> String:
+  ints(A.Stream.samples(bytes))
 
 def told(tag: String, p: A.Stream.Tape & List<&2, U32>) -> IO(A.Stream.Tape):
   (tape, bytes) = p
@@ -103,6 +114,7 @@ def main() -> IO(Unit):
     t7 : A.Stream.Tape <- show("second end", 3, t6)
     t8 : A.Stream.Tape <- show("wrap", 3, t7)
     t9 : A.Stream.Tape <- show("again", 3, t8)
+    IO.print("edges" ++ samples([0, 128, 255, 127, 255, 255, 0, 0]))
     shut(t9)
 
 #|start 0 0 0 0 0 0
@@ -112,3 +124,4 @@ def main() -> IO(Unit):
 #|second end 167 186 159 179 156 172
 #|wrap
 #|again 216 229 204 215 196 204
+#|edges -32768 32767 -1 0
