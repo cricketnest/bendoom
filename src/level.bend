@@ -561,26 +561,6 @@ def Level.sector_at(+l: Level, +x: U32, +y: U32) -> U32:
 # Loading
 # -------
 
-def Level.lump.at(m: Maybe<&2, W.Wad.Lump>) -> U32 & U32:
-  match m:
-    case None{}:
-      (0, 0)
-    case Some{l}:
-      W.Lump{pos, size, name} = l
-      (pos, size)
-
-def Level.lump.get(lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) -> U32 & U32:
-  match i:
-    case None{}:
-      (0, 0)
-    case Some{k}:
-      Level.lump.at(List.get(&2, W.Wad.Lump, lumps, k))
-
-# The position and size of the first lump called name in the map's
-# lumps.
-def Level.lump(+map: List<&2, W.Wad.Lump>, +name: String) -> U32 & U32:
-  Level.lump.get(map, W.Wad.index(name, map))
-
 def Level.map.drop(lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) ->
   List<&2, W.Wad.Lump>:
   match i:
@@ -602,17 +582,17 @@ def Level.fields(ps: U32 & U32, +stride: U32, fields: List<&2, U32>) -> List<&2,
 # Every word the level keeps, lump by lump in the order Level.pack
 # takes them.
 def Level.plan(+map: List<&2, W.Wad.Lump>) -> List<&2, List<&2, U32>>:
-  [Level.fields(Level.lump(map, "THINGS"), 10, [0, 2, 4, 6, 8]),
-    Level.fields(Level.lump(map, "LINEDEFS"), 14, [0, 2, 4, 10, 12]),
-    Level.fields(Level.lump(map, "SIDEDEFS"), 30, [0, 2, 28]),
-    Level.fields(Level.lump(map, "VERTEXES"), 4, [0, 2]),
-    Level.fields(Level.lump(map, "SEGS"), 12, [0, 2, 4, 6, 8, 10]),
-    Level.fields(Level.lump(map, "SSECTORS"), 4, [0, 2]),
-    Level.fields(Level.lump(map, "NODES"), 28, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]),
-    Level.fields(Level.lump(map, "SECTORS"), 26, [0, 2, 20]),
-    Level.fields(Level.lump(map, "BLOCKMAP"), 2, [0]),
-    Level.fields(Level.lump(map, "LINEDEFS"), 14, [6, 8]),
-    Level.fields(Level.lump(map, "SECTORS"), 26, [22, 24])]
+  [Level.fields(W.Wad.find(map, "THINGS"), 10, [0, 2, 4, 6, 8]),
+    Level.fields(W.Wad.find(map, "LINEDEFS"), 14, [0, 2, 4, 10, 12]),
+    Level.fields(W.Wad.find(map, "SIDEDEFS"), 30, [0, 2, 28]),
+    Level.fields(W.Wad.find(map, "VERTEXES"), 4, [0, 2]),
+    Level.fields(W.Wad.find(map, "SEGS"), 12, [0, 2, 4, 6, 8, 10]),
+    Level.fields(W.Wad.find(map, "SSECTORS"), 4, [0, 2]),
+    Level.fields(W.Wad.find(map, "NODES"), 28, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]),
+    Level.fields(W.Wad.find(map, "SECTORS"), 26, [0, 2, 20]),
+    Level.fields(W.Wad.find(map, "BLOCKMAP"), 2, [0]),
+    Level.fields(W.Wad.find(map, "LINEDEFS"), 14, [6, 8]),
+    Level.fields(W.Wad.find(map, "SECTORS"), 26, [22, 24])]
 
 def Level.vecs(lists: List<&2, List<&2, U32>>) -> List<&2, V.Vec>:
   match lists:
@@ -626,7 +606,7 @@ def Level.count.fin(stride: U32, ps: U32 & U32) -> U32:
   (size / stride : U32)
 
 def Level.count(+map: List<&2, W.Wad.Lump>, +name: String, stride: U32) -> U32:
-  Level.count.fin(stride, Level.lump(map, name))
+  Level.count.fin(stride, W.Wad.find(map, name))
 
 def Level.blockmap(+bm: V.Vec) -> Level.Blockmap:
   Blockmap{bm, F.Fixed.of_map(V.Vec.get(bm, 0)), F.Fixed.of_map(V.Vec.get(bm, 1)),
@@ -721,13 +701,13 @@ def Level.flats(+map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>, p: Array<U32> &
   Array<U32> & Level:
   (a, texnames) = p
   Level.pack(map, vs, texnames, B.Bytes.each(~String, ~B.Bytes.name,
-    Level.fields(Level.lump(map, "SECTORS"), 26, [4, 12]), a))
+    Level.fields(W.Wad.find(map, "SECTORS"), 26, [4, 12]), a))
 
 def Level.names(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, List<&2, U32>>) ->
   Array<U32> & Level:
   (a, lists) = p
   Level.flats(map, Level.vecs(lists), B.Bytes.each(~String, ~B.Bytes.name,
-    Level.fields(Level.lump(map, "SIDEDEFS"), 30, [4, 12, 20]), a))
+    Level.fields(W.Wad.find(map, "SIDEDEFS"), 30, [4, 12, 20]), a))
 
 # The level from the WAD's bytes and directory.
 def Level.load(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Level:

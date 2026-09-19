@@ -17,6 +17,9 @@ import ./src/project.bend as P
 import ./src/draw.bend as D
 import ./src/segs.bend as R
 import ./src/planes.bend as N
+import ./src/midi.bend as Mi
+import ./src/player.bend as Pl
+import ./src/song.bend as Sg
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -1375,4 +1378,42 @@ def Laws.lamp_under_door():
   {==}
 
 def Laws.door_opens_over_barrel():
+  {==}
+
+# Music: the reader's laws split on what follows, since Midi.drop
+# matches the list even when its count is 0.
+
+def Laws.sysex_skipped(rest):
+  match rest:
+    case []:
+      {==}
+    case h <> t:
+      {==}
+
+def Laws.end_of_track_ends(rest):
+  match rest:
+    case []:
+      {==}
+    case h <> t:
+      {==}
+
+def Laws.heap_one(e):
+  {==}
+
+def Laws.heap_ties():
+  {==}
+
+def Laws.quiet_offs(t, raw, key, vel):
+  {==}
+
+def Laws.mus_events():
+  {==}
+
+def Laws.smpte_division():
+  {==}
+
+def Laws.song_faults():
+  {==}
+
+def Laws.buffer_spills():
   {==}

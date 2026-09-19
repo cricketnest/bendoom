@@ -355,7 +355,7 @@ def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Ar
 # record order.
 def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & L.Level:
   (a, +lumps) = p
-  patch.at(a, lumps, L.Level.lump(L.Level.map(lumps), "THINGS"))
+  patch.at(a, lumps, W.Wad.find(L.Level.map(lumps), "THINGS"))
 
 # The solid things, after 20 idle tics as the oracle's scripts start.
 # Walking south at 25 from 1712 under the tech column at -192, 1600,

@@ -8,18 +8,19 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **No mutual recursion, no forward declaration.** Base's trick (a `law` declared, called, then filled by a `def`) is Base-only: user code gets "an unfilled law is a dead claim". Two shapes stay legal: a self-call whose first changing argument is a pattern sub-part, and post-processing (`helper(recursive_call(..))`).
 - **A decision inside a loop is a parameter.** The body cannot `match` a computed Bool and then recurse (that needs a helper, which is mutual recursion), so the caller computes the Bool for the next step and passes it first: `go(fuel, done: Bool, ..)` matched as `match fuel done`. A loop over a record does the same by carrying the flag in the record (`Xy{done, ..}`) and matching it in the pattern.
 - **Scrutinees follow binder order.** Destructuring lets and matches must take parameters in declaration order, and a let may not precede a match on a parameter, so put the flags matched on first and the records opened after.
-- **`[]` last before a case's colon reads as indexing:** `case False{} []:` is a parse error, so put the list scrutinee first (`case [] _:`).
+- **`[]` is a pattern only in a case's first position:** after another scrutinee it reads as indexing (`case False{} []:` does not parse), so put the list scrutinee first or write `Nil{}` there.
 - **A case cannot open a pair:** `case [] (stop, got):` is refused, so a loop state of several values is a small record matched as `Touch{stop, ..}` (`Sim.Touch`).
 - **A call result is not a pattern.** `(a, b) = f(x)` and `match f(x)` are refused: pass the result to a def that destructures its parameter. A let-bound variable is refused the same way.
+- **A `do` block binds actions and typed lets:** `x : T <- act` and `+x : T = f(y)` pass, but an untyped let (`+x = f(y)`) inside one is refused with "expected a pattern".
 - **A list holds Data only.** A pair is a Type, so a list of pairs is refused; a law comparing many cases as one list wraps each in a Data record (`LAWS.bend`'s `Closed.Got`).
 - **Templates take their function first,** with an affine parameter (`x: U32`, not `+x`).
 - **Reuse needs `+` everywhere:** on parameters, on pattern fields (`Player{+x, ..}`, `case 1n++p`, `(+a, b) = p`), and in laws (`for +level`).
 - **Linear arrays cannot be shared across nested calls.** A quadtree from an `Array` is an explicit stack (`Show.fold`); a copyable indexed structure is a `Vec` tree (`src/vec.bend`).
-- **Literals have limits:** a Nat literal past a few thousand (`9000n`) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`.
+- **Literals have limits:** a Nat literal of a few thousand (`4096n` already) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`.
 - **`Bool.pick` evaluates both branches.** It is a function, and calls are strict, so a pick between a costly value and a cheap one pays for the costly one every time; a branch that builds something is a `match`.
 - **No def named `exit`.** The native runtime has one of its own, and a build that gives the def a function of its own fails with "two names mangle to FID_EXIT"; whether it does depends on what the compiler inlines, so the name can pass for a while.
 - **`type` is a keyword,** refused as a field or parameter name; a thing's DoomEd type is its `kind`.
-- **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun.
+- **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun. Base's `List.length` recurses once an element, so it may not measure a WAD lump there; `List.drop` is a loop.
 
 ## Proofs
 

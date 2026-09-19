@@ -1,8 +1,9 @@
 # E1M1 as tables, for working out expected values before the code answers:
 # the lump directory, the map's lines, sides, sectors, vertices and
-# things, and the sector under a point.
+# things, the sector under a point, and the events of its song.
 #
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | linedefs | where special != 0'
+#   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | song-events | song-counts'
 
 # A WAD's directory.
 def lumps []: binary -> table<name: string, pos: int, size: int> {
@@ -115,4 +116,163 @@ def sector-at [x: int, y: int]: record -> int {
     $n = if (point-on-side $x $y $node) == 1 { $node.left } else { $node.right }
   }
   $bsp.sectors | get ($n - 32768)
+}
+
+# A channel event's name, by its status's high nibble from 0x80.
+const channel_kinds = [off on touch controller program pressure bend]
+
+# mus2mid.c's controller_map.
+const mus_controllers = [0 32 1 7 10 11 91 93 64 67 120 123 126 127 121]
+
+def bytes-list []: binary -> list<int> {
+  $in | chunks 1 | each { into int }
+}
+
+# A variable-length quantity at $pos: seven bits a byte, the top bit set
+# on all but the last. The value and the byte after it.
+def vlq [b: list<int>, pos: int]: nothing -> record<val: int, pos: int> {
+  mut val = 0
+  mut at = $pos
+  mut more = true
+  while $more {
+    let t = $b | get $at
+    $at += 1
+    $val = $val * 128 + ($t | bits and 127)
+    $more = $t >= 128
+  }
+  {val: $val, pos: $at}
+}
+
+# A MUS lump's events as mus2mid.c converts them to one MIDI track: MUS
+# channel 15 on MIDI's 9, the others on MIDI channels in the order of
+# their first use, skipping 9, each sent an all-notes-off at that first
+# use; the last velocity kept a channel; a group's delay before the next.
+def mus-events []: binary -> table {
+  let lump = $in
+  let b = $lump | bytes at ($lump | word 6).. | bytes-list
+  mut i = 0
+  mut delta = 0
+  mut chans = []
+  mut vels = 0..15 | each { 127 }
+  mut out = []
+  loop {
+    let d = $b | get $i
+    $i += 1
+    let c = $d | bits and 15
+    mut ch = 9
+    if $c != 15 {
+      let at = $chans | enumerate | where item == $c | get index.0?
+      let n = if $at == null { $chans | length } else { $at }
+      $ch = if $n >= 9 { $n + 1 } else { $n }
+      if $at == null {
+        $chans = $chans | append $c
+        $out = $out | append {delta: $delta kind: controller ch: $ch p1: 123 p2: 0}
+        $delta = 0
+      }
+    }
+    let op = $d | bits and 0x70
+    if $op == 0x60 {
+      $out = $out | append {delta: $delta kind: end ch: null p1: null p2: null}
+      break
+    }
+    let x = $b | get $i
+    $i += 1
+    let event = if $op == 0x00 {
+      {kind: off p1: ($x | bits and 127) p2: 0}
+    } else if $op == 0x10 {
+      if ($x | bits and 128) != 0 {
+        $vels = $vels | update $ch (($b | get $i) | bits and 127)
+        $i += 1
+      }
+      {kind: on p1: ($x | bits and 127) p2: ($vels | get $ch)}
+    } else if $op == 0x20 {
+      {kind: bend p1: (($x | bits and 1) * 64) p2: ($x | bits shr 1)}
+    } else if $op == 0x30 and $x >= 10 and $x <= 14 {
+      {kind: controller p1: ($mus_controllers | get $x) p2: 0}
+    } else if $op == 0x40 and $x <= 9 {
+      let v = $b | get $i
+      $i += 1
+      if $x == 0 { {kind: program p1: ($v | bits and 127) p2: 0} } else {
+        {kind: controller p1: ($mus_controllers | get $x) p2: ([$v 127] | math min)}
+      }
+    } else {
+      error make {msg: $"mus2mid.c refuses descriptor ($d) at score byte ($i - 2)"}
+    }
+    $out = $out | append ({delta: $delta ch: $ch} | merge $event)
+    $delta = 0
+    if ($d | bits and 128) != 0 {
+      let delay = vlq $b $i
+      $delta = $delay.val
+      $i = $delay.pos
+    }
+  }
+  $out | each { insert track 0 }
+}
+
+# A MIDI lump's events as midifile.c reads them: each track from after
+# its header to its end-of-track, a data byte in a status's place
+# repeating the last status.
+def midi-events []: binary -> table {
+  let lump = $in
+  let b = $lump | bytes-list
+  let tracks = $lump | bytes at 10..11 | into int --endian big
+  mut pos = 14
+  mut out = []
+  for track in 0..<$tracks {
+    $pos += 8
+    mut status = 0
+    mut done = false
+    while not $done {
+      let time = vlq $b $pos
+      let delta = $time.val
+      $pos = $time.pos
+      if ($b | get $pos) >= 128 {
+        $status = $b | get $pos
+        $pos += 1
+      }
+      mut event: any = {kind: other ch: null p1: null p2: null}
+      if $status == 0xFF or $status == 0xF0 or $status == 0xF7 {
+        let meta = if $status == 0xFF { $pos += 1; $b | get ($pos - 1) } else { null }
+        let len = vlq $b $pos
+        let n = $len.val
+        $pos = $len.pos
+        if $meta == 0x2F {
+          $event.kind = "end"
+          $done = true
+        } else if $meta == 0x51 and $n == 3 {
+          $event.kind = "tempo"
+          $event.p1 = $lump | bytes at $pos..($pos + 2) | into int --endian big
+        }
+        $pos += $n
+      } else {
+        let program = ($status | bits and 0xE0) == 0xC0
+        $event = {
+          kind: ($channel_kinds | get (($status | bits shr 4) - 8))
+          ch: ($status | bits and 15)
+          p1: ($b | get $pos)
+          p2: (if $program { 0 } else { $b | get ($pos + 1) })
+        }
+        $pos += if $program { 1 } else { 2 }
+      }
+      $out = $out | append ({track: $track delta: $delta} | merge $event)
+    }
+  }
+  $out
+}
+
+# E1M1's song as the events Chocolate Doom's player reads, a row each.
+def song-events []: binary -> table {
+  let wad = $in
+  let l = $wad | lumps | where name == "D_E1M1" | first
+  let song = $wad | bytes at $l.pos..<($l.pos + $l.size)
+  if ($song | bytes at 0..3) == 0x[4D55531A] { $song | mus-events } else { $song | midi-events }
+}
+
+# The song's length in ticks, its longest track's, and its events by
+# kind, in the order tests/music.bend prints them.
+def song-counts []: table -> string {
+  let events = $in
+  let ticks = $events | group-by track | values | each { get delta | math sum } | math max
+  let counts = $channel_kinds | append [tempo end other] | each {|k| $"($k) ($events | where kind == $k | length)" }
+  $"song ticks ($ticks) events ($events | length) ($counts | str join ' ')"
 }

@@ -20,6 +20,10 @@ import ./src/planes.bend as N
 import ./src/gfx.bend as G
 import ./src/sprites.bend as Z
 import ./src/masked.bend as Q
+import ./src/opl.bend as O
+import ./src/midi.bend as Mi
+import ./src/player.bend as Pl
+import ./src/song.bend as Sg
 
 # Bytes and the WAD
 # -----------------
@@ -1571,3 +1575,157 @@ law animation_frames:
     G.Gfx.anim.shown(9, 2, 3, 124, 2), G.Gfx.anim.shown(33, 2, 3, 124, 2))
     == (3, 4, 4, 5, 5, 2, 1, 1, 2, 2)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# Music
+# -----
+
+# LAW: a sysex event is its length and as many bytes, which midifile.c
+# reads past, whatever follows: the next event starts after them, under
+# the sysex's running status.
+law sysex_skipped:
+  for rest: List<&2, U32>
+  {Mi.Midi.next(Mi.Track{0 <> 240 <> 2 <> 7 <> 7 <> rest, 0})
+    == Mi.Got{Mi.Other{}, Mi.Track{rest, 240}} : Mi.Midi.Got}
+
+# LAW: a track ends at its end-of-track event, and the next track's
+# header follows it, whatever that is: ReadTrack stops there, not at the
+# chunk's length.
+law end_of_track_ends:
+  for rest: List<&2, U32>
+  {Mi.Midi.end(1n, Mi.Midi.next(Mi.Track{0 <> 255 <> 47 <> 0 <> rest, 0})) == Mi.Track{rest, 255} : Mi.Midi.Track}
+
+# An event after its delta.
+type Closed.At is Data:
+  At{delta: U32, event: Mi.Midi.Event}
+
+# A track's events to its end, each after its delta, at most n.
+def Closed.events(n: Nat, g: Mi.Midi.Got, +d: U32) -> List<&2, Closed.At>:
+  match n g:
+    case _ Mi.Got{Mi.End{}, t}:
+      [At{d, Mi.End{}}]
+    case 0n Mi.Got{e, t}:
+      []
+    case 1n+m Mi.Got{e, +t}:
+      At{d, e} <> Closed.events(m, Mi.Midi.next(t), Mi.Midi.delta(t))
+
+def Closed.track(+t: Mi.Midi.Track) -> List<&2, Closed.At>:
+  Closed.events(40n, Mi.Midi.next(t), Mi.Midi.delta(t))
+
+# A song's division, and its first track's events.
+def Closed.song(f: Mi.Midi.File) -> U32 & List<&2, Closed.At>:
+  Mi.File{division, tracks} = f
+  (division, Closed.track(Maybe.default(&2, Mi.Midi.Track, List.head(&2, Mi.Midi.Track, tracks), Mi.Bad{""})))
+
+# A MUS lump of a score: its header, the score at byte 16.
+def Closed.mus(score: List<&2, U32>) -> List<&2, U32>:
+  List.append(&2, U32, [77, 85, 83, 26, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0], score)
+
+# A MIDI lump of one track, at a division of 96 unless the header says.
+def Closed.midi(header: List<&2, U32>, track: List<&2, U32>) -> List<&2, U32>:
+  List.concat(&2, U32, [[77, 84, 104, 100, 0, 0, 0, 6], header, [77, 84, 114, 107, 0, 0, 0, 0], track])
+
+def Closed.fails(+lump: List<&2, U32>) -> Bool:
+  Maybe.is_some(&2, String, Mi.Midi.fault(lump))
+
+# LAW: a MUS score as mus2mid.c converts it. Channel 3, used first, is
+# MIDI channel 0 and gets an all-notes-off with the delta before its
+# first event; percussion channel 15 is 9 and gets none. A key with its
+# top bit set carries a velocity, masked to 7 bits, which later presses
+# on the channel reuse, whatever other channels do. The pitch wheel's
+# byte b is bend 64 * (b & 1), b >> 1; system event 14 is controller
+# 121; controller 0 is a program change and 3 is volume, 144 cut to 127.
+# The nine channels used next take MIDI 1 to 8 and then 10. A set top
+# bit on a descriptor ends its group, and the delay that follows, 5, 128
+# and 257 in two bytes each, and 3, falls on the next event, the end
+# included.
+law mus_events:
+  {Closed.song(Mi.Midi.file(Closed.mus([147, 188, 100, 5, 19, 62, 31, 164, 133, 35, 129, 51, 14, 67, 0, 133,
+    195, 3, 144, 129, 0, 0, 60, 1, 60, 2, 60, 4, 60, 5, 60, 6, 60, 7, 60, 8, 60, 137, 188, 130, 1, 147, 64, 3, 96])))
+    == (70, [At{0, Mi.Chan{176, 0, 123, 0}}, At{0, Mi.Chan{144, 0, 60, 100}}, At{5, Mi.Chan{144, 0, 62, 100}},
+      At{0, Mi.Chan{144, 9, 36, 5}}, At{0, Mi.Chan{224, 0, 64, 64}}, At{0, Mi.Chan{176, 0, 121, 0}},
+      At{0, Mi.Chan{192, 0, 5, 0}}, At{0, Mi.Chan{176, 0, 7, 127}}, At{128, Mi.Chan{176, 1, 123, 0}},
+      At{0, Mi.Chan{128, 1, 60, 0}}, At{0, Mi.Chan{176, 2, 123, 0}}, At{0, Mi.Chan{128, 2, 60, 0}},
+      At{0, Mi.Chan{176, 3, 123, 0}}, At{0, Mi.Chan{128, 3, 60, 0}}, At{0, Mi.Chan{176, 4, 123, 0}},
+      At{0, Mi.Chan{128, 4, 60, 0}}, At{0, Mi.Chan{176, 5, 123, 0}}, At{0, Mi.Chan{128, 5, 60, 0}},
+      At{0, Mi.Chan{176, 6, 123, 0}}, At{0, Mi.Chan{128, 6, 60, 0}}, At{0, Mi.Chan{176, 7, 123, 0}},
+      At{0, Mi.Chan{128, 7, 60, 0}}, At{0, Mi.Chan{176, 8, 123, 0}}, At{0, Mi.Chan{128, 8, 60, 0}},
+      At{0, Mi.Chan{176, 10, 123, 0}}, At{0, Mi.Chan{128, 10, 60, 0}}, At{257, Mi.Chan{144, 0, 64, 100}},
+      At{3, Mi.End{}}]) : U32 & List<&2, Closed.At>}
+
+# LAW: a SMPTE division, 0xE728, means 25 frames a second of 40 ticks,
+# but MIDI_GetFileTimeDivision divides the whole short, -6360, by 256
+# toward zero: 24 * 40 ticks a beat (sanity).
+law smpte_division:
+  {Closed.song(Mi.Midi.file(Closed.midi([0, 0, 0, 1, 231, 40], [0, 255, 47, 0])))
+    == (960, [At{0, Mi.End{}}]) : U32 & List<&2, Closed.At>}
+
+# LAW: the lumps the render refuses, in order, and near misses it takes:
+# neither MUS nor MIDI. MIDI, after the smallest track it takes: a status
+# byte of 0xF3; a data byte before any status; a delta of five bytes, but
+# not of four; a track cut short; format 2; a track header other than
+# MTrk. MUS, after the smallest score it takes: controller 10 in a
+# controller change; event type 5; system event 9; a delay of 2^28 ticks;
+# a delay of 2^28 - 1, which mus2mid.c writes but whose microseconds
+# pass the 2^31 the render counts, though a delay of 300000 ticks, 35.7
+# minutes at 140 a second, is taken; a score cut short; and a score of
+# 49144 releases in a lump of 96 KiB, which i_oplmusic.c does not
+# convert.
+law song_faults:
+  {[Closed.fails([1, 2, 3, 4, 5, 6, 7, 8]),
+    Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [0, 255, 47, 0])),
+    Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [0, 243, 0, 255, 47, 0])),
+    Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [0, 60, 100, 0, 255, 47, 0])),
+    Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [129, 128, 128, 128, 0, 255, 47, 0])),
+    Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [128, 128, 128, 0, 255, 47, 0])),
+    Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [0, 144, 60])),
+    Closed.fails(Closed.midi([0, 2, 0, 1, 0, 96], [0, 255, 47, 0])),
+    Closed.fails([77, 84, 104, 100, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96, 77, 84, 114, 120, 0, 0, 0, 0, 0, 255, 47, 0]),
+    Closed.fails(Closed.mus([96])),
+    Closed.fails(Closed.mus([64, 10, 0, 96])),
+    Closed.fails(Closed.mus([80, 96])),
+    Closed.fails(Closed.mus([48, 9, 96])),
+    Closed.fails(Closed.mus([128, 60, 129, 128, 128, 128, 0, 96])),
+    Closed.fails(Closed.mus([128, 60, 255, 255, 255, 127, 96])),
+    Closed.fails(Closed.mus([128, 60, 146, 167, 96, 96])),
+    Closed.fails(Closed.mus([16])),
+    Closed.fails(Closed.mus(List.append(&2, U32, List.replicate(U32, U32.to_nat(98288), 0), [96])))]
+    == [True{}, False{}, True{}, True{}, True{}, False{}, True{}, True{}, True{}, False{}, True{}, True{}, True{},
+      True{}, True{}, False{}, True{}, True{}] : List<&2, Bool>}
+
+def Closed.buffer(o: O.Opl) -> U32 & U32 & Nat:
+  O.Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o
+  (count, last, List.length(&2, O.Opl.Pending, pending))
+
+# LAW: the 1025th write queued on a reset chip finds OPL3_WriteRegBuffered's
+# buffer full: the first, due at sample 2, is applied at once and the
+# sample count moves to 2, while the new write is due at 2050, two after
+# the 1024th (sanity).
+law buffer_spills:
+  {Closed.buffer(O.Opl.queue(List.replicate(O.Opl.Write, U32.to_nat(1025), O.Write{1, 0}), O.Opl.reset()))
+    == (2, 2050, U32.to_nat(1024)) : U32 & U32 & Nat}
+
+# LAW: any callback pushed on the empty heap is its first, and popping
+# it empties the heap.
+law heap_one:
+  for +e: Sg.Song.Entry
+  {(Sg.Song.push([], e), Sg.Song.pop(Sg.Song.push([], e))) == ([e], [])
+    : List<&2, Sg.Song.Entry> & List<&2, Sg.Song.Entry>}
+
+# LAW: callbacks due at the same time do not pop in the order they were
+# pushed: after the first, OPL_Queue_Pop moves the last entry to the top,
+# so the third pushed runs before the second (sanity).
+law heap_ties:
+  {Sg.Song.pop(Sg.Song.push(Sg.Song.push(Sg.Song.push([], Sg.Entry{5, Some{0}}), Sg.Entry{5, Some{1}}),
+    Sg.Entry{5, Some{2}}))
+    == [Sg.Entry{5, Some{2}}, Sg.Entry{5, Some{1}}] : List<&2, Sg.Song.Entry>}
+
+# LAW: before any note, a note off or an all-notes-off on any channel
+# releases nothing and writes nothing.
+law quiet_offs:
+  for +t: Pl.Player.Tabs
+  for +raw: U32
+  for +key: U32
+  for +vel: U32
+  {(Pl.Player.event(t, 128, raw, key, vel, Pl.Player.start()),
+    Pl.Player.event(t, 176, raw, 123, vel, Pl.Player.start()))
+    == (Pl.Player.start(), Pl.Player.start()) : Pl.Player & Pl.Player}

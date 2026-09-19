@@ -11,6 +11,7 @@ import ./project.bend as P
 import ./render.bend as R
 import ./show.bend as V
 import ./demo.bend as D
+import ./stream.bend as M
 
 # The clock is read each frame; the tics it owes accumulate in
 # thousandths of a tic, and at most eight run per frame, the rest
@@ -18,25 +19,27 @@ import ./demo.bend as D
 # graphics, redrawn each frame from the latest tic's state, so an ended
 # level holds its last frame. The level is the map as loaded, which a
 # fresh state is built from. Again is whether Space or Enter is down.
-# The demo is the one being recorded, until the level ends.
+# The demo is the one being recorded, until the level ends, and the
+# music the song being streamed, if there is one.
 type Game is Type:
   Game{level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, state: S.State, input: K.Input,
-    again: Bool, last: Nat, owed: Nat, mem: Array<U32>, demo: Maybe<D.Demo.Rec>}
+    again: Bool, last: Nat, owed: Nat, mem: Array<U32>, demo: Maybe<D.Demo.Rec>, music: Maybe<M.Stream>}
 
 def Game.shown(level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, state: S.State, input: K.Input,
-  again: Bool, last: Nat, owed: Nat, demo: Maybe<D.Demo.Rec>, p: Array<U32> & Image) -> Game & Image:
+  again: Bool, last: Nat, owed: Nat, demo: Maybe<D.Demo.Rec>, music: Maybe<M.Stream>,
+  p: Array<U32> & Image) -> Game & Image:
   (mem, image) = p
-  (Game{level, gfx, tables, state, input, again, last, owed, mem, demo}, image)
+  (Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music}, image)
 
 def Game.view(g: Game) -> Game & Image:
-  Game{level, +gfx, +tables, +state, input, again, last, owed, mem, demo} = g
-  Game.shown(level, gfx, tables, state, input, again, last, owed, demo,
+  Game{level, +gfx, +tables, +state, input, again, last, owed, mem, demo, music} = g
+  Game.shown(level, gfx, tables, state, input, again, last, owed, demo, music,
     V.Show.image(R.Render.frame(tables, gfx, state, mem)))
 
 def Game.key(+code: U32, +down: Bool, g: Game) -> Game:
-  Game{level, gfx, tables, state, input, again, last, owed, mem, demo} = g
+  Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
   Game{level, gfx, tables, state, K.Input.press(code, down, input),
-    K.Keys.set(U32.is_eq(code, 32) || U32.is_eq(code, 13), down, again), last, owed, mem, demo}
+    K.Keys.set(U32.is_eq(code, 32) || U32.is_eq(code, 13), down, again), last, owed, mem, demo, music}
 
 def Game.quit(p: Bool & Game) -> Bool & Game:
   (quit, g) = p
@@ -92,14 +95,14 @@ def Game.ended(ending: Bool, clock: U32, demo: Maybe<D.Demo.Rec>) -> IO(Maybe<D.
       IO.pure(Maybe<D.Demo.Rec>, demo)
 
 def Game.advanced(+from: S.State, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, level: L.Level, gfx: G.Gfx,
-  tables: P.Project.Tables, input: K.Input, again: Bool, last: Nat, owed: Nat, mem: Array<U32>) ->
-  IO(Maybe<Game>):
+  tables: P.Project.Tables, input: K.Input, again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
+  music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
   +next = S.Sim.replay(cmds, from)
-  do IO<Maybe<Game>>:
+  do IO<Bool & Game>:
     kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(S.State.ended(next), Bool.not(S.State.ended(from))),
       S.State.clock(next), demo)
-    return Some{Game{level, gfx, tables, next, input, again, last, owed, mem, kept}}
+    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, music})
 
 # After the exit a press of Space or Enter starts the level again, from
 # the map as loaded. A match and not a pick, which would build the fresh
@@ -116,77 +119,103 @@ def Game.from(again: Bool, +level: L.Level, state: S.State) -> S.State:
 # key down now that was up a frame ago: a held key repeats as a release
 # and a press within one frame's events, or as presses alone, and
 # neither is one.
-def Game.advance(+now: Nat, was: Bool, g: Game) -> IO(Maybe<Game>):
-  Game{+level, gfx, tables, +state, +input, +again, last, owed, mem, demo} = g
+def Game.advance(+now: Nat, was: Bool, g: Game) -> IO(Bool & Game):
+  Game{+level, gfx, tables, +state, +input, +again, last, owed, mem, demo, music} = g
   +due = Nat.add(owed, Nat.mul(Nat.sub(now, last), 35n))
   +capped = Nat.is_gt(Nat.div(due, 1000n), 8n)
   +tics = Bool.pick(Nat, capped, 8n, Nat.div(due, 1000n))
   +from = Game.from(Bool.and(Bool.and(again, Bool.not(was)), S.State.ended(state)), level, state)
-  do IO<Maybe<Game>>:
+  do IO<Bool & Game>:
     played : Maybe<D.Demo.Rec> & List<&2, K.Cmd> <- D.Demo.record(demo, K.Input.script(tics, input))
     Game.advanced(from, played, level, gfx, tables, K.Input.after(tics, input), again, now,
-      Game.owed(capped, due), mem)
+      Game.owed(capped, due), mem, music)
 
-# Quitting ends the demo.
-def Game.step(quit: Bool, now: Nat, was: Bool, g: Game) -> IO(Maybe<Game>):
+# A frame that quits runs no tics.
+def Game.step(quit: Bool, now: Nat, was: Bool, g: Game) -> IO(Bool & Game):
   match quit:
     case True{}:
-      Game{level, gfx, tables, state, input, again, last, owed, mem, demo} = g
-      do IO<Maybe<Game>>:
-        D.Demo.stop(demo)
-        return None{}
+      IO.pure(Bool & Game, (True{}, g))
     case False{}:
       Game.advance(now, was, g)
 
-def Game.stepped(now: Nat, was: Bool, p: Bool & Game) -> IO(Maybe<Game>):
+def Game.stepped(now: Nat, was: Bool, p: Bool & Game) -> IO(Bool & Game):
   (quit, g) = p
   Game.step(quit, now, was, g)
 
-# A frame of the loop at a time: the events folded in, then the tics.
-def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Maybe<Game>):
-  Game{level, gfx, tables, state, input, +again, last, owed, mem, demo} = g
+# A frame of the loop at a time: the events folded in, then the tics;
+# and whether one of the events quits.
+def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
+  Game{level, gfx, tables, state, input, +again, last, owed, mem, demo, music} = g
   Game.stepped(now, again, Game.events(events, (False{}, Game{level, gfx, tables, state, input, again, last,
-    owed, mem, demo})))
+    owed, mem, demo, music})))
 
-def Game.tick(events: List<Event>, g: Game) -> IO(Maybe<Game>):
-  do IO<Maybe<Game>>:
+# The device's queue is topped up before the frame's events and tics, so
+# that the song plays on whatever the tics cost.
+def Game.tick(events: List<Event>, g: Game) -> IO(Bool & Game):
+  Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
+  do IO<Bool & Game>:
+    playing : Maybe<M.Stream> <- M.Stream.play(music)
     now : Nat <- IO.now()
-    Game.frame(now, events, g)
+    Game.frame(now, events, Game{level, gfx, tables, state, input, again, last, owed, mem, demo, playing})
+
+# The window, the demo and the song let go, whether the game quits or
+# its fuel runs out: the frames whose top-up found the device's queue
+# empty, if the music played.
+def Game.shut(window: Window, g: Game) -> IO(Maybe<U32>):
+  Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
+  do IO<Maybe<U32>>:
+    Window.close(window)
+    D.Demo.stop(demo)
+    M.Stream.stop(music)
+
+def Game.over(quit: Bool, window: Window, g: Game, rest: Window -> Game -> IO(Maybe<U32>)) -> IO(Maybe<U32>):
+  match quit:
+    case True{}:
+      Game.shut(window, g)
+    case False{}:
+      rest(window, g)
+
+def Game.next(window: Window, rest: Window -> Game -> IO(Maybe<U32>), p: Bool & Game) -> IO(Maybe<U32>):
+  (quit, g) = p
+  Game.over(quit, window, g, rest)
 
 def Game.turn(shown: Window & Image & List<Event>, g: Game,
-  rest: Window -> Game -> IO(Unit)) -> IO(Unit):
+  rest: Window -> Game -> IO(Maybe<U32>)) -> IO(Maybe<U32>):
   (window, image, events) = shown
-  IO.bind(Maybe<Game>, Unit, Game.tick(events, g), App.next(Game, window, rest))
+  IO.bind(Bool & Game, Maybe<U32>, Game.tick(events, g), p => Game.next(window, rest, p))
 
-def Game.draw(window: Window, drawn: Game & Image, rest: Window -> Game -> IO(Unit)) ->
-  IO(Unit):
+def Game.draw(window: Window, drawn: Game & Image, rest: Window -> Game -> IO(Maybe<U32>)) ->
+  IO(Maybe<U32>):
   (g, image) = drawn
-  do IO<Unit>:
+  do IO<Maybe<U32>>:
     shown : Window & Image & List<Event> <- Window.frame(window, image)
     Game.turn(shown, g, rest)
 
 # Base's App.run drops each frame on the GPU lane, which makes the
 # binary compile for the GPU at launch; this loop draws the same way
 # without it.
-def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Unit):
+def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Maybe<U32>):
   match fuel:
     case 0n:
-      Window.close(window)
+      Game.shut(window, g)
     case 1n+f:
       Game.draw(window, Game.view(g), w => h => Game.loop(f, w, h))
 
 def Game.start.go(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
-  mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
+  mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Maybe<U32>):
   (+gfx, +level) = gl
-  do IO<Unit>:
+  do IO<Maybe<U32>>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
+    music : Maybe<M.Stream> <- M.Stream.open()
     Game.loop(frames, window, Game{level, gfx, P.Project.tables(level),
-      S.Sim.replay(script, S.State.start(level)), input, False{}, now, 0n, mem, demo})
+      S.Sim.replay(script, S.State.start(level)), input, False{}, now, 0n, mem, demo, music})
 
 # The window opened and the loop run for at most so many frames, from
 # the player 1 start after a script, with the given input at first,
-# recording the demo if one is open.
+# recording the demo if one is open. The song starts with the loop, as
+# vanilla's does at the level's load, and plays on through the level's
+# end and a restart. It answers what Game.shut does.
 def Game.start(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
-  world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+  world: Array<U32> & G.Gfx & L.Level) -> IO(Maybe<U32>):
   (mem, gl) = world
   Game.start.go(frames, input, script, demo, now, mem, gl)

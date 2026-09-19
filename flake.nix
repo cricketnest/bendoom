@@ -26,12 +26,24 @@
           wads = pkgs.callPackage ./nix/wads.nix { };
           freedoom = "${wads.freedoom}/share/games/doom/freedoom1.wad";
           shareware = "${wads.doom1}/share/games/doom/doom1.wad";
-          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend; iwad = freedoom; };
-          film = pkgs.callPackage ./nix/film.nix { inherit bend; iwad = freedoom; };
+          # The music is a function of the IWAD: a package that takes one
+          # renders that IWAD's song, so the shareware song builds only
+          # with the shareware packages.
+          music = iwad: pkgs.callPackage ./nix/music.nix { inherit bend iwad; };
+          # alsa-lib loads the plugin behind the host's ALSA default from one
+          # directory of its own, so on a host whose default is PipeWire or
+          # PulseAudio the game needs theirs, as nixpkgs's alsa-utils does.
+          alsa-plugins = pkgs.symlinkJoin {
+            name = "bendoom-alsa-plugins";
+            paths = map (p: "${p}/lib/alsa-lib") [ pkgs.alsa-plugins pkgs.pipewire ];
+          };
+          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music alsa-plugins; iwad = freedoom; };
+          film = pkgs.callPackage ./nix/film.nix { inherit bend music; iwad = freedoom; };
         in {
           packages = {
             inherit bend bendoom film;
             default = bendoom;
+            music = music freedoom;
             doom1-wad = wads.doom1;
             bendoom-shareware = bendoom.override { iwad = shareware; };
             film-shareware = film.override { iwad = shareware; };
@@ -39,7 +51,7 @@
 
           checks = {
             proof = pkgs.callPackage ./nix/proof.nix { inherit bend; };
-            tests = pkgs.callPackage ./nix/tests.nix { inherit bend; };
+            tests = pkgs.callPackage ./nix/tests.nix { inherit bend; music = music freedoom; };
           };
 
           apps.default = {
@@ -54,13 +66,16 @@
               pkgs.llvmPackages_19.clang
               pkgs.jujutsu
               # tools/oracle.nu diffs our frames against Chocolate Doom's,
-              # which it runs on a headless X server.
+              # which it runs on a headless X server; tools/listen.nu
+              # records its music.
               pkgs.chocolate-doom
               pkgs.xorg.xorgserver
               pkgs.xdotool
             ];
             buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = freedoom;
+            BENDOOM_MUSIC = music freedoom;
+            ALSA_PLUGIN_DIR = alsa-plugins;
             BEND_NO_TELEMETRY = "1";
           };
         };

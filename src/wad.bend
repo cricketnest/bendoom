@@ -93,3 +93,23 @@ def Wad.index(+name: String, lumps: List<&2, Wad.Lump>) -> Maybe<Nat>:
       None{}
     case l <> rest:
       Wad.index.pick(Wad.named(name, l), Wad.index(name, rest))
+
+def Wad.find.at(m: Maybe<&2, Wad.Lump>) -> U32 & U32:
+  match m:
+    case None{}:
+      (0, 0)
+    case Some{l}:
+      Lump{pos, size, name} = l
+      (pos, size)
+
+def Wad.find.get(lumps: List<&2, Wad.Lump>, i: Maybe<Nat>) -> U32 & U32:
+  match i:
+    case None{}:
+      (0, 0)
+    case Some{k}:
+      Wad.find.at(List.get(&2, Wad.Lump, lumps, k))
+
+# The position and size of the first lump called name, both zero for
+# none.
+def Wad.find(+lumps: List<&2, Wad.Lump>, +name: String) -> U32 & U32:
+  Wad.find.get(lumps, Wad.index(name, lumps))

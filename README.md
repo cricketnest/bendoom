@@ -16,9 +16,11 @@ To record a game and make a video of it, first play with `RECORD` naming
 the demo to write, and quit with Esc or by closing the window; the demo
 also ends with the level. Ctrl+C in the terminal leaves it without its
 end marker. Then `film` encodes the demo as a 1600 by 1200 MP4 at Doom's
-35 tics a second, and leaves an existing video alone. The demo is
-vanilla's .lmp, which Chocolate Doom plays too. A demo recorded with
-`bendoom-shareware` is filmed with `film-shareware`.
+35 tics a second, and leaves an existing video alone. Under it runs
+E1M1's song as the package's WAD holds it, from the first frame and
+repeating for as long as the video lasts. The demo is vanilla's .lmp,
+which Chocolate Doom plays too. A demo recorded with `bendoom-shareware`
+is filmed with `film-shareware`, which carries the shareware song.
 
     RECORD=run.lmp nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
@@ -46,5 +48,5 @@ for bug.
 5. Decorations, items, pickups and sprites: every thing of both E1M1s but the monsters, spawned as on Hurt Me Plenty and drawn as vanilla's sprites behind walls, ledges and grates, animated on its tics; health, armour, ammo, weapons and the blue key taken as vanilla takes them; solid things in the way. Its frames Chocolate Doom's tic for tic. Done.
 6. Monsters, weapons, damage, the status bar.
 7. Sound effects.
-8. Music, rendered to PCM at build time.
+8. E1M1's music: the song and the instruments of the package's WAD played in Bend as Chocolate Doom's OPL music plays them, sample for sample, rendered while the flake builds and streamed by the game on repeat, so each package plays the song of the WAD it was built with. Done.
 9. Hellbent: the game as one λ-expression.

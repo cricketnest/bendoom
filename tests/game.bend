@@ -51,14 +51,19 @@ def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
     IO.print(line(tag, state))
     return Some{g}
 
-def report(tag: String, m: Maybe<M.Game>) -> IO(Maybe<M.Game>):
-  match m:
-    case None{}:
+def reported(quit: Bool, tag: String, g: M.Game) -> IO(Maybe<M.Game>):
+  match quit:
+    case True{}:
       do IO<Maybe<M.Game>>:
         IO.print(tag ++ " quit")
         return None{}
-    case Some{M.Game{level, gfx, tables, +state, input, again, last, owed, mem, demo}}:
-      told(tag, state, M.Game{level, gfx, tables, state, input, again, last, owed, mem, demo})
+    case False{}:
+      M.Game{level, gfx, tables, +state, input, again, last, owed, mem, demo, music} = g
+      told(tag, state, M.Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music})
+
+def report(tag: String, p: Bool & M.Game) -> IO(Maybe<M.Game>):
+  (quit, g) = p
+  reported(quit, tag, g)
 
 # A frame of the game, then its state's line; a game that has quit stays
 # quit.
@@ -67,7 +72,7 @@ def frame(tag: String, now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Ma
     case None{}:
       IO.pure(Maybe<M.Game>, None{})
     case Some{g}:
-      IO.bind(Maybe<M.Game>, Maybe<M.Game>, M.Game.frame(now, events, g), after => report(tag, after))
+      IO.bind(Bool & M.Game, Maybe<M.Game>, M.Game.frame(now, events, g), after => report(tag, after))
 
 # The exit room's door used from inside, then the walk to the switch.
 def route() -> List<&2, K.Cmd>:
@@ -84,7 +89,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
     g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}}})
+      P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g2 : Maybe<M.Game> <- frame("repeat", 400n, [Key{32, False{}}, Key{32, True{}}], g1)
     g3 : Maybe<M.Game> <- frame("release", 600n, [Key{32, False{}}], g2)
     g4 : Maybe<M.Game> <- frame("enter", 600n, [Key{13, True{}}], g3)
