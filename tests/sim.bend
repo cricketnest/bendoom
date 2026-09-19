@@ -532,20 +532,6 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
         IO.print(thing(H.Things.list(S.State.things(s)), id))
         things(rest, s)
 
-def words(+v: V.Vec, n: Nat, +i: U32) -> String:
-  match n:
-    case 0n:
-      ""
-    case 1n+m:
-      " " ++ U32.show(V.Vec.get(v, i)) ++ words(v, m, (i + 1 : U32))
-
-def inventory(inv: I.Inventory) -> String:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
-  "inventory health " ++ U32.show(health) ++ " armour " ++ U32.show(armour) ++ " type " ++ U32.show(armourtype)
-    ++ " cards " ++ U32.show(cards) ++ " ammo" ++ words(ammo, 4n, 0) ++ " caps" ++ words(caps, 4n, 0)
-    ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers" ++ words(powers, 6n, 0)
-    ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
-
 # What the blockmap links hold: how many links, how many of solid
 # things, and how many disagree with the population.
 type Links is Data:
@@ -632,7 +618,7 @@ def free(+s: S.State) -> IO(S.State):
   +spawned = H.Things.list(S.State.things(s))
   do IO<S.State>:
     IO.print("free at start " ++ Bool.show(S.Sim.free(S.State.level(s), S.Player.x(p), S.Player.y(p))))
-    IO.print(inventory(S.Player.inv(p)))
+    IO.print(I.Inventory.show(S.Player.inv(p)))
     IO.print("things at start " ++ Nat.show(List.length(&2, H.Thing, spawned)) ++ " random "
       ++ U32.show(S.State.rnd(s)))
     IO.print("by type" ++ kinds(H.Thing.defs(), spawned))
@@ -641,29 +627,14 @@ def free(+s: S.State) -> IO(S.State):
     things([2, 6, 29, 87, 245, 291], s)
     return s
 
-def missing(hit: Bool, +id: U32, rest: String) -> String:
-  match hit:
-    case True{}:
-      rest
-    case False{}:
-      " " ++ U32.show(id) ++ rest
-
-# The names of the things of before no longer in after.
-def gone(before: List<&2, H.Thing>, +after: List<&2, H.Thing>) -> String:
-  match before:
-    case []:
-      ""
-    case H.Thing{+i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      missing(present(after, i), i, gone(rest, after))
-
 # A run, then the tic, the player's place, the inventory, the names of
 # the things taken since the case's first state and how many are left.
 def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S.State):
   +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   do IO<S.State>:
     IO.print(line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
-    IO.print("  " ++ inventory(S.Player.inv(S.State.player(q))) ++ " taken"
-      ++ gone(H.Things.list(S.State.things(first)), H.Things.list(S.State.things(q))) ++ " things "
+    IO.print("  " ++ I.Inventory.show(S.Player.inv(S.State.player(q))) ++ " taken"
+      ++ H.Things.gone(H.Things.list(S.State.things(first)), S.State.things(q)) ++ " things "
       ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(q)))))
     return q
 

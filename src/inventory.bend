@@ -20,6 +20,21 @@ def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
     V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0}
 
+def Inventory.words(+v: V.Vec, n: Nat, +i: U32) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+m:
+      " " ++ U32.show(V.Vec.get(v, i)) ++ Inventory.words(v, m, (i + 1 : U32))
+
+# Every count as text, for the tests and the tools.
+def Inventory.show(inv: Inventory) -> String:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  "inventory health " ++ U32.show(health) ++ " armour " ++ U32.show(armour) ++ " type " ++ U32.show(armourtype)
+    ++ " cards " ++ U32.show(cards) ++ " ammo" ++ Inventory.words(ammo, 4n, 0) ++ " caps"
+    ++ Inventory.words(caps, 4n, 0) ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons)
+    ++ " powers" ++ Inventory.words(powers, 6n, 0) ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
+
 def Inventory.health(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   health
