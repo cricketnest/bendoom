@@ -12,11 +12,8 @@
 # minute, and one paletted screenshot is taken inside it. A shot counts
 # once it shows the pause graphic. It is compared with the frame
 # tools/frame.bend dumps from the same copy after the same script,
-# outside the status bar rows, the pause graphic, and the pistol: at
-# rest where a script that never moves leaves it, widened by the bob's
-# 16 units to either side and below for one that moves. The pistol
-# rises for the level's first 16 tics, so a script is at least 18; the
-# default idles 20.
+# outside the status bar rows and the pause graphic. The default script
+# idles 20 tics, past the pistol's rise.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
@@ -112,18 +109,6 @@ def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<a
   } | flatten | flatten
 }
 
-# The pixels the pistol may cover, as frame indices. Doom draws a weapon
-# sprite at scale one, its left at column 1 and its top at row 32 of a
-# 200-row screen whose centre row 100.5 sits on the view's 84, so row
-# 15.5 of the view, first row drawn 16, less the sprite's offsets. The
-# bob moves it up to 16 columns either way and up to 16 rows down.
-def pistol-mask [wad: binary, bobbing: bool]: nothing -> list<int> {
-  let reach = if $bobbing { 16 } else { 0 }
-  patch-pixels $wad PISGA0 1 16 | get at | where $it < 168 * 320 | each {|at|
-    (0 - $reach)..$reach | each {|dx| 0..$reach | each {|dy| $at + $dy * 320 + $dx } }
-  } | flatten | flatten | uniq | where $it < 168 * 320
-}
-
 # Chocolate Doom's frame after the demo's script, paused. It can only
 # take a screenshot while it runs, so it runs on an X server of its own
 # with no screen, Xvfb, where nothing shows on the desktop and no window
@@ -184,7 +169,6 @@ def main [
   let bytes = open --raw $wad
   let runs = $script | runs
   let tics = $runs | get tics | math sum
-  if $tics < 18 { error make {msg: "the pistol is still rising before tic 18"} }
   let pause = patch-pixels $bytes M_PAUSE 126 4
   let dir = mktemp --directory
   let iwad = $things | split row ' ' | where $it != '' | reduce --fold ($bytes
@@ -196,8 +180,7 @@ def main [
   let shot = vanilla $iwad $name ($runs | demo) $tics $pause $dir
   let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let moves = $runs | any {|run| ($run.bytes | bytes at 0..1) != 0x[00 00] }
-  let masked = pistol-mask $bytes $moves | append ($pause | get at)
+  let masked = $pause | get at
   let differing = 0..<(168 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
   if not $keep { rm --recursive $dir }
   {
