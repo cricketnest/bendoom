@@ -1,15 +1,19 @@
-# Freedoom's E1M1 from the player 1 start to the exit switch, with no
-# key: a command script in a demo's units, leg by leg, and after each
-# leg the clock, the player, the thinkers running and whether the level
-# has ended; then the time Doom's tally would show. The route: east onto
-# the lift its west line calls and down with it; across the pit to the
-# first door; through it and over the big room to the door in its west
-# wall; through that, north over the walk-over line and along the north
-# room; south through the exit room's door; west to the exit switch. The
-# oracle plays the same script: one tic before the exit vanilla's frame
-# is ours pixel for pixel, and one tic after it has left the level
-# (milestone 4's ticket 12). The positions are regression pins; the
-# ending is the claim.
+# Freedoom's E1M1 from the player 1 start with no key, along the route
+# milestone 4 wrote for an empty map: a command script in a demo's
+# units, leg by leg, and after each leg the clock, the player, the
+# thinkers running and whether the level has ended. The route: east
+# onto the lift its west line calls and down with it; across the pit to
+# the first door; through it and over the big room to the door in its
+# west wall; through that, north over the walk-over line and along the
+# north room. Then the run south meets the tech column at -192, 1600,
+# record 59, which holds the player back: the use meant for the exit
+# room's door falls short and starts nothing, the run west ends in front
+# of it, and the use meant for the exit switch finds none, so the level
+# does not end. Chocolate Doom, with every thing kept, plays the same
+# script to the same frames: none of its pixels differs after the run
+# south or at the end, where the ticket 06 build differs in 47586 after
+# the run south. The positions are regression pins until ticket 11
+# routes around the column.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -18,7 +22,6 @@ import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
-import ../src/game.bend as M
 
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
@@ -55,12 +58,12 @@ def route(p: Array<U32> & L.Level) -> IO(Unit):
       List.replicate(K.Cmd, 10n, K.Cmd.demo(25, 0, 0, False{})), idle(10n)], r3)
     r5 : S.State <- leg("north room", [use(), idle(62n), run(16n), turn(4294967232), run(40n), turn(64), run(36n),
       idle(12n)], r4)
-    r6 : S.State <- leg("exit door", [turn(64), run(22n), idle(10n)], r5)
-    r7 : S.State <- leg("exit room", [use(), idle(36n), run(8n), idle(22n)], r6)
-    r8 : S.State <- leg("exit switch", [turn(4294967232), run(9n), idle(20n)], r7)
-    r9 : S.State <- leg("exit", [use()], r8)
+    r6 : S.State <- leg("south to the column", [turn(64), run(22n), idle(10n)], r5)
+    r7 : S.State <- leg("use short of the exit door", [use(), idle(36n), run(8n), idle(22n)], r6)
+    r8 : S.State <- leg("west", [turn(4294967232), run(9n), idle(20n)], r7)
+    r9 : S.State <- leg("use", [use()], r8)
     r10 : S.State <- leg("after", [idle(5n)], r9)
-    IO.print(M.Game.time(S.State.clock(r10)))
+    return Unit{}
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -72,9 +75,8 @@ def main() -> IO(Unit):
 #|through it tic 243 837.883972 690.665405 90.000 z -128.000000 thinkers 10 ended False
 #|west door tic 285 576.143997 1053.525039 180.000 z -128.000000 thinkers 10 ended False
 #|north room tic 454 -191.832733 1711.947463 180.000 z -128.000000 thinkers 10 ended False
-#|exit door tic 487 -227.908691 1416.213073 270.000 z -128.000000 thinkers 10 ended False
-#|exit room tic 554 -228.547744 1292.948730 270.000 z -128.000000 thinkers 11 ended False
-#|exit switch tic 584 -365.325164 1283.349258 180.000 z -128.000000 thinkers 10 ended False
-#|exit tic 585 -366.564590 1283.299453 180.000 z -128.000000 thinkers 10 ended True
-#|after tic 585 -366.564590 1283.299453 180.000 z -128.000000 thinkers 10 ended True
-#|Time 0:16
+#|south to the column tic 487 -227.955474 1488.071182 270.000 z -128.000000 thinkers 10 ended False
+#|use short of the exit door tic 554 -229.367279 1416.050430 270.000 z -128.000000 thinkers 10 ended False
+#|west tic 584 -239.953552 1416.029861 180.000 z -128.000000 thinkers 9 ended False
+#|use tic 585 -239.953552 1416.029861 180.000 z -128.000000 thinkers 9 ended False
+#|after tic 590 -239.953552 1416.029861 180.000 z -128.000000 thinkers 9 ended False

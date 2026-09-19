@@ -809,7 +809,7 @@ def Gfx.sprite.marks(things: List<&2, H.Thing>, +n: Nat, marks: V.Vec) -> V.Vec:
   match things:
     case []:
       marks
-    case H.Thing{id, kind, x, y, z, angle, sector, +state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics} <> rest:
       Gfx.sprite.marks(rest, n, Gfx.sprite.chase(n, False{}, state, state, marks))
 
 def Gfx.sprite.keep(kept: Bool, row: U32, rest: List<&2, U32>) -> List<&2, U32>:
@@ -829,7 +829,7 @@ def Gfx.sprite.rows.go(n: Nat, +row: U32, +marks: V.Vec) -> List<&2, U32>:
 # The state rows the level's things spawn in and those they lead to, each
 # once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
-  H.Spawn{things, rnd} = s
+  H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, V.Vec.of_list([], U32.from_nat(n))))
 

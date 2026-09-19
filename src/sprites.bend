@@ -59,7 +59,7 @@ def Sprites.rotation(seen: U32, facing: U32) -> U32:
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, thing: H.Thing,
   rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
   P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
-  H.Thing{id, kind, +x, +y, +z, facing, sector, +state, tics} = thing
+  H.Thing{id, kind, +x, +y, +z, floorz, ceilz, facing, sector, +state, tics} = thing
   +trx = (x - vx : U32)
   +try = (y - vy : U32)
   +tz = (F.Fixed.mul(trx, cos) + F.Fixed.mul(try, sin) : U32)
@@ -103,9 +103,10 @@ def Sprites.gather(things: List<&2, H.Thing>, +ranks: V.Vec, +view: P.View, +lev
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, angle, +sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics} <> rest:
       Sprites.gather.at(V.Vec.get(ranks, sector), view, level, gfx,
-        H.Thing{id, kind, x, y, z, angle, sector, state, tics}, Sprites.gather(rest, ranks, view, level, gfx))
+        H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics},
+        Sprites.gather(rest, ranks, view, level, gfx))
 
 # Doom's R_SortVisSprites: whether a sprite is drawn before another. The
 # smaller scale goes first; of equal scales, the one earlier in Doom's

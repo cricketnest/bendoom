@@ -22,9 +22,21 @@ type Level.Start is Data:
   Start{x: U32, y: U32, angle: U32}
 
 # The THINGS lump's five words a record (x and y in map units, the angle
-# in degrees, the DoomEd type and the options), and how many records.
+# in degrees, the DoomEd type and the options), and how many records;
+# then Doom's blocklinks for the things spawned from them: a cell's
+# first thing plus one (0 for none), and four words a thing, the next in
+# its cell plus one, its x and y in fixed point, and its DoomEd type. A
+# thing never leaves the place it spawned at, so no tic writes them.
 type Level.Things is Data:
-  Things{words: V.Vec, count: U32}
+  Things{words: V.Vec, count: U32, heads: V.Vec, links: V.Vec}
+
+# A thing as the blockmap links it.
+type Level.Link is Data:
+  Link{next: U32, x: U32, y: U32, kind: U32}
+
+# A blockmap cell, by column and row.
+type Level.Cell is Data:
+  Cell{bx: U32, by: U32}
 
 # A THINGS record: its position in fixed point, its angle in degrees,
 # its DoomEd type and its options.
@@ -313,12 +325,12 @@ def Level.tanto(+l: Level) -> V.Vec:
   tanto
 
 def Level.nthings(+l: Level) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count, heads, links}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
   count
 
 def Level.things.record(+t: Level.Things, +i: U32) -> Level.Thing:
-  Things{+words, count} = t
+  Things{+words, count, heads, links} = t
   Thing{F.Fixed.of_map(Level.word(words, i, 5, 0)), F.Fixed.of_map(Level.word(words, i, 5, 1)),
     Level.word(words, i, 5, 2), Level.word(words, i, 5, 3), Level.word(words, i, 5, 4)}
 
@@ -359,22 +371,9 @@ def Level.root(+l: Level) -> U32:
     sectors, specials} = l
   root
 
-def Level.blocked.in(b: Level.Box, +bx: U32, +by: U32) -> Bool:
-  Box{top, bottom, left, right} = b
-  Bool.and(F.Fixed.le(left, bx), Bool.and(F.Fixed.le(bx, right),
-    Bool.and(F.Fixed.le(bottom, by), F.Fixed.le(by, top))))
-
-def Level.blocked.at(+bm: Level.Blockmap, b: Level.Box, x: U32, y: U32) -> Bool:
-  Blockmap{words, ox, oy, cols, rows} = bm
-  Level.blocked.in(b, F.Fixed.sarn((x - ox : U32), 23n), F.Fixed.sarn((y - oy : U32), 23n))
-
-# Whether a thing at (x, y) is in a blockmap cell of a sector's block
-# box: the things Doom's P_ChangeSector looks at when the sector moves.
-def Level.blocked(+l: Level, s: U32, x: U32, y: U32) -> Bool:
-  Level.blocked.at(Level.blockmap_of(l), Level.blockbox(l, s), x, y)
-
-# The lines listed in a blockmap cell (none outside the map): the words
-# after the cell's offset, past its leading zero, up to the 65535.
+# The lines listed in a blockmap cell: the words from the cell's offset
+# up to the 65535, the leading 0 included, since Doom's
+# P_BlockLinesIterator checks line 0 in every cell it walks.
 def Level.cell.go(k: Nat, end: Bool, +words: V.Vec, +i: U32, +w: U32) ->
   List<&2, U32>:
   match k end:
@@ -391,16 +390,110 @@ def Level.cell.list(inside: Bool, +words: V.Vec, +i: U32) -> List<&2, U32>:
     case False{}:
       []
     case True{}:
-      +off = (V.Vec.get(words, i) + 1 : U32)
+      +off = V.Vec.get(words, i)
       +w = V.Vec.get(words, off)
       Level.cell.go(U32.to_nat(4096), U32.is_eq(w, 65535), words, off, w)
 
-# Cell coordinates are signed: a negative one reads as a huge unsigned
-# one, so the unsigned bound checks both ends.
-def Level.cell.at(+bm: Level.Blockmap, +bx: U32, +by: U32) -> List<&2, U32>:
+def Level.things_of(+l: Level) -> Level.Things:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+    sectors, specials} = l
+  things
+
+# The level with other blocklinks.
+def Level.relinked(l: Level, hk: V.Vec & V.Vec) -> Level:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count, h, k}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+    sectors, specials} = l
+  (heads, links) = hk
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count, heads, links}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+    sectors, specials}
+
+# The level with no thing linked, room for n.
+def Level.unlinked.in(l: Level, bm: Level.Blockmap, n: U32) -> Level:
   Blockmap{words, ox, oy, +cols, +rows} = bm
-  Level.cell.list(Bool.and(U32.is_lt(bx, cols), U32.is_lt(by, rows)), words,
-    (4 + by * cols + bx : U32))
+  Level.relinked(l, (V.Vec.of_list([], (cols * rows : U32)), V.Vec.of_list([], (n * 4 : U32))))
+
+def Level.unlinked(+l: Level, n: U32) -> Level:
+  Level.unlinked.in(l, Level.blockmap_of(l), n)
+
+# The cell a point is in, by signed column and row.
+def Level.cell_of(+bm: Level.Blockmap, x: U32, y: U32) -> Level.Cell:
+  Blockmap{words, +ox, +oy, cols, rows} = bm
+  Cell{F.Fixed.sarn((x - ox : U32), 23n), F.Fixed.sarn((y - oy : U32), 23n)}
+
+def Level.cell.is(a: Level.Cell, b: Level.Cell) -> Bool:
+  Cell{ax, ay} = a
+  Cell{bx, by} = b
+  Bool.and(U32.is_eq(ax, bx), U32.is_eq(ay, by))
+
+# Whether a cell is on a map of so many columns and rows. Its
+# coordinates are signed: a negative one reads as a huge unsigned one,
+# so the unsigned bound checks both ends.
+def Level.cell.inside(+cols: U32, +rows: U32, +c: Level.Cell) -> Bool:
+  Cell{+bx, +by} = c
+  Bool.and(U32.is_lt(bx, cols), U32.is_lt(by, rows))
+
+def Level.cell.number(+cols: U32, +c: Level.Cell) -> U32:
+  Cell{+bx, +by} = c
+  (by * cols + bx : U32)
+
+# The lines of a cell of the geometry's blockmap.
+def Level.cell.lines(+geo: Level.Geo, +c: Level.Cell) -> List<&2, U32>:
+  Geo{lines, sides, verts, segs, subs, nodes, root, Blockmap{+words, ox, oy, +cols, +rows}, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches} = geo
+  Level.cell.list(Level.cell.inside(cols, rows, c), words, (4 + Level.cell.number(cols, c) : U32))
+
+def Level.linked.go(k: Nat, +links: V.Vec, +next: U32) -> List<&2, U32>:
+  match k next:
+    case _ 0:
+      []
+    case 0n _:
+      []
+    case 1n+j _:
+      +id = (next - 1 : U32)
+      id <> Level.linked.go(j, links, V.Vec.get(links, (id * 4 : U32)))
+
+def Level.cell.linked(inside: Bool, +heads: V.Vec, +links: V.Vec, +cell: U32) -> List<&2, U32>:
+  match inside:
+    case False{}:
+      []
+    case True{}:
+      Level.linked.go(U32.to_nat(4096), links, V.Vec.get(heads, cell))
+
+# The things linked in a cell of the geometry's blockmap, the last
+# linked first: Doom's blocklinks.
+def Level.cell.things(+geo: Level.Geo, +c: Level.Cell) -> List<&2, U32>:
+  Geo{lines, sides, verts, segs, subs, nodes, root, Blockmap{words, ox, oy, +cols, +rows}, Things{tw, count, +heads, +links}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches} = geo
+  Level.cell.linked(Level.cell.inside(cols, rows, c), heads, links, Level.cell.number(cols, c))
+
+def Level.links.words(links: V.Vec, +id: U32, next: U32, x: U32, y: U32, kind: U32) -> V.Vec:
+  V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(links, (id * 4 : U32), next), (id * 4 + 1 : U32), x), (id * 4 + 2 : U32),
+    y), (id * 4 + 3 : U32), kind)
+
+def Level.link.fin(inside: Bool, +cell: U32, +id: U32, x: U32, y: U32, kind: U32, +heads: V.Vec, links: V.Vec) ->
+  V.Vec & V.Vec:
+  match inside:
+    case False{}:
+      (heads, Level.links.words(links, id, 0, x, y, kind))
+    case True{}:
+      (V.Vec.set(heads, cell, (id + 1 : U32)), Level.links.words(links, id, V.Vec.get(heads, cell), x, y, kind))
+
+def Level.link.cell(+id: U32, x: U32, y: U32, kind: U32, +l: Level, bm: Level.Blockmap, t: Level.Things,
+  +c: Level.Cell) -> Level:
+  Blockmap{words, ox, oy, +cols, +rows} = bm
+  Things{tw, count, +heads, links} = t
+  Level.relinked(l, Level.link.fin(Level.cell.inside(cols, rows, c), Level.cell.number(cols, c), id, x, y, kind, heads,
+    links))
+
+# The level with a thing linked first in the cell its centre is in, as
+# Doom's P_SetThingPosition links it; a thing off the map is in none.
+def Level.link(+l: Level, +id: U32, +x: U32, +y: U32, kind: U32) -> Level:
+  Level.link.cell(id, x, y, kind, l, Level.blockmap_of(l), Level.things_of(l),
+    Level.cell_of(Level.blockmap_of(l), x, y))
+
+# Thing id as the blockmap links it; its next is plus one, 0 for none.
+def Level.linked.in(t: Level.Things, +id: U32) -> Level.Link:
+  Things{words, count, heads, +links} = t
+  Link{V.Vec.get(links, (id * 4 : U32)), V.Vec.get(links, (id * 4 + 1 : U32)), V.Vec.get(links, (id * 4 + 2 : U32)),
+    V.Vec.get(links, (id * 4 + 3 : U32))}
 
 # The sector under a point
 # ------------------------
@@ -545,7 +638,7 @@ def Level.blockmap(+bm: V.Vec) -> Level.Blockmap:
 # zeros; root 32768 is subsector 0.
 def Level.room(floor: U32, ceil: U32) -> Level:
   Level{Geo{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 32768,
-    Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Things{V.Leaf{0}, 0}, [], [],
+    Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Things{V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 0, 1,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
     V.Vec.of_list([F.Fixed.of_map(floor), F.Fixed.of_map(ceil), 0], 3), V.Leaf{0}}
@@ -612,7 +705,7 @@ def Level.pack.go(+map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>, texnames: Lis
     case [things, lines, sides, verts, segs, subs, nodes, sectors, bm, specials, sectags]:
       Level.grouped(Level{Geo{lines, sides, verts, segs, subs, nodes,
         (Level.count(map, "NODES", 28) - 1 : U32), Level.blockmap(bm),
-        Things{things, Level.count(map, "THINGS", 10)}, texnames, flatnames,
+        Things{things, Level.count(map, "THINGS", 10), V.Leaf{0}, V.Leaf{0}}, texnames, flatnames,
         V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0},
         Level.count(map, "LINEDEFS", 14), Level.count(map, "SECTORS", 26), sectags, V.Leaf{0}, V.Leaf{0}},
         Level.fixed(U32.to_nat(Level.count(map, "SECTORS", 26)), 0, sectors), specials})

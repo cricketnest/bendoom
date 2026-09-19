@@ -27,7 +27,7 @@ What was built:
 - `Inventory.grant` takes the eight types on the same path as the blue key: `Sim.touch` offers, `Inventory.took` tallies and flashes, and the check drops the thing by record id. The stimpack and medikit are P_GiveBody's 10 and 25: refused at 100 health or more, otherwise healed to at most 100. The soul sphere adds 100 and the health bonus 1, up to 200, and both are always taken. The armour bonus adds 1 up to 200 and sets type 1 when no armour is worn. Green and blue armour are P_GiveArmor: 100 points per type level, with the type, taken over fewer points of any type and refused at as many or more. The berserk pack is P_GivePower's strength: P_GiveBody's 100 whatever it returns, the counter set to 1, always taken. COUNTITEM stays in the definitions (the two bonuses, the soul sphere, the berserk pack).
 - `Inventory.tic` counts strength up by one a tic once it is on, as P_PlayerThink does. The fist, the pending weapon and the red palette are not represented.
 - The masks and indexes stay in inventory.bend, named: the blue lock's mask moved out of sim.bend into `Inventory.blue`, over `Inventory.bluecard` and `Inventory.blueskull`; the armour types are `Inventory.green_armour` and `Inventory.blue_armour`; the power index is `Inventory.pw_strength`. sim.bend gains no numbers.
-- `Sim.touch` is unchanged, and so is its reverse spawn order. Its comment now says that order is Doom's within one blockmap cell only.
+- `Sim.touch` offers each type on the key's path. Since the merge with ticket 09 it is ticket 09's blockmap walk: P_CheckPosition's things in cell order, until the first solid thing that overlaps the player ends the check.
 
 Acceptance and refusal boundaries, the closed laws, by hand. Each runs the tic that brings the player 8 from the thing (`Closed.offer`, shared with ticket 08's laws since the merge). An accepted grant leaves no thing and a flash of 6; a refusal leaves the thing and the inventory untouched.
 
@@ -77,7 +77,7 @@ The render test's old hashes and the sim test's old lines are unchanged, so tick
 
 Trade-offs:
 
-- **Touch order.** One position check still offers the last-spawned thing first. Health bonuses and armour bonuses commute with each other, but a stimpack, medikit or health bonus near 100 health does not commute with another healing item. Two such items in different blockmap cells, touched by one check, can resolve differently from vanilla until ticket 09's blockmap walk. Every law and script here touches one item per check.
+- **Touch order.** One position check offers the things in vanilla's order: the cells of the box widened by MAXRADIUS, columns west to east and rows south to north, each cell's things the last linked first, until the first solid thing that overlaps the player stops the check. A stimpack, medikit or health bonus near 100 health does not commute with another healing item, so two of them touched by one check resolve as in Chocolate Doom, in whichever cells they stand. Every law and script here still touches one item per check.
 - **Berserk.** The fist, the pending weapon and the red palette wait for milestone 6. Vanilla lowers the pistol on the tic after a berserk pickup, so no render case follows one.
 - **Health is unsigned.** P_GiveBody compares signed health. Nothing lowers health until milestone 6, and there P_TouchSpecialThing refuses a dead toucher before any grant, so the unsigned compare never differs.
 

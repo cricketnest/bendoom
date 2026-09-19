@@ -87,6 +87,7 @@ The rocket, 24 units tall, is taken on tic 33, about 46 ahead and 19 left: scree
 Trade-offs:
 
 - **Not represented.** The pending weapon, the dropped half-clip, messages and sounds, as the spec says.
+- **Touch order.** Since the merge with ticket 09 the grants run inside its blockmap walk, P_CheckPosition's order, until the first solid thing that overlaps the player stops the check, so two ammo pickups touched by one check near a cap resolve as in Chocolate Doom. Every law and script here touches one item per check.
 - **P_GiveAmmo's weapon switch** is not represented because milestone 5 cannot reach it. It fires only when the ammo was 0: for bullets and rockets with the fist ready, for shells and cells with the fist or pistol ready and the shotgun or plasma rifle owned. The pistol stays ready, and no ammo count drops to 0: nothing spends ammo, and a weapon pickup gives its ammo before the weapon is owned. Milestone 6, which fires weapons, owns the switch.
 
 Checks:

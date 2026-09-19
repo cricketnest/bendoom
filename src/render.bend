@@ -33,4 +33,4 @@ def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.
 # walls' scroll from its clock.
 def Render.frame(tables: P.Project.Tables, gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> Array<U32>:
   Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
-    G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), S.State.things(s), mem)
+    G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.list(S.State.things(s)), mem)

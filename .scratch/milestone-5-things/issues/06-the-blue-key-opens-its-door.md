@@ -66,8 +66,8 @@ The two key frames compare the key. Against our frame with record 87 left out of
 
 Trade-offs:
 
-- **Touch order.** Things are offered the last spawned first, which is the order within one blockmap cell. Doom also walks the cells west to east, which only matters when one check touches two things whose grants interact. Only the blue card grants so far. Ticket 09 walks the blockmap for solid things.
-- **Cost.** Every position check scans the population, prefiltered by Doom's MAXRADIUS box before the definition lookup. Against ticket 02, the route test runs in 314 ms native (from 193) and 1577 ms on bun (from 1413), about 0.2 ms a tic native. Without the prefilter it was 622 ms.
+- **Touch order.** Since the merge with ticket 09, things are offered in P_CheckPosition's blockmap order, cell by cell, until a solid thing stops the check. At this ticket they were offered the last spawned first, the order within one cell only.
+- **Cost.** At this ticket every position check scanned the population (ticket 09 replaced the scan with the blockmap walk), prefiltered by Doom's MAXRADIUS box before the definition lookup. Against ticket 02, the route test runs in 314 ms native (from 193) and 1577 ms on bun (from 1413), about 0.2 ms a tic native. Without the prefilter it was 622 ms.
 - **Dead toucher.** P_TouchSpecialThing's check for a dead toucher is left out: nothing lowers health until milestone 6.
 - **Door scripts.** The door 71 scripts hand a fresh state at the door the inventory the key run left, built with the player's constructor. Freedoom has no short walk from the key to its door, and ticket 11 owns the full route.
 - **Not represented.** Pickup messages, sounds, the status bar's key and the bonus palette have no representation, as the spec says.
