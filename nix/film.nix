@@ -13,7 +13,8 @@ let
   frames = callPackage ./program.nix {
     inherit bend;
     pname = "bendoom-film-frames";
-    root = "film.bend";
+    root = ../film.bend;
+    sources = [ ../src ];
   };
   song = music iwad;
 in
