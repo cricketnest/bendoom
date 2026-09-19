@@ -91,19 +91,32 @@ def Midi.chan(two: Bool, +status: U32, r: Midi.Read) -> Midi.Got:
       Read{p1, rest} = r
       Got{Chan{(status .&. 240 : U32), (status .&. 15 : U32), p1, 0}, Track{rest, status}}
 
-def Midi.event(meta: Bool, +status: U32, bytes: List<&2, U32>) -> Midi.Got:
-  match meta:
-    case True{}:
+# A sysex event: its length, then as many bytes of data, which the player
+# ignores.
+def Midi.sysex(+status: U32, r: Midi.Read) -> Midi.Got:
+  Read{+n, rest} = r
+  Got{Other{}, Track{List.drop(&2, U32, rest, U32.to_nat(n)), status}}
+
+def Midi.event.go(meta: Bool, sysex: Bool, +status: U32, bytes: List<&2, U32>) -> Midi.Got:
+  match meta sysex:
+    case True{} _:
       Midi.meta(Midi.byte(bytes))
-    case False{}:
+    case False{} True{}:
+      Midi.sysex(status, Midi.vlq(bytes))
+    case False{} False{}:
       Midi.chan(Bool.not(U32.is_eq((status .&. 224 : U32), 192)), status, Midi.byte(bytes))
+
+# The event of a status byte: meta 0xFF, sysex 0xF0 or 0xF7, or a channel
+# event.
+def Midi.event(+status: U32, bytes: List<&2, U32>) -> Midi.Got:
+  Midi.event.go(U32.is_eq(status, 255), U32.is_eq(status, 240) || U32.is_eq(status, 247), status, bytes)
 
 def Midi.event.status(fresh: Bool, +b: U32, +last: U32, rest: List<&2, U32>) -> Midi.Got:
   match fresh:
     case True{}:
-      Midi.event(U32.is_eq(b, 255), b, rest)
+      Midi.event(b, rest)
     case False{}:
-      Midi.event(U32.is_eq(last, 255), last, b <> rest)
+      Midi.event(last, b <> rest)
 
 # A status byte, or the last one again before a data byte.
 def Midi.status(+last: U32, r: Midi.Read) -> Midi.Got:
@@ -119,14 +132,32 @@ def Midi.next(t: Midi.Track) -> Midi.Got:
   Track{bytes, +status} = t
   Midi.status(status, Midi.byte(Midi.Read.rest(Midi.vlq(bytes))))
 
-def Midi.tracks.one(n: Nat, +bytes: List<&2, U32>) -> List<&2, Midi.Track>:
+def Midi.Track.bytes(t: Midi.Track) -> List<&2, U32>:
+  Track{bytes, status} = t
+  bytes
+
+# The bytes after a track's end-of-track event, reading at most n events.
+def Midi.skip(n: Nat, g: Midi.Got) -> List<&2, U32>:
+  match n g:
+    case _ Got{End{}, t}:
+      Midi.Track.bytes(t)
+    case 0n Got{e, t}:
+      Midi.Track.bytes(t)
+    case 1n+m Got{e, t}:
+      Midi.skip(m, Midi.next(t))
+
+# Each track as midifile.c's ReadTrack reads it: from after its eight-byte
+# header up to its end-of-track event, the next header following that
+# event. A track keeps the rest of the file after it, since the player
+# reads no further than the end-of-track. i_oplmusic.c takes no MIDI lump
+# of 96 KiB or more, so no track holds that many events.
+def Midi.tracks(n: Nat, +bytes: List<&2, U32>) -> List<&2, Midi.Track>:
   match n:
     case 0n:
       []
     case 1n+m:
-      +len = U32.to_nat(Midi.be(4n, List.drop(&2, U32, bytes, 4n)))
-      +body = List.drop(&2, U32, bytes, 8n)
-      Track{List.take(&2, U32, body, len), 0} <> Midi.tracks.one(m, List.drop(&2, U32, body, len))
+      +t = {Track{List.drop(&2, U32, bytes, 8n), 0} : Midi.Track}
+      t <> Midi.tracks(m, Midi.skip(U32.to_nat(98304), Midi.next(t)))
 
 # A standard MIDI file's division (ticks a beat) and its tracks.
 type Midi.File is Data:
@@ -134,4 +165,4 @@ type Midi.File is Data:
 
 def Midi.file(+bytes: List<&2, U32>) -> Midi.File:
   File{Midi.be(2n, List.drop(&2, U32, bytes, 12n)),
-    Midi.tracks.one(U32.to_nat(Midi.be(2n, List.drop(&2, U32, bytes, 10n))), List.drop(&2, U32, bytes, 14n))}
+    Midi.tracks(U32.to_nat(Midi.be(2n, List.drop(&2, U32, bytes, 10n))), List.drop(&2, U32, bytes, 14n))}

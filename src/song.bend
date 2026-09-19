@@ -7,20 +7,24 @@
 import Base
 import ./bytes.bend as B
 import ./wad.bend as W
+import ./fixed.bend as F
 import ./opl.bend as O
 import ./midi.bend as M
 import ./player.bend as P
 
+# A callback: a track's next event (TrackTimerCallback), or the restart
+# 5 ms after the last track ends (RestartSong), where the pass ends.
 type Song.Entry is Data:
-  Entry{time: U32, track: U32}
+  Next{time: U32, track: U32}
+  Restart{time: U32}
 
 # The chip with the frames made so far, the player, the tracks, the
-# callback heap as opl_queue.c's array, now (current_time), fill (the
-# frames of the buffer in progress), the tempo in microseconds a beat,
-# and the song's ticks a beat.
+# callback heap as opl_queue.c's array, now (current_time), the frames
+# made, the tracks still running, the tempo in microseconds a beat, and
+# the song's ticks a beat.
 type Song is Data:
   Song{sound: O.Opl.Frames, player: P.Player, tracks: List<&2, M.Midi.Track>,
-    heap: List<&2, Song.Entry>, now: U32, fill: U32, tempo: U32, division: U32}
+    heap: List<&2, Song.Entry>, now: U32, made: U32, running: U32, tempo: U32, division: U32}
 
 type Song.Env is Data:
   Env{roms: O.Opl.Roms, tabs: P.Player.Tabs}
@@ -29,15 +33,14 @@ type Song.Env is Data:
 # -----------------
 
 def Song.time(+e: Song.Entry) -> U32:
-  Entry{time, track} = e
-  time
-
-def Song.track(+e: Song.Entry) -> U32:
-  Entry{time, track} = e
-  track
+  match e:
+    case Next{time, track}:
+      time
+    case Restart{time}:
+      time
 
 def Song.at(+q: List<&2, Song.Entry>, +i: U32) -> Song.Entry:
-  Maybe.default(&2, Song.Entry, List.get(&2, Song.Entry, q, U32.to_nat(i)), Entry{0, 0})
+  Maybe.default(&2, Song.Entry, List.get(&2, Song.Entry, q, U32.to_nat(i)), Restart{0})
 
 def Song.put(q: List<&2, Song.Entry>, +i: U32, e: Song.Entry) -> List<&2, Song.Entry>:
   List.set(&2, Song.Entry, q, U32.to_nat(i), e)
@@ -87,54 +90,72 @@ def Song.down(f: Nat, next: Maybe<&2, U32>, +q: List<&2, Song.Entry>, +i: U32, +
       +q2 = Song.put(q, i, Song.at(q, c))
       Song.down(m, Song.child(q2, n, c, last), q2, c, last, n)
 
-type Song.Popped is Data:
-  Popped{entry: Song.Entry, heap: List<&2, Song.Entry>}
-
-# OPL_Queue_Pop.
-def Song.pop(+q: List<&2, Song.Entry>) -> Song.Popped:
+# OPL_Queue_Pop, less the entry it hands out.
+def Song.pop(+q: List<&2, Song.Entry>) -> List<&2, Song.Entry>:
   +n = (Song.size(q) - 1 : U32)
   +last = Song.at(q, n)
   +q2 = List.take(&2, Song.Entry, q, U32.to_nat(n))
-  Popped{Song.at(q, 0), Song.down(8n, Song.child(q2, n, 0, last), q2, 0, last, n)}
+  Song.down(8n, Song.child(q2, n, 0, last), q2, 0, last, n)
+
+# OPL_Queue_AdjustCallbacks for one time: its offset from now, an int64
+# made a float, over the factor, truncated toward zero (cvttss2si, which
+# gcc emits for the cast to uint64_t below 2^63) and added back. An
+# offset below zero, a callback overdue as the tempo changes, stays
+# overdue.
+def Song.rescale(+now: U32, +factor: F32, +time: U32) -> U32:
+  +off = (time - now : U32)
+  +neg = F.Fixed.is_neg(off)
+  +q = F32.to_u32((U32.to_f32(Bool.pick(U32, neg, (0 - off : U32), off)) / factor : F32))
+  (now + Bool.pick(U32, neg, (0 - q : U32), q) : U32)
 
 def Song.adjust(q: List<&2, Song.Entry>, +now: U32, +factor: F32) -> List<&2, Song.Entry>:
   match q:
     case []:
       []
-    case e <> rest:
-      Entry{+time, track} = e
-      Entry{(now + F32.to_u32((U32.to_f32((time - now : U32)) / factor : F32)) : U32), track} <>
-        Song.adjust(rest, now, factor)
+    case Next{+time, k} <> rest:
+      Next{Song.rescale(now, factor, time), k} <> Song.adjust(rest, now, factor)
+    case Restart{+time} <> rest:
+      Restart{Song.rescale(now, factor, time)} <> Song.adjust(rest, now, factor)
 
 # Callbacks
 # ---------
 
-def Song.due(+m: Song) -> Bool:
-  Song{sound, player, tracks, +heap, +now, fill, tempo, division} = m
-  Bool.not(List.is_empty(&2, Song.Entry, heap)) && U32.is_ge(now, Song.time(Song.at(heap, 0)))
-
 # ScheduleTrack: the track's next event after its delta in ticks, turned
 # to microseconds at the tempo.
 def Song.schedule(+k: U32, t: M.Midi.Track, m: Song) -> Song:
-  Song{sound, player, tracks, heap, +now, fill, +tempo, +division} = m
+  Song{sound, player, tracks, heap, +now, made, running, +tempo, +division} = m
   +delta = M.Midi.delta(t)
-  Song{sound, player, tracks, Song.push(heap, Entry{(now + (delta * (tempo / division)) +
-    (((delta * (tempo % division)) / division)) : U32), k}), now, fill, tempo, division}
+  Song{sound, player, tracks, Song.push(heap, Next{(now + (delta * (tempo / division)) +
+    (((delta * (tempo % division)) / division)) : U32), k}), now, made, running, tempo, division}
 
 # A channel event: the player's writes go to the chip's buffer.
 def Song.event(+env: Song.Env, +kind: U32, +raw: U32, +p1: U32, +p2: U32, m: Song) -> Song:
   Env{roms, +tabs} = env
-  Song{sound, player, tracks, heap, now, fill, tempo, division} = m
+  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
   +p = P.Player.event(tabs, kind, raw, p1, p2, player)
-  Song{O.Opl.Frames.queue(P.Player.taken(p), sound), P.Player.clear(p), tracks, heap, now, fill, tempo,
-    division}
+  Song{O.Opl.Frames.queue(P.Player.taken(p), sound), P.Player.clear(p), tracks, heap, now, made, running,
+    tempo, division}
 
 # MetaSetTempo: the heap rescaled by the old tempo over the new, in
-# single precision, as OPL_Queue_AdjustCallbacks does.
+# single precision.
 def Song.retempo(+new: U32, m: Song) -> Song:
-  Song{sound, player, tracks, heap, +now, fill, tempo, division} = m
+  Song{sound, player, tracks, heap, +now, made, running, tempo, division} = m
   Song{sound, player, tracks, Song.adjust(heap, now, (U32.to_f32(tempo) / U32.to_f32(new) : F32)), now,
-    fill, new, division}
+    made, running, new, division}
+
+def Song.last(done: Bool, +now: U32, heap: List<&2, Song.Entry>) -> List<&2, Song.Entry>:
+  match done:
+    case True{}:
+      Song.push(heap, Restart{(now + 5000 : U32)})
+    case False{}:
+      heap
+
+# A track's end: it is not scheduled again, and the last track's end
+# schedules the restart.
+def Song.ended(m: Song) -> Song:
+  Song{sound, player, tracks, heap, +now, made, +running, tempo, division} = m
+  Song{sound, player, tracks, Song.last(U32.is_eq(running, 1), now, heap), now, made, (running - 1 : U32),
+    tempo, division}
 
 def Song.handle(e: M.Midi.Event, +env: Song.Env, +k: U32, t: M.Midi.Track, m: Song) -> Song:
   match e:
@@ -143,63 +164,77 @@ def Song.handle(e: M.Midi.Event, +env: Song.Env, +k: U32, t: M.Midi.Track, m: So
     case M.Tempo{us}:
       Song.schedule(k, t, Song.retempo(us, m))
     case M.End{}:
-      m
+      Song.ended(m)
     case M.Other{}:
       Song.schedule(k, t, m)
 
 def Song.got(+env: Song.Env, +k: U32, m: Song, g: M.Midi.Got) -> Song:
-  Song{sound, player, tracks, heap, now, fill, tempo, division} = m
+  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
   M.Got{event, +t} = g
   Song.handle(event, env, k, t,
-    Song{sound, player, List.set(&2, M.Midi.Track, tracks, U32.to_nat(k), t), heap, now, fill, tempo,
+    Song{sound, player, List.set(&2, M.Midi.Track, tracks, U32.to_nat(k), t), heap, now, made, running, tempo,
       division})
 
-def Song.run(+env: Song.Env, m: Song, p: Song.Popped) -> Song:
-  Song{sound, player, +tracks, heap, now, fill, tempo, division} = m
-  Popped{+entry, q} = p
-  Song.got(env, Song.track(entry), Song{sound, player, tracks, q, now, fill, tempo, division},
-    M.Midi.next(Maybe.default(&2, M.Midi.Track,
-      List.get(&2, M.Midi.Track, tracks, U32.to_nat(Song.track(entry))), M.Track{[], 0})))
-
-def Song.heap(+m: Song) -> List<&2, Song.Entry>:
-  Song{sound, player, tracks, heap, now, fill, tempo, division} = m
-  heap
-
-# TrackTimerCallback for the heap's first entry.
-def Song.callback(+env: Song.Env, +m: Song) -> Song:
-  Song.run(env, m, Song.pop(Song.heap(m)))
-
-# AdvanceTime's loop: every callback due by now, in heap order.
-def Song.advance(n: Nat, due: Bool, +env: Song.Env, m: Song) -> Song:
-  match n due:
-    case _ False{}:
-      m
-    case 0n True{}:
-      m
-    case 1n+f True{}:
-      +m2 = Song.callback(env, m)
-      Song.advance(f, Song.due(m2), env, m2)
+# TrackTimerCallback for track k, the heap's first entry.
+def Song.callback(+env: Song.Env, +k: U32, m: Song) -> Song:
+  Song{sound, player, +tracks, +heap, now, made, running, tempo, division} = m
+  Song.got(env, k, Song{sound, player, tracks, Song.pop(heap), now, made, running, tempo, division},
+    M.Midi.next(Maybe.default(&2, M.Midi.Track, List.get(&2, M.Midi.Track, tracks, U32.to_nat(k)),
+      M.Track{[], 0})))
 
 # One cut of OPL_Mix_Callback's loop: frames up to the next callback's
-# time or the buffer's end. Past 100 ms a cut is the buffer's rest.
-def Song.cut(+env: Song.Env, m: Song) -> Song:
+# time, d microseconds away, or the buffer's end, and no further than
+# the span. Past 100 ms a cut is the buffer's rest.
+def Song.cut(+env: Song.Env, +d: U32, +span: U32, m: Song) -> Song:
   Env{+roms, tabs} = env
-  Song{sound, player, tracks, +heap, +now, +fill, tempo, division} = m
-  +d = U32.min((Song.time(Song.at(heap, 0)) - now : U32), 100000)
-  +n = U32.min((((d * 441) + 9999) / 10000 : U32), (4096 - fill : U32))
+  Song{sound, player, tracks, heap, +now, +made, running, tempo, division} = m
+  +n = U32.min(U32.min((((d * 441) + 9999) / 10000 : U32), (4096 - (made % 4096) : U32)), (span - made : U32))
   Song{O.Opl.frames(U32.to_nat(n), roms, sound), player, tracks, heap, (now + ((n * 10000) / 441) : U32),
-    ((fill + n) % 4096 : U32), tempo, division}
+    (made + n : U32), running, tempo, division}
 
-# Cuts until a callback is due.
-def Song.until(n: Nat, due: Bool, +env: Song.Env, m: Song) -> Song:
-  match n due:
-    case _ True{}:
+# What OPL_Mix_Callback does next: cut toward the next callback, run it
+# if due, or stop at the restart or the span's end.
+type Song.Step is Data:
+  Cut{d: U32}
+  Call{track: U32}
+  Stop{}
+
+def Song.wait(+now: U32, +time: U32) -> U32:
+  U32.min((time - now : U32), 100000)
+
+def Song.step.at(+now: U32, +full: Bool, e: Song.Entry) -> Song.Step:
+  match e:
+    case Next{+time, k}:
+      Bool.pick(Song.Step, full, Stop{},
+        Bool.pick(Song.Step, U32.is_ge(now, time), Call{k}, Cut{Song.wait(now, time)}))
+    case Restart{+time}:
+      Bool.pick(Song.Step, full || U32.is_ge(now, time), Stop{}, Cut{Song.wait(now, time)})
+
+def Song.step.top(+now: U32, +full: Bool, top: Maybe<&2, Song.Entry>) -> Song.Step:
+  match top:
+    case None{}:
+      Bool.pick(Song.Step, full, Stop{}, Cut{100000})
+    case Some{e}:
+      Song.step.at(now, full, e)
+
+def Song.step(+span: U32, +m: Song) -> Song.Step:
+  Song{sound, player, tracks, +heap, +now, +made, running, tempo, division} = m
+  Song.step.top(now, U32.is_ge(made, span), List.head(&2, Song.Entry, heap))
+
+def Song.play(n: Nat, s: Song.Step, +span: U32, +env: Song.Env, m: Song) -> Song:
+  match n s:
+    case _ Stop{}:
       m
-    case 0n False{}:
+    case 0n Cut{d}:
       m
-    case 1n+f False{}:
-      +m2 = Song.cut(env, m)
-      Song.until(f, Song.due(m2), env, m2)
+    case 0n Call{k}:
+      m
+    case 1n+f Cut{+d}:
+      +m2 = Song.cut(env, d, span, m)
+      Song.play(f, Song.step(span, m2), span, env, m2)
+    case 1n+f Call{+k}:
+      +m2 = Song.callback(env, k, m)
+      Song.play(f, Song.step(span, m2), span, env, m2)
 
 # Starting
 # --------
@@ -243,8 +278,9 @@ def Song.env(+l: Song.Lumps) -> Song.Env:
   Env{O.Opl.roms(), P.Player.tabs(genmidi)}
 
 def Song.file(f: M.Midi.File) -> Song:
-  M.File{division, tracks} = f
-  Song{O.Frames{O.Opl.reset(), []}, P.Player.start(), tracks, [], 0, 0, 500000, division}
+  M.File{division, +tracks} = f
+  Song{O.Frames{O.Opl.reset(), []}, P.Player.start(), tracks, [], 0, 0,
+    U32.from_nat(List.length(&2, M.Midi.Track, tracks)), 500000, division}
 
 # I_OPL_PlaySong: each track's first event scheduled at the default tempo.
 def Song.start(ts: List<&2, M.Midi.Track>, +k: U32, m: Song) -> Song:
@@ -260,24 +296,29 @@ def Song.start(ts: List<&2, M.Midi.Track>, +k: U32, m: Song) -> Song:
 # next buffer's first frame.
 def Song.idle(+env: Song.Env, m: Song) -> Song:
   Env{+roms, tabs} = env
-  Song{sound, player, +tracks, heap, now, fill, tempo, division} = m
-  Song.start(tracks, 0, Song{O.Opl.Frames.queue(P.Player.setup(), O.Opl.frames(U32.to_nat(4096), roms, sound)),
-    player, tracks, heap, now, fill, tempo, division})
-
-def Song.out(m: Song) -> List<&2, U32>:
-  Song{sound, player, tracks, heap, now, fill, tempo, division} = m
-  O.Opl.Frames.out(sound)
+  Song{sound, player, +tracks, heap, now, made, running, tempo, division} = m
+  Song.start(tracks, 0,
+    Song{O.Opl.Frames.queue(P.Player.setup(), O.Opl.frames(U32.to_nat(4096), roms, sound)), player, tracks,
+      heap, now, 4096, running, tempo, division})
 
 def Song.song(+l: Song.Lumps) -> List<&2, U32>:
   Lumps{genmidi, song} = l
   song
 
-def Song.opening.go(+env: Song.Env, +song: List<&2, U32>) -> List<&2, U32>:
-  +m = Song.cut(env, Song.idle(env, Song.file(M.Midi.file(song))))
-  +m2 = Song.advance(U32.to_nat(100000), Song.due(m), env, m)
-  Song.out(Song.until(U32.to_nat(100000), Song.due(m2), env, m2))
+def Song.render.go(+span: U32, +env: Song.Env, +m: Song) -> Song:
+  Song.play(U32.to_nat(100000000), Song.step(span, m), span, env, m)
 
-# The opening: the idle buffer, then the song from its start to the
-# callback after its first, the frames latest first.
-def Song.opening(+l: Song.Lumps) -> List<&2, U32>:
-  Song.opening.go(Song.env(l), Song.song(l))
+# The idle buffer, then the song's first pass, up to the restart or the
+# span's frames if fewer.
+def Song.render(+span: U32, +l: Song.Lumps) -> Song:
+  +env = Song.env(l)
+  Song.render.go(span, env, Song.idle(env, Song.file(M.Midi.file(Song.song(l)))))
+
+# The frames made, latest first.
+def Song.out(m: Song) -> List<&2, U32>:
+  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
+  O.Opl.Frames.out(sound)
+
+def Song.made(+m: Song) -> U32:
+  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
+  made

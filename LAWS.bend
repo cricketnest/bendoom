@@ -15,6 +15,9 @@ import ./src/draw.bend as D
 import ./src/segs.bend as R
 import ./src/planes.bend as N
 import ./src/gfx.bend as G
+import ./src/midi.bend as Mi
+import ./src/player.bend as Pl
+import ./src/song.bend as Sg
 
 # Bytes and the WAD
 # -----------------
@@ -853,3 +856,54 @@ law animation_frames:
     G.Gfx.anim.shown(9, 2, 3, 124, 2), G.Gfx.anim.shown(33, 2, 3, 124, 2))
     == (3, 4, 4, 5, 5, 2, 1, 1, 2, 2)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
+# Music
+# -----
+
+# LAW: a sysex event is its length and as many bytes, which midifile.c
+# reads past, whatever follows: the next event starts after them, under
+# the sysex's running status.
+law sysex_skipped:
+  for rest: List<&2, U32>
+  {Mi.Midi.next(Mi.Track{0 <> 240 <> 2 <> 7 <> 7 <> rest, 0})
+    == Mi.Got{Mi.Other{}, Mi.Track{rest, 240}} : Mi.Midi.Got}
+
+# LAW: a track ends at its end-of-track event, and the next track's
+# header follows it, whatever that is: ReadTrack stops there, not at the
+# chunk's length.
+law end_of_track_ends:
+  for rest: List<&2, U32>
+  {Mi.Midi.skip(1n, Mi.Midi.next(Mi.Track{0 <> 255 <> 47 <> 0 <> rest, 0})) == rest : List<&2, U32>}
+
+# LAW: any callback pushed on the empty heap is its first, and popping
+# it empties the heap.
+law heap_one:
+  for +e: Sg.Song.Entry
+  {(Sg.Song.push([], e), Sg.Song.pop(Sg.Song.push([], e))) == ([e], [])
+    : List<&2, Sg.Song.Entry> & List<&2, Sg.Song.Entry>}
+
+# LAW: callbacks due at the same time do not pop in the order they were
+# pushed: after the first, OPL_Queue_Pop moves the last entry to the top,
+# so the third pushed runs before the second (sanity).
+law heap_ties:
+  {Sg.Song.pop(Sg.Song.push(Sg.Song.push(Sg.Song.push([], Sg.Next{5, 0}), Sg.Next{5, 1}), Sg.Next{5, 2}))
+    == [Sg.Next{5, 2}, Sg.Next{5, 1}] : List<&2, Sg.Song.Entry>}
+
+# LAW: a note on of velocity zero is a note off, on any player.
+law velocity_zero_is_off:
+  for +t: Pl.Player.Tabs
+  for +raw: U32
+  for +key: U32
+  for +p: Pl.Player
+  {Pl.Player.event(t, 144, raw, key, 0, p) == Pl.Player.event(t, 128, raw, key, 0, p) : Pl.Player}
+
+# LAW: before any note, a note off or an all-notes-off on any channel
+# releases nothing and writes nothing.
+law quiet_offs:
+  for +t: Pl.Player.Tabs
+  for +raw: U32
+  for +key: U32
+  for +vel: U32
+  {(Pl.Player.event(t, 128, raw, key, vel, Pl.Player.start()),
+    Pl.Player.event(t, 176, raw, 123, vel, Pl.Player.start()))
+    == (Pl.Player.start(), Pl.Player.start()) : Pl.Player & Pl.Player}

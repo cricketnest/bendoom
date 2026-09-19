@@ -15,6 +15,9 @@ import ./src/project.bend as P
 import ./src/draw.bend as D
 import ./src/segs.bend as R
 import ./src/planes.bend as N
+import ./src/midi.bend as Mi
+import ./src/player.bend as Pl
+import ./src/song.bend as Sg
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -1154,4 +1157,33 @@ def Laws.each_in_order(n, i):
       Laws.each_in_order(m, 1n+i)
 
 def Laws.animation_frames():
+  {==}
+
+# Music: the reader's laws split on what follows, since List.drop reads
+# the list before the count.
+
+def Laws.sysex_skipped(rest):
+  match rest:
+    case []:
+      {==}
+    case h <> t:
+      {==}
+
+def Laws.end_of_track_ends(rest):
+  match rest:
+    case []:
+      {==}
+    case h <> t:
+      {==}
+
+def Laws.heap_one(e):
+  {==}
+
+def Laws.heap_ties():
+  {==}
+
+def Laws.velocity_zero_is_off(t, raw, key, p):
+  {==}
+
+def Laws.quiet_offs(t, raw, key, vel):
   {==}

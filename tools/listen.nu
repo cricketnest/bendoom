@@ -26,7 +26,7 @@
 #   tools/listen.nu
 #   tools/listen.nu --wad doom1.wad --length 200sec --keep
 #   tools/listen.nu compare a/music.raw b/music.raw
-#   tools/listen.nu opening a/music.raw
+#   tools/listen.nu render a/music.raw
 
 # The first frame of a capture with a sample other than zero, or null.
 def lead []: binary -> any {
@@ -120,13 +120,21 @@ def "main compare" [a: path, b: path]: nothing -> record {
     largest: ($d | get by | append 0 | math max)}
 }
 
-# The render of Freedoom's opening against a capture of it, both from
-# their first frame, left and right counted apart. The render prints its
-# frames as hex; build it first with bend tools/opening.bend -o opening.
-def "main opening" [capture: path, --binary: path = ./opening]: nothing -> record {
+# A render against a capture, both from their first frame, over the
+# render's frames: how many left and right samples differ, by how much at
+# most, and the first frame that differs. The render prints its frames as
+# hex; build it first with bend tools/render.bend -o render. Without
+# --frames it renders the song's first pass.
+def "main render" [
+  capture: path
+  --binary: path = ./render
+  --frames: int                 # render only this many frames
+]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
-  let render = ^$binary --threads 1 | lines | str join | decode hex
+  let span = if $frames == null { {} } else { {BENDOOM_FRAMES: ($frames | into string)} }
+  let render = with-env $span { ^$binary --threads 1 } | str trim | decode hex
   let d = differences $render (open --raw $capture)
   {frames: (($render | bytes length) // 4), left: ($d | where at mod 2 == 0 | length),
-    right: ($d | where at mod 2 == 1 | length), largest: ($d | get by | append 0 | math max)}
+    right: ($d | where at mod 2 == 1 | length), largest: ($d | get by | append 0 | math max),
+    first: ($d | get at.0? | if $in != null { $in // 2 })}
 }
