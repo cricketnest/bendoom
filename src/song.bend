@@ -30,10 +30,27 @@ type Song is Data:
 type Song.Env is Data:
   Env{roms: O.Opl.Roms, tabs: P.Player.Tabs, file: M.Midi.File}
 
+def Song.made(+m: Song) -> U32:
+  Song{sound, player, tracks, heap, now, made, running, tempo} = m
+  made
+
+def Song.file(+env: Song.Env) -> M.Midi.File:
+  Env{roms, tabs, file} = env
+  file
+
 # The frames of one of opl_sdl.c's buffers: GetSliceSize's largest power
 # of two not over 100 ms.
 def Song.buffer() -> U32:
   4096
+
+# Those 100 ms in microseconds: a wait toward a callback stops there, so
+# what follows is a cut of the buffer's rest.
+def Song.slice() -> U32:
+  100000
+
+# A time now never reaches: past the heap's end an entry is never due.
+def Song.never() -> U32:
+  4294967295
 
 # The callback heap
 # -----------------
@@ -44,7 +61,7 @@ def Song.time(+e: Song.Entry) -> U32:
 
 # The entry at i; past the heap's end, one never due.
 def Song.at(+q: List<&2, Song.Entry>, +i: U32) -> Song.Entry:
-  Maybe.default(&2, Song.Entry, List.get(&2, Song.Entry, q, U32.to_nat(i)), Entry{4294967295, None{}})
+  Maybe.default(&2, Song.Entry, List.get(&2, Song.Entry, q, U32.to_nat(i)), Entry{Song.never(), None{}})
 
 def Song.put(q: List<&2, Song.Entry>, +i: U32, e: Song.Entry) -> List<&2, Song.Entry>:
   List.set(&2, Song.Entry, q, U32.to_nat(i), e)
@@ -195,48 +212,55 @@ def Song.cut(+env: Song.Env, +d: U32, m: Song) -> Song:
 
 # What OPL_Mix_Callback does next: a cut toward the heap's first
 # callback, or the callback if due. Past 100 ms a cut is the buffer's
-# rest, so the wait stops there.
+# rest, so the wait stops there. Full is where the frames asked for are
+# made, and the turn hands them over.
 type Song.Step is Data:
   Cut{d: U32}
   Call{track: Maybe<&2, U32>}
+  Full{}
 
-def Song.step.at(+now: U32, e: Song.Entry) -> Song.Step:
+def Song.step.at(+now: U32, full: Bool, e: Song.Entry) -> Song.Step:
   Entry{+time, track} = e
-  Bool.pick(Song.Step, U32.is_ge(now, time), Call{track}, Cut{U32.min((time - now : U32), 100000)})
+  Bool.pick(Song.Step, full, Full{},
+    Bool.pick(Song.Step, U32.is_ge(now, time), Call{track}, Cut{U32.min((time - now : U32), Song.slice())}))
 
-def Song.step(+m: Song) -> Song.Step:
-  Song{sound, player, tracks, +heap, +now, made, running, tempo} = m
-  Song.step.at(now, Song.at(heap, 0))
+def Song.step(+upto: U32, +m: Song) -> Song.Step:
+  Song{sound, player, tracks, +heap, +now, +made, running, tempo} = m
+  Song.step.at(now, U32.is_ge(made, upto), Song.at(heap, 0))
 
-def Song.next.go(n: Nat, s: Song.Step, +env: Song.Env, m: Song) -> Song:
+# Where a pass stands: the song with the frames of another turn, the song
+# where the restart ends the pass, or a song whose callbacks outran the
+# events a lump holds.
+type Song.Turn is Data:
+  More{song: Song}
+  Ended{song: Song}
+  Stuck{}
+
+def Song.turn.go(n: Nat, s: Song.Step, +upto: U32, +env: Song.Env, m: Song) -> Song.Turn:
   match n s:
-    case _ Cut{+d}:
-      Song.cut(env, d, m)
+    case _ Full{}:
+      More{m}
     case _ Call{None{}}:
-      m
-    case 0n Call{Some{k}}:
-      m
+      Ended{m}
+    case 0n _:
+      Stuck{}
     case 1n+f Call{Some{+k}}:
       +m2 = Song.callback(env, k, m)
-      Song.next.go(f, Song.step(m2), env, m2)
+      Song.turn.go(f, Song.step(upto, m2), upto, env, m2)
+    case 1n+f Cut{+d}:
+      +m2 = Song.cut(env, d, m)
+      Song.turn.go(f, Song.step(upto, m2), upto, env, m2)
 
-# The callbacks due, then the next cut; or nothing where the restart is
-# due, at the pass's end. A legal lump (under 96 KiB, two bytes an event
-# at least) has fewer events than the fuel.
-def Song.next(+env: Song.Env, +m: Song) -> Song:
-  Song.next.go(U32.to_nat(65536), Song.step(m), env, m)
+# OPL_Mix_Callback until the song has made upto frames, or the restart
+# ends the pass: each turn is the callback due or a cut toward the next.
+# A cut makes a frame at least and a callback reads an event, so a turn
+# for every frame asked and every event a lump holds outlasts any song
+# the reader takes; one that wants more stops the render.
+def Song.turn(+upto: U32, +env: Song.Env, +m: Song) -> Song.Turn:
+  Song.turn.go(U32.to_nat(((upto - Song.made(m)) + M.Midi.most() : U32)), Song.step(upto, m), upto, env, m)
 
 # Starting
 # --------
-
-def Song.chans(p: P.Player) -> List<&2, P.Player.Chan>:
-  P.Player{chans, voices, free, alloced, writes} = p
-  chans
-
-# InitChannel on every channel; the voices keep theirs.
-def Song.channels(p: P.Player) -> P.Player:
-  P.Player{chans, voices, free, alloced, writes} = p
-  P.Player{Song.chans(P.Player.start()), voices, free, alloced, writes}
 
 def Song.begin.go(+env: Song.Env, ts: List<&2, M.Midi.Track>, +k: U32, m: Song) -> Song:
   match ts:
@@ -252,7 +276,7 @@ def Song.begin(+env: Song.Env, m: Song) -> Song:
   Env{roms, tabs, file} = env
   M.File{division, +tracks} = file
   Song{sound, player, old, heap, now, made, running, tempo} = m
-  Song.begin.go(env, tracks, 0, Song{sound, Song.channels(player), tracks, heap, now, made,
+  Song.begin.go(env, tracks, 0, Song{sound, P.Player.restart(player), tracks, heap, now, made,
     U32.from_nat(List.length(&2, M.Midi.Track, tracks)), tempo})
 
 # RestartSong, where the restart is due: the pass starts again at now,
@@ -273,56 +297,46 @@ def Song.start(+idle: Bool, +env: Song.Env) -> Song:
   Song.begin(env, Song{O.Opl.Frames.queue(P.Player.setup(), O.Opl.frames(U32.to_nat(made), roms,
     O.Frames{O.Opl.reset(), []})), P.Player.start(), [], [], 0, made, 0, 500000})
 
-type Song.Lumps is Data:
-  Lumps{genmidi: List<&2, U32>, song: List<&2, U32>}
-
 def Song.read(a: Array<U32>, at: U32 & U32) -> Array<U32> & List<&2, U32>:
   (pos, size) = at
   B.Bytes.list(a, pos, size)
 
-def Song.lumps.fin(genmidi: List<&2, U32>, p: Array<U32> & List<&2, U32>) -> Array<U32> & Song.Lumps:
+def Song.env.fin(genmidi: List<&2, U32>, p: Array<U32> & List<&2, U32>) -> Array<U32> & Song.Env:
   (a, song) = p
-  (a, Lumps{genmidi, song})
+  (a, Env{O.Opl.roms(), P.Player.tabs(genmidi), M.Midi.file(song)})
 
-def Song.lumps.song(song: U32 & U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & Song.Lumps:
+def Song.env.song(song: U32 & U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & Song.Env:
   (a, genmidi) = p
-  Song.lumps.fin(genmidi, Song.read(a, song))
+  Song.env.fin(genmidi, Song.read(a, song))
 
-def Song.lumps.dir(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Song.Lumps:
+def Song.env.dir(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Song.Env:
   (a, +lumps) = p
-  Song.lumps.song(W.Wad.find(lumps, "D_E1M1"), Song.read(a, W.Wad.find(lumps, "GENMIDI")))
+  Song.env.song(W.Wad.find(lumps, "D_E1M1"), Song.read(a, W.Wad.find(lumps, "GENMIDI")))
 
-# GENMIDI and E1M1's song, D_E1M1, from a WAD's bytes.
-def Song.lumps(a: Array<U32>) -> Array<U32> & Song.Lumps:
-  Song.lumps.dir(W.Wad.dir(a))
+# The chip's and the player's tables with E1M1's song, D_E1M1, read once
+# from a WAD's bytes beside the GENMIDI lump it plays with.
+def Song.env(a: Array<U32>) -> Array<U32> & Song.Env:
+  Song.env.dir(W.Wad.dir(a))
 
-def Song.lumps.only(p: Array<U32> & Song.Lumps) -> Song.Lumps:
-  (a, l) = p
-  l
+def Song.env.only(p: Array<U32> & Song.Env) -> Song.Env:
+  (a, e) = p
+  e
 
-def Song.song(+l: Song.Lumps) -> List<&2, U32>:
-  Lumps{genmidi, song} = l
-  song
-
-def Song.check(fault: Maybe<&2, String>, l: Song.Lumps) -> IO(Song.Lumps):
+def Song.check(fault: Maybe<&2, String>, e: Song.Env) -> IO(Song.Env):
   match fault:
     case None{}:
-      IO.pure(Song.Lumps, l)
+      IO.pure(Song.Env, e)
     case Some{why}:
-      IO.die(Song.Lumps, 1, "D_E1M1: " ++ why)
+      IO.die(Song.Env, 1, "D_E1M1: " ++ why)
 
-# The lumps of the WAD named by BENDOOM_IWAD, or an exit if Chocolate
-# Doom would not play its song.
-def Song.load() -> IO(Song.Lumps):
-  do IO<Song.Lumps>:
+# The song of the WAD named by BENDOOM_IWAD, or an exit if Chocolate
+# Doom would not play it.
+def Song.load() -> IO(Song.Env):
+  do IO<Song.Env>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    +lumps : Song.Lumps = Song.lumps.only(Song.lumps(bytes))
-    Song.check(M.Midi.fault(Song.song(lumps)), lumps)
-
-def Song.env(+l: Song.Lumps) -> Song.Env:
-  Lumps{genmidi, song} = l
-  Env{O.Opl.roms(), P.Player.tabs(genmidi), M.Midi.file(song)}
+    +env : Song.Env = Song.env.only(Song.env(bytes))
+    Song.check(M.Midi.fault.file(Song.file(env)), env)
 
 # The frames made and not yet taken, latest first.
 def Song.out(m: Song) -> List<&2, U32>:
@@ -334,7 +348,3 @@ def Song.clear(m: Song) -> Song:
   Song{sound, player, tracks, heap, now, made, running, tempo} = m
   O.Frames{opl, out} = sound
   Song{O.Frames{opl, []}, player, tracks, heap, now, made, running, tempo}
-
-def Song.made(+m: Song) -> U32:
-  Song{sound, player, tracks, heap, now, made, running, tempo} = m
-  made

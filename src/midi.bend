@@ -62,6 +62,17 @@ def Midi.vlq.go(bytes: List<&2, U32>, more: Bool, +left: U32, ok: Bool, +acc: U3
 def Midi.vlq(bytes: List<&2, U32>, ok: Bool) -> Midi.Read:
   Midi.vlq.go(bytes, True{}, 4, ok, 0)
 
+# A byte count no quantity reaches: mus2mid.c reads a MUS delay of as
+# many bytes as it takes, and refuses the value, not the count.
+def Midi.no_limit() -> U32:
+  4294967295
+
+# More events than a track can hold: i_oplmusic.c takes no lump of 96
+# KiB or more, every event but MUS's sixteen first-use all-notes-offs
+# reads a byte, and there are sixteen MUS channels.
+def Midi.most() -> U32:
+  98320
+
 # The bytes after the first n, if there are n.
 def Midi.drop(n: Nat, bytes: List<&2, U32>, ok: Bool) -> Midi.Read:
   match n bytes:
@@ -191,16 +202,29 @@ def Midi.mus.delay(r: Midi.Read, chans: List<&2, U32>, vels: List<&2, U32>) -> M
   Read{+delay, rest, ok} = r
   Midi.mus.track(ok && U32.is_lt(delay, 268435456), rest, delay, chans, vels)
 
+# What a MUS event hands the track after it: whether its descriptor ends
+# its group, the MUS channels in the order of their first use, and each
+# MIDI channel's last velocity.
+type Midi.Mus.State is Data:
+  State{last: Bool, chans: List<&2, U32>, vels: List<&2, U32>}
+
+def Midi.mus.vel(+st: Midi.Mus.State, +ch: U32) -> U32:
+  State{last, chans, vels} = st
+  Maybe.default(&2, U32, List.get(&2, U32, vels, U32.to_nat(ch)), 127)
+
+def Midi.mus.set(st: Midi.Mus.State, +ch: U32, +v: U32) -> Midi.Mus.State:
+  State{last, chans, vels} = st
+  State{last, chans, List.set(&2, U32, vels, U32.to_nat(ch), v)}
+
 # The track after an event. A descriptor's top bit ends its group, and
 # the delay before the next group follows, in as many bytes as it takes.
 # WriteTime writes a delay of 2^28 ticks or more in five bytes, which
 # midifile.c refuses.
-def Midi.mus.after(last: Bool, rest: List<&2, U32>, ok: Bool, chans: List<&2, U32>, vels: List<&2, U32>) ->
-  Midi.Track:
-  match last:
-    case True{}:
-      Midi.mus.delay(Midi.vlq.go(rest, True{}, 4294967295, ok, 0), chans, vels)
-    case False{}:
+def Midi.mus.after(st: Midi.Mus.State, rest: List<&2, U32>, ok: Bool) -> Midi.Track:
+  match st:
+    case State{True{}, chans, vels}:
+      Midi.mus.delay(Midi.vlq.go(rest, True{}, Midi.no_limit(), ok, 0), chans, vels)
+    case State{False{}, chans, vels}:
       Midi.mus.track(ok, rest, 0, chans, vels)
 
 # mus2mid.c's controller_map: MUS controller c's MIDI number.
@@ -208,56 +232,52 @@ def Midi.mus.controller(+c: U32) -> U32:
   Maybe.default(&2, U32, List.get(&2, U32,
     [0, 32, 1, 7, 10, 11, 91, 93, 64, 67, 120, 123, 126, 127, 121], U32.to_nat(c)), 0)
 
-def Midi.mus.release(+ch: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) -> Midi.Got:
+def Midi.mus.release(+ch: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+key, rest, ok} = r
-  Got{Chan{128, ch, (key .&. 127 : U32), 0}, Midi.mus.after(last, rest, ok, chans, vels)}
+  Got{Chan{128, ch, (key .&. 127 : U32), 0}, Midi.mus.after(st, rest, ok)}
 
-def Midi.mus.pressed(+ch: U32, +key: U32, last: Bool, chans: List<&2, U32>, +vels: List<&2, U32>,
-  rest: List<&2, U32>, ok: Bool) -> Midi.Got:
-  Got{Chan{144, ch, (key .&. 127 : U32), Maybe.default(&2, U32, List.get(&2, U32, vels, U32.to_nat(ch)), 127)},
-    Midi.mus.after(last, rest, ok, chans, vels)}
+def Midi.mus.pressed(+ch: U32, +key: U32, +st: Midi.Mus.State, rest: List<&2, U32>, ok: Bool) -> Midi.Got:
+  Got{Chan{144, ch, (key .&. 127 : U32), Midi.mus.vel(st, ch)}, Midi.mus.after(st, rest, ok)}
 
-def Midi.mus.velocity(+ch: U32, +key: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>,
-  r: Midi.Read) -> Midi.Got:
+def Midi.mus.velocity(+ch: U32, +key: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+v, rest, ok} = r
-  Midi.mus.pressed(ch, key, last, chans, List.set(&2, U32, vels, U32.to_nat(ch), (v .&. 127 : U32)), rest, ok)
+  Midi.mus.pressed(ch, key, Midi.mus.set(st, ch, (v .&. 127 : U32)), rest, ok)
 
-def Midi.mus.press.go(given: Bool, +ch: U32, +key: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>,
-  rest: List<&2, U32>, ok: Bool) -> Midi.Got:
+def Midi.mus.press.go(given: Bool, +ch: U32, +key: U32, st: Midi.Mus.State, rest: List<&2, U32>, ok: Bool) ->
+  Midi.Got:
   match given:
     case True{}:
-      Midi.mus.velocity(ch, key, last, chans, vels, Midi.byte(rest, ok))
+      Midi.mus.velocity(ch, key, st, Midi.byte(rest, ok))
     case False{}:
-      Midi.mus.pressed(ch, key, last, chans, vels, rest, ok)
+      Midi.mus.pressed(ch, key, st, rest, ok)
 
 # A key press: a key with its top bit set is followed by a velocity,
 # which the channel keeps for later presses.
-def Midi.mus.press(+ch: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) -> Midi.Got:
+def Midi.mus.press(+ch: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+key, rest, ok} = r
-  Midi.mus.press.go(U32.is_ge(key, 128), ch, key, last, chans, vels, rest, ok)
+  Midi.mus.press.go(U32.is_ge(key, 128), ch, key, st, rest, ok)
 
-def Midi.mus.pitch(+ch: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) -> Midi.Got:
+def Midi.mus.pitch(+ch: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+b, rest, ok} = r
-  Got{Chan{224, ch, ((b .&. 1) << 6n : U32), (b >> 1n : U32)}, Midi.mus.after(last, rest, ok, chans, vels)}
+  Got{Chan{224, ch, ((b .&. 1) << 6n : U32), (b >> 1n : U32)}, Midi.mus.after(st, rest, ok)}
 
 # A system event: controllers 10 to 14, with the value 0.
-def Midi.mus.system(+ch: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) -> Midi.Got:
+def Midi.mus.system(+ch: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+c, rest, ok} = r
   Got{Chan{176, ch, Midi.mus.controller(c), 0},
-    Midi.mus.after(last, rest, ok && U32.is_ge(c, 10) && U32.is_le(c, 14), chans, vels)}
+    Midi.mus.after(st, rest, ok && U32.is_ge(c, 10) && U32.is_le(c, 14))}
 
-def Midi.mus.value(+ch: U32, +c: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) ->
-  Midi.Got:
+def Midi.mus.value(+ch: U32, +c: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+v, rest, ok} = r
   +patch = U32.is_eq(c, 0)
   Got{Chan{Bool.pick(U32, patch, 192, 176), ch, Bool.pick(U32, patch, (v .&. 127 : U32), Midi.mus.controller(c)),
-    Bool.pick(U32, patch, 0, U32.min(v, 127))}, Midi.mus.after(last, rest, ok && U32.is_le(c, 9), chans, vels)}
+    Bool.pick(U32, patch, 0, U32.min(v, 127))}, Midi.mus.after(st, rest, ok && U32.is_le(c, 9))}
 
 # A controller change: controller 0 is a program change, and 1 to 9 map
 # to MIDI's with values past 127 cut to 127.
-def Midi.mus.control(+ch: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) -> Midi.Got:
+def Midi.mus.control(+ch: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+c, rest, ok} = r
-  Midi.mus.value(ch, c, last, chans, vels, Midi.byte(rest, ok))
+  Midi.mus.value(ch, c, st, Midi.byte(rest, ok))
 
 # The kinds of MUS event, by the descriptor's bits 4 to 6.
 type Midi.Op is Data:
@@ -274,52 +294,59 @@ def Midi.mus.op(+d: U32) -> Midi.Op:
     [Release{}, Press{}, Pitch{}, System{}, Control{}, Refused{}, Finish{}, Refused{}],
     U32.to_nat(((d >> 4n) .&. 7 : U32))), Refused{})
 
-def Midi.mus.event(op: Midi.Op, +ch: U32, last: Bool, chans: List<&2, U32>, vels: List<&2, U32>,
-  rest: List<&2, U32>, ok: Bool) -> Midi.Got:
+def Midi.mus.event(op: Midi.Op, +ch: U32, st: Midi.Mus.State, rest: List<&2, U32>, ok: Bool) -> Midi.Got:
   match op:
     case Release{}:
-      Midi.mus.release(ch, last, chans, vels, Midi.byte(rest, ok))
+      Midi.mus.release(ch, st, Midi.byte(rest, ok))
     case Press{}:
-      Midi.mus.press(ch, last, chans, vels, Midi.byte(rest, ok))
+      Midi.mus.press(ch, st, Midi.byte(rest, ok))
     case Pitch{}:
-      Midi.mus.pitch(ch, last, chans, vels, Midi.byte(rest, ok))
+      Midi.mus.pitch(ch, st, Midi.byte(rest, ok))
     case System{}:
-      Midi.mus.system(ch, last, chans, vels, Midi.byte(rest, ok))
+      Midi.mus.system(ch, st, Midi.byte(rest, ok))
     case Control{}:
-      Midi.mus.control(ch, last, chans, vels, Midi.byte(rest, ok))
+      Midi.mus.control(ch, st, Midi.byte(rest, ok))
     case Finish{}:
+      State{last, chans, vels} = st
       Got{End{}, Midi.mus.track(ok, rest, 0, chans, vels)}
     case Refused{}:
+      State{last, chans, vels} = st
       Got{End{}, Midi.mus.track(False{}, rest, 0, chans, vels)}
 
 # The position of MUS channel c among those used so far, or their count
-# if it is new.
-def Midi.mus.index(chans: List<&2, U32>, +c: U32, +i: U32) -> U32:
-  match chans:
-    case []:
+# if it is new. The match found is a parameter, since Bool.pick over the
+# recursive call would search on past it (docs/bend.md).
+def Midi.mus.index(chans: List<&2, U32>, hit: Bool, +c: U32, +i: U32) -> U32:
+  match chans hit:
+    case _ True{}:
       i
-    case +x <> rest:
-      Bool.pick(U32, U32.is_eq(x, c), i, Midi.mus.index(rest, c, (i + 1 : U32)))
+    case [] False{}:
+      i
+    case +x <> rest False{}:
+      +next = U32.is_eq(x, c)
+      Midi.mus.index(rest, next, c, Bool.pick(U32, next, i, (i + 1 : U32)))
 
 # The first use of a MUS channel sends its MIDI channel an all-notes-off,
 # after the delta, and the event itself follows at once.
-def Midi.mus.chan(fresh: Bool, +ch: U32, +c: U32, +d: U32, bytes: List<&2, U32>, chans: List<&2, U32>,
-  vels: List<&2, U32>, rest: List<&2, U32>, ok: Bool) -> Midi.Got:
+def Midi.mus.chan(fresh: Bool, +ch: U32, +c: U32, +d: U32, bytes: List<&2, U32>, st: Midi.Mus.State,
+  rest: List<&2, U32>, ok: Bool) -> Midi.Got:
   match fresh:
     case True{}:
+      State{last, chans, vels} = st
       Got{Chan{176, ch, 123, 0}, Mus{bytes, 0, List.append(&2, U32, chans, [c]), vels}}
     case False{}:
-      Midi.mus.event(Midi.mus.op(d), ch, U32.is_ge(d, 128), chans, vels, rest, ok)
+      Midi.mus.event(Midi.mus.op(d), ch, st, rest, ok)
 
 # GetMIDIChannel: MUS channel 15 is MIDI's percussion channel 9, and the
 # others take MIDI channels in the order of their first use, skipping 9.
 def Midi.mus.next(bytes: List<&2, U32>, +chans: List<&2, U32>, vels: List<&2, U32>, r: Midi.Read) -> Midi.Got:
   Read{+d, rest, ok} = r
   +c = (d .&. 15 : U32)
-  +i = Midi.mus.index(chans, c, 0)
+  +i = Midi.mus.index(chans, False{}, c, 0)
   +perc = U32.is_eq(c, 15)
   Midi.mus.chan(Bool.not(perc) && U32.is_eq(i, U32.from_nat(List.length(&2, U32, chans))),
-    Bool.pick(U32, perc, 9, Bool.pick(U32, U32.is_ge(i, 9), (i + 1 : U32), i)), c, d, bytes, chans, vels, rest, ok)
+    Bool.pick(U32, perc, 9, Bool.pick(U32, U32.is_ge(i, 9), (i + 1 : U32), i)), c, d, bytes,
+    State{U32.is_ge(d, 128), chans, vels}, rest, ok)
 
 # Reading
 # -------
@@ -381,7 +408,7 @@ def Midi.tracks(n: Nat, +bytes: List<&2, U32>) -> List<&2, Midi.Track>:
       []
     case 1n+m:
       +t = Midi.tracks.start(U32.is_eq(Midi.be(4n, bytes), 1297379947), bytes)
-      t <> Midi.tracks(m, Midi.Track.bytes(Midi.end(U32.to_nat(98304), Midi.next(t))))
+      t <> Midi.tracks(m, Midi.Track.bytes(Midi.end(U32.to_nat(Midi.most()), Midi.next(t))))
 
 # A song's division (ticks a beat) and its tracks.
 type Midi.File is Data:
@@ -429,12 +456,13 @@ def Midi.file.of(midi: Bool, mus: Bool, +bytes: List<&2, U32>) -> Midi.File:
       File{0, [Bad{"neither MUS nor a MIDI lump under 96 KiB"}]}
 
 # I_OPL_RegisterSong reads a lump from "MThd" under 96 KiB as MIDI and
-# converts any other as MUS. The render takes as MUS only a lump from
-# "MUS" 0x1A with a whole header, 16 bytes.
+# converts any other under 96 KiB as MUS. The render takes as MUS only a
+# lump from "MUS" 0x1A with a whole header, 16 bytes.
 def Midi.file(+bytes: List<&2, U32>) -> Midi.File:
   +tag = Midi.be(4n, bytes)
-  Midi.file.of(U32.is_eq(tag, 1297377380) && Bool.not(Midi.over(bytes, U32.to_nat(98303))),
-    U32.is_eq(tag, 1297437466) && Midi.over(bytes, 15n), bytes)
+  +small = Bool.not(Midi.over(bytes, U32.to_nat(98303)))
+  Midi.file.of(U32.is_eq(tag, 1297377380) && small,
+    U32.is_eq(tag, 1297437466) && Midi.over(bytes, 15n) && small, bytes)
 
 def Midi.fault.of(t: Midi.Track) -> Maybe<&2, String>:
   match t:
@@ -445,18 +473,58 @@ def Midi.fault.of(t: Midi.Track) -> Maybe<&2, String>:
     case Mus{bytes, delta, chans, vels}:
       None{}
 
-# Each track to its end: every event but MUS's first-use all-notes-offs
-# reads a byte, so none has 2^32 events.
-def Midi.faults(ts: List<&2, Midi.Track>) -> Maybe<&2, String>:
+# A track walked to its end: why Chocolate Doom would refuse it, its
+# length in ticks and the largest tempo it sets.
+type Midi.Span is Data:
+  Span{why: Maybe<&2, String>, ticks: U32, tempo: U32}
+
+def Midi.span.go(n: Nat, g: Midi.Got, +d: U32, +ticks: U32, +tempo: U32) -> Midi.Span:
+  match n g:
+    case _ Got{End{}, t}:
+      Span{Midi.fault.of(t), (ticks + d : U32), tempo}
+    case 0n Got{e, t}:
+      Span{Some{"a track of more events than a lump under 96 KiB holds"}, ticks, tempo}
+    case 1n+m Got{Tempo{+us}, +t}:
+      Midi.span.go(m, Midi.next(t), Midi.delta(t), (ticks + d : U32), U32.max(tempo, us))
+    case 1n+m Got{e, +t}:
+      Midi.span.go(m, Midi.next(t), Midi.delta(t), (ticks + d : U32), tempo)
+
+# A track to its end, at the player's default tempo until it sets one.
+def Midi.span(+t: Midi.Track) -> Midi.Span:
+  Midi.span.go(U32.to_nat(Midi.most()), Midi.next(t), Midi.delta(t), 0, 500000)
+
+def Midi.spans.both(a: Midi.Span, b: Midi.Span) -> Midi.Span:
+  Span{wa, ta, pa} = a
+  Span{wb, tb, pb} = b
+  Span{Maybe.or(&2, String, wa, wb), U32.max(ta, tb), U32.max(pa, pb)}
+
+def Midi.spans(ts: List<&2, Midi.Track>) -> Midi.Span:
   match ts:
     case []:
+      Span{None{}, 0, 500000}
+    case +t <> rest:
+      Midi.spans.both(Midi.span(t), Midi.spans(rest))
+
+# ScheduleTrack's microseconds are 64 bits wide and the render's are a
+# U32, so a callback past 2^31 microseconds is refused rather than
+# wrapped: a pass of 35 minutes, and two within the count.
+def Midi.fits(+ticks: U32, +tempo: U32, +division: U32) -> Bool:
+  U32.is_le(ticks, (2147483647 / ((tempo / U32.max(division, 1)) + 1 : U32) : U32))
+
+def Midi.fault.long(fits: Bool) -> Maybe<&2, String>:
+  match fits:
+    case True{}:
       None{}
-    case t <> rest:
-      Maybe.or(&2, String, Midi.fault.of(Midi.end(U32.to_nat(4294967295), Midi.next(t))), Midi.faults(rest))
+    case False{}:
+      Some{"a song whose ticks at its fastest tempo pass the 2^31 microseconds the render counts"}
+
+def Midi.span.why(s: Midi.Span, +division: U32) -> Maybe<&2, String>:
+  Span{why, +ticks, +tempo} = s
+  Maybe.or(&2, String, why, Midi.fault.long(Midi.fits(ticks, tempo, division)))
 
 def Midi.fault.file(f: Midi.File) -> Maybe<&2, String>:
-  File{division, tracks} = f
-  Midi.faults(tracks)
+  File{+division, tracks} = f
+  Midi.span.why(Midi.spans(tracks), division)
 
 # Why Chocolate Doom would not play the lump, if it would not: the first
 # track that fails.

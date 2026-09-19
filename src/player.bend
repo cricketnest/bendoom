@@ -57,10 +57,20 @@ def Player.setup() -> List<&2, O.Opl.Write>:
 def Player.Voice.fresh() -> Player.Voice:
   Voice{Player.no_instr(), 0, None{}, 0, 0, 0, 0, 0, 0}
 
+# InitChannel on every channel.
+def Player.channels() -> List<&2, Player.Chan>:
+  List.replicate(Player.Chan, 16n, Chan{0, U32.min(Player.volume(), 100), 0})
+
 # InitVoices and InitChannel.
 def Player.start() -> Player:
-  Player{List.replicate(Player.Chan, 16n, Chan{0, U32.min(Player.volume(), 100), 0}),
-    List.replicate(Player.Voice, 9n, Player.Voice.fresh()), [0, 1, 2, 3, 4, 5, 6, 7, 8], [], []}
+  Player{Player.channels(), List.replicate(Player.Voice, 9n, Player.Voice.fresh()),
+    [0, 1, 2, 3, 4, 5, 6, 7, 8], [], []}
+
+# RestartSong's InitChannel on every channel; the voices, the free and
+# allocated lists and the pending writes keep theirs.
+def Player.restart(p: Player) -> Player:
+  Player{chans, voices, free, alloced, writes} = p
+  Player{Player.channels(), voices, free, alloced, writes}
 
 # GENMIDI
 # -------

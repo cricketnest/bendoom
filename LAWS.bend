@@ -945,8 +945,12 @@ law smpte_division:
 # byte of 0xF3; a data byte before any status; a delta of five bytes, but
 # not of four; a track cut short; format 2; a track header other than
 # MTrk. MUS, after the smallest score it takes: controller 10 in a
-# controller change; event type 5; system event 9; a delay of 2^28 ticks,
-# but not of 2^28 - 1; a score cut short.
+# controller change; event type 5; system event 9; a delay of 2^28 ticks;
+# a delay of 2^28 - 1, which mus2mid.c writes but whose microseconds
+# pass the 2^31 the render counts, though a delay of 300000 ticks, 35.7
+# minutes at 140 a second, is taken; a score cut short; and a score of
+# 49144 releases in a lump of 96 KiB, which i_oplmusic.c does not
+# convert.
 law song_faults:
   {[Closed.fails([1, 2, 3, 4, 5, 6, 7, 8]),
     Closed.fails(Closed.midi([0, 0, 0, 1, 0, 96], [0, 255, 47, 0])),
@@ -963,9 +967,11 @@ law song_faults:
     Closed.fails(Closed.mus([48, 9, 96])),
     Closed.fails(Closed.mus([128, 60, 129, 128, 128, 128, 0, 96])),
     Closed.fails(Closed.mus([128, 60, 255, 255, 255, 127, 96])),
-    Closed.fails(Closed.mus([16]))]
+    Closed.fails(Closed.mus([128, 60, 146, 167, 96, 96])),
+    Closed.fails(Closed.mus([16])),
+    Closed.fails(Closed.mus(List.append(&2, U32, List.replicate(U32, U32.to_nat(98288), 0), [96])))]
     == [True{}, False{}, True{}, True{}, True{}, False{}, True{}, True{}, True{}, False{}, True{}, True{}, True{},
-      True{}, False{}, True{}] : List<&2, Bool>}
+      True{}, True{}, False{}, True{}, True{}] : List<&2, Bool>}
 
 def Closed.buffer(o: O.Opl) -> U32 & U32 & Nat:
   O.Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o

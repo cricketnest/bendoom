@@ -76,6 +76,21 @@ def bytes-list []: binary -> list<int> {
   $in | chunks 1 | each { into int }
 }
 
+# A variable-length quantity at $pos: seven bits a byte, the top bit set
+# on all but the last. The value and the byte after it.
+def vlq [b: list<int>, pos: int]: nothing -> record<val: int, pos: int> {
+  mut val = 0
+  mut at = $pos
+  mut more = true
+  while $more {
+    let t = $b | get $at
+    $at += 1
+    $val = $val * 128 + ($t | bits and 127)
+    $more = $t >= 128
+  }
+  {val: $val, pos: $at}
+}
+
 # A MUS lump's events as mus2mid.c converts them to one MIDI track: MUS
 # channel 15 on MIDI's 9, the others on MIDI channels in the order of
 # their first use, skipping 9, each sent an all-notes-off at that first
@@ -134,13 +149,9 @@ def mus-events []: binary -> table {
     $out = $out | append ({delta: $delta ch: $ch} | merge $event)
     $delta = 0
     if ($d | bits and 128) != 0 {
-      mut more = true
-      while $more {
-        let t = $b | get $i
-        $i += 1
-        $delta = $delta * 128 + ($t | bits and 127)
-        $more = $t >= 128
-      }
+      let delay = vlq $b $i
+      $delta = $delay.val
+      $i = $delay.pos
     }
   }
   $out | each { insert track 0 }
@@ -160,14 +171,9 @@ def midi-events []: binary -> table {
     mut status = 0
     mut done = false
     while not $done {
-      mut delta = 0
-      mut more = true
-      while $more {
-        let t = $b | get $pos
-        $pos += 1
-        $delta = $delta * 128 + ($t | bits and 127)
-        $more = $t >= 128
-      }
+      let time = vlq $b $pos
+      let delta = $time.val
+      $pos = $time.pos
       if ($b | get $pos) >= 128 {
         $status = $b | get $pos
         $pos += 1
@@ -175,14 +181,9 @@ def midi-events []: binary -> table {
       mut event: any = {kind: other ch: null p1: null p2: null}
       if $status == 0xFF or $status == 0xF0 or $status == 0xF7 {
         let meta = if $status == 0xFF { $pos += 1; $b | get ($pos - 1) } else { null }
-        mut n = 0
-        mut more = true
-        while $more {
-          let t = $b | get $pos
-          $pos += 1
-          $n = $n * 128 + ($t | bits and 127)
-          $more = $t >= 128
-        }
+        let len = vlq $b $pos
+        let n = $len.val
+        $pos = $len.pos
         if $meta == 0x2F {
           $event.kind = "end"
           $done = true

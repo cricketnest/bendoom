@@ -401,24 +401,27 @@ def Opl.stamp(ws: List<&2, Opl.Write>, +t: U32) -> List<&2, Opl.Pending>:
     case w <> rest:
       Pending{t, w} <> Opl.stamp(rest, (t + 2 : U32))
 
-def Opl.spill.one(pending: List<&2, Opl.Pending>, core: Opl.Core, count: U32, last: U32, rcnt: U32, oldl: U32,
-  oldr: U32, curl: U32, curr: U32) -> Opl:
+def Opl.pending(+o: Opl) -> List<&2, Opl.Pending>:
+  Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o
+  pending
+
+def Opl.spill.one(pending: List<&2, Opl.Pending>, o: Opl) -> Opl:
   match pending:
     case []:
-      Opl{core, count, last, [], rcnt, oldl, oldr, curl, curr}
-    case Pending{time, write} <> rest:
+      o
+    case Pending{+time, write} <> rest:
+      Opl{core, count, last, old, rcnt, oldl, oldr, curl, curr} = o
       Opl{Opl.write(core, write), time, last, rest, rcnt, oldl, oldr, curl, curr}
 
 # The buffer holds 1024 writes. A write that finds it full has the
 # oldest applied at once, and the sample count moves to that write's
 # time (opl3.c:1344).
-def Opl.spill(n: Nat, o: Opl) -> Opl:
+def Opl.spill(n: Nat, +o: Opl) -> Opl:
   match n:
     case 0n:
       o
     case 1n+m:
-      Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o
-      Opl.spill(m, Opl.spill.one(pending, core, count, last, rcnt, oldl, oldr, curl, curr))
+      Opl.spill(m, Opl.spill.one(Opl.pending(o), o))
 
 # OPL3_WriteRegBuffered for writes made together: the first is due at the
 # later of two samples after the last one queued and the sample about to

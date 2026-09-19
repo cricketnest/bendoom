@@ -82,7 +82,7 @@ def Test.tracks(ts: List<&2, M.Midi.Track>) -> Test.Tally:
     case []:
       Tally{0, List.replicate(U32, 10n, 0)}
     case +t <> rest:
-      Test.merge(Test.walk(U32.to_nat(98304), M.Midi.next(t), M.Midi.delta(t), 0, List.replicate(U32, 10n, 0)),
+      Test.merge(Test.walk(U32.to_nat(M.Midi.most()), M.Midi.next(t), M.Midi.delta(t), 0, List.replicate(U32, 10n, 0)),
         Test.tracks(rest))
 
 def Test.named(names: List<&2, String>, counts: List<&2, U32>) -> List<&2, String>:
@@ -117,26 +117,24 @@ def Test.frame(+frames: List<&2, U32>, +i: U32) -> String:
   +lr = Maybe.default(&2, U32, List.get(&2, U32, frames, U32.to_nat(i)), 0)
   U32.show(i) ++ " " ++ Test.signed((lr .&. 65535 : U32)) ++ " " ++ Test.signed((lr >> 16n : U32))
 
-# Cuts until 72000 frames are made; the last may pass it, and Test.first
-# drops what it passes by.
-def Test.render(n: Nat, done: Bool, +env: S.Song.Env, +m: S.Song) -> S.Song:
-  match n done:
-    case _ True{}:
-      m
-    case 0n False{}:
-      m
-    case 1n+f False{}:
-      +next = S.Song.next(env, m)
-      Test.render(f, U32.is_ge(S.Song.made(next), 72000), env, next)
-
+# The song's first 72000 frames, in order: the turn that makes them may
+# pass 72000, and what it passes by is dropped.
 def Test.first(+m: S.Song) -> List<&2, U32>:
   List.reverse(&2, U32, List.drop(&2, U32, S.Song.out(m), U32.to_nat((S.Song.made(m) - 72000 : U32))))
 
-def Test.print(+lumps: S.Song.Lumps) -> IO(Unit):
-  +env = S.Song.env(lumps)
-  +frames = Test.first(Test.render(U32.to_nat(72000), False{}, env, S.Song.start(True{}, env)))
+def Test.frames(t: S.Song.Turn) -> List<&2, U32>:
+  match t:
+    case S.More{+m}:
+      Test.first(m)
+    case S.Ended{+m}:
+      Test.first(m)
+    case S.Stuck{}:
+      []
+
+def Test.print(+env: S.Song.Env) -> IO(Unit):
+  +frames = Test.frames(S.Song.turn(72000, env, S.Song.start(True{}, env)))
   do IO<Unit>:
-    IO.print(Test.song(M.Midi.file(S.Song.song(lumps))))
+    IO.print(Test.song(S.Song.file(env)))
     IO.print("hash " ++ U32.show(H.Fnv.words(frames)))
     IO.print(Test.frame(frames, 4535))
     IO.print(Test.frame(frames, 4536))
@@ -149,8 +147,8 @@ def Test.print(+lumps: S.Song.Lumps) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    lumps : S.Song.Lumps <- S.Song.load()
-    Test.print(lumps)
+    env : S.Song.Env <- S.Song.load()
+    Test.print(env)
 
 #|song ticks 26114 events 12478 off 5483 on 5483 touch 0 controller 439 program 80 pressure 0 bend 955 tempo 3 end 18 other 17
 #|hash 1145462143
