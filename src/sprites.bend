@@ -147,9 +147,21 @@ def Sprites.clip.if(clips: Bool, +top: Bool, +bottom: Bool, +r1: U32, +r2: U32, 
         List.drop(&2, U32, bottoms, U32.to_nat((r1 - x1 : U32))), top, bottom, r1, mem)
 
 # Doom's R_PointOnSegSide: whether a point is behind the seg.
-def Sprites.behind(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
+def Sprites.seg_side(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
   L.Seg{+x1, +y1, x2, y2, angle, offset, flags, side, front, back} = s
   L.Level.node_side(x, y, x1, y1, (x2 - x1 : U32), (y2 - y1 : U32))
+
+# Whether a stored range is behind the sprite, from whether all of it
+# and whether some of it is smaller than the sprite: with some alone,
+# when the sprite is in front of its seg, which is asked only then.
+def Sprites.clip.behind(all: Bool, some: Bool, +level: L.Level, seg: U32, +x: U32, +y: U32) -> Bool:
+  match all some:
+    case True{} _:
+      True{}
+    case False{} False{}:
+      False{}
+    case False{} True{}:
+      Bool.not(Sprites.seg_side(L.Level.seg(level, seg), x, y))
 
 # A stored range in front of the sprite, over the columns they share,
 # r1 to r2: it clips the columns no newer range clipped, below unless
@@ -200,9 +212,8 @@ def Sprites.clip.wall(meets: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, 
     case True{}:
       Vis{+sx1, +sx2, +scale, +gx, +gy, gz, gzt, mid, frac, step, patch, cmap, rank, id} = vis
       D.Wall{seg, +x1, +x2, +scale1, +scale2, wstep, sil, bsil, tsil, texcols, tops, bottoms} = wall
-      Sprites.clip.side(Bool.or(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale),
-          Bool.and(F.Fixed.lt(F.Fixed.min(scale1, scale2), scale),
-            Bool.not(Sprites.behind(L.Level.seg(level, seg), gx, gy)))),
+      Sprites.clip.side(Sprites.clip.behind(F.Fixed.lt(F.Fixed.max(scale1, scale2), scale),
+          F.Fixed.lt(F.Fixed.min(scale1, scale2), scale), level, seg, gx, gy),
         view, level, gfx, vis, U32.max(x1, sx1), U32.min(x2, sx2), wall, st)
 
 # The stored ranges, newest first, gathered as the sprite leaves them

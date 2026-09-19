@@ -4,7 +4,7 @@
 
 **Where:** `window_fill` in `bend2/effs/window_frame.c`, Bend commit e6676b0. It only happens on Linux without a GPU build; on a Mac or with CUDA the GPU paints the window.
 
-**Status:** ready-for-human (report upstream; not patched here)
+**Status:** ready-for-human (report upstream; patched locally in `nix/bend.nix` since milestone 5)
 
 ## What I measured
 
@@ -55,4 +55,4 @@ In `window_fill`, the two loops that call `window_pix` for every pixel become on
 
 ## What to do
 
-Nothing is broken: the game holds its 35 frames a second. Report this upstream with the numbers and the fix. Patch it locally in `nix/bend.nix` only if the frame rate becomes a problem before upstream fixes it; a local patch can break each time the Bend pin moves.
+Report this upstream with the numbers and the fix. Milestone 5's busiest view, the blue key's room full of things, held 31 frames a second with the slow paint, under the 35 the game must hold, so `nix/window-fill.patch` is this fix, applied by `nix/bend.nix` (milestone 5, ticket 12). It can break when the Bend pin moves; drop it once upstream paints this way.

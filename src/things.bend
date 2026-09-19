@@ -92,14 +92,6 @@ def Thing.tic(thing: Thing) -> Thing:
   Thing.tic.step(U32.is_eq(tics, 4294967295), U32.is_eq(tics, 1),
     Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics})
 
-# Every thing's tic, in the order they spawned.
-def Thing.tics(things: List<&2, Thing>) -> List<&2, Thing>:
-  match things:
-    case []:
-      []
-    case thing <> rest:
-      Thing.tic(thing) <> Thing.tics(rest)
-
 # A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
 # radius and height in map units, and vanilla's flags: 1 special, 2
 # solid, 4 shootable, 256 hung from the ceiling, 512 no gravity, 524288
@@ -320,10 +312,20 @@ def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
     case Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       Things.gone.name(Things.get(after, id), id, Things.gone(rest, after))
 
-# Every thing alive through its tic, in the order they spawned.
+def Thing.Tree.tics(t: Thing.Tree) -> Thing.Tree:
+  match t:
+    case Slot{None{}}:
+      Slot{None{}}
+    case Slot{Some{thing}}:
+      Slot{Some{Thing.tic(thing)}}
+    case Fork{l, r}:
+      Fork{Thing.Tree.tics(l), Thing.Tree.tics(r)}
+
+# Every thing alive through its tic. A tic reads no other thing, so the
+# order vanilla's thinkers run them in cannot show.
 def Things.tics(ts: Things) -> Things:
-  Things{+tree, +count, you} = ts
-  Things.of(Thing.tics(Things.list.go(U32.to_nat(count), tree, 0)), count, you)
+  Things{tree, count, you} = ts
+  Things{Thing.Tree.tics(tree), count, you}
 
 def Thing.link.go(things: List<&2, Thing>, +level: L.Level) -> L.Level:
   match things:
