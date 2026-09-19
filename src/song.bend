@@ -266,12 +266,25 @@ def Song.lumps.only(p: Array<U32> & Song.Lumps) -> Song.Lumps:
   (a, l) = p
   l
 
-# The lumps of the WAD named by BENDOOM_IWAD.
+def Song.song(+l: Song.Lumps) -> List<&2, U32>:
+  Lumps{genmidi, song} = l
+  song
+
+def Song.check(fault: Maybe<&2, String>, l: Song.Lumps) -> IO(Song.Lumps):
+  match fault:
+    case None{}:
+      IO.pure(Song.Lumps, l)
+    case Some{why}:
+      IO.die(Song.Lumps, 1, "D_E1M1: " ++ why)
+
+# The lumps of the WAD named by BENDOOM_IWAD, or an exit if Chocolate
+# Doom would not play its song.
 def Song.load() -> IO(Song.Lumps):
   do IO<Song.Lumps>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    IO.pure(Song.Lumps, Song.lumps.only(Song.lumps(bytes)))
+    +lumps : Song.Lumps = Song.lumps.only(Song.lumps(bytes))
+    Song.check(M.Midi.fault(Song.song(lumps)), lumps)
 
 def Song.env(+l: Song.Lumps) -> Song.Env:
   Lumps{genmidi, song} = l
@@ -300,10 +313,6 @@ def Song.idle(+env: Song.Env, m: Song) -> Song:
   Song.start(tracks, 0,
     Song{O.Opl.Frames.queue(P.Player.setup(), O.Opl.frames(U32.to_nat(4096), roms, sound)), player, tracks,
       heap, now, 4096, running, tempo, division})
-
-def Song.song(+l: Song.Lumps) -> List<&2, U32>:
-  Lumps{genmidi, song} = l
-  song
 
 def Song.render.go(+span: U32, +env: Song.Env, +m: Song) -> Song:
   Song.play(U32.to_nat(100000000), Song.step(span, m), span, env, m)

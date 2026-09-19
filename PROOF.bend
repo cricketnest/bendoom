@@ -1184,3 +1184,15 @@ def Laws.heap_ties():
 
 def Laws.quiet_offs(t, raw, key, vel):
   {==}
+
+def Laws.mus_events():
+  {==}
+
+def Laws.smpte_division():
+  {==}
+
+def Laws.song_faults():
+  {==}
+
+def Laws.buffer_spills():
+  {==}
