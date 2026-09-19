@@ -16,7 +16,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **Templates take their function first,** with an affine parameter (`x: U32`, not `+x`).
 - **Reuse needs `+` everywhere:** on parameters, on pattern fields (`Player{+x, ..}`, `case 1n++p`, `(+a, b) = p`), and in laws (`for +level`).
 - **Linear arrays cannot be shared across nested calls.** A quadtree from an `Array` is an explicit stack (`Show.fold`); a copyable indexed structure is a `Vec` tree (`src/vec.bend`).
-- **Literals have limits:** a Nat literal of a few thousand (`4096n` already) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`.
+- **Literals have limits:** a Nat literal of a few thousand (`4096n` already) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`. A float literal has no sign: a negative one is `F32.neg(x)`.
 - **`Bool.pick` evaluates both branches.** It is a function, and calls are strict, so a pick between a costly value and a cheap one pays for the costly one every time; a branch that builds something is a `match`.
 - **No def named `exit`.** The native runtime has one of its own, and a build that gives the def a function of its own fails with "two names mangle to FID_EXIT"; whether it does depends on what the compiler inlines, so the name can pass for a while.
 - **`type` is a keyword,** refused as a field or parameter name; a thing's DoomEd type is its `kind`.
@@ -24,7 +24,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 
 ## Proofs
 
-- **A universal U32 law does not compute.** Every word operation on a symbolic word is stuck in the checker, and Base has only `Word.add_comm`; state arithmetic facts as closed sample laws unless you are writing the word library.
+- **A universal U32 law does not compute.** Every word operation on a symbolic word is stuck in the checker, and Base has only `Word.add_comm`; state arithmetic facts as closed sample laws unless you are writing the word library. An `F32` operation is stuck even on literals, so a float fact is a test line and not a law.
 - **Normalization duplicates.** A def that uses its argument twice, nested n deep (`sar(sar(sar(x)))`), makes the checker's term 2^n large; write it linear.
 - **A let bound to a record is annotated** (`+level = {L.Level{geo, ..} : L.Level}`): the checker cannot infer a constructor's type from its fields.
 - **Hypotheses are parameters.** A lemma takes the fact it needs (`e: {True{} == f(x) : Bool}`) and returns the fact it proves; the caller passes `{==}` or an earlier lemma. Rewriting a hypothesis in place is not the tool.
