@@ -4,7 +4,7 @@
 
 **Blocked by:** 05 (The repeat and the render node)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [x] `tests/stream.bend` streams the Freedoom render in pieces of varying frame counts on both lanes and prints the samples at the start, on either side of the first-pass boundary and on either side of the second pass's wrap, with expected values read from the files in nushell
 - [x] `nix/tests.nix` gets the Freedoom render and sets `BENDOOM_MUSIC`
