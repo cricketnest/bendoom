@@ -2,7 +2,9 @@
 # through buildInputs; BENDOOM_IWAD in the environment overrides the
 # wrapper's default. The game makes no parallel call, and the runtime's
 # idle workers cost it three frames a second, so it runs on one thread.
-{ lib, llvmPackages_19, makeWrapper, bend, libx11, alsa-lib, iwad }:
+# The song it plays is the render of its own IWAD, so an override of the
+# IWAD carries its music along.
+{ lib, llvmPackages_19, makeWrapper, bend, libx11, alsa-lib, iwad, music }:
 
 llvmPackages_19.stdenv.mkDerivation {
   pname = "bendoom";
@@ -33,6 +35,7 @@ llvmPackages_19.stdenv.mkDerivation {
     install -Dm755 bendoom $out/libexec/bendoom
     makeWrapper $out/libexec/bendoom $out/bin/bendoom \
       --set-default BENDOOM_IWAD ${lib.escapeShellArg iwad} \
+      --set-default BENDOOM_MUSIC ${music iwad} \
       --add-flags "--threads 1"
     runHook postInstall
   '';
