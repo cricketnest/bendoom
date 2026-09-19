@@ -30,7 +30,7 @@
           # renders that IWAD's song, so the shareware song builds only
           # with the shareware packages.
           music = iwad: pkgs.callPackage ./nix/music.nix { inherit bend iwad; };
-          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend; iwad = freedoom; };
+          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music; iwad = freedoom; };
           film = pkgs.callPackage ./nix/film.nix { inherit bend; iwad = freedoom; };
         in {
           packages = {
@@ -44,7 +44,7 @@
 
           checks = {
             proof = pkgs.callPackage ./nix/proof.nix { inherit bend; };
-            tests = pkgs.callPackage ./nix/tests.nix { inherit bend; };
+            tests = pkgs.callPackage ./nix/tests.nix { inherit bend; music = music freedoom; };
           };
 
           apps.default = {
@@ -67,6 +67,7 @@
             ];
             buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = freedoom;
+            BENDOOM_MUSIC = music freedoom;
             BEND_NO_TELEMETRY = "1";
           };
         };
