@@ -31,7 +31,7 @@
           # with the shareware packages.
           music = iwad: pkgs.callPackage ./nix/music.nix { inherit bend iwad; };
           bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend; iwad = freedoom; };
-          film = pkgs.callPackage ./nix/film.nix { inherit bend; iwad = freedoom; };
+          film = pkgs.callPackage ./nix/film.nix { inherit bend music; iwad = freedoom; };
         in {
           packages = {
             inherit bend bendoom film;

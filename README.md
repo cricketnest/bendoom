@@ -16,9 +16,11 @@ To record a game and make a video of it, first play with `RECORD` naming
 the demo to write, and quit with Esc or by closing the window; the demo
 also ends with the level. Ctrl+C in the terminal leaves it without its
 end marker. Then `film` encodes the demo as a 1600 by 1200 MP4 at Doom's
-35 tics a second, and leaves an existing video alone. The demo is
-vanilla's .lmp, which Chocolate Doom plays too. A demo recorded with
-`bendoom-shareware` is filmed with `film-shareware`.
+35 tics a second, and leaves an existing video alone. Under it runs
+E1M1's song as the package's WAD holds it, from the first frame and
+repeating for as long as the video lasts. The demo is vanilla's .lmp,
+which Chocolate Doom plays too. A demo recorded with `bendoom-shareware`
+is filmed with `film-shareware`, which carries the shareware song.
 
     RECORD=run.lmp nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
