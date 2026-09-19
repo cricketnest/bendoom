@@ -1182,8 +1182,17 @@ def Laws.heap_one(e):
 def Laws.heap_ties():
   {==}
 
-def Laws.velocity_zero_is_off(t, raw, key, p):
+def Laws.quiet_offs(t, raw, key, vel):
   {==}
 
-def Laws.quiet_offs(t, raw, key, vel):
+def Laws.mus_events():
+  {==}
+
+def Laws.smpte_division():
+  {==}
+
+def Laws.song_faults():
+  {==}
+
+def Laws.buffer_spills():
   {==}

@@ -401,15 +401,37 @@ def Opl.stamp(ws: List<&2, Opl.Write>, +t: U32) -> List<&2, Opl.Pending>:
     case w <> rest:
       Pending{t, w} <> Opl.stamp(rest, (t + 2 : U32))
 
+def Opl.spill.one(pending: List<&2, Opl.Pending>, core: Opl.Core, count: U32, last: U32, rcnt: U32, oldl: U32,
+  oldr: U32, curl: U32, curr: U32) -> Opl:
+  match pending:
+    case []:
+      Opl{core, count, last, [], rcnt, oldl, oldr, curl, curr}
+    case Pending{time, write} <> rest:
+      Opl{Opl.write(core, write), time, last, rest, rcnt, oldl, oldr, curl, curr}
+
+# The buffer holds 1024 writes. A write that finds it full has the
+# oldest applied at once, and the sample count moves to that write's
+# time (opl3.c:1344).
+def Opl.spill(n: Nat, o: Opl) -> Opl:
+  match n:
+    case 0n:
+      o
+    case 1n+m:
+      Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o
+      Opl.spill(m, Opl.spill.one(pending, core, count, last, rcnt, oldl, oldr, curl, curr))
+
 # OPL3_WriteRegBuffered for writes made together: the first is due at the
 # later of two samples after the last one queued and the sample about to
-# be generated, each next two samples on.
+# be generated, each next two samples on. A spill moves the count no
+# further than the last write queued, so it moves no write's time.
 def Opl.queue(+ws: List<&2, Opl.Write>, o: Opl) -> Opl:
   Opl{core, +count, +last, pending, rcnt, oldl, oldr, curl, curr} = o
   +t = U32.max((last + 2 : U32), count)
   +n = U32.from_nat(List.length(&2, Opl.Write, ws))
-  Opl{core, count, Bool.pick(U32, U32.is_eq(n, 0), last, (t + (n - 1) * 2 : U32)),
-    List.append(&2, Opl.Pending, pending, Opl.stamp(ws, t)), rcnt, oldl, oldr, curl, curr}
+  +all = List.append(&2, Opl.Pending, pending, Opl.stamp(ws, t))
+  Opl.spill(U32.to_nat((U32.max(U32.from_nat(List.length(&2, Opl.Pending, all)), 1024) - 1024 : U32)),
+    Opl{core, count, Bool.pick(U32, U32.is_eq(n, 0), last, (t + (n - 1) * 2 : U32)), all, rcnt, oldl, oldr, curl,
+      curr})
 
 # Resampling
 # ----------
@@ -494,15 +516,3 @@ def Opl.Frames.out(f: Opl.Frames) -> List<&2, U32>:
 def Opl.Frames.queue(+ws: List<&2, Opl.Write>, f: Opl.Frames) -> Opl.Frames:
   Frames{opl, out} = f
   Frames{Opl.queue(ws, opl), out}
-
-def Opl.hash.go(frames: List<&2, U32>, +h: U32) -> U32:
-  match frames:
-    case []:
-      h
-    case lr <> rest:
-      Opl.hash.go(rest, ((h .^. lr) * 16777619 : U32))
-
-# FNV-1a over frames as 32-bit words, the checksum the test and the bench
-# print.
-def Opl.hash(frames: List<&2, U32>) -> U32:
-  Opl.hash.go(frames, 2166136261)

@@ -6,12 +6,13 @@
 #   bend bench/chip.bend -o chip
 #   time ./chip --threads 1
 import Base
+import ../src/fnv.bend as H
 import ../src/opl.bend as O
 
 # Channel 0's carrier at full level and fastest attack, keyed at f-num
 # 0x244, block 4.
 def main() -> IO(Unit):
   do IO<Unit>:
-    IO.print(U32.show(O.Opl.hash(O.Opl.Frames.out(O.Opl.frames(U32.to_nat(4410000), O.Opl.roms(),
+    IO.print(U32.show(H.Fnv.words(O.Opl.Frames.out(O.Opl.frames(U32.to_nat(4410000), O.Opl.roms(),
       O.Opl.Frames.queue([O.Write{67, 0}, O.Write{99, 240}, O.Write{160, 68}, O.Write{176, 50}],
         O.Frames{O.Opl.reset(), []}))))))
