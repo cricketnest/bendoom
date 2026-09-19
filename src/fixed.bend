@@ -46,6 +46,12 @@ def Fixed.sar(x: U32) -> U32:
 def Fixed.half(+x: U32) -> U32:
   Bool.pick(U32, Fixed.is_neg(x), Fixed.neg((Fixed.neg(x) >> 1n : U32)), (x >> 1n : U32))
 
+# Doom's P_AproxDistance: the longer leg plus half the shorter.
+def Fixed.approx(+dx: U32, +dy: U32) -> U32:
+  +ax = Fixed.abs(dx)
+  +ay = Fixed.abs(dy)
+  Bool.pick(U32, Fixed.lt(ax, ay), (ax + ay - (ax >> 1n) : U32), (ax + ay - (ay >> 1n) : U32))
+
 # A signed 16-bit map coordinate as fixed: the sign extension is shifted
 # out, so the plain shift is the conversion.
 def Fixed.of_map(w: U32) -> U32:

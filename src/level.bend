@@ -290,6 +290,14 @@ def Level.blockbox(+l: Level, s: U32) -> Level.Box:
     sectors, specials} = l
   Level.blockbox.at(blockmap, boxes, (s * 4 : U32))
 
+# Doom's soundorg: the middle of a sector's box, where its sounds come
+# from.
+def Level.soundorg(+l: Level, +s: U32) -> U32 & U32:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, +boxes, nlines, nsectors, sectags, sidetex, switches},
+    sectors, specials} = l
+  (F.Fixed.half((V.Vec.get(boxes, (s * 4 + 3 : U32)) + V.Vec.get(boxes, (s * 4 + 2 : U32)) : U32)),
+    F.Fixed.half((V.Vec.get(boxes, (s * 4 : U32)) + V.Vec.get(boxes, (s * 4 + 1 : U32)) : U32)))
+
 def Level.side(+l: Level, +i: U32) -> Level.Side:
   Level{Geo{lines, +sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l

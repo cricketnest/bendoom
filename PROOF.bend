@@ -321,7 +321,8 @@ def Laws.floor_lowered():
 def Laws.lift_crushed():
   {==}
 
-def Laws.use_fires_once(forward, side, turn, next, player, level, things, sidetex, thinkers, rnd, clock, usedown):
+def Laws.use_fires_once(forward, side, turn, next, player, level, things, sidetex, thinkers, rnd, clock, usedown, sounds,
+  mrnd):
   match next level:
     case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
       {==}
@@ -344,12 +345,21 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
 
 def Laws.exit_ends(cmd):
+  {==}
+
+def Laws.sound_places():
+  {==}
+
+def Laws.door_sounds():
+  {==}
+
+def Laws.switch_sounds():
   {==}
 
 def Laws.random_table():
@@ -845,7 +855,7 @@ def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(
 def moved_free(+level: L.Level, t: S.Sim.Try, at: L.Level, s: S.State, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.State.player(S.State.moved(t, at, s))):
   match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown}:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       ht
 
 # Free reads the geometry alone
@@ -1008,25 +1018,26 @@ def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Pl
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}:
       {==}
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = S.Sim.counters(S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))))
-      +before = {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown} : S.State}
-      +went = S.Sim.mobj(cmd, before)
+      +used = S.Sim.use(S.Sim.pressed(cmd, usedown),
+        {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd} : S.State})
+      +went = S.Sim.mobj(cmd, level, thought, used)
       kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
-        S.Sim.thinkers(S.Sim.cross(S.Player.crossed(S.State.player(went)),
-          S.Sim.use(S.Sim.pressed(cmd, usedown), thought, went))),
-        moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, things, cmd, thought)), level, before,
-          mobj_z_free(level, S.Sim.xy(level, things, cmd, thought), xy_free(level, things, cmd, thought,
+        S.State.told(S.Sim.thinkers(S.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
+        moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, S.State.things(used), cmd, thought)), S.State.level(used), used,
+          mobj_z_free(level, S.Sim.xy(level, S.State.things(used), cmd, thought), xy_free(level,
+            S.State.things(used), cmd, thought,
             counters_free(level, S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
               psprites_free(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
                 eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free))))))))

@@ -170,9 +170,9 @@ def maxed(inv: I.Inventory) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus}
 
 def full(s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown}
+    usedown, sounds, mrnd}
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
