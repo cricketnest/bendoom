@@ -203,10 +203,10 @@ def idle() -> K.Cmd:
   K.Cmd.idle()
 
 def use() -> K.Cmd:
-  K.Cmd.demo(0, 0, 0, True{})
+  K.Cmd.demo(0, 0, 0, 2)
 
 def forward() -> K.Cmd:
-  K.Cmd.demo(25, 0, 0, False{})
+  K.Cmd.demo(25, 0, 0, 0)
 
 def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
   S.State.at(level, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
@@ -244,7 +244,7 @@ def crossed(+level: L.Level) -> IO(Unit):
     x1 : S.State <- run("over", 1n, forward(), [145], x0)
     x2 : S.State <- run("-", 61n, idle(), [145], x1)
     x3 : S.State <- run("-", 1n, idle(), [145], x2)
-    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, False{}), [145], x3)
+    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, 0), [145], x3)
     IO.print(drawn(x4))
     IO.print("-")
 
@@ -253,7 +253,7 @@ def crossed(+level: L.Level) -> IO(Unit):
 # pit east of it, used again while it runs, and again once it is back.
 def lift(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, False{}), [98], S.State.start(level))
+    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, 0), [98], S.State.start(level))
     l1 : S.State <- run("-", 4n, idle(), [98], l0)
     l2 : S.State <- run("over", 1n, idle(), [98], l1)
     l3 : S.State <- run("-", 33n, idle(), [98], l2)
@@ -296,11 +296,11 @@ def holding(inv: I.Inventory, s: S.State) -> S.State:
 # alone.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, False{}),
+    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, 0),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
-    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), k0)
-    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
-    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
+    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, 0), k0)
+    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, 0), k1)
+    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, 0), k2)
     b0 : S.State <- keyed("blue walk with the skull", 87, 30n, forward(),
       holding(I.Inventory.card(8, I.Inventory.start()), at(level, 832, 1400, 90)))
     b1 : S.State <- keyed("use", 87, 1n, use(), b0)
@@ -323,7 +323,7 @@ def exits(+level: L.Level) -> IO(Unit):
     x0 : S.State <- ending("exit first tic use", 1n, use(), at(level, 65184, 1296, 180))
     x1 : S.State <- ending("-", 19n, idle(), x0)
     x2 : S.State <- ending("use", 1n, use(), x1)
-    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, True{}), x2)
+    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, 2), x2)
     IO.print(drawn(x3))
     IO.print("-")
 
@@ -558,11 +558,11 @@ def locked(+placed: L.Level) -> IO(Unit):
     k0 : S.State <- keyed("blue door refused", 82, 1n, use(),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(placed, 880, 1440, 90)))
     k1 : S.State <- keyed("-", 82, 20n, idle(), k0)
-    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, False{}), k1)
+    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, 0), k1)
     k3 : S.State <- keyed("walk", 82, 13n, forward(), k2)
     k4 : S.State <- keyed("-", 82, 1n, forward(), k3)
     k5 : S.State <- keyed("-", 82, 20n, idle(), k4)
-    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, False{}), k5)
+    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, 0), k5)
     k7 : S.State <- keyed("walk", 82, 19n, forward(), k6)
     k8 : S.State <- keyed("use", 82, 1n, use(), k7)
     k9 : S.State <- keyed("-", 82, 5n, idle(), k8)
@@ -791,10 +791,10 @@ def box(tag: String, +s: S.State) -> IO(Unit):
 def chainsaw(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
   +s = holding(inv, at(level, 3158, 2176, 180))
   do IO<S.State>:
-    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), s,
+    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, 0), s,
       S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
-        [K.Cmd.demo(0, 0, 4294967280, False{})]), s))
-    b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, False{}), s, a)
+        [K.Cmd.demo(0, 0, 4294967280, 0)]), s))
+    b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, 0), s, a)
     finished(b)
 
 # The ammo and the chainsaw, then health, armour and berserk, a pickup
@@ -867,24 +867,24 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
   do IO<Unit>:
     s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level))
     p0 : S.State <- free(s)
-    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
-    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p1)
-    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p2)
-    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p3)
-    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
-    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p5)
-    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p6)
-    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p7)
-    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
-    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, p9)
-    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}}, p10)
-    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p11)
-    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p12)
-    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, p13)
-    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.State.start(level))
-    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q1)
-    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q2)
-    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
+    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
+    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p1)
+    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p2)
+    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p3)
+    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
+    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p5)
+    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p6)
+    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p7)
+    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
+    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, p9)
+    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p10)
+    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p11)
+    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p12)
+    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p13)
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, S.State.start(level))
+    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q1)
+    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q2)
+    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q3)
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     IO.print("the walks: " ++ drawn(p14) ++ ", " ++ drawn(q6))

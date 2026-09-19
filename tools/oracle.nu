@@ -17,7 +17,7 @@
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
-# "count,forward,side,turn,use" in a demo's units:
+# "count,forward,side,turn,buttons" (tools/demo.nu):
 #
 #   bend tools/frame.bend -o frame
 #   tools/oracle.nu -416 256 0
@@ -117,7 +117,7 @@ def main [
   x: int                                   # the start's x, in map units
   y: int                                   # the start's y
   angle: int                               # its facing in degrees, a multiple of 45
-  script: string = "20,0,0,0,0"            # the commands, runs of "count,forward,side,turn,use"
+  script: string = "20,0,0,0,0"            # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend

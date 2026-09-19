@@ -93,9 +93,9 @@ def frame(tag: String, now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Ma
 
 # The exit room's door used from inside, then the walk to the switch.
 def route() -> List<&2, K.Cmd>:
-  List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 5n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, True{})],
-    [K.Cmd.demo(0, 0, 96, False{})], List.replicate(K.Cmd, 12n, K.Cmd.demo(25, 0, 0, False{})),
-    [K.Cmd.demo(0, 0, 224, False{})], List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})),
+  List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 5n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, 2)],
+    [K.Cmd.demo(0, 0, 96, 0)], List.replicate(K.Cmd, 12n, K.Cmd.demo(25, 0, 0, 0)),
+    [K.Cmd.demo(0, 0, 224, 0)], List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, 0)),
     List.replicate(K.Cmd, 10n, K.Cmd.idle())])
 
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
@@ -105,7 +105,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   do IO<Unit>:
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
-    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, True{}), beside)))
+    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
       P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g2 : Maybe<M.Game> <- frame("repeat", 400n, [Key{32, False{}}, Key{32, True{}}], g1)
