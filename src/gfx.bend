@@ -706,14 +706,22 @@ def Gfx.tally.right(t: Gfx.Tally) -> Bool:
   Bool.or(Bool.and(U32.is_eq(zeros, 1), U32.is_zero(rotated)),
     Bool.and(U32.is_zero(zeros), Bool.and(U32.is_eq(rotated, 8), U32.is_eq(rots, 510))))
 
-# Doom's words for what is wrong with a sprite's frame.
-def Gfx.tally.fault(t: Gfx.Tally, +sprite: String, +frame: String) -> String:
-  Tally{+zeros, +rotated, rots} = t
-  +at = "Sprite " ++ sprite ++ " frame " ++ frame
-  "R_InitSprites: " ++ Bool.pick(String, Bool.and(U32.is_zero(zeros), U32.is_zero(rotated)),
-    "No patches found for " ++ sprite ++ " frame " ++ frame, Bool.pick(String, U32.is_zero(zeros),
-      at ++ " is missing rotations", Bool.pick(String, U32.is_zero(rotated), at ++ " has multip rot=0 lump",
-        at ++ " has rotations and a rot=0 lump")))
+def Gfx.tally.words(nozeros: Bool, norotations: Bool, named: String) -> String:
+  match nozeros norotations:
+    case True{} True{}:
+      "No patches found for " ++ named
+    case True{} False{}:
+      "Sprite " ++ named ++ " is missing rotations"
+    case False{} True{}:
+      "Sprite " ++ named ++ " has multip rot=0 lump"
+    case False{} False{}:
+      "Sprite " ++ named ++ " has rotations and a rot=0 lump"
+
+# Doom's words for what is wrong with a sprite's frame, from whether it
+# has lumps for every side and whether it has rotations.
+def Gfx.tally.fault(t: Gfx.Tally, sprite: String, frame: String) -> String:
+  Tally{zeros, rotated, rots} = t
+  "R_InitSprites: " ++ Gfx.tally.words(U32.is_zero(zeros), U32.is_zero(rotated), sprite ++ " frame " ++ frame)
 
 # The first of n frames from f that vanilla refuses, or none.
 def Gfx.frames.wrong(n: Nat, +f: U32, +installs: List<&2, Gfx.Install>) -> U32:

@@ -1,9 +1,45 @@
+--- a/bend2/comp.ts
++++ b/bend2/comp.ts
+@@ -4547,11 +4547,12 @@
+ // ======
+
+ // The Linux kit's fill, the Mac's window_msl in the runtime's dialect:
+-// a ! build carries window_dev in its cubin, a host build walks the
+-// pixels itself. An Image is a quadtree over 2^k x 2^k: a Qua at level
+-// i splits its square in four (tl, tr, bl, br), a Qua under the pixels
+-// follows tl, a Pix is 0xRRGGBB.
+-#if defined(__linux__) || defined(__CUDACC_RTC__)
++// a ! build carries window_dev in its cubin; a host build walks the
++// tree once itself (window_rect in effs/window_frame.c). An Image is a
++// quadtree over 2^k x 2^k: a Qua at level i splits its square in four
++// (tl, tr, bl, br), a Qua under the pixels follows tl, a Pix is
++// 0xRRGGBB.
++#ifdef __CUDACC_RTC__
+
+ INLINE u32 window_pix(Corpus H, Term t, u32 k, u32 x, u32 y) {
+   for (u32 i = k; term_tag(t) == TAG_CTR;) {
+@@ -4566,7 +4567,6 @@
+   return (u32)term_loc(t) & 0xFFFFFF;
+ }
+
+-#ifdef __CUDACC_RTC__
+ extern "C" __global__ void window_dev(Corpus H, Term root, u32 w, u32 h,
+   u32 k, u32* out) {
+   u32 x = blockIdx.x * blockDim.x + threadIdx.x;
+@@ -4575,7 +4575,6 @@
+     out[y * w + x] = window_pix(H, root, k, x, y);
+   }
+ }
+-#endif
+
+ #endif
+
 --- a/bend2/effs/window_frame.c
 +++ b/bend2/effs/window_frame.c
-@@ -278,9 +278,39 @@
+@@ -278,9 +278,38 @@
  static u64         window_len;
  #endif
- 
+
 +// The pixels of a square of side 2^i at (x0, y0) cut to the window,
 +// from its subtree: walked once, and a leaf's colour painted over the
 +// whole of its square.
@@ -11,12 +47,11 @@
 +  if (x0 >= w || y0 >= h) {
 +    return;
 +  }
-+  while (term_tag(t) == TAG_CTR) {
++  while (i == 0 && term_tag(t) == TAG_CTR) {
++    t = H[term_rfc(t) ? H[term_loc(t)] >> 24 : term_loc(t)];
++  }
++  if (term_tag(t) == TAG_CTR) {
 +    Loc l = term_rfc(t) ? H[term_loc(t)] >> 24 : term_loc(t);
-+    if (i == 0) {
-+      t = H[l];
-+      continue;
-+    }
 +    i -= 1;
 +    window_rect(H, H[l + 0], i, x0, y0, pix, w, h);
 +    window_rect(H, H[l + 1], i, x0 + (1u << i), y0, pix, w, h);
@@ -42,7 +77,7 @@
  static void window_fill(Env e, u32* pix, u32 w, u32 h, Term image, u32 k) {
  #if BEND_CUDA
    if (io_gpu) {
-@@ -308,11 +338,7 @@
+@@ -308,11 +337,7 @@
      return;
    }
  #endif
@@ -53,5 +88,5 @@
 -  }
 +  window_rect(e.mem, image, k, 0, 0, pix, w, h);
  }
- 
+
  // A frame waits for the next 60 Hz tick, as the Mac's display sync.

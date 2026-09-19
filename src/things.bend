@@ -246,6 +246,13 @@ def Thing.Tree.set(t: Thing.Tree, odd: Bool, +i: U32, m: Maybe<&2, Thing>) -> Th
     case Fork{l, r} True{}:
       Fork{l, Thing.Tree.set(r, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32), m)}
 
+def Thing.Tree.tics(t: Thing.Tree) -> Thing.Tree:
+  match t:
+    case Slot{m}:
+      Slot{Maybe.map(&2, Thing, Thing, Thing.tic, m)}
+    case Fork{l, r}:
+      Fork{Thing.Tree.tics(l), Thing.Tree.tics(r)}
+
 def Things.get(ts: Things, +id: U32) -> Maybe<&2, Thing>:
   Things{tree, count, you} = ts
   Thing.Tree.get(tree, V.Vec.odd(id), id)
@@ -304,6 +311,7 @@ def Things.gone.name(m: Maybe<&2, Thing>, +id: U32, rest: String) -> String:
     case Some{_}:
       rest
 
+# The names of the things of a list gone from a population, as text.
 def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
   match before:
     case []:
@@ -315,15 +323,6 @@ def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
 # population, as text.
 def Things.tally(first: List<&2, Thing>, +things: Things) -> String:
   " things " ++ Nat.show(List.length(&2, Thing, Things.list(things))) ++ " taken" ++ Things.gone(first, things)
-
-def Thing.Tree.tics(t: Thing.Tree) -> Thing.Tree:
-  match t:
-    case Slot{None{}}:
-      Slot{None{}}
-    case Slot{Some{thing}}:
-      Slot{Some{Thing.tic(thing)}}
-    case Fork{l, r}:
-      Fork{Thing.Tree.tics(l), Thing.Tree.tics(r)}
 
 # Every thing alive through its tic. A tic reads no other thing, so the
 # order vanilla's thinkers run them in cannot show.

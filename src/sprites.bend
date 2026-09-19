@@ -148,11 +148,12 @@ def Sprites.seg_side(s: L.Level.Seg, +x: U32, +y: U32) -> Bool:
   L.Seg{+x1, +y1, x2, y2, angle, offset, flags, side, front, back} = s
   L.Level.node_side(x, y, x1, y1, (x2 - x1 : U32), (y2 - y1 : U32))
 
-# Whether a stored range is behind the sprite, from whether all of it
-# and whether some of it is smaller than the sprite: with some alone,
+# Whether a stored range is behind the sprite, from whether its larger
+# and its smaller scale are under the sprite's: with the smaller alone,
 # when the sprite is in front of its seg, which is asked only then.
-def Sprites.clip.behind(all: Bool, some: Bool, +level: L.Level, seg: U32, +x: U32, +y: U32) -> Bool:
-  match all some:
+def Sprites.clip.behind(larger_under: Bool, smaller_under: Bool, +level: L.Level, seg: U32, +x: U32, +y: U32) ->
+  Bool:
+  match larger_under smaller_under:
     case True{} _:
       True{}
     case False{} False{}:

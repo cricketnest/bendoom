@@ -4,7 +4,7 @@
 
 **Blocked by:** 11 (Both E1M1 routes survive their things)
 
-**Status:** resolved (two boxes wait on ticket 11's play-through in the window)
+**Status:** ready-for-human (the maintainer plays both maps to the exit in the window, ticket 11's play-through; the last two boxes wait on it)
 
 - [x] The window bench measures a named scene containing many things plus a running light or mover, with the machine and power state recorded
 - [x] The measured rate is at least 35 frames a second; a lower result is fixed in this ticket
@@ -62,7 +62,7 @@ The structures were measured before anything was added, and nothing was added: n
 Fixed from the spec review:
 
 - R_DrawVisSprite's `dc_iscale` is the absolute value of `xiscale`. Bendoom passed the signed step, so a mirrored patch would have sampled its posts upward. No milestone 5 thing shows a rotated frame, so no frame could show it. `Sprites.col.of` takes the absolute value, and `sprite_columns` pins it. Milestone 6's monsters are its first render cases.
-- The spec's closed law on sprite-column bounds did not exist. `sprite_columns` projects a thing ahead (columns 128 to 191), one off the left edge (from column 0, 22 columns into its patch), a mirrored one off the right (to 319, from its patch's last column, stepping back), and one past the edge, not drawn. The expected values are R_ProjectSprite worked by hand. A typo in one literal made the checker refuse the law, and one false value in each law fails the proof at that law.
+- The spec's closed law on sprite-column bounds did not exist. `sprite_columns` projects a thing ahead (columns 128 to 191), one off the left edge (from column 0, 22 columns into its patch), a mirrored one off the right (to 319, from its patch's last column, stepping back), and one past the edge, not drawn, all 160 ahead at scale 1. At 320 ahead, scale 1/2 and a step of 2, it projects a thing ahead (columns 144 to 175) and a mirrored one off the left edge, drawn from column 0 at its patch's column 44 less 1/65536: the last column, 64 less 1/65536, plus the step of -2 times the 10 columns cut. Its column is drawn with `dc_iscale` 2, so passing the scale or the signed step there fails. The expected values are R_ProjectSprite and R_DrawVisSprite worked by hand, the derivation above the law. A typo in one literal made the checker refuse the law, and one false value in each law fails the proof at that law.
 - The sort's equal-scale tie had no committed check: `sprite_order` sorts four sprites by R_SortVisSprites' rule.
 - A frame with no patches failed with "Sprite TEST frame B has no patches". It now fails with R_InitSprites' own "No patches found for TEST frame B". The test header labels the frame past a sprite's last as a regression pin, since vanilla fails it only in R_ProjectSprite, by numbers.
 - Notes false about the code: ticket 05's "nothing takes" the lasting row's `next` (the sprite load's chase reads it and stops there) and its "fifth word a row" (a sixth word in each of a row's eight views). Ticket 11's `I.Inventory.tally`, now `H.Things.tally`. Ticket 03's "vanilla's words", which now lists where vanilla names a lump or sprite by number. The spec's "overflow crashes" (vanilla drops sprites past 128 and ranges past 256) and its oracle that "removes monsters" (it keeps every record and sets the demo's no-monsters byte).
@@ -115,6 +115,8 @@ The shareware route replays locally to the same ending as ticket 11: tic 645, th
 - `git diff --check` finds only the patch file's blank context lines.
 
 
+**The coordinator's review.** `Gfx.tally.fault` built all four of its messages through nested picks; it is a match now, `Gfx.tally.words`, and names the sprite's frame once. `sprite_columns` gained the half-scale and mirrored left-cut cases above; one false value in each of the frac, the column's `dc_iscale` and the half-scale x1 fails the proof at the law. The runtime patch's loop unwraps a level-0 node in a `while` and splits a node in an `if`, and `window_pix`, left to the device kernel, moves under `__CUDACC_RTC__` in `comp.ts`; window dumps of the three scenes are still byte for byte equal and the key room still runs at 56, 55, 56. `Thing.Tree.tics` maps a slot with `Maybe.map` and sits beside the tree's other definitions; `Sprites.clip.behind`'s flags are named for the scales they test; `Things.gone` has its comment back. The spec's story 53 and README condition, this ticket's status, and milestone 4 ticket 10's note on the random table are corrected.
+
 **Decided without the maintainer.**
 
 - **The runtime patch.** Game-side fixes alone left the key room at 32 to 33 frames a second. The walk and walls are milestone 3's code at 7.8 ms, and the paint was 14 ms of the frame. Upstream issue 01 had set the condition for a local patch, and it was met. The cost: `nix/window-fill.patch` must be checked each time the Bend pin moves, and dropped once upstream paints this way.
@@ -123,4 +125,4 @@ The shareware route replays locally to the same ending as ticket 11: tic 645, th
 - **The spec's wording.** Its two false lines are corrected in place, not left beside a note.
 - **The spec's status** is `ready-for-human`, not `done`, and the README's line says what was built without "Done.", both until the play-through.
 
-**What stays open.** Ticket 11's window play-through: the maintainer plays both maps to the exit in the window. Two boxes here wait on it. The README marks milestone 5 done, and the spec's status changes to done. The README's milestone 5 line names what was built and says it is done once both maps are played to the exit in the window. The spec's status is `ready-for-human`, with that play-through named as its last item. Every other box has its evidence above.
+**What stays open.** Ticket 11's window play-through: the maintainer plays both maps to the exit in the window. The last two boxes wait on it, so this ticket stays ready-for-human, as milestone 4's ticket 13 did. Until then the README's milestone 5 line names what was built and says it is done once both maps are played to the exit in the window. The spec's status is `ready-for-human`, with that play-through named as its last item. Every other box has its evidence above.

@@ -27,12 +27,11 @@ static void window_rect(Corpus H, Term t, u32 i, u32 x0, u32 y0, u32* pix, u32 w
   if (x0 >= w || y0 >= h) {
     return;
   }
-  while (term_tag(t) == TAG_CTR) {
+  while (i == 0 && term_tag(t) == TAG_CTR) {
+    t = H[term_rfc(t) ? H[term_loc(t)] >> 24 : term_loc(t)];
+  }
+  if (term_tag(t) == TAG_CTR) {
     Loc l = term_rfc(t) ? H[term_loc(t)] >> 24 : term_loc(t);
-    if (i == 0) {
-      t = H[l];
-      continue;
-    }
     i -= 1;
     window_rect(H, H[l + 0], i, x0, y0, pix, w, h);
     window_rect(H, H[l + 1], i, x0 + (1u << i), y0, pix, w, h);
@@ -51,7 +50,7 @@ static void window_rect(Corpus H, Term t, u32 i, u32 x0, u32 y0, u32* pix, u32 w
 }
 ```
 
-In `window_fill`, the two loops that call `window_pix` for every pixel become one call: `window_rect(e.mem, image, k, 0, 0, pix, w, h)`.
+In `window_fill`, the two loops that call `window_pix` for every pixel become one call: `window_rect(e.mem, image, k, 0, 0, pix, w, h)`. `window_pix` is then the device kernel's alone, so it moves under `#ifdef __CUDACC_RTC__` in `comp.ts`.
 
 ## What to do
 

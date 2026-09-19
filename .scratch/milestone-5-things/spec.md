@@ -64,7 +64,7 @@ Load the non-monster things used by the shareware and Freedoom E1M1s at Hurt Me 
 50. As a developer, I want sprite projection and clipping to reuse the stored wall ranges and clip lists, so that the renderer gains no second account of visibility.
 51. As a developer, I want masked middle textures drawn during sprite clipping when they are behind a sprite, with the remaining masked ranges drawn afterward, so that the final pass follows vanilla's ordering.
 52. As a developer, I want sprite and masked-object lists to have no static vanilla limits, so that Bendoom keeps the renderer's existing policy of not reproducing vanilla's overflows, which drop sprites past 128 and ranges past 256.
-53. As a developer, I want the frame dump and oracle to keep the map's supported things while removing monsters and replacing only the player start, so that sprite comparisons use the real E1M1 population.
+53. As a developer, I want the frame dump and oracle to keep every THINGS record, replacing only the player start and spawning no monster, so that sprite comparisons use the real E1M1 population.
 54. As a developer, I want scripted pickup runs to print the inventory, active thing count and blue door result, so that pickup behaviour is checked at the program's boundary on both lanes.
 55. As a developer, I want rendered frames before and after a pickup and at sprite occlusion cases, so that state, projection and removal are covered through one replay seam.
 56. As a developer, I want every compared sprite frame to report zero differing unmasked pixels against Chocolate Doom, so that fidelity remains a number.
@@ -93,7 +93,7 @@ Load the non-monster things used by the shareware and Freedoom E1M1s at Hurt Me 
 - The state advances things in vanilla thinker order after the player's movement and use, among the existing thinkers, then advances the clock. Pickup animation is a state sequence, not a function of the clock, because spawn phases differ. Existing flat and wall animations remain functions of the clock.
 - The frame stays 320 by 200 palette indices with a 320 by 168 view. The black status-bar band and the missing first-person weapon stay as they are. The renderer remains a pure function of tables, graphics and state and still draws the latest completed tic without interpolation.
 - The oracle keeps E1M1's THINGS records, replaces the player 1 start in place, and runs Chocolate Doom with no monsters on Hurt Me Plenty, so no monster spawns. It no longer replaces the entire lump with one record. The existing status bar, pause graphic and first-person weapon masks remain. Sprite pixels themselves are never masked.
-- README's milestone 5 line is marked done only after both WADs render their things, the blue key route works, the oracle cases reach zero and the frame-rate measurement passes.
+- README's milestone 5 line is marked done only after both WADs render their things, the blue key route works, the oracle cases reach zero, the frame-rate measurement passes, and the maintainer has played both maps to the exit in the window.
 
 ## Testing Decisions
 

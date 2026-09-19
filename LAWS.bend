@@ -1453,33 +1453,44 @@ def Sprite.gfx() -> G.Gfx:
     V.Vec.of_list(List.append(&2, U32, Sprite.slots(8n, 1000, 0), Sprite.slots(8n, 2000, 1)), 96),
     G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}}
 
-# Thing id in a state row, 160 ahead of the eye and y to its left.
-def Sprite.at(id: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
+# Thing id in a state row, x ahead of the eye and y to its left.
+def Sprite.at(id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
   Z.Sprites.project(Sprite.view(), Closed.doors(), Sprite.gfx(), 1,
-    H.Thing{id, 2014, 10485760, y, 0, 0, 0, 0, 0, state, 4294967295}, [])
+    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295}, [])
 
-# LAW: R_ProjectSprite holds a sprite's columns to the screen. At 160
-# the scale is 1, so a thing ahead spans columns 128 to 191 from its
-# patch's column 0. One 150 to the left starts at column -22 and ends
-# at 41: it is drawn from column 0, starting 22 columns into its patch.
-# A mirrored one 150 to the right spans 278 to 341: it is drawn to 319,
-# from its patch's last column, 64 less 1/65536, stepping back one a
-# column. One 400 to the left ends at -209 and is not drawn. The
-# mirrored sprite's column at 319, unclipped, steps down its patch by
-# the scale's reciprocal without the step's sign, as R_DrawVisSprite's
-# dc_iscale takes the absolute value, clipped by the screen's edges;
-# its top is at 69, the centre 84 less the 15 its top stands over the
-# eye (sanity).
+# LAW: R_ProjectSprite holds a sprite's columns to the screen, and
+# R_DrawVisSprite steps down a column by the scale's reciprocal. Facing
+# east, a thing x ahead and y to the left has tz = x and tx = -y; its
+# scale is 160 / tz, and with the patch 64 wide and its origin 32 in,
+# x1 = 160 + (tx - 32) scale and x2 = 160 + (tx + 32) scale - 1, the
+# first held to 0 and the last to 319. The patch's column starts at 0,
+# or at 64 less 1/65536 for a mirrored patch (startfrac = width - 1),
+# and steps xiscale = 1 / scale a column, its negation when mirrored;
+# a sprite cut on the left starts xiscale (x1 - x1 unclipped) further.
+# - 160 ahead the scale and its reciprocal are 1: straight ahead, x1 =
+#   128 and x2 = 191; 150 left, x1 = -22, drawn from 0 at column 22 of
+#   the patch; mirrored and 150 right, x1 = 278 and x2 = 341, drawn to
+#   319 from 64 less 1/65536 stepping -1; 400 left, x2 = -209, culled.
+# - 320 ahead the scale is 1/2 and xiscale 2: straight ahead, x1 = 160
+#   - 16 = 144 and x2 = 176 - 1 = 175. Mirrored and 308 left, x1 = 160
+#   - 170 = -10 and x2 = 160 - 138 - 1 = 21: drawn from 0, its patch's
+#   column 64 less 1/65536 plus -2 times 10, 44 less 1/65536, stepping
+#   -2. That column is drawn with dc_iscale 2, the step's absolute
+#   value, and its top at 84 less half the 15 its top stands over the
+#   eye, 76.5; the clips no range set are the screen's edges (sanity).
 law sprite_columns:
-  {(Sprite.at(1, 0, 0), Sprite.at(2, 9830400, 0), Sprite.at(3, 4285136896, 1), Sprite.at(4, 26214400, 0),
-    Z.Sprites.col.of(319, Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760,
-      2000, 65792, 1, 3}, Z.Sprites.unclipped(), Z.Sprites.unclipped()))
+  {(Sprite.at(1, 10485760, 0, 0), Sprite.at(2, 10485760, 9830400, 0), Sprite.at(3, 10485760, 4285136896, 1),
+    Sprite.at(4, 10485760, 26214400, 0), Sprite.at(5, 20971520, 0, 0), Sprite.at(6, 20971520, 20185088, 1),
+    Z.Sprites.col.of(0, Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000,
+      65792, 1, 6}, Z.Sprites.unclipped(), Z.Sprites.unclipped()))
     == ([Z.Vis{128, 191, 65536, 10485760, 0, 0, 3670016, 983040, 0, 65536, 1000, 65792, 1, 1}],
       [Z.Vis{0, 41, 65536, 10485760, 9830400, 0, 3670016, 983040, 1441792, 65536, 1000, 65792, 1, 2}],
       [Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760, 2000, 65792, 1, 3}],
-      [], Q.Col{319, 4521984, 65536, 983040, 65536, 65792, 4294967295, 168})
+      [], [Z.Vis{144, 175, 32768, 20971520, 0, 0, 3670016, 983040, 0, 131072, 1000, 65792, 1, 5}],
+      [Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000, 65792, 1, 6}],
+      Q.Col{0, 5013504, 32768, 983040, 131072, 65792, 4294967295, 168})
     : List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis>
-      & Q.Masked.Col}
+      & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & Q.Masked.Col}
 
 # A sprite of a scale, its sector's rank in the walk and its thing's id.
 def Sprite.vis(scale: U32, rank: U32, id: U32) -> Z.Sprites.Vis:
