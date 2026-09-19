@@ -8,19 +8,10 @@
 import Base
 import ../src/opl.bend as O
 
-def Bench.hash(frames: List<&2, U32>, +h: U32) -> U32:
-  match frames:
-    case []:
-      h
-    case lr <> rest:
-      Bench.hash(rest, ((h .^. lr) * 16777619 : U32))
-
-def Bench.out(f: O.Opl.Frames) -> String:
-  U32.show(Bench.hash(O.Opl.Frames.out(f), 2166136261))
-
 # Channel 0's carrier at full level and fastest attack, keyed at f-num
 # 0x244, block 4.
 def main() -> IO(Unit):
   do IO<Unit>:
-    IO.print(Bench.out(O.Opl.frames(U32.to_nat(4410000), O.Opl.roms(),
-      O.Frames{O.Opl.queue([17152, 25584, 41028, 45106], O.Opl.reset()), []})))
+    IO.print(U32.show(O.Opl.hash(O.Opl.Frames.out(O.Opl.frames(U32.to_nat(4410000), O.Opl.roms(),
+      O.Opl.Frames.queue([O.Write{67, 0}, O.Write{99, 240}, O.Write{160, 68}, O.Write{176, 50}],
+        O.Frames{O.Opl.reset(), []}))))))

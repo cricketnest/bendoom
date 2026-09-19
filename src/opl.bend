@@ -37,21 +37,25 @@ type Opl.Core is Data:
   Core{chans: List<&2, Opl.Chan>, timer: U32, egtimer: U32, egstate: U32, egadd: U32,
     trempos: U32, vibpos: U32, nts: U32, mix: U32}
 
-# A register write waiting in OPL3_WriteRegBuffered's buffer until the
-# chip sample it is due after.
 type Opl.Write is Data:
-  Write{time: U32, reg: U32, val: U32}
+  Write{reg: U32, val: U32}
+
+# A write waiting in OPL3_WriteRegBuffered's buffer until the chip sample
+# it is due after.
+type Opl.Pending is Data:
+  Pending{time: U32, write: Opl.Write}
 
 # The chip with its write buffer (count is writebuf_samplecnt, last is
 # writebuf_lasttime) and OPL3_GenerateResampled's state: rcnt is
 # samplecnt, and the two frames it interpolates between.
 type Opl is Data:
-  Opl{core: Opl.Core, count: U32, last: U32, pending: List<&2, Opl.Write>, rcnt: U32,
+  Opl{core: Opl.Core, count: U32, last: U32, pending: List<&2, Opl.Pending>, rcnt: U32,
     oldl: U32, oldr: U32, curl: U32, curr: U32}
 
-# What every operator reads of the chip in a sample.
-type Opl.G is Data:
-  G{egadd: U32, egstate: U32, timer: U32, trem: U32, vibpos: U32}
+# The chip's timers and modulation as every operator reads them in a
+# sample.
+type Opl.Clock is Data:
+  Clock{egadd: U32, egstate: U32, timer: U32, trem: U32, vibpos: U32}
 
 def Opl.at(+xs: List<&2, U32>, +i: U32) -> U32:
   Maybe.default(&2, U32, List.get(&2, U32, xs, U32.to_nat(i)), 0)
@@ -89,12 +93,12 @@ def Opl.shift.high(+hi: U32, +lo: U32, +timer: U32, +egstate: U32) -> U32:
   +t = Bool.pick(U32, U32.is_ge(s, 4), 3, s)
   Bool.pick(U32, U32.is_eq(t, 0), egstate, t)
 
-def Opl.shift(nonzero: Bool, +hi: U32, +lo: U32, +g: Opl.G) -> U32:
+def Opl.shift(nonzero: Bool, +hi: U32, +lo: U32, +clock: Opl.Clock) -> U32:
   match nonzero:
     case False{}:
       0
     case True{}:
-      G{+egadd, +egstate, +timer, trem, vibpos} = g
+      Clock{+egadd, +egstate, +timer, trem, vibpos} = clock
       Bool.pick(U32, U32.is_lt(hi, 12),
         Bool.pick(U32, U32.is_eq(egstate, 1), Opl.shift.low((hi + egadd : U32), lo), 0),
         Opl.shift.high(hi, lo, timer, egstate))
@@ -156,16 +160,16 @@ def Opl.tremolo(+pos: U32) -> U32:
 
 # One operator's sample: OPL3_EnvelopeCalc, OPL3_PhaseGenerate and
 # OPL3_SlotGenerate, pm being the phase modulation its channel feeds it.
-def Opl.Slot.step(+roms: Opl.Roms, +g: Opl.G, +fnum: U32, +block: U32, +ksv: U32, pm: U32,
+def Opl.Slot.step(+roms: Opl.Roms, +clock: Opl.Clock, +fnum: U32, +block: U32, +ksv: U32, pm: U32,
   s: Opl.Slot) -> Opl.Slot:
-  G{egadd, egstate, timer, trem, vibpos} = g
+  Clock{egadd, egstate, timer, trem, vibpos} = clock
   Slot{out, prout, +rout, +gen, +key, +am, +vib, +egt, +ksr, +mt, ksl, tl, +lvl, +ar, +dr, +sl, +rr,
     +wf, +phase} = s
   +reset = U32.is_eq(key, 1) && U32.is_eq(gen, 3)
   +reg = Opl.reg_rate(reset, gen, egt, ar, dr, rr)
   +rate = (Bool.pick(U32, U32.is_eq(ksr, 1), ksv, (ksv >> 2n : U32)) + (reg << 2n) : U32)
   +hi = Bool.pick(U32, U32.is_gt((rate >> 2n : U32), 15), 15, (rate >> 2n : U32))
-  +shift = Opl.shift(U32.is_ne(reg, 0), hi, (rate .&. 3 : U32), g)
+  +shift = Opl.shift(U32.is_ne(reg, 0), hi, (rate .&. 3 : U32), clock)
   +off = U32.is_eq((rout .&. 504 : U32), 504)
   +start = Bool.pick(U32, reset && U32.is_eq(hi, 15), 0,
     Bool.pick(U32, U32.is_ne(gen, 0) && Bool.not(reset) && off, 511, rout))
@@ -193,10 +197,10 @@ def Opl.accm(+con: U32, +m: U32, +c: U32) -> U32:
 type Opl.Out is Data:
   Out{chan: Opl.Chan, l: U32, r: U32}
 
-def Opl.Chan.step(+roms: Opl.Roms, +g: Opl.G, +late: Bool, ch: Opl.Chan) -> Opl.Out:
+def Opl.Chan.step(+roms: Opl.Roms, +clock: Opl.Clock, +late: Bool, ch: Opl.Chan) -> Opl.Out:
   Chan{+fnum, +block, +ksv, +fb, +con, +m, +c} = ch
-  +m2 = Opl.Slot.step(roms, g, fnum, block, ksv, Opl.fbmod(fb, m), m)
-  +c2 = Opl.Slot.step(roms, g, fnum, block, ksv, Bool.pick(U32, U32.is_eq(con, 1), 0, Opl.out(m2)), c)
+  +m2 = Opl.Slot.step(roms, clock, fnum, block, ksv, Opl.fbmod(fb, m), m)
+  +c2 = Opl.Slot.step(roms, clock, fnum, block, ksv, Bool.pick(U32, U32.is_eq(con, 1), 0, Opl.out(m2)), c)
   +r = Opl.accm(con, Opl.out(m2), Opl.out(c2))
   Out{Chan{fnum, block, ksv, fb, con, m2, c2},
     Bool.pick(U32, late, Opl.accm(con, Opl.out(m2), Opl.out(c)), r), r}
@@ -209,12 +213,12 @@ def Opl.mix.cons(o: Opl.Out, rest: Opl.Mixed) -> Opl.Mixed:
   Mixed{cs, ml, mr} = rest
   Mixed{ch <> cs, (l + ml : U32), (r + mr : U32)}
 
-def Opl.mix(chans: List<&2, Opl.Chan>, +roms: Opl.Roms, +g: Opl.G, +i: U32) -> Opl.Mixed:
+def Opl.mix(chans: List<&2, Opl.Chan>, +roms: Opl.Roms, +clock: Opl.Clock, +i: U32) -> Opl.Mixed:
   match chans:
     case []:
       Mixed{[], 0, 0}
     case ch <> rest:
-      Opl.mix.cons(Opl.Chan.step(roms, g, U32.is_ge(i, 6), ch), Opl.mix(rest, roms, g, (i + 1 : U32)))
+      Opl.mix.cons(Opl.Chan.step(roms, clock, U32.is_ge(i, 6), ch), Opl.mix(rest, roms, clock, (i + 1 : U32)))
 
 def Opl.clip(+x: U32) -> U32:
   Bool.pick(U32, F.Fixed.gt(x, 32767), 32767, Bool.pick(U32, F.Fixed.lt(x, 4294934528), 4294934528, x))
@@ -249,7 +253,7 @@ def Opl.generate.fin(+timer: U32, +egtimer: U32, +egstate: U32, +trempos: U32, +
 def Opl.generate(+roms: Opl.Roms, core: Opl.Core) -> Opl.Sample:
   Core{chans, +timer, +egtimer, +egstate, egadd, +trempos, +vibpos, nts, mix} = core
   Opl.generate.fin(timer, egtimer, egstate, trempos, vibpos, nts, mix,
-    Opl.mix(chans, roms, G{egadd, egstate, timer, Opl.tremolo(trempos), vibpos}, 0))
+    Opl.mix(chans, roms, Clock{egadd, egstate, timer, Opl.tremolo(trempos), vibpos}, 0))
 
 # Register writes
 # ---------------
@@ -300,31 +304,42 @@ def Opl.Chan.freq(+fnum: U32, +block: U32, +nts: U32, fb: U32, con: U32, km: U32
 # A write to one channel: A0, B0 and C0 are the channel's own, the rest
 # its modulator's or, from the fourth slot of a group of six, its
 # carrier's.
-def Opl.Chan.write(+reg: U32, +val: U32, +nts: U32, ch: Opl.Chan) -> Opl.Chan:
-  Chan{+fnum, +block, +ksv, +fb, +con, +m, +c} = ch
-  +k = (reg >> 4n : U32)
-  +on = ((val >> 5n) .&. 1 : U32)
-  Bool.pick(Opl.Chan, U32.is_eq(k, 10),
-    Opl.Chan.freq(((fnum .&. 768) .|. val : U32), block, nts, fb, con, Opl.key(m), Opl.key(c), m, c),
-    Bool.pick(Opl.Chan, U32.is_eq(k, 11),
+def Opl.Chan.write.go(a0: Bool, b0: Bool, c0: Bool, car: Bool, +reg: U32, +val: U32, +nts: U32,
+  ch: Opl.Chan) -> Opl.Chan:
+  match a0 b0 c0 car:
+    case True{} _ _ _:
+      Chan{+fnum, block, ksv, fb, con, +m, +c} = ch
+      Opl.Chan.freq(((fnum .&. 768) .|. val : U32), block, nts, fb, con, Opl.key(m), Opl.key(c), m, c)
+    case False{} True{} _ _:
+      Chan{fnum, block, ksv, fb, con, m, c} = ch
+      +on = ((val >> 5n) .&. 1 : U32)
       Opl.Chan.freq(((fnum .&. 255) .|. ((val .&. 3) << 8n) : U32), ((val >> 2n) .&. 7 : U32), nts,
-        fb, con, on, on, m, c),
-      Bool.pick(Opl.Chan, U32.is_eq(k, 12),
-        Chan{fnum, block, ksv, ((val .&. 14) >> 1n : U32), (val .&. 1 : U32), m, c},
-        Bool.pick(Opl.Chan, U32.is_ge((reg .&. 7 : U32), 3),
-          Chan{fnum, block, ksv, fb, con, m, Opl.Slot.write(reg, val, fnum, block, c)},
-          Chan{fnum, block, ksv, fb, con, Opl.Slot.write(reg, val, fnum, block, m), c}))))
+        fb, con, on, on, m, c)
+    case False{} False{} True{} _:
+      Chan{fnum, block, ksv, fb, con, m, c} = ch
+      Chan{fnum, block, ksv, ((val .&. 14) >> 1n : U32), (val .&. 1 : U32), m, c}
+    case False{} False{} False{} True{}:
+      Chan{+fnum, +block, ksv, fb, con, m, c} = ch
+      Chan{fnum, block, ksv, fb, con, m, Opl.Slot.write(reg, val, fnum, block, c)}
+    case False{} False{} False{} False{}:
+      Chan{+fnum, +block, ksv, fb, con, m, c} = ch
+      Chan{fnum, block, ksv, fb, con, Opl.Slot.write(reg, val, fnum, block, m), c}
 
-# The channel a register reaches, 9 for none: OPL3_WriteReg's ad_slot and
+def Opl.Chan.write(+reg: U32, +val: U32, +nts: U32, ch: Opl.Chan) -> Opl.Chan:
+  +k = (reg >> 4n : U32)
+  Opl.Chan.write.go(U32.is_eq(k, 10), U32.is_eq(k, 11), U32.is_eq(k, 12), U32.is_ge((reg .&. 7 : U32), 3),
+    reg, val, nts, ch)
+
+# The channel a register reaches, if any: OPL3_WriteReg's ad_slot and
 # channel decoding for the low array.
-def Opl.target(+reg: U32) -> U32:
+def Opl.target(+reg: U32) -> Maybe<&2, U32>:
   +k = (reg >> 4n : U32)
   +r = (reg .&. 31 : U32)
   +slot = U32.is_lt(r, 22) && U32.is_lt((r .&. 7 : U32), 6)
-  Bool.pick(U32, (U32.is_ge(k, 2) && U32.is_le(k, 9)) || U32.is_ge(k, 14),
-    Bool.pick(U32, slot, (((r >> 3n) * 3) + ((r .&. 7) % 3) : U32), 9),
-    Bool.pick(U32, U32.is_ge(k, 10) && U32.is_le(k, 12) && U32.is_lt((reg .&. 15 : U32), 9),
-      (reg .&. 15 : U32), 9))
+  +chan = U32.is_ge(k, 10) && U32.is_le(k, 12) && U32.is_lt((reg .&. 15 : U32), 9)
+  Bool.pick(Maybe<&2, U32>, (U32.is_ge(k, 2) && U32.is_le(k, 9)) || U32.is_ge(k, 14),
+    Bool.pick(Maybe<&2, U32>, slot, Some{(((r >> 3n) * 3) + ((r .&. 7) % 3) : U32)}, None{}),
+    Bool.pick(Maybe<&2, U32>, chan, Some{(reg .&. 15 : U32)}, None{}))
 
 def Opl.write.at(chans: List<&2, Opl.Chan>, n: Nat, +reg: U32, +val: U32, +nts: U32) ->
   List<&2, Opl.Chan>:
@@ -336,53 +351,65 @@ def Opl.write.at(chans: List<&2, Opl.Chan>, n: Nat, +reg: U32, +val: U32, +nts: 
     case ch <> rest 1n+i:
       ch <> Opl.write.at(rest, i, reg, val, nts)
 
+def Opl.write.to(chans: List<&2, Opl.Chan>, target: Maybe<&2, U32>, +reg: U32, +val: U32, +nts: U32) ->
+  List<&2, Opl.Chan>:
+  match target:
+    case None{}:
+      chans
+    case Some{i}:
+      Opl.write.at(chans, U32.to_nat(i), reg, val, nts)
+
 # OPL3_WriteReg.
 def Opl.write(core: Opl.Core, w: Opl.Write) -> Opl.Core:
   Core{chans, timer, egtimer, egstate, egadd, trempos, vibpos, +nts, mix} = core
-  Write{time, +reg, +val} = w
-  Core{Opl.write.at(chans, U32.to_nat(Opl.target(reg)), reg, val, nts), timer, egtimer, egstate, egadd,
-    trempos, vibpos, Bool.pick(U32, U32.is_eq(reg, 8), ((val >> 6n) .&. 1 : U32), nts), mix}
+  Write{+reg, +val} = w
+  Core{Opl.write.to(chans, Opl.target(reg), reg, val, nts), timer, egtimer, egstate, egadd, trempos,
+    vibpos, Bool.pick(U32, U32.is_eq(reg, 8), ((val >> 6n) .&. 1 : U32), nts), mix}
 
 # The write buffer
 # ----------------
 
-def Opl.due(+count: U32, ws: List<&2, Opl.Write>) -> Bool:
+def Opl.due(+count: U32, ws: List<&2, Opl.Pending>) -> Bool:
   match ws:
     case []:
       False{}
     case w <> rest:
-      Write{time, reg, val} = w
+      Pending{time, write} = w
       U32.is_le(time, count)
 
 type Opl.Flushed is Data:
-  Flushed{core: Opl.Core, pending: List<&2, Opl.Write>}
+  Flushed{core: Opl.Core, pending: List<&2, Opl.Pending>}
+
+def Opl.flush.one(core: Opl.Core, w: Opl.Pending) -> Opl.Core:
+  Pending{time, write} = w
+  Opl.write(core, write)
 
 # The writes due by the sample just generated, applied in order.
-def Opl.flush(pending: List<&2, Opl.Write>, due: Bool, core: Opl.Core, +count: U32) -> Opl.Flushed:
+def Opl.flush(pending: List<&2, Opl.Pending>, due: Bool, core: Opl.Core, +count: U32) -> Opl.Flushed:
   match pending due:
     case [] _:
       Flushed{core, []}
     case w <> rest False{}:
       Flushed{core, w <> rest}
     case w <> +rest True{}:
-      Opl.flush(rest, Opl.due(count, rest), Opl.write(core, w), count)
+      Opl.flush(rest, Opl.due(count, rest), Opl.flush.one(core, w), count)
 
-def Opl.stamp(ws: List<&2, U32>, +t: U32) -> List<&2, Opl.Write>:
+def Opl.stamp(ws: List<&2, Opl.Write>, +t: U32) -> List<&2, Opl.Pending>:
   match ws:
     case []:
       []
-    case +w <> rest:
-      Write{t, (w >> 8n : U32), (w .&. 255 : U32)} <> Opl.stamp(rest, (t + 2 : U32))
+    case w <> rest:
+      Pending{t, w} <> Opl.stamp(rest, (t + 2 : U32))
 
-# OPL3_WriteRegBuffered for writes made together, each (reg << 8) | val:
-# the first is due at the later of two samples after the last one queued
-# and the sample about to be generated, each next two samples on.
-def Opl.queue(+ws: List<&2, U32>, o: Opl) -> Opl:
+# OPL3_WriteRegBuffered for writes made together: the first is due at the
+# later of two samples after the last one queued and the sample about to
+# be generated, each next two samples on.
+def Opl.queue(+ws: List<&2, Opl.Write>, o: Opl) -> Opl:
   Opl{core, +count, +last, pending, rcnt, oldl, oldr, curl, curr} = o
   +t = U32.max((last + 2 : U32), count)
-  +n = U32.from_nat(List.length(&2, U32, ws))
+  +n = U32.from_nat(List.length(&2, Opl.Write, ws))
   Opl{core, count, Bool.pick(U32, U32.is_eq(n, 0), last, (t + (n - 1) * 2 : U32)),
-    List.append(&2, Opl.Write, pending, Opl.stamp(ws, t)), rcnt, oldl, oldr, curl, curr}
+    List.append(&2, Opl.Pending, pending, Opl.stamp(ws, t)), rcnt, oldl, oldr, curl, curr}
 
 # Resampling
 # ----------
@@ -392,7 +419,7 @@ def Opl.tick.done(+count: U32, last: U32, rcnt: U32, oldl: U32, oldr: U32, l: U3
   Flushed{core, pending} = f
   Opl{core, (count + 1 : U32), last, pending, (rcnt - 908 : U32), oldl, oldr, l, r}
 
-def Opl.tick.fin(+count: U32, last: U32, +pending: List<&2, Opl.Write>, rcnt: U32, oldl: U32,
+def Opl.tick.fin(+count: U32, last: U32, +pending: List<&2, Opl.Pending>, rcnt: U32, oldl: U32,
   oldr: U32, s: Opl.Sample) -> Opl:
   Sample{core, l, r} = s
   Opl.tick.done(count, last, rcnt, oldl, oldr, l, r,
@@ -463,3 +490,19 @@ def Opl.reset() -> Opl:
 def Opl.Frames.out(f: Opl.Frames) -> List<&2, U32>:
   Frames{opl, out} = f
   out
+
+def Opl.Frames.queue(+ws: List<&2, Opl.Write>, f: Opl.Frames) -> Opl.Frames:
+  Frames{opl, out} = f
+  Frames{Opl.queue(ws, opl), out}
+
+def Opl.hash.go(frames: List<&2, U32>, +h: U32) -> U32:
+  match frames:
+    case []:
+      h
+    case lr <> rest:
+      Opl.hash.go(rest, ((h .^. lr) * 16777619 : U32))
+
+# FNV-1a over frames as 32-bit words, the checksum the test and the bench
+# print.
+def Opl.hash(frames: List<&2, U32>) -> U32:
+  Opl.hash.go(frames, 2166136261)
