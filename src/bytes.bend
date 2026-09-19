@@ -9,6 +9,20 @@ def Bytes.read(path: String) -> IO(Result<&1, &1, U32 & String, Array<U32>>):
   import "./effs/bytes_read.c"
   import "./effs/bytes_read.js"
 
+# The low byte of each cell to an open file: Base writes only text, as
+# UTF-8.
+def Bytes.write(file: File, bytes: List<&2, U32>) -> IO(File & Result<&1, &1, U32 & String, Unit>):
+  import "./effs/bytes_write.c"
+  import "./effs/bytes_write.js"
+
+def Bytes.put.done(p: File & Result<&1, &1, U32 & String, Unit>) -> IO(File):
+  (file, done) = p
+  IO.bind(Unit, File, IO.pass(Unit, done), u => IO.pure(File, file))
+
+# The bytes written, or the program dies with the error.
+def Bytes.put(file: File, bytes: List<&2, U32>) -> IO(File):
+  IO.bind(File & Result<&1, &1, U32 & String, Unit>, File, Bytes.write(file, bytes), Bytes.put.done)
+
 def Bytes.at(a: Array<U32>, +i: U32) -> Array<U32> & U32:
   a[i]
 

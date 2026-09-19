@@ -108,7 +108,7 @@ def restarted(+start: S.State, +ended: H.Things, m: Maybe<M.Game>) -> IO(S.State
       do IO<S.State>:
         IO.print("quit")
         return start
-    case Some{M.Game{level, gfx, tables, +state, input, again, last, owed, mem}}:
+    case Some{M.Game{level, gfx, tables, +state, input, again, last, owed, mem, demo}}:
       do IO<S.State>:
         IO.print(line("restarted", start, state))
         IO.print("  restored" ++ restored(H.Things.list(S.State.things(start)), ended, S.State.things(state)))
@@ -148,7 +148,7 @@ def route(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     +r20 : S.State <- leg("exit", [use()], start, r19)
     IO.print(M.Game.time(S.State.clock(r20)))
     again : Maybe<M.Game> <- M.Game.frame(0n, [Key{13, True{}}], M.Game{level, gfx, P.Project.tables(level),
-      r20, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem})
+      r20, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}})
     s0 : S.State <- restarted(start, S.State.things(r20), again)
     s1 : S.State <- leg("south door again", south_door(), start, s0)
     return Unit{}

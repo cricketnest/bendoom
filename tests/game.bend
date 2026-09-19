@@ -57,8 +57,8 @@ def report(tag: String, m: Maybe<M.Game>) -> IO(Maybe<M.Game>):
       do IO<Maybe<M.Game>>:
         IO.print(tag ++ " quit")
         return None{}
-    case Some{M.Game{level, gfx, tables, +state, input, again, last, owed, mem}}:
-      told(tag, state, M.Game{level, gfx, tables, state, input, again, last, owed, mem})
+    case Some{M.Game{level, gfx, tables, +state, input, again, last, owed, mem, demo}}:
+      told(tag, state, M.Game{level, gfx, tables, state, input, again, last, owed, mem, demo})
 
 # A frame of the game, then its state's line; a game that has quit stays
 # quit.
@@ -84,7 +84,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
     g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem}})
+      P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}}})
     g2 : Maybe<M.Game> <- frame("repeat", 400n, [Key{32, False{}}, Key{32, True{}}], g1)
     g3 : Maybe<M.Game> <- frame("release", 600n, [Key{32, False{}}], g2)
     g4 : Maybe<M.Game> <- frame("enter", 600n, [Key{13, True{}}], g3)
