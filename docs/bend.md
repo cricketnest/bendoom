@@ -10,6 +10,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **Scrutinees follow binder order.** Destructuring lets and matches must take parameters in declaration order, and a let may not precede a match on a parameter, so put the flags matched on first and the records opened after.
 - **`[]` is a pattern only in a case's first position:** `case 1n+m []:` does not parse; write `Nil{}` there.
 - **A call result is not a pattern.** `(a, b) = f(x)` and `match f(x)` are refused: pass the result to a def that destructures its parameter. A let-bound variable is refused the same way.
+- **A `do` block binds only actions** (`x : T <- act`): a let (`+x = f(y)`) inside one is refused with "expected a pattern", so it goes before the `do`.
 - **Templates take their function first,** with an affine parameter (`x: U32`, not `+x`).
 - **Reuse needs `+` everywhere:** on parameters, on pattern fields (`Player{+x, ..}`, `case 1n++p`, `(+a, b) = p`), and in laws (`for +level`).
 - **Linear arrays cannot be shared across nested calls.** A quadtree from an `Array` is an explicit stack (`Show.fold`); a copyable indexed structure is a `Vec` tree (`src/vec.bend`).

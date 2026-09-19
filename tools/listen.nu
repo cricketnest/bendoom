@@ -120,21 +120,22 @@ def "main compare" [a: path, b: path]: nothing -> record {
     largest: ($d | get by | append 0 | math max)}
 }
 
-# A render against a capture, both from their first frame, over the
-# render's frames: how many left and right samples differ, by how much at
-# most, and the first frame that differs. The render prints its frames as
-# hex; build it first with bend tools/render.bend -o render. Without
-# --frames it renders the song's first pass.
-def "main render" [
-  capture: path
-  --binary: path = ./render
-  --frames: int                 # render only this many frames
-]: nothing -> record {
+# music.bend's two passes against a capture: the render starts with the
+# idle buffer, as the capture does, and both are compared from their
+# first frame over the render's frames. The report gives each pass's
+# frames, how many left and right samples differ, by how much at most,
+# and the first frame that differs. Build it first with
+# bend music.bend -o music.
+def "main render" [capture: path, --binary: path = ./music]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
-  let span = if $frames == null { {} } else { {BENDOOM_FRAMES: ($frames | into string)} }
-  let render = with-env $span { ^$binary --threads 1 } | str trim | decode hex
-  let d = differences $render (open --raw $capture)
-  {frames: (($render | bytes length) // 4), left: ($d | where at mod 2 == 0 | length),
-    right: ($d | where at mod 2 == 1 | length), largest: ($d | get by | append 0 | math max),
-    first: ($d | get at.0? | if $in != null { $in // 2 })}
+  let binary = $binary | path expand
+  let dir = mktemp --directory
+  do { cd $dir; with-env {BENDOOM_IDLE: 1} { ^$binary --threads 1 } }
+  let first = open --raw ($dir | path join first.raw)
+  let second = open --raw ($dir | path join second.raw)
+  rm --recursive $dir
+  let d = differences (bytes build $first $second) (open --raw $capture)
+  {first_pass: (($first | bytes length) // 4), second_pass: (($second | bytes length) // 4),
+    left: ($d | where at mod 2 == 0 | length), right: ($d | where at mod 2 == 1 | length),
+    largest: ($d | get by | append 0 | math max), differs_from: ($d | get at.0? | if $in != null { $in // 2 })}
 }

@@ -886,8 +886,9 @@ law heap_one:
 # pushed: after the first, OPL_Queue_Pop moves the last entry to the top,
 # so the third pushed runs before the second (sanity).
 law heap_ties:
-  {Sg.Song.pop(Sg.Song.push(Sg.Song.push(Sg.Song.push([], Sg.Next{5, 0}), Sg.Next{5, 1}), Sg.Next{5, 2}))
-    == [Sg.Next{5, 2}, Sg.Next{5, 1}] : List<&2, Sg.Song.Entry>}
+  {Sg.Song.pop(Sg.Song.push(Sg.Song.push(Sg.Song.push([], Sg.Entry{5, Some{0}}), Sg.Entry{5, Some{1}}),
+    Sg.Entry{5, Some{2}}))
+    == [Sg.Entry{5, Some{2}}, Sg.Entry{5, Some{1}}] : List<&2, Sg.Song.Entry>}
 
 # LAW: a note on of velocity zero is a note off, on any player.
 law velocity_zero_is_off:

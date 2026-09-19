@@ -26,12 +26,17 @@
           wads = pkgs.callPackage ./nix/wads.nix { };
           freedoom = "${wads.freedoom}/share/games/doom/freedoom1.wad";
           shareware = "${wads.doom1}/share/games/doom/doom1.wad";
+          # The music is a function of the IWAD: a package that takes one
+          # renders that IWAD's song, so the shareware song builds only
+          # with the shareware packages.
+          music = iwad: pkgs.callPackage ./nix/music.nix { inherit bend iwad; };
           bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend; iwad = freedoom; };
           film = pkgs.callPackage ./nix/film.nix { inherit bend; iwad = freedoom; };
         in {
           packages = {
             inherit bend bendoom film;
             default = bendoom;
+            music = music freedoom;
             doom1-wad = wads.doom1;
             bendoom-shareware = bendoom.override { iwad = shareware; };
             film-shareware = film.override { iwad = shareware; };

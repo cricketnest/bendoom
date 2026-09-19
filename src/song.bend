@@ -1,9 +1,9 @@
-# E1M1's song as Chocolate Doom plays it. Its SDL driver (opl/opl_sdl.c)
-# fills 4096-frame buffers, each cut at every callback due in it: a cut
-# is the whole frames that reach the callback's time, and time advances
-# by the cut's microseconds, rounded down. The callbacks wait in
-# opl_queue.c's heap and read the song's tracks (i_oplmusic.c). The
-# song's time counts microseconds from its start.
+# E1M1's song as Chocolate Doom plays it, looping. Its SDL driver
+# (opl/opl_sdl.c) fills 4096-frame buffers, each cut at every callback
+# due in it: a cut is the whole frames that reach the callback's time,
+# and time advances by the cut's microseconds, rounded down. The
+# callbacks wait in opl_queue.c's heap and read the song's tracks
+# (i_oplmusic.c). The song's time counts microseconds from its start.
 import Base
 import ./bytes.bend as B
 import ./wad.bend as W
@@ -12,35 +12,39 @@ import ./opl.bend as O
 import ./midi.bend as M
 import ./player.bend as P
 
-# A callback: a track's next event (TrackTimerCallback), or the restart
-# 5 ms after the last track ends (RestartSong), where the pass ends.
+# A callback due at a time: a track's next event (TrackTimerCallback),
+# or with no track the restart 5 ms after the last track ends
+# (RestartSong), where a pass ends.
 type Song.Entry is Data:
-  Next{time: U32, track: U32}
-  Restart{time: U32}
+  Entry{time: U32, track: Maybe<&2, U32>}
 
-# The chip with the frames made so far, the player, the tracks, the
-# callback heap as opl_queue.c's array, now (current_time), the frames
-# made, the tracks still running, the tempo in microseconds a beat, and
-# the song's ticks a beat.
+# The chip with the frames made and not yet taken, the player, the
+# tracks, the callback heap as opl_queue.c's array, now (current_time),
+# the frames made, the tracks still running, and the tempo in
+# microseconds a beat.
 type Song is Data:
   Song{sound: O.Opl.Frames, player: P.Player, tracks: List<&2, M.Midi.Track>,
-    heap: List<&2, Song.Entry>, now: U32, made: U32, running: U32, tempo: U32, division: U32}
+    heap: List<&2, Song.Entry>, now: U32, made: U32, running: U32, tempo: U32}
 
+# The chip's tables, the player's, and the song as its lump holds it.
 type Song.Env is Data:
-  Env{roms: O.Opl.Roms, tabs: P.Player.Tabs}
+  Env{roms: O.Opl.Roms, tabs: P.Player.Tabs, file: M.Midi.File}
+
+# The frames of one of opl_sdl.c's buffers: GetSliceSize's largest power
+# of two not over 100 ms.
+def Song.buffer() -> U32:
+  4096
 
 # The callback heap
 # -----------------
 
 def Song.time(+e: Song.Entry) -> U32:
-  match e:
-    case Next{time, track}:
-      time
-    case Restart{time}:
-      time
+  Entry{time, track} = e
+  time
 
+# The entry at i; past the heap's end, one never due.
 def Song.at(+q: List<&2, Song.Entry>, +i: U32) -> Song.Entry:
-  Maybe.default(&2, Song.Entry, List.get(&2, Song.Entry, q, U32.to_nat(i)), Restart{0})
+  Maybe.default(&2, Song.Entry, List.get(&2, Song.Entry, q, U32.to_nat(i)), Entry{4294967295, None{}})
 
 def Song.put(q: List<&2, Song.Entry>, +i: U32, e: Song.Entry) -> List<&2, Song.Entry>:
   List.set(&2, Song.Entry, q, U32.to_nat(i), e)
@@ -112,132 +116,162 @@ def Song.adjust(q: List<&2, Song.Entry>, +now: U32, +factor: F32) -> List<&2, So
   match q:
     case []:
       []
-    case Next{+time, k} <> rest:
-      Next{Song.rescale(now, factor, time), k} <> Song.adjust(rest, now, factor)
-    case Restart{+time} <> rest:
-      Restart{Song.rescale(now, factor, time)} <> Song.adjust(rest, now, factor)
+    case Entry{+time, track} <> rest:
+      Entry{Song.rescale(now, factor, time), track} <> Song.adjust(rest, now, factor)
 
 # Callbacks
 # ---------
 
 # ScheduleTrack: the track's next event after its delta in ticks, turned
 # to microseconds at the tempo.
-def Song.schedule(+k: U32, t: M.Midi.Track, m: Song) -> Song:
-  Song{sound, player, tracks, heap, +now, made, running, +tempo, +division} = m
+def Song.schedule(+env: Song.Env, +k: U32, t: M.Midi.Track, m: Song) -> Song:
+  Env{roms, tabs, file} = env
+  M.File{+division, tracks} = file
+  Song{sound, player, tracks, heap, +now, made, running, +tempo} = m
   +delta = M.Midi.delta(t)
-  Song{sound, player, tracks, Song.push(heap, Next{(now + (delta * (tempo / division)) +
-    (((delta * (tempo % division)) / division)) : U32), k}), now, made, running, tempo, division}
+  Song{sound, player, tracks, Song.push(heap, Entry{(now + (delta * (tempo / division)) +
+    (((delta * (tempo % division)) / division)) : U32), Some{k}}), now, made, running, tempo}
 
 # A channel event: the player's writes go to the chip's buffer.
 def Song.event(+env: Song.Env, +kind: U32, +raw: U32, +p1: U32, +p2: U32, m: Song) -> Song:
-  Env{roms, +tabs} = env
-  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
+  Env{roms, +tabs, file} = env
+  Song{sound, player, tracks, heap, now, made, running, tempo} = m
   +p = P.Player.event(tabs, kind, raw, p1, p2, player)
-  Song{O.Opl.Frames.queue(P.Player.taken(p), sound), P.Player.clear(p), tracks, heap, now, made, running,
-    tempo, division}
+  Song{O.Opl.Frames.queue(P.Player.taken(p), sound), P.Player.clear(p), tracks, heap, now, made, running, tempo}
 
 # MetaSetTempo: the heap rescaled by the old tempo over the new, in
 # single precision.
 def Song.retempo(+new: U32, m: Song) -> Song:
-  Song{sound, player, tracks, heap, +now, made, running, tempo, division} = m
+  Song{sound, player, tracks, heap, +now, made, running, tempo} = m
   Song{sound, player, tracks, Song.adjust(heap, now, (U32.to_f32(tempo) / U32.to_f32(new) : F32)), now,
-    made, running, new, division}
+    made, running, new}
 
 def Song.last(done: Bool, +now: U32, heap: List<&2, Song.Entry>) -> List<&2, Song.Entry>:
   match done:
     case True{}:
-      Song.push(heap, Restart{(now + 5000 : U32)})
+      Song.push(heap, Entry{(now + 5000 : U32), None{}})
     case False{}:
       heap
 
 # A track's end: it is not scheduled again, and the last track's end
 # schedules the restart.
 def Song.ended(m: Song) -> Song:
-  Song{sound, player, tracks, heap, +now, made, +running, tempo, division} = m
+  Song{sound, player, tracks, heap, +now, made, +running, tempo} = m
   Song{sound, player, tracks, Song.last(U32.is_eq(running, 1), now, heap), now, made, (running - 1 : U32),
-    tempo, division}
+    tempo}
 
 def Song.handle(e: M.Midi.Event, +env: Song.Env, +k: U32, t: M.Midi.Track, m: Song) -> Song:
   match e:
     case M.Chan{kind, raw, p1, p2}:
-      Song.schedule(k, t, Song.event(env, kind, raw, p1, p2, m))
+      Song.schedule(env, k, t, Song.event(env, kind, raw, p1, p2, m))
     case M.Tempo{us}:
-      Song.schedule(k, t, Song.retempo(us, m))
+      Song.schedule(env, k, t, Song.retempo(us, m))
     case M.End{}:
       Song.ended(m)
     case M.Other{}:
-      Song.schedule(k, t, m)
+      Song.schedule(env, k, t, m)
 
 def Song.got(+env: Song.Env, +k: U32, m: Song, g: M.Midi.Got) -> Song:
-  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
+  Song{sound, player, tracks, heap, now, made, running, tempo} = m
   M.Got{event, +t} = g
   Song.handle(event, env, k, t,
-    Song{sound, player, List.set(&2, M.Midi.Track, tracks, U32.to_nat(k), t), heap, now, made, running, tempo,
-      division})
+    Song{sound, player, List.set(&2, M.Midi.Track, tracks, U32.to_nat(k), t), heap, now, made, running, tempo})
 
 # TrackTimerCallback for track k, the heap's first entry.
 def Song.callback(+env: Song.Env, +k: U32, m: Song) -> Song:
-  Song{sound, player, +tracks, +heap, now, made, running, tempo, division} = m
-  Song.got(env, k, Song{sound, player, tracks, Song.pop(heap), now, made, running, tempo, division},
+  Song{sound, player, +tracks, +heap, now, made, running, tempo} = m
+  Song.got(env, k, Song{sound, player, tracks, Song.pop(heap), now, made, running, tempo},
     M.Midi.next(Maybe.default(&2, M.Midi.Track, List.get(&2, M.Midi.Track, tracks, U32.to_nat(k)),
       M.Track{[], 0})))
 
 # One cut of OPL_Mix_Callback's loop: frames up to the next callback's
-# time, d microseconds away, or the buffer's end, and no further than
-# the span. Past 100 ms a cut is the buffer's rest.
-def Song.cut(+env: Song.Env, +d: U32, +span: U32, m: Song) -> Song:
-  Env{+roms, tabs} = env
-  Song{sound, player, tracks, heap, +now, +made, running, tempo, division} = m
-  +n = U32.min(U32.min((((d * 441) + 9999) / 10000 : U32), (4096 - (made % 4096) : U32)), (span - made : U32))
+# time, d microseconds away, or the buffer's end.
+def Song.cut(+env: Song.Env, +d: U32, m: Song) -> Song:
+  Env{+roms, tabs, file} = env
+  Song{sound, player, tracks, heap, +now, +made, running, tempo} = m
+  +n = U32.min((((d * 441) + 9999) / 10000 : U32), (Song.buffer() - (made % Song.buffer()) : U32))
   Song{O.Opl.frames(U32.to_nat(n), roms, sound), player, tracks, heap, (now + ((n * 10000) / 441) : U32),
-    (made + n : U32), running, tempo, division}
+    (made + n : U32), running, tempo}
 
-# What OPL_Mix_Callback does next: cut toward the next callback, run it
-# if due, or stop at the restart or the span's end.
+# What OPL_Mix_Callback does next: a cut toward the heap's first
+# callback, or the callback if due. Past 100 ms a cut is the buffer's
+# rest, so the wait stops there.
 type Song.Step is Data:
   Cut{d: U32}
-  Call{track: U32}
-  Stop{}
+  Call{track: Maybe<&2, U32>}
 
-def Song.wait(+now: U32, +time: U32) -> U32:
-  U32.min((time - now : U32), 100000)
+def Song.step.at(+now: U32, e: Song.Entry) -> Song.Step:
+  Entry{+time, track} = e
+  Bool.pick(Song.Step, U32.is_ge(now, time), Call{track}, Cut{U32.min((time - now : U32), 100000)})
 
-def Song.step.at(+now: U32, +full: Bool, e: Song.Entry) -> Song.Step:
-  match e:
-    case Next{+time, k}:
-      Bool.pick(Song.Step, full, Stop{},
-        Bool.pick(Song.Step, U32.is_ge(now, time), Call{k}, Cut{Song.wait(now, time)}))
-    case Restart{+time}:
-      Bool.pick(Song.Step, full || U32.is_ge(now, time), Stop{}, Cut{Song.wait(now, time)})
+def Song.step(+m: Song) -> Song.Step:
+  Song{sound, player, tracks, +heap, +now, made, running, tempo} = m
+  Song.step.at(now, Song.at(heap, 0))
 
-def Song.step.top(+now: U32, +full: Bool, top: Maybe<&2, Song.Entry>) -> Song.Step:
-  match top:
-    case None{}:
-      Bool.pick(Song.Step, full, Stop{}, Cut{100000})
-    case Some{e}:
-      Song.step.at(now, full, e)
-
-def Song.step(+span: U32, +m: Song) -> Song.Step:
-  Song{sound, player, tracks, +heap, +now, +made, running, tempo, division} = m
-  Song.step.top(now, U32.is_ge(made, span), List.head(&2, Song.Entry, heap))
-
-def Song.play(n: Nat, s: Song.Step, +span: U32, +env: Song.Env, m: Song) -> Song:
+def Song.next.go(n: Nat, s: Song.Step, +env: Song.Env, m: Song) -> Song:
   match n s:
-    case _ Stop{}:
+    case _ Cut{+d}:
+      Song.cut(env, d, m)
+    case _ Call{None{}}:
       m
-    case 0n Cut{d}:
+    case 0n Call{Some{k}}:
       m
-    case 0n Call{k}:
-      m
-    case 1n+f Cut{+d}:
-      +m2 = Song.cut(env, d, span, m)
-      Song.play(f, Song.step(span, m2), span, env, m2)
-    case 1n+f Call{+k}:
+    case 1n+f Call{Some{+k}}:
       +m2 = Song.callback(env, k, m)
-      Song.play(f, Song.step(span, m2), span, env, m2)
+      Song.next.go(f, Song.step(m2), env, m2)
+
+# The callbacks due, then the next cut; or nothing where the restart is
+# due, at the pass's end. A legal lump (under 96 KiB, two bytes an event
+# at least) has fewer events than the fuel.
+def Song.next(+env: Song.Env, +m: Song) -> Song:
+  Song.next.go(U32.to_nat(65536), Song.step(m), env, m)
 
 # Starting
 # --------
+
+def Song.chans(p: P.Player) -> List<&2, P.Player.Chan>:
+  P.Player{chans, voices, free, alloced, writes} = p
+  chans
+
+# InitChannel on every channel; the voices keep theirs.
+def Song.channels(p: P.Player) -> P.Player:
+  P.Player{chans, voices, free, alloced, writes} = p
+  P.Player{Song.chans(P.Player.start()), voices, free, alloced, writes}
+
+def Song.begin.go(+env: Song.Env, ts: List<&2, M.Midi.Track>, +k: U32, m: Song) -> Song:
+  match ts:
+    case []:
+      m
+    case t <> rest:
+      Song.begin.go(env, rest, (k + 1 : U32), Song.schedule(env, k, t, m))
+
+# Every track from its start, scheduled at now, all running, and every
+# channel set up. I_OPL_PlaySong and RestartSong both do this; neither
+# touches the voices or the chip.
+def Song.begin(+env: Song.Env, m: Song) -> Song:
+  Env{roms, tabs, file} = env
+  M.File{division, +tracks} = file
+  Song{sound, player, old, heap, now, made, running, tempo} = m
+  Song.begin.go(env, tracks, 0, Song{sound, Song.channels(player), tracks, heap, now, made,
+    U32.from_nat(List.length(&2, M.Midi.Track, tracks)), tempo})
+
+# RestartSong, where the restart is due: the pass starts again at now,
+# overshoot included, at the tempo the pass ended with (only
+# I_OPL_PlaySong sets the default).
+def Song.restart(+env: Song.Env, m: Song) -> Song:
+  Song{sound, player, tracks, +heap, now, made, running, tempo} = m
+  Song.begin(env, Song{sound, player, tracks, Song.pop(heap), now, made, running, tempo})
+
+# The song as I_OPL_PlaySong starts it at the default tempo, on a chip
+# reset as the sound starts. Idle, the chip first makes Chocolate Doom's
+# first buffer, as a capture has it: the game reaches the level before
+# the buffer ends, and the song starts at the next one's first frame.
+# Either way OPL_InitRegisters' writes wait in the chip's buffer first.
+def Song.start(+idle: Bool, +env: Song.Env) -> Song:
+  Env{+roms, tabs, file} = env
+  +made = Bool.pick(U32, idle, Song.buffer(), 0)
+  Song.begin(env, Song{O.Opl.Frames.queue(P.Player.setup(), O.Opl.frames(U32.to_nat(made), roms,
+    O.Frames{O.Opl.reset(), []})), P.Player.start(), [], [], 0, made, 0, 500000})
 
 type Song.Lumps is Data:
   Lumps{genmidi: List<&2, U32>, song: List<&2, U32>}
@@ -275,50 +309,19 @@ def Song.load() -> IO(Song.Lumps):
 
 def Song.env(+l: Song.Lumps) -> Song.Env:
   Lumps{genmidi, song} = l
-  Env{O.Opl.roms(), P.Player.tabs(genmidi)}
+  Env{O.Opl.roms(), P.Player.tabs(genmidi), M.Midi.file(song)}
 
-def Song.file(f: M.Midi.File) -> Song:
-  M.File{division, +tracks} = f
-  Song{O.Frames{O.Opl.reset(), []}, P.Player.start(), tracks, [], 0, 0,
-    U32.from_nat(List.length(&2, M.Midi.Track, tracks)), 500000, division}
-
-# I_OPL_PlaySong: each track's first event scheduled at the default tempo.
-def Song.start(ts: List<&2, M.Midi.Track>, +k: U32, m: Song) -> Song:
-  match ts:
-    case []:
-      m
-    case t <> rest:
-      Song.start(rest, (k + 1 : U32), Song.schedule(k, t, m))
-
-# Chocolate Doom's first buffer: the chip, reset as the sound starts,
-# makes 4096 frames before the game reaches the level. Then
-# OPL_InitRegisters' writes join the buffer, and the song starts at the
-# next buffer's first frame.
-def Song.idle(+env: Song.Env, m: Song) -> Song:
-  Env{+roms, tabs} = env
-  Song{sound, player, +tracks, heap, now, made, running, tempo, division} = m
-  Song.start(tracks, 0,
-    Song{O.Opl.Frames.queue(P.Player.setup(), O.Opl.frames(U32.to_nat(4096), roms, sound)), player, tracks,
-      heap, now, 4096, running, tempo, division})
-
-def Song.song(+l: Song.Lumps) -> List<&2, U32>:
-  Lumps{genmidi, song} = l
-  song
-
-def Song.render.go(+span: U32, +env: Song.Env, +m: Song) -> Song:
-  Song.play(U32.to_nat(100000000), Song.step(span, m), span, env, m)
-
-# The idle buffer, then the song's first pass, up to the restart or the
-# span's frames if fewer.
-def Song.render(+span: U32, +l: Song.Lumps) -> Song:
-  +env = Song.env(l)
-  Song.render.go(span, env, Song.idle(env, Song.file(M.Midi.file(Song.song(l)))))
-
-# The frames made, latest first.
+# The frames made and not yet taken, latest first.
 def Song.out(m: Song) -> List<&2, U32>:
-  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
+  Song{sound, player, tracks, heap, now, made, running, tempo} = m
   O.Opl.Frames.out(sound)
 
+# The song with its frames taken.
+def Song.clear(m: Song) -> Song:
+  Song{sound, player, tracks, heap, now, made, running, tempo} = m
+  O.Frames{opl, out} = sound
+  Song{O.Frames{opl, []}, player, tracks, heap, now, made, running, tempo}
+
 def Song.made(+m: Song) -> U32:
-  Song{sound, player, tracks, heap, now, made, running, tempo, division} = m
+  Song{sound, player, tracks, heap, now, made, running, tempo} = m
   made

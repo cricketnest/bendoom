@@ -1,9 +1,9 @@
-# Freedoom's song as tools/render.bend renders it, over its first 72000
-# frames: the idle buffer, the song's two tempo changes at tick 0, which
-# rescale every track's first callback, its first note at frame 4536 and
-# its first voice steal, a note on channel 9 with all nine voices busy,
-# whose callback runs after frame 67613. It prints the frame count, an
-# FNV-1a hash of the frames (each a 32-bit word, left in the low half),
+# Freedoom's song as music.bend renders it with BENDOOM_IDLE, over its
+# first 72000 frames: the idle buffer, the song's two tempo changes at
+# tick 0, which rescale every track's first callback, its first note at
+# frame 4536 and its first voice steal, a note on channel 9 with all nine
+# voices busy, whose callback runs after frame 67613. It prints an
+# FNV-1a hash of the frames (each a 32-bit word, left in the low half)
 # and frames on either side of the first note and of the steal. The
 # expected lines are Chocolate Doom's, read in nushell from a real-time
 # capture (tools/listen.nu --keep) as the same words:
@@ -22,11 +22,25 @@ def Test.frame(+frames: List<&2, U32>, +i: U32) -> String:
   +lr = Maybe.default(&2, U32, List.get(&2, U32, frames, U32.to_nat(i)), 0)
   U32.show(i) ++ " " ++ Test.signed((lr .&. 65535 : U32)) ++ " " ++ Test.signed((lr >> 16n : U32))
 
+# Cuts until 72000 frames are made; the last may pass it, and Test.first
+# drops what it passes by.
+def Test.render(n: Nat, done: Bool, +env: S.Song.Env, +m: S.Song) -> S.Song:
+  match n done:
+    case _ True{}:
+      m
+    case 0n False{}:
+      m
+    case 1n+f False{}:
+      +next = S.Song.next(env, m)
+      Test.render(f, U32.is_ge(S.Song.made(next), 72000), env, next)
+
+def Test.first(+m: S.Song) -> List<&2, U32>:
+  List.reverse(&2, U32, List.drop(&2, U32, S.Song.out(m), U32.to_nat((S.Song.made(m) - 72000 : U32))))
+
 def Test.print(+lumps: S.Song.Lumps) -> IO(Unit):
-  +song = S.Song.render(72000, lumps)
-  +frames = List.reverse(&2, U32, S.Song.out(song))
+  +env = S.Song.env(lumps)
+  +frames = Test.first(Test.render(U32.to_nat(72000), False{}, env, S.Song.start(True{}, env)))
   do IO<Unit>:
-    IO.print("frames " ++ U32.show(S.Song.made(song)))
     IO.print("hash " ++ U32.show(O.Opl.hash(frames)))
     IO.print(Test.frame(frames, 4535))
     IO.print(Test.frame(frames, 4536))
@@ -41,7 +55,6 @@ def main() -> IO(Unit):
     lumps : S.Song.Lumps <- S.Song.load()
     Test.print(lumps)
 
-#|frames 72000
 #|hash 1145462143
 #|4535 0 0
 #|4536 29 0
