@@ -1,10 +1,10 @@
 # The render named by BENDOOM_MUSIC streamed as the game streams it, in
-# pieces of varying frame counts, printing the pass, the frames read
-# from it, and the frames themselves where the song begins, at each end
-# of a pass and at each start after one. Freedoom's passes are 5,759,883
-# and 5,759,888 frames, so the pull after the last frame of a pass reads
-# none, which is the end the second pass opens again on. The expected
-# frames are read from the render's files in nushell:
+# pieces of varying frame counts, printing the frames where the song
+# begins, at each end of a pass and at each start after one. Freedoom's
+# passes are 5,759,883 and 5,759,888 frames, so the pull after the last
+# three frames of a pass reads none: that empty read is the pass's end,
+# and the second pass opens again on it. The expected frames are read
+# from the render's files in nushell:
 #
 #   def frames [file: path, off: int, n: int] {
 #     open --raw $file | bytes at $off..<($off + $n * 4) | chunks 4 | each {|c|
@@ -23,25 +23,21 @@ import ../src/stream.bend as A
 def int(+x: U32) -> String:
   Bool.pick(String, U32.is_lt(x, 32768), U32.show(x), "-" ++ U32.show((65536 - x : U32)))
 
-def frames(fs: List<&2, U32>) -> String:
-  match fs:
-    case []:
+# The samples of a read, left then right.
+def samples(bytes: List<&2, U32>) -> String:
+  match bytes:
+    case lo <> hi <> rest:
+      " " ++ int((lo .|. (hi << 8n) : U32)) ++ samples(rest)
+    case _:
       ""
-    case +f <> rest:
-      " " ++ int((f .&. 65535 : U32)) ++ " " ++ int((f >> 16n : U32)) ++ frames(rest)
-
-def line(tag: String, second: Bool, +at: U32, fs: List<&2, U32>) -> String:
-  tag ++ " " ++ Bool.pick(String, second, "second", "first") ++ " " ++ U32.show(at) ++ frames(fs)
 
 def told(tag: String, p: A.Stream.Tape & List<&2, U32>) -> IO(A.Stream.Tape):
-  (tape, fs) = p
-  A.Tape{file, path, at} = tape
-  A.At{+second, +now} = at
+  (tape, bytes) = p
   do IO<A.Stream.Tape>:
-    IO.print(line(tag, second, now, fs))
-    return A.Tape{file, path, A.At{second, now}}
+    IO.print(tag ++ samples(bytes))
+    return tape
 
-# A pull of so many frames, its place and its frames printed.
+# A pull of so many frames, its samples printed.
 def show(tag: String, k: U32, tape: A.Stream.Tape) -> IO(A.Stream.Tape):
   IO.bind(A.Stream.Tape & List<&2, U32>, A.Stream.Tape, A.Stream.pull(k, tape), p => told(tag, p))
 
@@ -90,7 +86,7 @@ def opened(m: Maybe<A.Stream.Tape>) -> IO(A.Stream.Tape):
       IO.pure(A.Stream.Tape, t)
 
 def shut(tape: A.Stream.Tape) -> IO(Unit):
-  A.Tape{file, path, at} = tape
+  A.Tape{file, path} = tape
   File.close(file)
 
 def main() -> IO(Unit):
@@ -109,10 +105,10 @@ def main() -> IO(Unit):
     t9 : A.Stream.Tape <- show("again", 3, t8)
     shut(t9)
 
-#|start first 3 0 0 0 0 0 0
-#|first end first 5759883 268 286 249 264 233 247
-#|boundary second 0
-#|second start second 3 216 229 204 215 196 204
-#|second end second 5759888 167 186 159 179 156 172
-#|wrap second 0
-#|again second 3 216 229 204 215 196 204
+#|start 0 0 0 0 0 0
+#|first end 268 286 249 264 233 247
+#|boundary
+#|second start 216 229 204 215 196 204
+#|second end 167 186 159 179 156 172
+#|wrap
+#|again 216 229 204 215 196 204

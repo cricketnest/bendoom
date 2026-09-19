@@ -19,7 +19,6 @@ import ./src/opl.bend as O
 import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
-import ./src/stream.bend as St
 
 # Bytes and the WAD
 # -----------------
@@ -1005,27 +1004,3 @@ law quiet_offs:
   {(Pl.Player.event(t, 128, raw, key, vel, Pl.Player.start()),
     Pl.Player.event(t, 176, raw, 123, vel, Pl.Player.start()))
     == (Pl.Player.start(), Pl.Player.start()) : Pl.Player & Pl.Player}
-
-# The music stream
-# ----------------
-
-# LAW: the song's place after a frames and then b more is its place
-# after a + b, whatever the place and however the reads are cut.
-law stream_pieces:
-  for a: Nat
-  for +b: Nat
-  for +p: St.Stream.At
-  {St.Stream.after(False{}, b, St.Stream.after(False{}, a, p))
-    == St.Stream.after(False{}, Nat.add(a, b), p) : St.Stream.At}
-
-# LAW: Freedoom's passes are 5,759,883 and 5,759,888 frames. The last
-# frame of each is read within its pass, and the read that finds the
-# pass's end carries the song to the second pass's first frame, at
-# either boundary (sanity).
-law stream_passes:
-  {(St.Stream.after(False{}, 1n, St.At{False{}, 5759882}),
-    St.Stream.after(True{}, 0n, St.At{False{}, 5759883}),
-    St.Stream.after(False{}, 1n, St.At{True{}, 5759887}),
-    St.Stream.after(True{}, 0n, St.At{True{}, 5759888}))
-    == (St.At{False{}, 5759883}, St.At{True{}, 0}, St.At{True{}, 5759888}, St.At{True{}, 0})
-    : St.Stream.At & St.Stream.At & St.Stream.At & St.Stream.At}

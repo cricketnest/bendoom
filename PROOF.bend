@@ -18,7 +18,6 @@ import ./src/planes.bend as N
 import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
-import ./src/stream.bend as St
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -1196,17 +1195,4 @@ def Laws.song_faults():
   {==}
 
 def Laws.buffer_spills():
-  {==}
-
-# The stream's place moves a frame at a time, so pieces compose by
-# induction on the first read's frames.
-
-def Laws.stream_pieces(a, b, p):
-  match a:
-    case 0n:
-      {==}
-    case 1n+m:
-      Laws.stream_pieces(m, b, St.Stream.one(p))
-
-def Laws.stream_passes():
   {==}
