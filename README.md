@@ -32,7 +32,7 @@ for bug.
 2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law. Done.
 3. Walls, floors, ceilings and the sky: vanilla's renderer, its frames Chocolate Doom's pixel for pixel. Done.
 4. Doors, the lift, switches, the exit, blinking and glowing lights, animated flats and textures, scrolling walls: E1M1 completable, no enemies, its frames Chocolate Doom's tic for tic. Done.
-5. Things: decorations, items, pickups, sprites.
+5. Decorations, items, pickups and sprites: every thing of both E1M1s but the monsters, spawned as on Hurt Me Plenty and drawn as vanilla's sprites behind walls, ledges and grates, animated on its tics; health, armour, ammo, weapons and the blue key taken as vanilla takes them; solid things in the way. Its frames Chocolate Doom's tic for tic. Done.
 6. Monsters, weapons, damage, the status bar.
 7. Sound effects.
 8. Music, rendered to PCM at build time.

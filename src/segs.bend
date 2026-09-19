@@ -324,27 +324,27 @@ def Segs.Rw.markceiling(rw: Segs.Rw) -> Bool:
 # The range is stored with the texture columns and clips its loop
 # gathered, in column order.
 def Segs.store.done(wall: D.Draw.Wall, solid: List<&2, C.Clip.Range>, walls: List<&2, D.Draw.Wall>,
-  tasks: List<&2, D.Draw.Task>, heads: List<&2, D.Draw.Plane>, count: U32, depth: Nat, st: Segs.Cols) ->
-  D.Draw:
+  tasks: List<&2, D.Draw.Task>, heads: List<&2, D.Draw.Plane>, count: U32, depth: Nat, seen: D.Draw.Seen,
+  st: Segs.Cols) -> D.Draw:
   D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, t0, t1, t2} = wall
   Cols{mem, cols, rw, view, gfx, floor, ceil, texcols, tops, bottoms} = st
   D.Draw{mem, solid, D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil,
     List.reverse(&2, U32, texcols), List.reverse(&2, U32, tops), List.reverse(&2, U32, bottoms)} <> walls,
-    tasks, D.Planes{heads, count, cols, depth, floor, ceil}}
+    tasks, D.Planes{heads, count, cols, depth, floor, ceil}, seen}
 
 def Segs.store.loop(+wall: D.Draw.Wall, rw: Segs.Rw, view: P.View, gfx: G.Gfx, solid: List<&2, C.Clip.Range>,
-  walls: List<&2, D.Draw.Wall>, tasks: List<&2, D.Draw.Task>, mem: Array<U32>, ps: D.Draw.Planes) ->
-  D.Draw:
+  walls: List<&2, D.Draw.Wall>, tasks: List<&2, D.Draw.Task>, seen: D.Draw.Seen, mem: Array<U32>,
+  ps: D.Draw.Planes) -> D.Draw:
   D.Wall{index, +x1, x2, scale1, scale2, step, sil, bsil, tsil, t0, t1, t2} = wall
   D.Planes{heads, count, cols, depth, floor, ceil} = ps
-  Segs.store.done(wall, solid, walls, tasks, heads, count, depth,
+  Segs.store.done(wall, solid, walls, tasks, heads, count, depth, seen,
     D.Draw.each(~Segs.Cols, ~Segs.col, U32.to_nat((x2 - x1 + 1 : U32)), U32.to_nat(x1),
       Cols{mem, cols, rw, view, gfx, floor, ceil, [], [], []}))
 
 def Segs.store.rw(+wall: D.Draw.Wall, +rw: Segs.Rw, view: P.View, gfx: G.Gfx, st: D.Draw) -> D.Draw:
   D.Wall{index, +x1, +x2, scale1, scale2, step, sil, bsil, tsil, t0, t1, t2} = wall
-  D.Draw{mem, solid, walls, tasks, planes} = st
-  Segs.store.loop(wall, rw, view, gfx, solid, walls, tasks, mem,
+  D.Draw{mem, solid, walls, tasks, planes, seen} = st
+  Segs.store.loop(wall, rw, view, gfx, solid, walls, tasks, seen, mem,
     N.Planes.check(Segs.Rw.markfloor(rw), True{}, x1, x2,
       N.Planes.check(Segs.Rw.markceiling(rw), False{}, x1, x2, planes)))
 
@@ -413,13 +413,13 @@ def Segs.clip(kind: Segs.Kind, +view: P.View, +level: L.Level, +gfx: G.Gfx, +seg
     case Nothing{}:
       st
     case Window{}:
-      D.Draw{mem, +solids, walls, tasks, planes} = st
+      D.Draw{mem, +solids, walls, tasks, planes, seen} = st
       Segs.stores(C.Clip.gaps(first, last, solids), view, level, gfx, seg, index, angle1,
-        D.Draw{mem, solids, walls, tasks, planes})
+        D.Draw{mem, solids, walls, tasks, planes, seen})
     case Solid{}:
-      D.Draw{mem, +solids, walls, tasks, planes} = st
+      D.Draw{mem, +solids, walls, tasks, planes, seen} = st
       Segs.stores(C.Clip.gaps(first, last, solids), view, level, gfx, seg, index, angle1,
-        D.Draw{mem, C.Clip.add(first, last, solids), walls, tasks, planes})
+        D.Draw{mem, C.Clip.add(first, last, solids), walls, tasks, planes, seen})
 
 def Segs.add.span(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, index: U32,
   angle1: U32, span: P.View.Span, st: D.Draw) -> D.Draw:

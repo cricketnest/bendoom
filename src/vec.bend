@@ -40,6 +40,14 @@ def Vec.set.go(v: Vec, odd: Bool, +i: U32, x: U32) -> Vec:
 def Vec.set(v: Vec, +i: U32, x: U32) -> Vec:
   Vec.set.go(v, Vec.odd(i), i, x)
 
+# The tree with every entry doubled.
+def Vec.doubled(v: Vec) -> Vec:
+  match v:
+    case Leaf{x}:
+      Leaf{(x * 2 : U32)}
+    case Node{l, r}:
+      Node{Vec.doubled(l), Vec.doubled(r)}
+
 def Vec.split.cons(h: U32, p: List<&2, U32> & List<&2, U32>) ->
   List<&2, U32> & List<&2, U32>:
   (o, e) = p
@@ -89,3 +97,11 @@ def Vec.of_list(xs: List<&2, U32>, n: U32) -> Vec:
 # A list as a tree of just its length.
 def Vec.of(+xs: List<&2, U32>) -> Vec:
   Vec.of_list(xs, U32.from_nat(List.length(&2, U32, xs)))
+
+# The n entries from i, each after a space.
+def Vec.show(+v: Vec, n: Nat, +i: U32) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+m:
+      " " ++ U32.show(Vec.get(v, i)) ++ Vec.show(v, m, (i + 1 : U32))
