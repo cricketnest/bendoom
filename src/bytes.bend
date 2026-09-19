@@ -1,27 +1,102 @@
-# A file as one flat Array<U32>, one byte per slot (Base's File.read_bytes
-# answers a List, one cell per byte), and little-endian readers over it.
-# A read hands the array back beside the byte, and a pair from a call can
-# only be taken apart by a helper, so each reader is a chain of them.
+# A file as one flat Array<U32>, one byte per slot, little-endian
+# readers over it, and bytes out as hexadecimal text. Base reads a file
+# as Lists of bytes, one cell each, and cannot ask its size, so the
+# array grows as the file fills it. Base writes only text, as UTF-8, so
+# bytes leave Bend as hex and coreutils' basenc --base16 -d makes them
+# bytes again. A read hands the array back beside the byte, and a pair
+# from a call can only be taken apart by a helper, so each reader is a
+# chain of them.
 import Base
 
-# The bytes, sized up to a power of two, zero past the end.
+def Bytes.fold.next(~S: Type, ~step: List<&2, U32> -> S -> S, bytes: List<&2, U32>, file: File, s: S,
+  more: File -> S -> IO(S)) -> IO(S):
+  match bytes:
+    case []:
+      IO.bind(Unit, S, File.close(file), u => IO.pure(S, s))
+    case b <> rest:
+      more(file, step(b <> rest, s))
+
+def Bytes.fold.chunk(~S: Type, ~step: List<&2, U32> -> S -> S,
+  p: File & Result<&1, &1, U32 & String, List<&2, U32>>, s: S, more: File -> S -> IO(S)) -> IO(S):
+  (file, got) = p
+  IO.bind(List<&2, U32>, S, IO.pass(List<&2, U32>, got), bytes => Bytes.fold.next(~S, ~step, bytes, file, s, more))
+
+def Bytes.fold.go(~S: Type, ~step: List<&2, U32> -> S -> S, fuel: Nat, file: File, s: S) -> IO(S):
+  match fuel:
+    case 0n:
+      IO.pure(S, s)
+    case 1n+f:
+      IO.bind(File & Result<&1, &1, U32 & String, List<&2, U32>>, S, File.read_bytes(file, 4096),
+        p => Bytes.fold.chunk(~S, ~step, p, s, h => t => Bytes.fold.go(~S, ~step, f, h, t)))
+
+# An open file's chunks folded into a state, first to last, until a read
+# comes back empty, and the file closed. A chunk is at most 4096 bytes,
+# so a step that recurses once a byte is safe on the JS lane.
+def Bytes.fold(~S: Type, ~step: List<&2, U32> -> S -> S, file: File, s: S) -> IO(S):
+  Bytes.fold.go(~S, ~step, U32.to_nat(4294967295), file, s)
+
+# An array being filled: 2^d slots, the first i written.
+type Bytes.Fill is Type:
+  Fill{a: Array<U32>, i: U32, d: Nat}
+
+def Bytes.full(+i: U32, d: Nat) -> Bool:
+  U32.is_eq(i, (1 << d : U32))
+
+# A full array doubles before the next byte goes in, so it ends at the
+# smallest power of two that holds the file.
+def Bytes.fill.go(bytes: List<&2, U32>, full: Bool, a: Array<U32>, +i: U32, +d: Nat) -> Bytes.Fill:
+  match bytes full:
+    case [] _:
+      Fill{a, i, d}
+    case b <> rest True{}:
+      Bytes.fill.go(rest, Bytes.full((i + 1 : U32), 1n+d), Array.set(U32, ANode{a, Array.new(U32, d, 0)}, i, b),
+        (i + 1 : U32), 1n+d)
+    case b <> rest False{}:
+      Bytes.fill.go(rest, Bytes.full((i + 1 : U32), d), Array.set(U32, a, i, b), (i + 1 : U32), d)
+
+def Bytes.fill(bytes: List<&2, U32>, s: Bytes.Fill) -> Bytes.Fill:
+  Fill{a, +i, +d} = s
+  Bytes.fill.go(bytes, Bytes.full(i, d), a, i, d)
+
+def Bytes.read.done(s: Bytes.Fill) -> IO(Result<&1, &1, U32 & String, Array<U32>>):
+  Fill{a, i, d} = s
+  IO.pure(Result<&1, &1, U32 & String, Array<U32>>, Done{a})
+
+def Bytes.read.opened(r: Result<&1, &1, U32 & String, File>) -> IO(Result<&1, &1, U32 & String, Array<U32>>):
+  match r:
+    case Fail{e}:
+      IO.pure(Result<&1, &1, U32 & String, Array<U32>>, Fail{e})
+    case Done{file}:
+      IO.bind(Bytes.Fill, Result<&1, &1, U32 & String, Array<U32>>,
+        Bytes.fold(~Bytes.Fill, ~Bytes.fill, file, Fill{Array.new(U32, 0n, 0), 0, 0n}), Bytes.read.done)
+
+# The bytes, sized up to a power of two, zero past the end; a file that
+# will not open is a Fail.
 def Bytes.read(path: String) -> IO(Result<&1, &1, U32 & String, Array<U32>>):
-  import "./effs/bytes_read.c"
-  import "./effs/bytes_read.js"
+  IO.bind(Result<&1, &1, U32 & String, File>, Result<&1, &1, U32 & String, Array<U32>>, File.open(path, "r"),
+    Bytes.read.opened)
 
-# The low byte of each cell to an open file: Base writes only text, as
-# UTF-8.
-def Bytes.write(file: File, bytes: List<&2, U32>) -> IO(File & Result<&1, &1, U32 & String, Unit>):
-  import "./effs/bytes_write.c"
-  import "./effs/bytes_write.js"
+def Bytes.hex.digit(+d: U32) -> Char:
+  Char.from_u32(Bool.pick(U32, U32.is_lt(d, 10), (48 + d : U32), (87 + d : U32)))
 
-def Bytes.put.done(p: File & Result<&1, &1, U32 & String, Unit>) -> IO(File):
+# The low byte of each cell as two hex digits. It recurses once a byte,
+# which is four times faster natively than a loop over the reversed
+# list, so on the JS lane it takes short runs only.
+def Bytes.hex(bytes: List<&2, U32>) -> String:
+  match bytes:
+    case []:
+      ""
+    case +b <> rest:
+      SCon{Bytes.hex.digit(((b >> 4n) .&. 15 : U32)), SCon{Bytes.hex.digit((b .&. 15 : U32)), Bytes.hex(rest)}}
+
+def Bytes.put_hex.done(p: File & Result<&1, &1, U32 & String, Unit>) -> IO(File):
   (file, done) = p
   IO.bind(Unit, File, IO.pass(Unit, done), u => IO.pure(File, file))
 
-# The bytes written, or the program dies with the error.
-def Bytes.put(file: File, bytes: List<&2, U32>) -> IO(File):
-  IO.bind(File & Result<&1, &1, U32 & String, Unit>, File, Bytes.write(file, bytes), Bytes.put.done)
+# The bytes written to an open file as hex, or the program dies with
+# the error.
+def Bytes.put_hex(file: File, bytes: List<&2, U32>) -> IO(File):
+  IO.bind(File & Result<&1, &1, U32 & String, Unit>, File, File.write(file, Bytes.hex(bytes)), Bytes.put_hex.done)
 
 def Bytes.at(a: Array<U32>, +i: U32) -> Array<U32> & U32:
   a[i]

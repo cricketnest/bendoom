@@ -2,9 +2,10 @@
 # from the player's eye, and the keyboard walks the player at Doom's 35
 # tics a second whatever the frame rate; Esc or Close quits. E1M1's song
 # plays from the render in the directory named by BENDOOM_MUSIC, which
-# the package's wrapper defaults to its own IWAD's. RECORD names a demo
+# the package's launcher defaults to its own IWAD's. RECORD names a demo
 # to record, as vanilla's -record does, until the level ends or the game
-# quits; film.bend makes a video of it.
+# quits; film.bend makes a video of it. This binary writes the demo as
+# hex text, and the launcher makes the .lmp of it.
 import Base
 import ./src/level.bend as L
 import ./src/gfx.bend as G

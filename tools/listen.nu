@@ -131,8 +131,8 @@ def "main render" [capture: path, --binary: path = ./music]: nothing -> record {
   let binary = $binary | path expand
   let dir = mktemp --directory
   do { cd $dir; with-env {BENDOOM_IDLE: 1} { ^$binary --threads 1 } }
-  let first = open --raw ($dir | path join first.raw)
-  let second = open --raw ($dir | path join second.raw)
+  let first = ^basenc --base16 -d ($dir | path join first.hex) | into binary
+  let second = ^basenc --base16 -d ($dir | path join second.hex) | into binary
   rm --recursive $dir
   let d = differences (bytes build $first $second) (open --raw $capture)
   {first_pass: (($first | bytes length) // 4), second_pass: (($second | bytes length) // 4),

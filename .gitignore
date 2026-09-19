@@ -4,3 +4,4 @@ result-*
 *.c.tmp
 /bendoom
 /bendoom.gpu
+/bytes.scratch

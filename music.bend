@@ -1,11 +1,12 @@
 # E1M1's song from the WAD named by BENDOOM_IWAD, as Chocolate Doom
 # plays it looping, written to two files in the current directory: the
-# first pass to first.raw, from the song's start to the sample where its
-# restart runs, and the second pass to second.raw, up to the next. Both
-# are raw 16-bit little-endian stereo at 44100 Hz, left then right, and
-# written a buffer at a time as it is made. With BENDOOM_IDLE set, first.raw
-# starts with Chocolate Doom's idle first buffer, as a capture does;
-# tools/listen.nu sets it to compare the passes with one.
+# first pass to first.hex, from the song's start to the sample where its
+# restart runs, and the second pass to second.hex, up to the next. Both
+# are 16-bit little-endian stereo at 44100 Hz, left then right, as hex
+# text that basenc --base16 -d makes first.raw and second.raw of, and
+# written a buffer at a time as it is made. With BENDOOM_IDLE set, the
+# first pass starts with Chocolate Doom's idle first buffer, as a
+# capture does; tools/listen.nu sets it to compare the passes with one.
 #
 #   bend music.bend -o music
 import Base
@@ -26,7 +27,7 @@ def Music.bytes(frames: List<&2, U32>, acc: List<&2, U32>) -> List<&2, U32>:
       Music.bytes(rest, lr <> (lr >> 8n : U32) <> (lr >> 16n : U32) <> (lr >> 24n : U32) <> acc)
 
 def Music.put(+m: S.Song, file: File) -> IO(File):
-  B.Bytes.put(file, Music.bytes(S.Song.out(m), []))
+  B.Bytes.put_hex(file, Music.bytes(S.Song.out(m), []))
 
 # The song run a buffer further.
 def Music.turn(+env: S.Song.Env, +m: S.Song) -> S.Song.Turn:
@@ -57,8 +58,8 @@ def Music.pass(path: String, +env: S.Song.Env, +m: S.Song) -> IO(S.Song):
 
 def Music.render(+env: S.Song.Env, +idle: Bool) -> IO(Unit):
   do IO<Unit>:
-    first : S.Song <- Music.pass("first.raw", env, S.Song.start(idle, env))
-    second : S.Song <- Music.pass("second.raw", env, S.Song.restart(env, first))
+    first : S.Song <- Music.pass("first.hex", env, S.Song.start(idle, env))
+    second : S.Song <- Music.pass("second.hex", env, S.Song.restart(env, first))
     IO.pure(Unit, Unit{})
 
 def main() -> IO(Unit):

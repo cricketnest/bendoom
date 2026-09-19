@@ -1,7 +1,7 @@
 # A root .bend program compiled to a binary: the program and the sources
-# it imports in, one executable out. film.bend and music.bend are built
-# this way.
-{ lib, llvmPackages_19, bend, pname, root, sources }:
+# it imports in, one executable out, built with the stdenv's clang, which
+# finds the libraries the program links through buildInputs.
+{ lib, llvmPackages_19, bend, pname, root, sources, buildInputs ? [ ] }:
 
 llvmPackages_19.stdenv.mkDerivation {
   inherit pname;
@@ -13,6 +13,7 @@ llvmPackages_19.stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [ bend ];
+  inherit buildInputs;
 
   buildPhase = ''
     runHook preBuild

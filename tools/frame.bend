@@ -18,19 +18,9 @@ import ../src/project.bend as P
 import ../src/render.bend as R
 import ./script.bend as T
 
-def Frame.digit(+d: U32) -> Char:
-  Char.from_u32(Bool.pick(U32, U32.is_lt(d, 10), (48 + d : U32), (87 + d : U32)))
-
-def Frame.hex(xs: List<&2, U32>) -> List<&2, Char>:
-  match xs:
-    case []:
-      []
-    case +x <> rest:
-      Frame.digit((x >> 4n : U32)) <> Frame.digit((x .&. 15 : U32)) <> Frame.hex(rest)
-
 def Frame.line(p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
   (mem, xs) = p
-  (mem, String.from_list(Frame.hex(xs)))
+  (mem, B.Bytes.hex(xs))
 
 def Frame.print(p: Array<U32> & String) -> IO(Array<U32>):
   (mem, text) = p

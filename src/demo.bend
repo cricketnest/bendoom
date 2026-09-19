@@ -1,5 +1,7 @@
 # A vanilla demo, the .lmp Doom's -record writes: the version 1.9
 # header, four bytes a tic, and 0x80 at the end. Chocolate Doom plays it.
+# A recording is written as hex text, which the package's launcher
+# decodes into the .lmp.
 import Base
 import ./bytes.bend as B
 import ./keys.bend as K
@@ -66,13 +68,13 @@ def Demo.open(path: Result<&1, &1, U32 & String, String>) -> IO(Maybe<Demo.Rec>)
     case Done{name}:
       do IO<Maybe<Demo.Rec>>:
         file : File <- IO.try(File, File.open(name, "w"))
-        kept : File <- B.Bytes.put(file, Demo.header())
+        kept : File <- B.Bytes.put_hex(file, Demo.header())
         return Some{Rec{kept, 0}}
 
 def Demo.recorded(file: File, p: List<&2, U32> & U32) -> IO(Maybe<Demo.Rec> & List<&2, K.Cmd>):
   (+bytes, carry) = p
   do IO<Maybe<Demo.Rec> & List<&2, K.Cmd>>:
-    kept : File <- B.Bytes.put(file, bytes)
+    kept : File <- B.Bytes.put_hex(file, bytes)
     return (Some{Rec{kept, carry}}, Demo.cmds(bytes))
 
 # A run of tics recorded, and the commands to play: the ones the demo
@@ -92,5 +94,5 @@ def Demo.stop(demo: Maybe<Demo.Rec>) -> IO(Unit):
       IO.pure(Unit, Unit{})
     case Some{Rec{file, carry}}:
       do IO<Unit>:
-        done : File <- B.Bytes.put(file, [128])
+        done : File <- B.Bytes.put_hex(file, [128])
         File.close(done)

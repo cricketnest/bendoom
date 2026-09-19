@@ -1,13 +1,14 @@
 # bendoom-film: a demo in, an MP4 out. film.bend plays the demo and
-# ffmpeg encodes its frames. Each of Doom's 320 by 200 pixels becomes a
-# block 5 wide and 6 high, so the video is 1600 by 1200: the 4:3 of the
-# monitor the frames were drawn for, every pixel the same size. H.264 in
-# 4:2:0 plays everywhere; its colour, at half resolution, blurs the
-# seams of blocks an odd width apart. Under it runs the IWAD's song, the
-# first pass then the second forever, from frame zero as the game starts
-# it on its first frame; the video arrives on a pipe, so its length is
-# unknown until it ends and -shortest is what cuts the audio.
-{ lib, callPackage, writers, bend, ffmpeg-headless, iwad, music }:
+# prints its frames as hex, basenc makes them bytes, and ffmpeg encodes
+# them. Each of Doom's 320 by 200 pixels becomes a block 5 wide and 6
+# high, so the video is 1600 by 1200: the 4:3 of the monitor the frames
+# were drawn for, every pixel the same size. H.264 in 4:2:0 plays
+# everywhere; its colour, at half resolution, blurs the seams of blocks
+# an odd width apart. Under it runs the IWAD's song, the first pass then
+# the second forever, from frame zero as the game starts it on its first
+# frame; the video arrives on a pipe, so its length is unknown until it
+# ends and -shortest is what cuts the audio.
+{ lib, callPackage, writers, bend, coreutils, ffmpeg-headless, iwad, music }:
 
 let
   frames = callPackage ./program.nix {
@@ -23,7 +24,7 @@ writers.writeNuBin "bendoom-film" ''
   def main [demo: path, video: path] {
     with-env {DEMO: $demo, BENDOOM_IWAD: ($env.BENDOOM_IWAD? | default "${iwad}")} {
       ^${lib.getExe frames} --threads 1
-    } | (^${lib.getExe ffmpeg-headless} -loglevel error -stats -n
+    } | ^${coreutils}/bin/basenc --base16 -d | (^${lib.getExe ffmpeg-headless} -loglevel error -stats -n
       -f rawvideo -pix_fmt rgb24 -s 320x200 -framerate 35 -i -
       -f s16le -ar 44100 -ac 2 -i ${song}/first.raw
       -stream_loop -1 -f s16le -ar 44100 -ac 2 -i ${song}/second.raw
