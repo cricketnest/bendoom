@@ -366,6 +366,9 @@ def Laws.pistol_rises():
 def Laws.pistol_bobs():
   {==}
 
+def Laws.ray_meets():
+  {==}
+
 def Laws.door_timeline():
   {==}
 
