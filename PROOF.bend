@@ -334,10 +334,46 @@ def Laws.arrows_wasd(down, keys):
 def Laws.lowest_number_wins(two, three):
   {==}
 
+# The player of tic_rest's law, at rest at a place with the inventory
+# G_PlayerReborn gives, and the state its move and eye leave, which the
+# sector's special is handed.
+def rest_player(+x: U32, +y: U32) -> S.Player:
+  S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}
+
+def rest_walked(+level: L.Level, +x: U32, +y: U32) -> S.State:
+  S.State.player.put(Laws.Closed.state(rest_player(x, y), level, 0),
+    S.Sim.eye(level, 0, S.Sim.move(level, K.Cmd.idle(), rest_player(x, y))))
+
+# A level whose sector's special the law says nothing about leaves the
+# nukage's flag stuck, so the tic splits on it: the blow it may deal
+# writes the health, the wound and the momentum, and the place a tic
+# from rest leaves is the place either way.
+def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) ->
+  {(S.Player.x(S.State.player(S.Sim.tic.live(K.Cmd.idle(), L.Level{geo, sectors, specials}, geo, 0, False{},
+      False{}, S.Sim.sector.hurt(due, rest_walked(L.Level{geo, sectors, specials}, x, y))))),
+    S.Player.y(S.State.player(S.Sim.tic.live(K.Cmd.idle(), L.Level{geo, sectors, specials}, geo, 0, False{},
+      False{}, S.Sim.sector.hurt(due, rest_walked(L.Level{geo, sectors, specials}, x, y))))))
+    == (x, y) : U32 & U32}:
+  match due:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
 def Laws.tic_rest(level, x, y):
   match level:
     case L.Level{geo, sectors, specials}:
-      {==}
+      rest_due(Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials},
+          L.Level.sector_at(L.Level{geo, sectors, specials},
+            S.Player.x(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))),
+            S.Player.y(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))))), 7),
+        Bool.and(U32.is_zero((0 .&. 31 : U32)),
+          U32.is_eq(S.Player.z(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))),
+            L.Level.floor(L.Level{geo, sectors, specials},
+              L.Level.sector_at(L.Level{geo, sectors, specials},
+                S.Player.x(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))),
+                S.Player.y(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y)))))))),
+        geo, sectors, specials, x, y)
 
 def Laws.tic_counts(cmd, p, level, clock):
   match level:
