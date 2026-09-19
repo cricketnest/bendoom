@@ -1347,6 +1347,9 @@ def Laws.weapon_taken():
 def Laws.radius_within():
   {==}
 
+def Laws.solid_stays():
+  {==}
+
 def Laws.blocker_geometry():
   {==}
 

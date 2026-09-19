@@ -15,7 +15,11 @@
 # armour, a leg hung from its ceiling, the blue key, the dead former
 # sergeant and the last, each with the sector under it (tools/wad.nu's
 # sector-at), its z, its facing (its record's angle), its state row,
-# its tics and its definition. The player's inventory, G_PlayerReborn's.
+# its tics and its definition. The blockmap's links against that
+# population: 180 links for 180 things, 79 of them solid (the solid
+# types' counts in ticket 02's nushell inventory), none at another
+# place, type or cell than its thing's, and no thing missing from the
+# cell of its centre. The player's inventory, G_PlayerReborn's.
 # Then the pickups, each run printed with the tic, the player's place,
 # the inventory, the records taken since the case began and the things
 # left: a clip, three shells in a row and the rocket walked into, with
@@ -43,8 +47,7 @@
 # twice, held, walked through and closed on the player; the special 23
 # switch; a special 2 line crossed both ways; the lift called by its
 # line and by its switch; the blue key taken, and its door, sector 71,
-# refusing the start's inventory and opening for the one the key left
-# and for the blue skull alone; the exit switch; the blinks and the
+# opening for the blue skull alone; the exit switch; the blinks and the
 # strobe from the start. The heights and tics are the hand computations
 # in milestone 4's tickets 04 to 10; the blinks' lights, a nushell
 # replay of T_LightFlash over Chocolate Doom's random table from index
@@ -60,8 +63,10 @@
 # barrel, an armour bonus, a health bonus and the twitching impaled
 # body: a nushell replay of P_MobjThinker over info.c's states from the
 # spawn's tics, the rows numbered in info.c's order.
-# Last, solid things stop the player and movers, and carried things
-# ride them, as solids says.
+# Last, on a copy of the map with three monster records rewritten, solid
+# things stop the player and movers, and carried things ride them, as
+# solids says; and the blue key door refuses a use, a blue card is taken
+# and the door then opens, in one replay, as locked says.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -175,13 +180,14 @@ def present(things: List<&2, H.Thing>, +id: U32) -> Bool:
     case H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       Bool.or(U32.is_eq(i, id), present(rest, id))
 
-# A run, then the blue key door's heights, whether the blue key (record
-# 87) is there, how many things are, and the cards and pickup flash.
-def keyed(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+# A run, then the blue key door's heights, whether the blue card of
+# record id is there, how many things are, and the cards and pickup
+# flash.
+def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
   +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   +inv = S.Player.inv(S.State.player(q))
   do IO<S.State>:
-    IO.print(watch(tag, [71], q) ++ " key " ++ Bool.show(present(H.Things.list(S.State.things(q)), 87)) ++ " things "
+    IO.print(watch(tag, [71], q) ++ " key " ++ Bool.show(present(H.Things.list(S.State.things(q)), id)) ++ " things "
       ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(q)))) ++ " cards "
       ++ U32.show(I.Inventory.cards(inv))
       ++ " flash " ++ U32.show(I.Inventory.bonus(inv)))
@@ -192,30 +198,23 @@ def holding(inv: I.Inventory, s: S.State) -> S.State:
   S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
   S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown}
 
-# The blue key door, sector 71, used from the south by a player holding
-# an inventory.
-def door71(tag: String, inv: I.Inventory, +level: L.Level) -> IO(Unit):
-  do IO<Unit>:
-    b0 : S.State <- keyed(tag, 30n, forward(), holding(inv, at(level, 832, 1400, 90)))
-    b1 : S.State <- keyed("use", 1n, use(), b0)
-    b2 : S.State <- keyed("-", 10n, idle(), b1)
-    b3 : S.State <- keyed("-", 51n, idle(), b2)
-    IO.print("-")
-
-# The blue key, taken strafing past it, the oracle's script: 20 idle
-# tics, a turn to 157.5, strafing left. Then the door refusing the
-# start's inventory and opening for the inventory the key left, or for
-# the blue skull alone.
+# The blue key, record 87, taken strafing past it, the oracle's script:
+# 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
+# sector 71, used from the south by a player holding the blue skull
+# alone.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    k0 : S.State <- keyed("key turn", 1n, K.Cmd.demo(0, 0, 4294967280, False{}),
+    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, False{}),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
-    k1 : S.State <- keyed("strafe", 12n, K.Cmd.demo(0, 4294967272, 0, False{}), k0)
-    k2 : S.State <- keyed("-", 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
-    k3 : S.State <- keyed("-", 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
-    door71("blue walk", S.Player.inv(S.State.player(S.State.start(level))), level)
-    door71("blue walk with the key", S.Player.inv(S.State.player(k3)), level)
-    door71("blue walk with the skull", I.Inventory.card(8, I.Inventory.start()), level)
+    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), k0)
+    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
+    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
+    b0 : S.State <- keyed("blue walk with the skull", 87, 30n, forward(),
+      holding(I.Inventory.card(8, I.Inventory.start()), at(level, 832, 1400, 90)))
+    b1 : S.State <- keyed("use", 87, 1n, use(), b0)
+    b2 : S.State <- keyed("-", 87, 10n, idle(), b1)
+    b3 : S.State <- keyed("-", 87, 51n, idle(), b2)
+    IO.print("-")
 
 # A run, then whether the level has ended and the exit line's special.
 def ending(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
@@ -369,12 +368,15 @@ def patch.record(a: Array<U32>, +pos: U32, i: U32, x: U32, y: U32, kind: U32) ->
 
 def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Array<U32> & L.Level:
   (+pos, size) = lump
-  L.Level.load((patch.record(patch.record(a, pos, 3, 96, 216, 48), pos, 35, 800, 528, 2035), lumps))
+  L.Level.load((patch.record(patch.record(patch.record(a, pos, 3, 96, 216, 48), pos, 35, 800, 528, 2035), pos, 82,
+    824, 1352, 5), lumps))
 
-# E1M1 with records 3 and 35, monsters neither game spawns, made a tech
-# column on the first lift and a barrel in the first door, as
-# tools/oracle.nu's --wad copy of the IWAD has them: both spawn as the
-# map's other things do, drawing their random numbers in record order.
+# E1M1 with records 3, 35 and 82, monsters neither game spawns, made a
+# tech column on the first lift, a barrel in the first door and a second
+# blue card in the hall south of the blue key door, as tools/oracle.nu's
+# --things "3,48,96,216 35,2035,800,528 82,5,824,1352" has them: each
+# spawns as the map's other things do, drawing its random numbers in
+# record order.
 def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & L.Level:
   (a, +lumps) = p
   patch.at(a, lumps, L.Level.lump(L.Level.map(lumps), "THINGS"))
@@ -399,8 +401,7 @@ def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & L.Level:
 # Meanwhile the barrel runs S_BAR1 (row 10) and S_BAR2 (row 11), 6 tics
 # each, from the 3 its spawn drew: the next row on tic 3 and every 6
 # tics after.
-def solids(+level: L.Level, p: Array<U32> & L.Level) -> IO(Unit):
-  (a, +placed) = p
+def solids(+level: L.Level, +placed: L.Level) -> IO(Unit):
   do IO<Unit>:
     c0 : S.State <- run("column walk", 17n, forward(), [],
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 65344, 1712, 270)))
@@ -427,6 +428,41 @@ def solids(+level: L.Level, p: Array<U32> & L.Level) -> IO(Unit):
     b6 : S.State <- carry("-", 1n, idle(), [10], 35, b5)
     b7 : S.State <- carry("-", 4n, idle(), [10], 35, b6)
     IO.print("-")
+
+# The blue key door, sector 71, on the patched map: from 880, 1440
+# facing north, 20 idle tics and a use the door refuses, then 20 idle
+# tics; a turn to 247.5 and a walk that takes record 82's card on tic
+# 56, 34.43 east and 35.87 north of it, inside the reach of 36 (tic 55
+# leaves 36.81 east), 49.7 away, while the bob holds the eye 36 over the
+# floor so the card stays in view; 20 idle tics, a turn north, 19 tics
+# forward and a use on tic 97 from 1423.47, 56.53 short of the door's
+# line and inside the use range of 64. The door opens at 2 a tic from
+# -128 on that tic, -116 at 102, -86 at 117, and stops at its top, 4
+# under the ceilings of 0 beside it, on tic 158.
+def locked(+placed: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    k0 : S.State <- keyed("blue door refused", 82, 1n, use(),
+      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(placed, 880, 1440, 90)))
+    k1 : S.State <- keyed("-", 82, 20n, idle(), k0)
+    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, False{}), k1)
+    k3 : S.State <- keyed("walk", 82, 13n, forward(), k2)
+    k4 : S.State <- keyed("-", 82, 1n, forward(), k3)
+    k5 : S.State <- keyed("-", 82, 20n, idle(), k4)
+    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, False{}), k5)
+    k7 : S.State <- keyed("walk", 82, 19n, forward(), k6)
+    k8 : S.State <- keyed("use", 82, 1n, use(), k7)
+    k9 : S.State <- keyed("-", 82, 5n, idle(), k8)
+    k10 : S.State <- keyed("-", 82, 15n, idle(), k9)
+    k11 : S.State <- keyed("-", 82, 41n, idle(), k10)
+    k12 : S.State <- keyed("-", 82, 1n, idle(), k11)
+    IO.print("-")
+
+# The patched map's cases.
+def patched.cases(+level: L.Level, p: Array<U32> & L.Level) -> IO(Unit):
+  (a, +placed) = p
+  do IO<Unit>:
+    solids(level, placed)
+    locked(placed)
 
 def door(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -510,6 +546,87 @@ def inventory(inv: I.Inventory) -> String:
     ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers" ++ words(powers, 6n, 0)
     ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
 
+# What the blockmap links hold: how many links, how many of solid
+# things, and how many disagree with the population.
+type Links is Data:
+  Links{links: U32, solid: U32, wrong: U32}
+
+def solid.def(d: H.Thing.Def) -> Bool:
+  H.Def{k, state, radius, height, +flags} = d
+  Bool.not(U32.is_zero((flags .&. 2 : U32)))
+
+def solid(+kind: U32) -> Bool:
+  solid.def(H.Thing.info(kind))
+
+# Whether a link agrees with the population: its thing alive, at the
+# link's x and y, of its type, with its centre in cell c.
+def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, link: L.Level.Link) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{H.Thing{id, +kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics}}:
+      L.Link{next, +lx, +ly, +lkind} = link
+      Bool.and(L.Level.cell.is(L.Level.cell_of(bm, x, y), c),
+        Bool.and(U32.is_eq(x, lx), Bool.and(U32.is_eq(y, ly), U32.is_eq(kind, lkind))))
+
+def links.count(+link: L.Level.Link, m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, t: Links) ->
+  Links:
+  L.Link{next, x, y, +kind} = link
+  Links{n, s, w} = t
+  Links{(n + 1 : U32), (s + Bool.to_u32(solid(kind)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c, link))) : U32)}
+
+def links.cell(ids: List<&2, U32>, +level: L.Level, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
+  match ids:
+    case []:
+      t
+    case +id <> rest:
+      links.cell(rest, level, ts, c, links.count(L.Level.linked.in(L.Level.things_of(level), id), H.Things.get(ts, id),
+        L.Level.blockmap_of(level), c, t))
+
+def links.cells(cells: List<&2, L.Level.Cell>, +level: L.Level, +ts: H.Things, t: Links) -> Links:
+  match cells:
+    case []:
+      t
+    case +c <> rest:
+      links.cells(rest, level, ts, links.cell(L.Level.cell.things(L.Level.geo(level), c), level, ts, c, t))
+
+# How many of the things are not in the list of the cell their centre
+# is in.
+def unlinked(things: List<&2, H.Thing>, +level: L.Level) -> U32:
+  match things:
+    case []:
+      0
+    case H.Thing{+id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+      (Bool.to_u32(Bool.not(S.Sim.member(L.Level.cell.things(L.Level.geo(level),
+        L.Level.cell_of(L.Level.blockmap_of(level), x, y)), id))) + unlinked(rest, level) : U32)
+
+def solids.count(things: List<&2, H.Thing>) -> U32:
+  match things:
+    case []:
+      0
+    case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+      (Bool.to_u32(solid(kind)) + solids.count(rest) : U32)
+
+def links.show(t: Links, +things: List<&2, H.Thing>, +level: L.Level) -> String:
+  Links{n, s, w} = t
+  "links " ++ U32.show(n) ++ " of " ++ Nat.show(List.length(&2, H.Thing, things)) ++ " things, solid "
+    ++ U32.show(s) ++ " of " ++ U32.show(solids.count(things)) ++ ", wrong " ++ U32.show(w) ++ ", unlinked "
+    ++ U32.show(unlinked(things, level))
+
+# The blockmap links of a state's level against its population, cell by
+# cell over the whole blockmap: as many links as things, as many of them
+# solid as solid things, none that disagrees with its thing, and no
+# thing missing from its centre's cell mean each thing is linked once,
+# in the cell of its centre, with its x, y and type.
+def links.in(bm: L.Level.Blockmap, +s: S.State) -> String:
+  L.Blockmap{words, ox, oy, +cols, +rows} = bm
+  +level = S.State.level(s)
+  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), level, S.State.things(s),
+    Links{0, 0, 0}), H.Things.list(S.State.things(s)), level)
+
+def links(+s: S.State) -> String:
+  links.in(L.Level.blockmap_of(S.State.level(s)), s)
+
 def free(+s: S.State) -> IO(S.State):
   +p = S.State.player(s)
   +spawned = H.Things.list(S.State.things(s))
@@ -520,6 +637,7 @@ def free(+s: S.State) -> IO(S.State):
       ++ U32.show(S.State.rnd(s)))
     IO.print("by type" ++ kinds(H.Thing.defs(), spawned))
     IO.print("first" ++ ids(List.take(&2, H.Thing, spawned, 12n)))
+    IO.print(links(s))
     things([2, 6, 29, 87, 245, 291], s)
     return s
 
@@ -658,7 +776,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     pickups(level)
     door(level)
-    solids(level, patched(W.Wad.dir(a)))
+    patched.cases(level, patched(W.Wad.dir(a)))
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -672,6 +790,7 @@ def main() -> IO(Unit):
 #|things at start 180 random 1
 #|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1
 #|first 2 6 8 9 10 11 12 13 14 15 16 17
+#|links 180 of 180 things, solid 79 of 79, wrong 0, unlinked 0
 #|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1
 #|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 angle 270.000 sector 130 state 6 tics 5 radius 20 height 16 flags 1
 #|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 angle 90.000 sector 153 state 53 tics 4294967295 radius 20 height 68 flags 768
@@ -857,16 +976,6 @@ def main() -> IO(Unit):
 #|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
 #|- tic 34 2227.581390 547.485961 157.500 z 136.000000 floor 136.000000 eye 37.663955 thinkers 9 sector 71 -128.000000 -128.000000 key False things 179 cards 1 flash 12
 #|- tic 44 2202.145187 486.011810 157.500 z 136.000000 floor 136.000000 eye 46.122497 thinkers 9 sector 71 -128.000000 -128.000000 key False things 179 cards 1 flash 2
-#|blue walk tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
-#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
-#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
-#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
-#|-
-#|blue walk with the key tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 1 flash 0
-#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 180 cards 1 flash 0
-#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 180 cards 1 flash 0
-#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 180 cards 1 flash 0
-#|-
 #|blue walk with the skull tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 8 flash 0
 #|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 180 cards 8 flash 0
 #|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 180 cards 8 flash 0
@@ -929,4 +1038,18 @@ def main() -> IO(Unit):
 #|- tic 296 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -84.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -84.000000 state 11 tics 1
 #|- tic 297 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -82.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -82.000000 state 10 tics 6
 #|- tic 301 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -74.000000 state 10 tics 2
+#|-
+#|blue door refused tic 21 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
+#|- tic 41 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
+#|turn tic 42 880.000000 1440.000000 247.500 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
+#|walk tic 55 860.814102 1393.630569 247.500 z -128.000000 floor -128.000000 eye 36.733230 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
+#|- tic 56 858.431030 1387.871063 247.500 z -128.000000 floor -128.000000 eye 36.145187 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 12
+#|- tic 76 838.610397 1339.968490 247.500 z -128.000000 floor -128.000000 eye 40.905364 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 0
+#|turn tic 77 838.308792 1339.239654 90.000 z -128.000000 floor -128.000000 eye 40.925247 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 0
+#|walk tic 96 835.806503 1423.465972 90.000 z -128.000000 floor -128.000000 eye 34.990249 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 0
+#|use tic 97 835.761825 1429.752563 90.000 z -128.000000 floor -128.000000 eye 36.239089 thinkers 10 sector 71 -128.000000 -126.000000 key False things 182 cards 1 flash 0
+#|- tic 102 835.593826 1453.375137 90.000 z -128.000000 floor -128.000000 eye 41.488937 thinkers 10 sector 71 -128.000000 -116.000000 key False things 182 cards 1 flash 0
+#|- tic 117 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -86.000000 key False things 182 cards 1 flash 0
+#|- tic 158 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 182 cards 1 flash 0
+#|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 182 cards 1 flash 0
 #|-

@@ -1070,10 +1070,12 @@ law replay_keeps_clear:
 # LAW: clear is pinned to the things: when the player's box is clear,
 # every thing the blockmap links in the cells around it, whichever
 # position in the list it holds, is not solid or has its box apart from
-# the player's (blocker_geometry shows the numbers). That the links are
-# the living solid things, and that none linked in a further cell can
-# reach the box, rests on the ticket's argument: the checker cannot
-# compute the cell arithmetic.
+# the player's (blocker_geometry shows the numbers). That the links hold
+# the living solid things rests on tests/sim.bend's links check at the
+# start of both E1M1s, which tic_keeps_geometry and solid_stays carry
+# through every tic; that none linked in a further cell can reach the
+# box rests on ticket 09's argument, since the checker cannot compute
+# the cell arithmetic.
 law clear_pins_things:
   for +level: L.Level
   for +x: U32
@@ -1095,6 +1097,19 @@ def Closed.within(defs: List<&2, H.Thing.Def>) -> Bool:
 # the thing check widens its box by (sanity).
 law radius_within:
   {Closed.within(H.Thing.defs()) == True{} : Bool}
+
+def Closed.lasting(defs: List<&2, H.Thing.Def>) -> Bool:
+  match defs:
+    case []:
+      True{}
+    case H.Def{kind, state, radius, height, +flags} <> rest:
+      Bool.and(Bool.not(U32.is_eq((flags .&. 3 : U32), 3)), Closed.lasting(rest))
+
+# LAW: no type Bendoom spawns is both solid and special, info.c's flags
+# 2 and 1, so no pickup takes a solid thing away: only a grant removes a
+# thing, and only a special thing is offered one (sanity).
+law solid_stays:
+  {Closed.lasting(H.Thing.defs()) == True{} : Bool}
 
 # Solid things
 # ------------

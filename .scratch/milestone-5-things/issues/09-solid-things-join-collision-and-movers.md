@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 (The blue key opens its door)
 
-**Status:** needs-triage
+**Status:** resolved
 
 - [x] Position checking examines nearby things through the blockmap before it examines lines
 - [x] Two radii decide a solid collision as vanilla does; vanilla tests no height for a thing that is not a missile
@@ -12,7 +12,7 @@
 - [x] A thing standing on a moving floor follows it and retains its stable identity and state
 - [x] A moving ceiling updates thing floor and ceiling bounds and reports a blocked move when a shootable solid thing no longer fits, and passes over any other, as vanilla does
 - [x] Crushing damage and barrel explosions are not introduced
-- [ ] The player's completed tic is free of every active solid thing, stated and filled as a law
+- [x] The player's completed tic is free of every active solid thing, stated and filled as a law
 - [x] Sim tests cover a blocked decoration, a passable corpse, a carried thing and a blocked mover on both lanes
 - [x] Existing line collision, re-clip and mover timelines stay green
 
@@ -35,12 +35,12 @@ The laws, all filled; `bend PROOF.bend` prints "All terms check.":
 - `replay_keeps_clear`, the freedom law: replaying any script from a free state leaves the player's box clear of every solid thing linked in the cells around it. `Free` is P_CheckPosition's verdict, now lines and things, so the wall law's proof carries both. Its fold lemmas were reworked for the early stop, and the freedom law follows from it.
 - `clear_pins_things` reads the verdict on each thing: any thing listed in the cells around the player, whichever position it holds, is not solid or has its box apart from the player's. `blocker_geometry` shows the numbers: a lamp stops the box at 32 minus 1/65536 and not at 32, never its own box, a corpse never, a barrel at 26. `radius_within` shows no type is wider than the 32 the check widens by.
 
-**Why the freedom box stays open.** The laws prove the player clear of every solid thing *linked in the cells around it*; the ticket asks for *every active solid thing*. Two steps join them, and both rest on argument, not on the checker:
+**The freedom law, resolved in ticket 10.** The maintainer accepted the remaining argument on one condition, a check of the links through the real load path, which ticket 10 added. What each part of "the player is free of every active solid thing" now stands on:
 
-1. The links hold exactly the living population's things, each in the cell of its centre with its x, y and type. `State.populated` builds both from one list; `tic_keeps_geometry` proves no tic changes the links; no code path changes a thing's x, y or type, only its height and whether it lives, and no solid thing can be removed. Proving the first part means showing a thing's id sits in the chain of its own cell, which is `V.Vec` get after set at other indices: U32 bit reasoning the checker cannot compute (docs/bend.md).
-2. A thing linked in any other cell cannot reach the box: its centre is then at least 48 units off along an axis, more than its radius, at most 32 by `radius_within`, plus the player's 16. That is the monotonicity of the arithmetic shift over wrapping U32 subtraction, again not computable in the checker.
-
-The universal statements stop at the cells, as `free_pins_lines` does for lines. The maintainer decides whether that suffices; until then the box and the status stay open.
+- **Proved by the checker.** `replay_keeps_clear`: replaying any script from a free state leaves the player's box clear of every solid thing linked in the cells around it. `clear_pins_things` reads that verdict on each linked thing. `tic_keeps_geometry`: no tic changes the links, which sit in the geometry. `radius_within`: no type is wider than MAXRADIUS. `solid_stays` (ticket 10): no type is both solid and special, so no pickup can take a solid thing away.
+- **Checked on both E1M1s.** `tests/sim.bend` loads each map through `L.Level.load` and `State.start` and walks every blockmap cell: the links hold each spawned thing exactly once, in the cell of its centre, with its x, y and type; Freedoom has 180 links for 180 things, 79 of them solid, and the shareware map 85 for 85, 18 solid, with none wrong and none unlinked. The solid counts are the solid types' counts in ticket 02's nushell inventory. Freedoom's line is in the flake; the shareware one was run locally.
+- **Read from the code.** No path writes a thing's x, y or type, only its heights, state and tics, and a thing leaves the population only when a grant takes it. With `solid_stays`, the links therefore still hold every living solid thing on every later tic.
+- **Argued, not computable in the checker.** A thing linked in a cell outside those the check walks cannot reach the box: its centre is then more than 48 units off along an axis, more than its radius (at most 32 by `radius_within`) plus the player's 16. That is the monotonicity of the arithmetic shift over wrapping U32 subtraction, which the checker cannot compute (docs/bend.md).
 - Closed laws, by hand from vanilla's constants. `thing_blocks`: 79.25 after tic 2, held there on tic 3; the raised lamp stops it too; over a corpse it reaches 85.82. `floor_carries_things`: a barrel follows a floor down 4 a tic, a hung leg stays at 60. `barrel_stops_door`: 42 after tic 13, the 14th undone, 44 after the 15th. `lamp_under_door`: a solid, unshootable lamp does not stop the door, which shuts on tic 34. `door_opens_over_barrel`: 2 and 4 up over a barrel that does not fit. `link_order` places the player's link in its cell. `line_geometry` gained box radii and the monster-blocking flag.
 - A mutated expected value fails the check in `thing_blocks` and in `barrel_stops_door`, so the laws compute.
 
@@ -50,7 +50,7 @@ The sim cases, on Freedoom, in tests/sim.bend, both lanes:
 - **Passable corpse.** Walking south from 128, 432 over the dead former human, record 171: the positions equal the free walk (432 less the column walk's distance, 399.121368 at tic 30), across the corpse's box.
 - **Carried thing.** A tech column on lift 98 at 96, 216, as record 3. Its height, floor and ceiling follow the lift from 12 down to -124 and back, with id, type, state and tics kept.
 - **Blocked mover.** A barrel in door 10 at 800, 528, as record 35. The shut door opens over it. Closing, it is undone at -86 on tic 295, 2 short of leaving 40 of the barrel's 42, and goes back up: -84 on tic 296, -74 on tic 301.
-- Records 3 and 35 are monsters, which neither game spawns. The test rewrites them in place in the WAD's bytes before loading, as the oracle's scratch copy of the IWAD does (passed with `--wad`), so both spawn as vanilla's P_SpawnMapThing spawns them, drawing their random numbers in record order. The barrel's tics, 3, check out in a nushell replay of those draws over Chocolate Doom's rndtable: its second draw is the 38th, 200, and 1 + 200 mod 6 is 3.
+- Records 3 and 35 are monsters, which neither game spawns. The test rewrites them in place in the WAD's bytes before loading, as the oracle's scratch copy of the IWAD does (passed with `--wad` here; since ticket 10, `--things "3,48,96,216 35,2035,800,528"`), so both spawn as vanilla's P_SpawnMapThing spawns them, drawing their random numbers in record order. The barrel's tics, 3, check out in a nushell replay of those draws over Chocolate Doom's rndtable: its second draw is the 38th, 200, and 1 + 200 mod 6 is 3.
 
 The oracle (every thing kept; the control is the ticket 06 build's frame dump on the same script):
 
@@ -61,13 +61,15 @@ The oracle (every thing kept; the control is the ticket 06 build's frame dump on
 | column, tic 48 | -192 1712 270 | `20,0,0,0,0 28,25,0,0,0` | 136 | 42107 |
 | corpse, tic 30 | 128 432 270 | `20,0,0,0,0 10,25,0,0,0` | 6 | |
 | corpse, tic 38 | 128 432 270 | `20,0,0,0,0 18,25,0,0,0` | 0 | |
-| carried, tic 12 | 240 256 180, --wad | `10,25,0,0,0 1,0,0,0,1 1,0,0,0,0 6,0,0,0,0` | 0 | 0 |
-| carried, tic 44 | 240 256 180, --wad | `… 32,0,0,0,0` | 0 | 3606 |
-| carried, tic 184 | 240 256 180, --wad | `… 32,0,0,0,0 1,0,0,0,0 105,0,0,0,0 34,0,0,0,0` | 0 | 0 |
-| door, tics 294, 295, 296 | 832 384 90, --wad | `40,25,0,0,0 1,0,0,0,1 61,0,0,0,0 192,0,0,0,0` and 1 or 2 idle | 110 each | |
-| door, tic 301 | 832 384 90, --wad | `… 7,0,0,0,0` | 38 | 48207 |
+| carried, tic 12 | 240 256 180, patched | `10,25,0,0,0 1,0,0,0,1 1,0,0,0,0 6,0,0,0,0` | 0 | 0 |
+| carried, tic 44 | 240 256 180, patched | `… 32,0,0,0,0` | 0 | 3606 |
+| carried, tic 184 | 240 256 180, patched | `… 32,0,0,0,0 1,0,0,0,0 105,0,0,0,0 34,0,0,0,0` | 0 | 0 |
+| door, tics 294, 295, 296 | 832 384 90, patched | `40,25,0,0,0 1,0,0,0,1 61,0,0,0,0 192,0,0,0,0` and 1 or 2 idle | 110 each | |
+| door, tic 301 | 832 384 90, patched | `… 7,0,0,0,0` | 38 | 48207 |
 
 Each nonzero count is a small patch outside the collision: at column tics 38 and 48, armor bonus 126, 196 units ahead (columns 51 to 59, rows 101 to 111), changing frame in vanilla on a tic when neither player moves; for the door, the barrel's lights and distant items, all below the door's edge (rows 84 to 153); for the corpse, 6 pixels at columns 310 to 313. This base has no thing animation or full-bright frames; ticket 05 brings them. A collision or mover difference shifts the whole view: the controls differ by thousands. A floor lamp tried first as the carried thing differed in all 1294 of its pixels (columns 90 to 114, rows 79 to 146) because vanilla draws it full-bright, so the tech column replaced it.
+
+Merged with tickets 01 to 08 (4b664fb), which bring the animation and full-bright frames, every case in this table reports 0; ticket 10's table has the reruns.
 
 **The route.** Freedoom's route test ran south into the tech column at -192, 1600. Chocolate Doom plays the unchanged script to the same frames: 0 differing pixels at the end of the south run and at the end of the script, where the ticket 06 build differs in 47586 after the south run. So the old commands no longer reach the exit switch in vanilla either. Its pins are updated to vanilla's outcome, its legs named for what they now do (the run south to the column, the use short of the exit door, the run west, a use that finds no switch), and it no longer prints a tally time, since the level does not end; routing around the column is ticket 11's. Every other existing expected value is unchanged.
 
