@@ -1,10 +1,11 @@
 # The playsim for one player among things: Doom's P_MovePlayer,
-# P_CalcHeight, P_XYMovement, P_TryMove, P_CheckPosition, P_SlideMove and
-# P_ZMovement, as pure functions of the level, the things, the tic
-# command and the player, and the tic that maps one state of the level
-# to the next. Every position the player is moved to has passed
-# Sim.check, whose lines are what Sim.free asks, so the wall law holds by
-# construction.
+# P_CalcHeight, P_MovePsprites, P_XYMovement, P_TryMove,
+# P_CheckPosition, P_SlideMove and P_ZMovement, as pure functions of the
+# level, the things, the tic command and the player, and the tic that
+# maps one state of the level to the next, with the sounds that tic
+# starts and stops where vanilla calls S_StartSound and S_StopSound.
+# Every position the player is moved to has passed Sim.check, whose
+# lines are what Sim.free asks, so the wall law holds by construction.
 import Base
 import ./vec.bend as V
 import ./fixed.bend as F
@@ -14,15 +15,26 @@ import ./keys.bend as K
 import ./random.bend as M
 import ./things.bend as H
 import ./inventory.bend as I
+import ./sound.bend as Sn
+
+# Doom's pspdef_t, a player sprite: its state row, none while it does
+# not show, the tics left in it, and its place on a 320 by 200 screen.
+type Psprite is Data:
+  Psprite{state: Maybe<&2, U32>, tics: U32, sx: U32, sy: U32}
+
+# The player's sprites: the weapon and its muzzle flash.
+type Psprites is Data:
+  Psprites{weapon: Psprite, flash: Psprite}
 
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
 # height and its delta, the eye's height, the special lines this tic's
-# moves have crossed, in the order they fire, and the inventory.
+# moves have crossed, in the order they fire, the inventory, and the
+# player sprites.
 type Player is Data:
   Player{x: U32, y: U32, z: U32, angle: U32, momx: U32, momy: U32, momz: U32,
     floorz: U32, ceilz: U32, viewheight: U32, deltaview: U32, viewz: U32, crossed: List<&2, U32>,
-    inv: I.Inventory}
+    inv: I.Inventory, psprites: Psprites}
 
 # What Doom's P_CheckPosition and PIT_CheckThing read of a mobj, the one
 # moved or one in its way: its id, its centre, its feet, its radius and
@@ -84,66 +96,170 @@ def Sim.maxbob() -> U32:
   1048576
 
 def Player.x(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   x
 
 def Player.y(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   y
 
 def Player.angle(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   angle
 
 def Player.momx(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   momx
 
 def Player.z(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   z
 
 def Player.floorz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   floorz
 
 def Player.ceilz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   ceilz
 
 def Player.crossed(+p: Player) -> List<&2, U32>:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   crossed
 
 def Player.viewz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   viewz
 
 def Player.inv(+p: Player) -> I.Inventory:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   inv
+
+def Player.psprites(+p: Player) -> Psprites:
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
+  psprites
 
 # The player holding an inventory.
 def Player.holding(p: Player, held: I.Inventory) -> Player:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, held}
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, held, psprites}
 
 # On the ground: at or below the floor.
 def Player.onground(+p: Player) -> Bool:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   F.Fixed.le(z, floorz)
 
-def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32) -> Player:
+# The weapon
+# ----------
+
+# Doom's WEAPONBOTTOM, WEAPONTOP and RAISESPEED: the screen row a weapon
+# starts to rise from, the row it rests at, and its rise a tic.
+def Sim.weaponbottom() -> U32:
+  8388608
+
+def Sim.weapontop() -> U32:
+  2097152
+
+def Sim.raisespeed() -> U32:
+  393216
+
+# Doom's player->bob: the squared momentum over four, at most 16 units.
+def Sim.bob(+momx: U32, +momy: U32) -> U32:
+  F.Fixed.min(Sim.maxbob(), ((F.Fixed.mul(momx, momx) + F.Fixed.mul(momy, momy) : U32) >> 2n : U32))
+
+# A sprite and the state it is to enter, if any.
+type Sim.Entering is Data:
+  Entering{state: Maybe<&2, U32>, psp: Psprite}
+
+# Doom's A_Raise: the sprite rises, and at the top the weapon's ready
+# state is set.
+def Sim.raise(psp: Psprite, weapon: H.Thing.Weapon) -> Sim.Entering:
+  Psprite{state, tics, sx, sy} = psp
+  H.Weapon{up, ready} = weapon
+  +risen = (sy - Sim.raisespeed() : U32)
+  Entering{Bool.pick(Maybe<&2, U32>, F.Fixed.gt(risen, Sim.weapontop()), None{}, Some{ready}),
+    Psprite{state, tics, sx, F.Fixed.max(risen, Sim.weapontop())}}
+
+# Doom's A_WeaponReady's bob: the sprite swings on the level's clock, a
+# turn every 64 tics, as far as the bob to either side of column 1 and
+# below the top.
+def Sim.ready(psp: Psprite, +sine: V.Vec, clock: U32, +bob: U32) -> Sim.Entering:
+  Psprite{state, tics, sx, sy} = psp
+  +angle = ((128 * clock : U32) .&. 8191 : U32)
+  Entering{None{}, Psprite{state, tics, (65536 + F.Fixed.mul(bob, A.Angle.cos(sine, angle)) : U32),
+    (Sim.weapontop() + F.Fixed.mul(bob, A.Angle.sin(sine, (angle .&. 4095 : U32))) : U32)}}
+
+def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, sine: V.Vec, clock: U32, bob: U32,
+  weapon: H.Thing.Weapon) -> Sim.Entering:
+  match action:
+    case H.Null{}:
+      Entering{None{}, psp}
+    case H.Raise{}:
+      Sim.raise(psp, weapon)
+    case H.WeaponReady{}:
+      Sim.ready(psp, sine, clock, bob)
+
+# Doom's P_SetPsprite: the sprite enters the state for its tics and the
+# state's action runs, and again for a state the action sets. No chain of
+# vanilla's is longer than three.
+def Sim.psprite.set(fuel: Nat, st: Sim.Entering, +sine: V.Vec, +clock: U32, +bob: U32, +weapon: H.Thing.Weapon) ->
+  Psprite:
+  match fuel st:
+    case 1n+f Entering{Some{+state}, Psprite{was, tics, sx, sy}}:
+      Sim.psprite.set(f, Sim.psprite.act(H.Thing.Row.action(H.Thing.row(state)),
+        Psprite{Some{state}, H.Thing.Row.tics(H.Thing.row(state)), sx, sy}, sine, clock, bob, weapon),
+        sine, clock, bob, weapon)
+    case _ Entering{state, psp}:
+      psp
+
+# Doom's P_MovePsprites for one sprite: one that shows counts its tics
+# down, and the tic they run out enters its next state. No weapon state
+# lasts.
+def Sim.psprite.tic(psp: Psprite, sine: V.Vec, clock: U32, bob: U32, weapon: H.Thing.Weapon) -> Psprite:
+  match psp:
+    case Psprite{None{}, tics, sx, sy}:
+      Psprite{None{}, tics, sx, sy}
+    case Psprite{Some{+state}, +tics, sx, sy}:
+      Sim.psprite.set(4n, Entering{Bool.pick(Maybe<&2, U32>, U32.is_eq(tics, 1),
+        Some{H.Thing.Row.next(H.Thing.row(state))}, None{}), Psprite{Some{state}, (tics - 1 : U32), sx, sy}},
+        sine, clock, bob, weapon)
+
+# The flash is drawn where the weapon is.
+def Sim.psprites.follow(weapon: Psprite, flash: Psprite) -> Psprites:
+  Psprite{state, tics, +sx, +sy} = weapon
+  Psprite{fstate, ftics, fx, fy} = flash
+  Psprites{Psprite{state, tics, sx, sy}, Psprite{fstate, ftics, sx, sy}}
+
+# Doom's P_MovePsprites, with the bob P_CalcHeight works out from the
+# momentum the move left.
+def Sim.psprites(+level: L.Level, +clock: U32, p: Player) -> Player:
+  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
+    Psprites{weapon, flash}} = p
+  +sine = L.Level.sine(level)
+  +bob = Sim.bob(momx, momy)
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
+    Sim.psprites.follow(Sim.psprite.tic(weapon, sine, clock, bob, H.Thing.pistol()),
+      Sim.psprite.tic(flash, sine, clock, bob, H.Thing.pistol()))}
+
+# Doom's P_SetupPsprites and P_BringUpWeapon: no sprite shows, then the
+# weapon enters its raise state at the bottom.
+def Psprites.start(+sine: V.Vec, +weapon: H.Thing.Weapon) -> Psprites:
+  H.Weapon{up, ready} = weapon
+  Psprites{Sim.psprite.set(4n, Entering{Some{up}, Psprite{None{}, 0, 0, Sim.weaponbottom()}}, sine, 0, 0, weapon),
+    Psprite{None{}, 0, 0, 0}}
+
+def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32, psprites: Psprites) -> Player:
   Player{x, y, floor, angle, 0, 0, 0, floor, ceil, Sim.viewheight(), 0,
-    (floor + Sim.viewheight() : U32), [], I.Inventory.start()}
+    (floor + Sim.viewheight() : U32), [], I.Inventory.start(), psprites}
 
 def Player.at(+level: L.Level, s: L.Level.Start) -> Player:
   L.Start{+x, +y, angle} = s
   +sector = L.Level.sector_at(level, x, y)
-  Player.at.fin(x, y, angle, L.Level.floor(level, sector), L.Level.ceil(level, sector))
+  Player.at.fin(x, y, angle, L.Level.floor(level, sector), L.Level.ceil(level, sector),
+    Psprites.start(L.Level.sine(level), H.Thing.pistol()))
 
 # The player at the level's start, on its floor, its eye at rest, with
-# the inventory Doom's G_PlayerReborn gives.
+# the inventory Doom's G_PlayerReborn gives and the pistol coming up.
 def Player.start(+level: L.Level) -> Player:
   Player.at(level, L.Level.start_of(level))
 
@@ -444,13 +560,16 @@ def Sim.passes(f: Sim.Fit, +z: U32, +height: U32) -> Bool:
 # Pickups
 # -------
 
-def Sim.touch.took(granted: Maybe<&2, I.Inventory>, counted: Bool, inv: I.Inventory, bm: L.Level.Blockmap,
-  th: H.Thing, things: H.Things) -> I.Inventory & H.Things:
+# The end of P_TouchSpecialThing: a thing taken is removed, and then
+# heard from nobody.
+def Sim.touch.took(granted: Maybe<&2, I.Inventory>, counted: Bool, inv: I.Inventory, kind: U32,
+  bm: L.Level.Blockmap, th: H.Thing, things: H.Things) -> I.Inventory & H.Things:
   match granted:
     case None{}:
       (inv, things)
     case Some{got}:
-      (I.Inventory.took(counted, got), H.Things.removed(things, bm, th))
+      (I.Inventory.took(counted, got), H.Things.sounded(H.Things.removed(things, bm, th),
+        Sn.Sound.plain(I.Inventory.sound(kind), Sn.Nobody{})))
 
 def Sim.touch.offer(reached: Bool, +kind: U32, counted: Bool, +inv: I.Inventory, bm: L.Level.Blockmap, th: H.Thing,
   things: H.Things) -> I.Inventory & H.Things:
@@ -458,7 +577,7 @@ def Sim.touch.offer(reached: Bool, +kind: U32, counted: Bool, +inv: I.Inventory,
     case False{}:
       (inv, things)
     case True{}:
-      Sim.touch.took(I.Inventory.grant(kind, inv), counted, inv, bm, th, things)
+      Sim.touch.took(I.Inventory.grant(kind, inv), counted, inv, kind, bm, th, things)
 
 # Doom's PIT_CheckThing and P_TouchSpecialThing for the player's box at
 # (x, y) with its feet at z: a special thing the box overlaps, its
@@ -555,9 +674,9 @@ def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x:
     case False{}:
       Try{False{}, p, things}
     case True{}:
-      Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+      Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
       Try{True{}, Player{x, y, z, angle, momx, momy, momz, floor, ceil, viewheight, deltaview, viewz,
-        List.append(&2, U32, crossed, over), inv}, Sim.relink(level, things, ox, oy, x, y)}
+        List.append(&2, U32, crossed, over), inv, psprites}, Sim.relink(level, things, ox, oy, x, y)}
 
 # The move is taken when the place passes; the player's mobj then goes
 # first in its cell and its sector. What the check picked up stays picked
@@ -730,12 +849,6 @@ def Sim.trace(+level: L.Level, +p: Player, x1: U32, y1: U32, x2: U32, y2: U32, b
   U32 & U32:
   Sim.trace.go(Sim.meets(level, x1, y1, x2, y2), level, p, best)
 
-# Doom's P_AproxDistance.
-def Sim.approx(+dx: U32, +dy: U32) -> U32:
-  +ax = F.Fixed.abs(dx)
-  +ay = F.Fixed.abs(dy)
-  Bool.pick(U32, F.Fixed.lt(ax, ay), (ax + ay - (ax >> 1n) : U32), (ax + ay - (ay >> 1n) : U32))
-
 # Doom's P_HitSlideLine: the move projected onto the line.
 def Sim.along.angle(+level: L.Level, +p: Player, +line: L.Level.Line, +mx: U32, +my: U32) ->
   U32 & U32:
@@ -746,7 +859,7 @@ def Sim.along.angle(+level: L.Level, +p: Player, +line: L.Level.Line, +mx: U32, 
     + Bool.pick(U32, Sim.point_side(Player.x(p), Player.y(p), line), A.Angle.ang180(), 0) : U32)
   +delta = (A.Angle.of(tanto, mx, my) - lineangle : U32)
   +delta2 = Bool.pick(U32, U32.is_gt(delta, A.Angle.ang180()), (delta + A.Angle.ang180() : U32), delta)
-  +newlen = F.Fixed.mul(Sim.approx(mx, my), A.Angle.cos(sine, A.Angle.fine(delta2)))
+  +newlen = F.Fixed.mul(F.Fixed.approx(mx, my), A.Angle.cos(sine, A.Angle.fine(delta2)))
   (F.Fixed.mul(newlen, A.Angle.cos(sine, A.Angle.fine(lineangle))),
     F.Fixed.mul(newlen, A.Angle.sin(sine, A.Angle.fine(lineangle))))
 
@@ -770,16 +883,16 @@ def Sim.stairstep.fin(+level: L.Level, t: Sim.Try) -> Sim.Try:
 # Doom's stairstep: the move along y alone, else along x alone. Either
 # way it ends the slide.
 def Sim.stairstep(+level: L.Level, things: H.Things, +p: Player) -> Sim.Try:
-  Player{+x, +y, z, angle, momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{+x, +y, z, angle, momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Sim.stairstep.fin(level, Sim.try_move(level, things, p, x, (y + momy : U32)))
 
 # The remainder of the move, clipped along the wall, becomes the
 # momentum and is tried; a failure retries the slide from here.
 def Sim.slide.wall.go(+level: L.Level, things: H.Things, +p: Player, m: U32 & U32) -> Sim.Try:
-  Player{+x, +y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{+x, +y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   (+mx, +my) = m
   Sim.try_move(level, things, Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz,
-    crossed, inv}, (x + mx : U32), (y + my : U32))
+    crossed, inv, psprites}, (x + mx : U32), (y + my : U32))
 
 def Sim.slide.wall(left: Bool, +level: L.Level, things: H.Things, +p: Player, +frac: U32, i: U32) ->
   Sim.Try:
@@ -787,7 +900,7 @@ def Sim.slide.wall(left: Bool, +level: L.Level, things: H.Things, +p: Player, +f
     case False{}:
       Try{True{}, p, things}
     case True{}:
-      Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+      Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
       Sim.slide.wall.go(level, things, p, Sim.along(level, p, i, F.Fixed.mul(momx, frac),
         F.Fixed.mul(momy, frac)))
 
@@ -811,7 +924,7 @@ def Sim.slide.upto(some: Bool, +level: L.Level, things: H.Things, +p: Player, +f
     case False{}:
       Sim.slide.rest(level, things, p, frac, i)
     case True{}:
-      Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+      Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
       Sim.slide.upto.fin(level, frac, i, Sim.try_move(level, things, p,
         (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32)))
 
@@ -837,7 +950,7 @@ def Sim.trail(+v: U32, +mom: U32) -> U32:
 # One try of the slide: the three leading corners are traced along the
 # momentum for the closest blocking line.
 def Sim.slide.once(+level: L.Level, things: H.Things, +p: Player) -> Sim.Try:
-  Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{+x, +y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   +lx = Sim.lead(x, momx)
   +ly = Sim.lead(y, momy)
   +tx = Sim.trail(x, momx)
@@ -905,19 +1018,19 @@ def Sim.xy.go(fuel: Nat, +level: L.Level, st: Sim.Xy) -> Sim.Try:
 def Sim.slow(stop: Bool, p: Player) -> Player:
   match stop:
     case True{}:
-      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
-      Player{x, y, z, angle, 0, 0, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}
+      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
+      Player{x, y, z, angle, 0, 0, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}
     case False{}:
-      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
       Player{x, y, z, angle, F.Fixed.mul(momx, Sim.decay()), F.Fixed.mul(momy, Sim.decay()),
-        momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}
+        momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}
 
 def Sim.crawling(+mom: U32) -> Bool:
   Bool.and(F.Fixed.gt(mom, F.Fixed.neg(Sim.stopspeed())), F.Fixed.lt(mom, Sim.stopspeed()))
 
 def Sim.friction.ground(+cmd: K.Cmd, +p: Player) -> Player:
   K.Cmd{forward, side, turn, use} = cmd
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Sim.slow(Bool.and(Sim.crawling(momx), Bool.and(Sim.crawling(momy),
     Bool.and(U32.is_zero(forward), U32.is_zero(side)))), p)
 
@@ -938,16 +1051,16 @@ def Sim.xy.moving(moving: Bool, +level: L.Level, things: H.Things, +cmd: K.Cmd, 
     case False{}:
       Try{False{}, p, things}
     case True{}:
-      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+      Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
       +xm = Sim.clamp(momx)
       +ym = Sim.clamp(momy)
       Sim.xy.slowed(cmd, Sim.xy.go(2n, level, Xy{False{}, Try{False{}, Player{x, y, z, angle, xm, ym, momz, floorz,
-        ceilz, viewheight, deltaview, viewz, crossed, inv}, things}, xm, ym}))
+        ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, things}, xm, ym}))
 
 # Doom's P_XYMovement: the momentum, capped, moves the player, in
 # halves when large; a blocked move slides; then friction.
 def Sim.xy(+level: L.Level, things: H.Things, cmd: K.Cmd, +p: Player) -> Sim.Try:
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Sim.xy.moving(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, things, cmd, p)
 
 # The move
@@ -955,12 +1068,12 @@ def Sim.xy(+level: L.Level, things: H.Things, cmd: K.Cmd, +p: Player) -> Sim.Try
 
 # Doom's P_Thrust: momentum along an angle.
 def Sim.thrust(+level: L.Level, p: Player, +angle: U32, +move: U32) -> Player:
-  Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   +sine = L.Level.sine(level)
   +f = A.Angle.fine(angle)
   Player{x, y, z, a, (momx + F.Fixed.mul(move, A.Angle.cos(sine, f)) : U32),
     (momy + F.Fixed.mul(move, A.Angle.sin(sine, f)) : U32), momz, floorz, ceilz, viewheight,
-    deltaview, viewz, crossed, inv}
+    deltaview, viewz, crossed, inv, psprites}
 
 # A move key thrusts only on the ground.
 def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
@@ -970,10 +1083,10 @@ def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
 # Doom's P_MovePlayer: turn, then thrust forward and sideways.
 def Sim.move(+level: L.Level, +cmd: K.Cmd, p: Player) -> Player:
   K.Cmd{forward, side, turn, use} = cmd
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   +a = (angle + (turn << 16n) : U32)
   Sim.push(level, Sim.push(level, Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight,
-    deltaview, viewz, crossed, inv}, a, forward), (a - A.Angle.ang90() : U32), side)
+    deltaview, viewz, crossed, inv, psprites}, a, forward), (a - A.Angle.ang90() : U32), side)
 
 # The eye
 # -------
@@ -992,20 +1105,20 @@ def Sim.eye.delta(+viewheight: U32, +deltaview: U32) -> U32 & U32:
   (vh, Bool.pick(U32, U32.is_zero(dv), 0, Bool.pick(U32, U32.is_zero(dv2), 1, dv2)))
 
 def Sim.eye.ground.fin(+p: Player, +swing: U32, vd: U32 & U32) -> Player:
-  Player{x, y, +z, angle, momx, momy, momz, floorz, +ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, +z, angle, momx, momy, momz, floorz, +ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   (+vh, dv) = vd
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, vh, dv,
-    F.Fixed.min((z + vh + swing : U32), (ceilz - 262144 : U32)), crossed, inv}
+    F.Fixed.min((z + vh + swing : U32), (ceilz - 262144 : U32)), crossed, inv, psprites}
 
 def Sim.eye.ground(+p: Player, swing: U32) -> Player:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, +viewheight, +deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, +viewheight, +deltaview, viewz, crossed, inv, psprites} = p
   Sim.eye.ground.fin(p, swing, Sim.eye.delta((viewheight + deltaview : U32), deltaview))
 
 # In the air the eye sits at the view height, unbobbed.
 def Sim.eye.air(p: Player) -> Player:
-  Player{x, y, +z, angle, momx, momy, momz, floorz, ceilz, +viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, +z, angle, momx, momy, momz, floorz, ceilz, +viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview,
-    (z + viewheight : U32), crossed, inv}
+    (z + viewheight : U32), crossed, inv, psprites}
 
 def Sim.eye.if(onground: Bool, +p: Player, swing: U32) -> Player:
   match onground:
@@ -1014,26 +1127,21 @@ def Sim.eye.if(onground: Bool, +p: Player, swing: U32) -> Player:
     case False{}:
       Sim.eye.air(p)
 
-# The bob is the squared momentum over four, at most 16 units; half of
-# it swings the eye on the level's clock, a turn every 20 tics.
+# Half of the bob swings the eye on the level's clock, a turn every 20
+# tics.
 def Sim.eye(+level: L.Level, clock: U32, +p: Player) -> Player:
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
-  Sim.eye.if(Player.onground(p), p, F.Fixed.mul((F.Fixed.min(Sim.maxbob(),
-    ((F.Fixed.mul(momx, momx) + F.Fixed.mul(momy, momy) : U32) >> 2n : U32)) >> 1n : U32),
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
+  Sim.eye.if(Player.onground(p), p, F.Fixed.mul((Sim.bob(momx, momy) >> 1n : U32),
     A.Angle.sin(L.Level.sine(level), ((409 * clock : U32) .&. 8191 : U32))))
 
 # The vertical move
 # -----------------
 
-# Landing from a fall faster than eight units a tic dips the view by an
-# eighth of the momentum.
-def Sim.z.land(landing: Bool, +momz: U32, deltaview: U32) -> U32:
-  match landing:
-    case True{}:
-      Bool.pick(U32, F.Fixed.lt(momz, F.Fixed.neg((Sim.gravity() << 3n : U32))),
-        F.Fixed.sarn(momz, 3n), deltaview)
-    case False{}:
-      deltaview
+# Whether the vertical move ends a fall faster than eight units a tic on
+# the floor: the landing that dips the view and is heard.
+def Sim.lands(p: Player) -> Bool:
+  Player{x, y, z, angle, momx, momy, +momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
+  Bool.and(F.Fixed.le((z + momz : U32), floorz), F.Fixed.lt(momz, F.Fixed.neg((Sim.gravity() << 3n : U32))))
 
 # Below the ceiling: at most 56 under it, no rising momentum.
 def Sim.z.ceiling(+z: U32, +momz: U32, +ceilz: U32) -> U32 & U32:
@@ -1042,32 +1150,33 @@ def Sim.z.ceiling(+z: U32, +momz: U32, +ceilz: U32) -> U32 & U32:
     Bool.pick(U32, Bool.and(hit, F.Fixed.gt(momz, 0)), 0, momz))
 
 def Sim.z.fin(+p: Player, zm: U32 & U32) -> Player:
-  Player{x, y, oz, angle, momx, momy, omomz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, oz, angle, momx, momy, omomz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   (z, momz) = zm
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv}
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}
 
-# On or under the floor the fall ends there; above it gravity pulls,
-# doubled on the first airborne tic.
+# On or under the floor the fall ends there, and a landing dips the view
+# by an eighth of the momentum; above it gravity pulls, doubled on the
+# first airborne tic.
 def Sim.z.clip(+p: Player, +z: U32) -> Player:
-  Player{x, y, oz, angle, momx, momy, +momz, +floorz, +ceilz, viewheight, +deltaview, viewz, crossed, inv} = p
+  Player{x, y, oz, angle, momx, momy, +momz, +floorz, +ceilz, viewheight, +deltaview, viewz, crossed, inv, psprites} = p
   +floored = F.Fixed.le(z, floorz)
   +falling = F.Fixed.lt(momz, 0)
   +momz2 = Bool.pick(U32, floored, Bool.pick(U32, falling, 0, momz),
     Bool.pick(U32, U32.is_zero(momz), F.Fixed.neg((Sim.gravity() << 1n : U32)),
       (momz - Sim.gravity() : U32)))
   Sim.z.fin(Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight,
-    Sim.z.land(Bool.and(floored, falling), momz, deltaview), viewz, crossed, inv},
+    Bool.pick(U32, Sim.lands(p), F.Fixed.sarn(momz, 3n), deltaview), viewz, crossed, inv, psprites},
     Sim.z.ceiling(Bool.pick(U32, floored, floorz, z), momz2, ceilz))
 
 # A floor risen under the player dips the view by the rise, to recover
 # by an eighth of the gap a tic.
 def Sim.z.step(+p: Player) -> Player:
-  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, +viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, +viewheight, deltaview, viewz, crossed, inv, psprites} = p
   +below = F.Fixed.lt(z, floorz)
   +vh = Bool.pick(U32, below, (viewheight - (floorz - z) : U32), viewheight)
   Sim.z.clip(Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, vh,
     Bool.pick(U32, below, F.Fixed.sarn((Sim.viewheight() - vh : U32), 3n), deltaview),
-    viewz, crossed, inv}, (z + momz : U32))
+    viewz, crossed, inv, psprites}, (z + momz : U32))
 
 def Sim.z.if(still: Bool, +p: Player) -> Player:
   match still:
@@ -1079,7 +1188,7 @@ def Sim.z.if(still: Bool, +p: Player) -> Player:
 # Doom's P_ZMovement, run when the player is off the floor or moving
 # vertically.
 def Sim.z(+p: Player) -> Player:
-  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, +z, angle, momx, momy, +momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Sim.z.if(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), p)
 
 # The state
@@ -1091,19 +1200,27 @@ type Sim.Step is Data:
   Travel{down: Bool, dest: U32}
   Hold{tics: U32}
 
+# The sounds a mover's sector makes, 0 for none: as it starts, as a wait
+# ends, as a travel up or down ends, as something in its way turns it
+# back, and every eighth tic of the clock while it travels.
+type Sim.Noise is Data:
+  Noise{start: U32, wake: U32, up: U32, down: U32, crush: U32, grind: U32}
+
 # Doom's thinkers. A mobj is P_MobjThinker for the mobj an id names, a
 # thing's or the player's. A mover is T_VerticalDoor, T_PlatRaise and
 # T_MoveFloor in one: a sector's ceiling or floor, a speed, the steps
-# left, and the whole plan, which a crushed mover starts again. A button
-# is a pressed switch waiting to pop back: the side, which of its three
-# textures, the texture it showed, and the tics left. A blink is
+# left, the whole plan, which a crushed mover starts again, and its
+# sounds. A button is a pressed switch waiting to pop back: the side,
+# which of its three textures, the texture it showed, and the tics left.
+# A blink is
 # T_LightFlash and T_StrobeFlash in one: the tics left at the sector's
 # light, its dark and bright levels, the time at each, and whether a time
 # is the count or the mask of a random one. A glow is T_Glow: the two
 # levels and the way it is going.
 type Thinker is Data:
   Mobj{id: U32}
-  Mover{sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>}
+  Mover{sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>,
+    noise: Sim.Noise}
   Button{side: U32, slot: U32, texture: U32, tics: U32}
   Blink{sector: U32, count: U32, dark: U32, bright: U32, darktime: U32, brighttime: U32, random: Bool}
   Glow{sector: U32, dark: U32, bright: U32, down: Bool}
@@ -1120,64 +1237,150 @@ type Thinkers is Data:
 # sectors' words and its lines' specials), the things alive and their
 # links, the sides' texture numbers (top, bottom and middle a side, as
 # the graphics number them), the thinkers, the random table's index, the
-# clock (Doom's leveltime), whether the level has ended, and whether use
-# was down on the last tic.
+# clock (Doom's leveltime), whether the level has ended, whether use was
+# down on the last tic, the sounds the last tic started and stopped, in
+# order, and M_Random's index, the random numbers no demo depends on.
 type State is Data:
   State{player: Player, level: L.Level, things: H.Things, sidetex: V.Vec,
-    thinkers: Thinkers, rnd: U32, clock: U32, ended: Bool, usedown: Bool}
+    thinkers: Thinkers, rnd: U32, clock: U32, ended: Bool, usedown: Bool,
+    sounds: List<&2, Sn.Sound.Event>, mrnd: U32}
 
 def State.player(s: State) -> Player:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   player
 
 def State.level(s: State) -> L.Level:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   level
 
 def State.things(s: State) -> H.Things:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   things
 
 def State.sidetex(s: State) -> V.Vec:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   sidetex
 
 def State.thinkers.of(s: State) -> Thinkers:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   thinkers
 
 # The thinkers in the order they were started.
 def State.thinkers(s: State) -> List<&2, Thinker>:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd} = s
   List.append(&2, Thinker, List.reverse(&2, Thinker, ran), due)
 
 def State.rnd(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   rnd
 
 def State.clock(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   clock
 
 def State.ended(s: State) -> Bool:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   ended
 
 def State.usedown(s: State) -> Bool:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   usedown
+
+def State.sounds(s: State) -> List<&2, Sn.Sound.Event>:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  sounds
+
+def State.mrnd(s: State) -> U32:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  mrnd
 
 # The state with a thinker started, last to run.
 def State.thinking(s: State, t: Thinker) -> State:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd} = s
   State{player, level, things, sidetex, Thinkers{ran, List.append(&2, Thinker, due, [t])}, rnd, clock, ended,
-    usedown}
+    usedown, sounds, mrnd}
 
 # The state with the thinker whose turn it was kept, to run again next
 # tic.
 def State.kept(s: State, t: Thinker) -> State:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown} = s
-  State{player, level, things, sidetex, Thinkers{t <> ran, due}, rnd, clock, ended, usedown}
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, Thinkers{t <> ran, due}, rnd, clock, ended, usedown, sounds, mrnd}
+
+# Sounds
+# ------
+
+# The state after the tic reports an event: a start draws from M_Random
+# as S_StartSound does.
+def State.heard(+e: Sn.Sound.Event, s: State) -> State:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, +mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown,
+    List.append(&2, Sn.Sound.Event, sounds, [e]), Bool.pick(U32, Sn.Sound.Event.draws(e), M.Random.next(mrnd), mrnd)}
+
+def State.told.go(events: List<&2, Sn.Sound.Event>, s: State) -> State:
+  match events:
+    case []:
+      s
+    case e <> rest:
+      State.told.go(rest, State.heard(e, s))
+
+# The state once it has reported what its things were heard doing.
+def State.told(s: State) -> State:
+  State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State.told.go(heard, State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd,
+    clock, ended, usedown, sounds, mrnd})
+
+def Sim.sound.spot(xy: U32 & U32) -> Sn.Sound.Source:
+  (x, y) = xy
+  Sn.Spot{x, y}
+
+# The player hears its own sounds where it stands, and a thing that is
+# gone has no place.
+def Sim.sound.thing(own: Bool, m: Maybe<&2, H.Thing>) -> Sn.Sound.Source:
+  match own m:
+    case False{} Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      Sn.Spot{x, y}
+    case _ _:
+      Sn.Nobody{}
+
+# Where a source is: a spot, or nobody for a sound with no place.
+def Sim.sound.place(source: Sn.Sound.Source, +s: State) -> Sn.Sound.Source:
+  match source:
+    case Sn.Thing{+id}:
+      Sim.sound.thing(U32.is_eq(id, H.Thing.you()), H.Things.get(State.things(s), id))
+    case Sn.Sector{sector}:
+      Sim.sound.spot(L.Level.soundorg(State.level(s), sector))
+    case other:
+      other
+
+# The volume and separation the player hears a place at.
+def Sim.sound.params(place: Sn.Sound.Source, +level: L.Level, +p: Player) -> U32 & U32:
+  match place:
+    case Sn.Spot{x, y}:
+      Sn.Sound.adjust(L.Level.sine(level), L.Level.tanto(level), Player.x(p), Player.y(p), Player.angle(p), x, y)
+    case _:
+      (Sn.Sound.volume(), Sn.Sound.centre())
+
+def Sim.sound.if(audible: Bool, e: Sn.Sound.Event, s: State) -> State:
+  match audible:
+    case False{}:
+      s
+    case True{}:
+      State.heard(e, s)
+
+def Sim.sound.start(+sfx: U32, source: Sn.Sound.Source, params: U32 & U32, s: State) -> State:
+  (+vol, sep) = params
+  Sim.sound.if(Bool.not(Bool.or(U32.is_zero(sfx), U32.is_zero(vol))), Sn.Start{sfx, source, vol, sep}, s)
+
+def Sim.sound.told(sfx: U32, +source: Sn.Sound.Source, +s: State) -> State:
+  Sim.sound.start(sfx, source, Sim.sound.params(Sim.sound.place(source, s), State.level(s), State.player(s)), s)
+
+# Doom's S_StartSound: a source starts a sound, heard by the player where
+# the state has it. What the things were heard doing is reported first,
+# so the tic's sounds stay in order. Sound 0 starts nothing, and neither
+# does a sound S_AdjustSoundParams finds inaudible, which draws no random
+# number either.
+def Sim.sound(sfx: U32, source: Sn.Sound.Source, s: State) -> State:
+  Sim.sound.told(sfx, source, State.told(s))
 
 # Lights
 # ------
@@ -1190,11 +1393,11 @@ def Sim.light(s: State, sector: U32) -> U32:
 # thinkers, started or kept.
 def Sim.blink.to(~put: @s: State -> @t: Thinker -> State, +lit: Bool, +sector: U32, +dark: U32, +bright: U32,
   +darktime: U32, +brighttime: U32, +random: Bool, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd} = s
   +time = Bool.pick(U32, lit, darktime, brighttime)
   +i = Bool.pick(U32, random, M.Random.next(rnd), rnd)
   put(State{player, L.Level.light.put(level, sector, Bool.pick(U32, lit, dark, bright)), things, sidetex,
-    thinkers, i, clock, ended, usedown}, Blink{sector, Bool.pick(U32, random,
+    thinkers, i, clock, ended, usedown, sounds, mrnd}, Blink{sector, Bool.pick(U32, random,
     ((M.Random.at(i) .&. time : U32) + 1 : U32), time), dark, bright, darktime, brighttime, random})
 
 def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, darktime: U32, brighttime: U32,
@@ -1209,12 +1412,12 @@ def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, dar
 # Doom's T_Glow: 8 a tic, and a step that would reach an end is undone
 # and turns the glow.
 def Sim.glow(+sector: U32, +dark: U32, +bright: U32, +down: Bool, s: State) -> State:
-  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   +light = L.Level.sector.light(level, sector)
   +next = Bool.pick(U32, down, (light - 8 : U32), (light + 8 : U32))
   +turn = Bool.pick(Bool, down, F.Fixed.le(next, dark), F.Fixed.ge(next, bright))
   State.kept(State{player, L.Level.light.put(level, sector, Bool.pick(U32, turn, light, next)), things, sidetex,
-    thinkers, rnd, clock, ended, usedown}, Glow{sector, dark, bright, Bool.xor(down, turn)})
+    thinkers, rnd, clock, ended, usedown, sounds, mrnd}, Glow{sector, dark, bright, Bool.xor(down, turn)})
 
 # Movers
 # ------
@@ -1231,11 +1434,11 @@ def Sim.fits(+floor: U32, +ceil: U32, +height: U32) -> Bool:
 # The player clipped again: its position check's pickups, the floor and
 # ceiling there, and whether it still fits.
 def Sim.reclip.fit(p: Player, touched: I.Inventory & H.Things, f: Sim.Fit) -> Sim.Try:
-  Player{x, y, +z, angle, momx, momy, momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, +z, angle, momx, momy, momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   (held, things) = touched
   Fit{ok, +floor, +ceil} = f
   Try{Sim.fits(floor, ceil, Sim.height()), Player{x, y, Sim.clip(z, floorz, floor, ceil, Sim.height()), angle,
-    momx, momy, momz, floor, ceil, viewheight, deltaview, viewz, crossed, held}, things}
+    momx, momy, momz, floor, ceil, viewheight, deltaview, viewz, crossed, held, psprites}, things}
 
 def Sim.reclip.met(+level: L.Level, things: H.Things, +p: Player, m: Sim.Body, +met: Sim.Met) -> Sim.Try:
   Sim.reclip.fit(p, Sim.touch(level, things, p, Player.x(p), Player.y(p), met), Sim.check.met(met, level, m, 1))
@@ -1310,55 +1513,78 @@ def Sim.change(+level: L.Level, +sector: U32, p: Player, things: H.Things) -> Si
 # The state with a try's player and things, in a level.
 def State.moved(t: Sim.Try, level: L.Level, s: State) -> State:
   Try{ok, p, got} = t
-  State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  State{p, level, got, sidetex, thinkers, rnd, clock, ended, usedown}
+  State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{p, level, got, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+
+def Sim.Noise.start(n: Sim.Noise) -> U32:
+  Noise{start, wake, up, down, crush, grind} = n
+  start
+
+def Sim.Noise.wake(n: Sim.Noise) -> U32:
+  Noise{start, wake, up, down, crush, grind} = n
+  wake
 
 # A mover with steps left runs again next tic, after those kept so far;
 # one with none has ended.
 def Sim.mover.kept(sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>,
-  plan: List<&2, Sim.Step>, s: State) -> State:
+  plan: List<&2, Sim.Step>, noise: Sim.Noise, s: State) -> State:
   match steps:
     case []:
       s
     case step <> rest:
-      State.kept(s, Mover{sector, ceiling, speed, step <> rest, plan})
+      State.kept(s, Mover{sector, ceiling, speed, step <> rest, plan, noise})
+
+# A mover's sector heard grinding and then stopping, as T_MoveFloor
+# sounds them after its step.
+def Sim.mover.heard(+sector: U32, grind: U32, stop: U32, s: State) -> State:
+  Sim.sound(stop, Sn.Sector{sector}, Sim.sound(grind, Sn.Sector{sector}, s))
 
 # A step something does not fit is undone, everything clipped again, and
-# the mover crushed: it starts its plan again, unless the step was its
-# travel's last, which Doom ends all the same.
+# the mover crushed: it starts its plan again and sounds its crush,
+# unless the step was its travel's last, which Doom ends all the same.
 def Sim.mover.fitted(t: Sim.Try, +sector: U32, +ceiling: Bool, speed: U32, was: U32, past: Bool,
-  +rest: List<&2, Sim.Step>, going: List<&2, Sim.Step>, +plan: List<&2, Sim.Step>, +s: State) -> State:
+  +rest: List<&2, Sim.Step>, going: List<&2, Sim.Step>, +plan: List<&2, Sim.Step>, noise: Sim.Noise, grind: U32,
+  stop: U32, crush: U32, +s: State) -> State:
   match t:
     case Try{True{}, p, got}:
-      Sim.mover.kept(sector, ceiling, speed, going, plan, State.moved(Try{True{}, p, got}, State.level(s), s))
+      Sim.mover.kept(sector, ceiling, speed, going, plan, noise,
+        Sim.mover.heard(sector, grind, stop, State.moved(Try{True{}, p, got}, State.level(s), s)))
     case Try{False{}, p, got}:
       +undone = L.Level.plane.put(State.level(s), sector, ceiling, was)
-      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, Sim.Step>, past, rest, plan), plan,
-        State.moved(Sim.change(undone, sector, p, got), undone, s))
+      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, Sim.Step>, past, rest, plan), plan, noise,
+        Sim.mover.heard(sector, grind, crush, State.moved(Sim.change(undone, sector, p, got), undone, s)))
 
 # Doom's T_MovePlane: a step that would pass the destination lands on it
 # and ends the travel. A ceiling going up short of its destination does
-# not care what fits under it.
+# not care what fits under it. The sector grinds when the clock's low
+# three bits are clear, and a travel's last step sounds its end whether
+# or not everything fits.
 def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest: U32,
-  +rest: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, s: State) -> State:
-  State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  +rest: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, +noise: Sim.Noise, s: State) -> State:
+  Noise{start, wake, rose, fell, crush, grind} = noise
+  State{+player, +level, +things, sidetex, thinkers, rnd, +clock, ended, usedown, sounds, mrnd} = s
   +was = L.Level.plane(level, sector, ceiling)
   +next = Bool.pick(U32, down, (was - speed : U32), (was + speed : U32))
   +past = Bool.pick(Bool, down, F.Fixed.lt(next, dest), F.Fixed.gt(next, dest))
   +moved = L.Level.plane.put(level, sector, ceiling, Bool.pick(U32, past, dest, next))
+  +stop = Bool.pick(U32, past, Bool.pick(U32, down, fell, rose), 0)
   Sim.mover.fitted(Sim.Try.or(Bool.and(ceiling, Bool.not(Bool.or(down, past))),
     Sim.change(moved, sector, player, things)), sector, ceiling, speed, was, past, rest,
-    Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan,
-    State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown})
+    Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan, noise,
+    Bool.pick(U32, U32.is_zero((clock .&. 7 : U32)), grind, 0), stop, Bool.pick(U32, past, stop, crush),
+    State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd})
 
 # Doom's button in P_UpdateSpecials: the tic its count reaches zero the
-# side shows its texture again.
+# side shows its texture again. Vanilla sounds the pop-back from the
+# address of the button's origin where it means the origin, and reads a
+# place out of the next button's slot: the map's own origin, while that
+# slot is free.
 def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: State) -> State:
   match done:
     case True{}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
-      State{player, level, things, V.Vec.set(sidetex, (side * 3 + slot : U32), texture), thinkers, rnd, clock, ended,
-        usedown}
+      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+      Sim.sound(Sn.Sound.swtchn(), Sn.Spot{0, 0}, State{player, level, things,
+        V.Vec.set(sidetex, (side * 3 + slot : U32), texture), thinkers, rnd, clock, ended, usedown, sounds, mrnd})
     case False{}:
       State.kept(s, Button{side, slot, texture, (tics - 1 : U32)})
 
@@ -1370,27 +1596,28 @@ def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
     case None{}:
       s
     case Some{th}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
       State.kept(State{player, level, H.Things.put(things, id, Some{H.Thing.tic(th)}), sidetex, thinkers, rnd, clock,
-        ended, usedown}, Mobj{id})
+        ended, usedown, sounds, mrnd}, Mobj{id})
 
 def Sim.thing(+id: U32, +s: State) -> State:
   Sim.thing.tic(H.Things.get(State.things(s), id), id, s)
 
-# A thinker's tic. A wait counts down, and the tic it reaches zero does
-# nothing else, as Doom's doors and lifts turn. A blink turns on the tic
-# its count runs out.
+# A thinker's tic. A wait counts down, and the tic it reaches zero
+# sounds the mover's wake and does nothing else, as Doom's doors and
+# lifts turn. A blink turns on the tic its count runs out.
 def Sim.think(t: Thinker, s: State) -> State:
   match t:
     case Mobj{id}:
       Sim.thing(id, s)
-    case Mover{sector, ceiling, speed, [], plan}:
+    case Mover{sector, ceiling, speed, [], plan, noise}:
       s
-    case Mover{sector, ceiling, speed, Hold{+tics} <> +rest, plan}:
+    case Mover{+sector, ceiling, speed, Hold{+tics} <> +rest, plan, +noise}:
       Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(tics, 1), rest,
-        Hold{(tics - 1 : U32)} <> rest), plan, s)
-    case Mover{sector, ceiling, speed, Travel{down, dest} <> rest, plan}:
-      Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, s)
+        Hold{(tics - 1 : U32)} <> rest), plan, noise,
+        Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
+    case Mover{sector, ceiling, speed, Travel{down, dest} <> rest, plan, noise}:
+      Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
     case Button{side, slot, texture, +tics}:
       Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
     case Blink{sector, +count, dark, bright, darktime, brighttime, random}:
@@ -1433,14 +1660,35 @@ def Sim.moving(thinkers: List<&2, Thinker>, +sector: U32) -> Bool:
   match thinkers:
     case []:
       False{}
-    case Mover{s, ceiling, speed, steps, plan} <> rest:
+    case Mover{s, ceiling, speed, steps, plan, noise} <> rest:
       Bool.or(U32.is_eq(s, sector), Sim.moving(rest, sector))
     case _ <> rest:
       Sim.moving(rest, sector)
 
-# A mover at the start of its plan.
-def Sim.mover.new(sector: U32, ceiling: Bool, speed: U32, +plan: List<&2, Sim.Step>) -> Thinker:
-  Mover{sector, ceiling, speed, plan, plan}
+# A mover begun: at the start of its plan, last to run, its start heard.
+def Sim.mover.begin(+sector: U32, ceiling: Bool, speed: U32, +plan: List<&2, Sim.Step>, +noise: Sim.Noise,
+  s: State) -> State:
+  State.thinking(Sim.sound(Sim.Noise.start(noise), Sn.Sector{sector}, s),
+    Mover{sector, ceiling, speed, plan, plan, noise})
+
+# T_VerticalDoor's sounds: the door opens, closes once its wait is over,
+# and opens again on what is in its way. The blazing door has its own
+# open and close, closes aloud a second time as it shuts, and is turned
+# back with the plain door's sound.
+def Sim.noise.door() -> Sim.Noise:
+  Noise{Sn.Sound.doropn(), Sn.Sound.dorcls(), 0, 0, Sn.Sound.doropn(), 0}
+
+def Sim.noise.blazing() -> Sim.Noise:
+  Noise{Sn.Sound.bdopn(), Sn.Sound.bdcls(), 0, Sn.Sound.bdcls(), Sn.Sound.doropn(), 0}
+
+# T_PlatRaise's: the lift starts, stops at either end, starts again
+# after its wait, and again when turned back down.
+def Sim.noise.lift() -> Sim.Noise:
+  Noise{Sn.Sound.pstart(), Sn.Sound.pstart(), Sn.Sound.pstop(), Sn.Sound.pstop(), Sn.Sound.pstart(), 0}
+
+# T_MoveFloor's: the floor grinds as it moves and stops aloud.
+def Sim.noise.floor() -> Sim.Noise:
+  Noise{0, 0, Sn.Sound.pstop(), Sn.Sound.pstop(), 0, Sn.Sound.stnmov()}
 
 # The level's start
 # -----------------
@@ -1482,10 +1730,10 @@ def Sim.lights(n: Nat, +sector: U32, +s: State) -> State:
 # its thinker started.
 def State.entered(th: H.Thing, s: State) -> State:
   H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = th
-  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   State.thinking(State{player, level, H.Things.entered(things, L.Level.blockmap_of(level),
     H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}), sidetex, thinkers, rnd, clock, ended,
-    usedown}, Mobj{id})
+    usedown, sounds, mrnd}, Mobj{id})
 
 def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
   match things:
@@ -1497,10 +1745,10 @@ def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
 # The player's mobj entered: linked where the player stands, its thinker
 # started.
 def State.entered.you(s: State) -> State:
-  State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), H.Things.you(things),
     Player.x(player), Player.y(player), L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex,
-    thinkers, rnd, clock, ended, usedown}, Mobj{H.Things.you(things)})
+    thinkers, rnd, clock, ended, usedown, sounds, mrnd}, Mobj{H.Things.you(things)})
 
 # Whether the player's mobj enters before the first of some things: its
 # record comes before theirs, or none is left.
@@ -1530,10 +1778,10 @@ def Sim.nothing(bm: L.Level.Blockmap, count: U32, you: U32, nsectors: U32) -> H.
 # Doom spawns a map's records in, so each is linked and thinks as it
 # would had it spawned then.
 def State.populated(+things: List<&2, H.Thing>, count: U32, s: State) -> State:
-  State{player, +level, +old, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, +level, +old, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   State.populated.go(things, State.you.first(things, H.Things.you(old)), H.Things.you(old),
     State{player, level, Sim.nothing(L.Level.blockmap_of(level), count, H.Things.you(old), L.Level.nsectors(level)),
-      sidetex, thinkers, rnd, clock, ended, usedown})
+      sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd})
 
 # Doom's P_SpawnMobj in play: a thing of a type at (x, y) and z, or on
 # the floor or under the ceiling for H.Thing.onfloor and
@@ -1542,21 +1790,21 @@ def State.populated(+things: List<&2, H.Thing>, count: U32, s: State) -> State:
 # last, so it first thinks the same tic if the thinkers' run is not over,
 # as one added to the tail of Doom's list does.
 def Sim.spawn(d: H.Thing.Def, x: U32, y: U32, z: U32, s: State) -> State:
-  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   State.entered(H.Thing.mobj(d, level, H.Things.count(things), x, y, z), State{player, level,
-    H.Things.fresh(things), sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown})
+    H.Things.fresh(things), sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown, sounds, mrnd})
 
 def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
   match m:
     case None{}:
       s
     case Some{th}:
-      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
+      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
       State{player, level, H.Things.removed(things, L.Level.blockmap_of(level), th), sidetex, thinkers, rnd, clock,
-        ended, usedown}
+        ended, usedown, sounds, mrnd}
 
 # Doom's P_RemoveMobj: the thing unlinked and gone, its id never given
-# again; its thinker ends when its turn comes.
+# again, its sound stopped; its thinker ends when its turn comes.
 def Sim.remove(id: U32, +s: State) -> State:
   Sim.remove.thing(H.Things.get(State.things(s), id), s)
 
@@ -1564,12 +1812,13 @@ def Sim.remove(id: U32, +s: State) -> State:
 # at rest at a place, the things spawned with the random numbers they
 # draw, and then the lights in sector order. Use counts as down, as
 # Doom's G_PlayerReborn leaves it, so a key held since before the level
-# does nothing.
+# does nothing. M_Random's index stands at 64: G_InitNew clears it, and
+# the melt that wipes the level in draws once a screen column, 320.
 def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn) -> State:
   H.Spawn{things, rnd, you} = spawn
   Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0, State.populated(things, L.Level.nthings(level),
     State{Player.at(level, place), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), Thinkers{[], []},
-      rnd, 0, False{}, True{}}))
+      rnd, 0, False{}, True{}, [], 64}))
 
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
   State.at.spawned(level, place, H.Thing.spawn(level))
@@ -1594,9 +1843,9 @@ def Sim.door.turn(thinkers: List<&2, Thinker>, +sector: U32, +floor: U32) -> Lis
   match thinkers:
     case []:
       []
-    case Mover{+s, ceiling, speed, +steps, +plan} <> rest:
+    case Mover{+s, ceiling, speed, +steps, +plan, noise} <> rest:
       Mover{s, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(s, sector),
-        Sim.door.turned(steps, plan, floor), steps), plan} <> Sim.door.turn(rest, sector, floor)
+        Sim.door.turned(steps, plan, floor), steps), plan, noise} <> Sim.door.turn(rest, sector, floor)
     case other <> rest:
       other <> Sim.door.turn(rest, sector, floor)
 
@@ -1608,28 +1857,29 @@ def Sim.door.top(+level: L.Level, sector: U32) -> U32:
 def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, Sim.Step>:
   [Travel{False{}, Sim.door.top(level, sector)}, Hold{150}, Travel{True{}, L.Level.floor(level, sector)}]
 
-def Sim.door.on(moving: Bool, +sector: U32, speed: U32, +s: State) -> State:
+# A door already moving is turned without a sound.
+def Sim.door.on(moving: Bool, +sector: U32, speed: U32, noise: Sim.Noise, +s: State) -> State:
   match moving:
     case True{}:
-      State{player, +level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown} = s
+      State{player, +level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd} = s
       State{player, level, things, sidetex, Thinkers{Sim.door.turn(ran, sector, L.Level.floor(level, sector)),
-        Sim.door.turn(due, sector, L.Level.floor(level, sector))}, rnd, clock, ended, usedown}
+        Sim.door.turn(due, sector, L.Level.floor(level, sector))}, rnd, clock, ended, usedown, sounds, mrnd}
     case False{}:
-      State.thinking(s, Sim.mover.new(sector, True{}, speed, Sim.door.plan(State.level(s), sector)))
+      Sim.mover.begin(sector, True{}, speed, Sim.door.plan(State.level(s), sector), noise, s)
 
 # Doom's EV_VerticalDoor: the door is the sector behind the line.
-def Sim.door(line: L.Level.Line, speed: U32, +s: State) -> State:
+def Sim.door(line: L.Level.Line, speed: U32, noise: Sim.Noise, +s: State) -> State:
   L.Line{x1, y1, x2, y2, flags, front, +back} = line
-  Sim.door.on(Sim.moving(State.thinkers(s), back), back, speed, s)
+  Sim.door.on(Sim.moving(State.thinkers(s), back), back, speed, noise, s)
 
-# Doom's locked EV_VerticalDoor: without the key it refuses; with it, it
-# is the manual door.
-def Sim.door.locked(opens: Bool, line: L.Level.Line, +s: State) -> State:
+# Doom's locked EV_VerticalDoor: without the key it refuses with a grunt
+# from nobody; with it, it is the manual door.
+def Sim.door.locked(opens: Bool, line: L.Level.Line, s: State) -> State:
   match opens:
     case True{}:
-      Sim.door(line, 131072, s)
+      Sim.door(line, 131072, Sim.noise.door(), s)
     case False{}:
-      s
+      Sim.sound(Sn.Sound.oof(), Sn.Nobody{}, s)
 
 # Switches and tagged movers
 # --------------------------
@@ -1649,20 +1899,20 @@ def Sim.tagged(+s: State, line: U32) -> List<&2, U32>:
   Sim.tagged.go(U32.to_nat(L.Level.nsectors(State.level(s))), State.level(s), State.thinkers(s),
     L.Level.tag(State.level(s), line), 0)
 
-# A mover made for each sector, all against the level as it stood.
-def Sim.start(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, +s: State) ->
+# A mover begun for each sector, all against the level as it stood.
+def Sim.start(~make: @+level: L.Level -> @+sector: U32 -> @s: State -> State, sectors: List<&2, U32>, +s: State) ->
   State:
   match sectors:
     case []:
       s
     case sector <> rest:
-      Sim.start(~make, rest, State.thinking(s, make(State.level(s), sector)))
+      Sim.start(~make, rest, make(State.level(s), sector, s))
 
 # Doom's lowerFloorToLowest: 1 a tic down to the lowest floor around,
 # its own included.
-def Sim.floor.low(+level: L.Level, +sector: U32) -> Thinker:
-  Sim.mover.new(sector, False{}, 65536, [Travel{True{}, Sim.extreme(~F.Fixed.min,
-    ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}])
+def Sim.floor.low(+level: L.Level, +sector: U32, s: State) -> State:
+  Sim.mover.begin(sector, False{}, 65536, [Travel{True{}, Sim.extreme(~F.Fixed.min,
+    ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}], Sim.noise.floor(), s)
 
 # Which of a side's three textures is a switch: the top, else the
 # middle, else the bottom; 3 when none is.
@@ -1680,6 +1930,20 @@ def Sim.pressed.side(thinkers: List<&2, Thinker>, +side: U32) -> Bool:
     case _ <> rest:
       Sim.pressed.side(rest, side)
 
+# P_ChangeSwitchTexture sounds a switch from the first button's origin
+# where it means the pressed line's: nobody while no button runs, else
+# the sector in front of the running button's line. Vanilla's first
+# button is a slot, which can be free while a later one runs; here it is
+# the first still running, the same while one runs at a time.
+def Sim.switch.origin(thinkers: List<&2, Thinker>, +level: L.Level) -> Sn.Sound.Source:
+  match thinkers:
+    case []:
+      Sn.Nobody{}
+    case Button{side, slot, texture, tics} <> rest:
+      Sn.Sector{L.Level.side.sector(level, side)}
+    case _ <> rest:
+      Sim.switch.origin(rest, level)
+
 # A switch that works again starts a button of 35 tics for the texture
 # it showed, unless its side has one running.
 def Sim.switch.button(start: Bool, side: U32, slot: U32, showed: U32, s: State) -> State:
@@ -1689,17 +1953,21 @@ def Sim.switch.button(start: Bool, side: U32, slot: U32, showed: U32, s: State) 
     case True{}:
       State.thinking(s, Button{side, slot, showed, 35})
 
-# The switch's texture swapped for its partner.
+# The switch's texture swapped for its partner, with a click. The exit
+# switch clicks like any other: vanilla clears a once-only line's special
+# before it looks for the exit's, so sfx_swtchx never plays.
 def Sim.switch.swap(none: Bool, again: Bool, +side: U32, +slot: U32, s: State) -> State:
   match none:
     case True{}:
       s
     case False{}:
-      State{player, +level, things, +sidetex, Thinkers{+ran, +due}, rnd, clock, ended, usedown} = s
+      State{player, +level, things, +sidetex, Thinkers{+ran, +due}, rnd, clock, ended, usedown, sounds, mrnd} = s
       +showed = V.Vec.get(sidetex, (side * 3 + slot : U32))
-      Sim.switch.button(Bool.and(again, Bool.not(Bool.or(Sim.pressed.side(ran, side), Sim.pressed.side(due, side)))),
-        side, slot, showed, State{player, level, things, V.Vec.set(sidetex, (side * 3 + slot : U32),
-          L.Level.switch(level, showed)), Thinkers{ran, due}, rnd, clock, ended, usedown})
+      +started = List.append(&2, Thinker, List.reverse(&2, Thinker, ran), due)
+      Sim.switch.button(Bool.and(again, Bool.not(Sim.pressed.side(started, side))), side, slot, showed,
+        Sim.sound(Sn.Sound.swtchn(), Sim.switch.origin(started, level),
+          State{player, level, things, V.Vec.set(sidetex, (side * 3 + slot : U32), L.Level.switch(level, showed)),
+            Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd}))
 
 # Doom's P_ChangeSwitchTexture on the line's front side.
 def Sim.switch(again: Bool, line: U32, +s: State) -> State:
@@ -1709,17 +1977,17 @@ def Sim.switch(again: Bool, line: U32, +s: State) -> State:
 
 # A line that works once has no special afterwards.
 def Sim.once(line: U32, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown}
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
 
 # Doom's G_ExitLevel: the level ends, and the tic it ends on runs on.
 def State.end(s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown} = s
-  State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown}
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}
 
 # A switch that works once: when its tag starts a mover, its texture is
 # swapped and its special cleared.
-def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, +line: U32,
+def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> @s: State -> State, sectors: List<&2, U32>, +line: U32,
   s: State) -> State:
   match sectors:
     case []:
@@ -1729,7 +1997,7 @@ def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: L
 
 # A switch that works again: when its tag starts a mover, its texture is
 # swapped for 35 tics.
-def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: List<&2, U32>, line: U32,
+def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> @s: State -> State, sectors: List<&2, U32>, line: U32,
   +s: State) -> State:
   match sectors:
     case []:
@@ -1739,17 +2007,22 @@ def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> Thinker, sectors: 
 
 # Doom's downWaitUpStay lift: 4 a tic down to the lowest floor around,
 # its own included, 105 tics there, and back up to where it was.
-def Sim.lift(+level: L.Level, +sector: U32) -> Thinker:
-  Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.extreme(~F.Fixed.min,
+def Sim.lift(+level: L.Level, +sector: U32, s: State) -> State:
+  Sim.mover.begin(sector, False{}, 262144, [Travel{True{}, Sim.extreme(~F.Fixed.min,
     ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}, Hold{105},
-    Travel{False{}, L.Level.floor(level, sector)}])
+    Travel{False{}, L.Level.floor(level, sector)}], Sim.noise.lift(), s)
 
 # Walk-over lines
 # ---------------
 
-# Doom's EV_DoDoor open: up to the door's top, where it stays.
-def Sim.door.open(+level: L.Level, +sector: U32) -> Thinker:
-  Sim.mover.new(sector, True{}, 131072, [Travel{False{}, Sim.door.top(level, sector)}])
+def Sim.door.open.to(+sector: U32, +top: U32, ceil: U32, s: State) -> State:
+  Sim.mover.begin(sector, True{}, 131072, [Travel{False{}, top}],
+    Noise{Bool.pick(U32, U32.is_eq(top, ceil), 0, Sn.Sound.doropn()), 0, 0, 0, 0, 0}, s)
+
+# Doom's EV_DoDoor open: up to the door's top, where it stays, heard
+# unless it is there already.
+def Sim.door.open(+level: L.Level, +sector: U32, s: State) -> State:
+  Sim.door.open.to(sector, Sim.door.top(level, sector), L.Level.ceil(level, sector), s)
 
 # Doom's turboLower: 4 a tic down to the highest floor around, plus 8
 # when that is not the floor's own height. A travel down to a height
@@ -1757,9 +2030,10 @@ def Sim.door.open(+level: L.Level, +sector: U32) -> Thinker:
 def Sim.floor.turbo.to(+highest: U32, own: U32) -> U32:
   Bool.pick(U32, U32.is_eq(highest, own), highest, (highest + 524288 : U32))
 
-def Sim.floor.turbo(+level: L.Level, +sector: U32) -> Thinker:
-  Sim.mover.new(sector, False{}, 262144, [Travel{True{}, Sim.floor.turbo.to(Sim.extreme(~F.Fixed.max,
-    ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}])
+def Sim.floor.turbo(+level: L.Level, +sector: U32, s: State) -> State:
+  Sim.mover.begin(sector, False{}, 262144, [Travel{True{}, Sim.floor.turbo.to(Sim.extreme(~F.Fixed.max,
+    ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}],
+    Sim.noise.floor(), s)
 
 # Doom's P_CrossSpecialLine for the specials E1M1 carries. The two that
 # work once lose their special whether or not a sector started; the
@@ -1794,9 +2068,9 @@ def Sim.cross(lines: List<&2, U32>, +s: State) -> State:
 def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: State) -> State:
   match special:
     case 1:
-      Sim.door(L.Level.line(State.level(s), i), 131072, s)
+      Sim.door(L.Level.line(State.level(s), i), 131072, Sim.noise.door(), s)
     case 117:
-      Sim.door(L.Level.line(State.level(s), i), 524288, s)
+      Sim.door(L.Level.line(State.level(s), i), 524288, Sim.noise.blazing(), s)
     case 26:
       Sim.door.locked(I.Inventory.blue(inv), L.Level.line(State.level(s), i), s)
     case 23:
@@ -1816,11 +2090,21 @@ def Sim.use.line(back: Bool, +level: L.Level, +i: U32, inv: I.Inventory, s: Stat
     case False{}:
       Sim.use.special(L.Level.special(level, i), i, inv, s)
 
-def Sim.use.hit(hit: Maybe<&2, U32>, +p: Player, +s: State) -> State:
+# What a use trace reaches: a special line, a wall that ends it, or
+# nothing.
+type Sim.Reach is Data:
+  Special{line: U32}
+  Wall{}
+  Nothing{}
+
+# The player grunts at a wall.
+def Sim.use.hit(hit: Sim.Reach, +p: Player, +s: State) -> State:
   match hit:
-    case None{}:
+    case Nothing{}:
       s
-    case Some{+i}:
+    case Wall{}:
+      Sim.sound(Sn.Sound.noway(), Sn.Thing{H.Thing.you()}, s)
+    case Special{+i}:
       Sim.use.line(Sim.point_side(Player.x(p), Player.y(p), L.Level.line(State.level(s), i)),
         State.level(s), i, Player.inv(p), s)
 
@@ -1830,22 +2114,22 @@ def Sim.use.shut(+level: L.Level, +line: L.Level.Line) -> Bool:
   Bool.or(U32.is_eq(back, L.Level.none()),
     F.Fixed.le((Sim.open_top(level, line) - Sim.open_bottom(level, line) : U32), 0))
 
-def Sim.use.first.pick(special: Bool, shut: Bool, i: U32, later: Maybe<&2, U32>) -> Maybe<&2, U32>:
+def Sim.use.first.pick(special: Bool, shut: Bool, i: U32, later: Sim.Reach) -> Sim.Reach:
   match special shut:
     case True{} _:
-      Some{i}
+      Special{i}
     case False{} True{}:
-      None{}
+      Wall{}
     case False{} False{}:
       later
 
 # Doom's PTR_UseTraverse along the sorted meets: the first special line
 # ends the trace whatever its special; a line without one lets it go on
 # when its opening is more than nothing.
-def Sim.use.first(sorted: List<&2, Sim.Meet>, +level: L.Level) -> Maybe<&2, U32>:
+def Sim.use.first(sorted: List<&2, Sim.Meet>, +level: L.Level) -> Sim.Reach:
   match sorted:
     case []:
-      None{}
+      Nothing{}
     case Meet{frac, +i} <> rest:
       Sim.use.first.pick(Bool.not(U32.is_zero(L.Level.special(level, i))),
         Sim.use.shut(level, L.Level.line(level, i)), i, Sim.use.first(rest, level))
@@ -1882,11 +2166,12 @@ def Sim.use.sort(meets: List<&2, Sim.Meet>, +sorted: List<&2, Sim.Meet>) -> List
       Sim.use.sort(rest, Sim.use.insert(sorted, Sim.use.before(m, sorted), m))
 
 # Doom's P_UseLines, on the press: a trace of 64 units along the facing.
-def Sim.use(press: Bool, +p: Player, +s: State) -> State:
+def Sim.use(press: Bool, +s: State) -> State:
   match press:
     case False{}:
       s
     case True{}:
+      +p = State.player(s)
       +level = State.level(s)
       +sine = L.Level.sine(level)
       +f = A.Angle.fine(Player.angle(p))
@@ -1904,31 +2189,40 @@ def Sim.pressed(cmd: K.Cmd, usedown: Bool) -> Bool:
 # The player where it stood before a thinker's turn, as the turn left
 # it otherwise, the lines it crossed fired and forgotten.
 def Player.held(before: Player, after: Player) -> Player:
-  Player{x, y, bz, ba, bmomx, bmomy, bmomz, bfloorz, bceilz, bviewheight, bdeltaview, bviewz, bcrossed, binv} = before
-  Player{ax, ay, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = after
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, [], inv}
+  Player{x, y, bz, ba, bmomx, bmomy, bmomz, bfloorz, bceilz, bviewheight, bdeltaview, bviewz, bcrossed, binv, bpsprites} = before
+  Player{ax, ay, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = after
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, [], inv, psprites}
 
 # What a turn keeps of the state it began with, whatever it did: the
 # geometry, so no tic writes a wall, and the player's place, so nothing
 # but the player's own movement moves the player sideways.
 def State.held(geo: L.Level.Geo, before: State, after: State) -> State:
-  State{was, wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown} = before
-  State{player, L.Level{g, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown} = after
+  State{was, wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd} = before
+  State{player, L.Level{g, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = after
   State{Player.held(was, player), L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended,
-    usedown}
+    usedown, sounds, mrnd}
 
 # P_PlayerThink's counters.
 def Sim.counters(p: Player) -> Player:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed,
-    I.Inventory.tic(inv)}
+    I.Inventory.tic(inv), psprites}
+
+# The player's own landing, heard from the player.
+def Sim.mobj.landed(hard: Bool, things: H.Things) -> H.Things:
+  match hard:
+    case False{}:
+      things
+    case True{}:
+      H.Things.sounded(things, Sn.Sound.plain(Sn.Sound.oof(), Sn.Thing{H.Thing.you()}))
 
 def Sim.mobj.z(t: Sim.Try) -> Sim.Try:
-  Try{ok, p, things} = t
-  Try{ok, Sim.z(p), things}
+  Try{ok, +p, things} = t
+  Try{ok, Sim.z(p), Sim.mobj.landed(Sim.lands(p), things)}
 
 # Doom's P_MobjThinker for the player: the XY movement, with the pickups
-# its position checks make, then the vertical; the lines that movement
+# its position checks make, then the vertical, against the level the tic
+# began with, whose geometry the wall law reads; the lines that movement
 # crossed fire, and the thinker is kept.
 def Sim.mobj(+cmd: K.Cmd, +geo: L.Level.Geo, +s: State) -> State:
   +level = {L.Level{geo, L.Level.sectors(State.level(s)), L.Level.specials(State.level(s))} : L.Level}
@@ -1960,11 +2254,11 @@ def Sim.thinkers.go(fuel: List<&2, Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: 
   match fuel s:
     case [] s:
       s
-    case f <> rest State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown}:
-      State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown}
-    case f <> rest State{player, level, +things, sidetex, Thinkers{ran, +t <> due}, rnd, clock, ended, usedown}:
+    case f <> rest State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd}:
+      State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd}
+    case f <> rest State{player, level, +things, sidetex, Thinkers{ran, +t <> due}, rnd, clock, ended, usedown, sounds, mrnd}:
       Sim.thinkers.go(rest, cmd, geo, Sim.turn(Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-        State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown}))
+        State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd}))
 
 # Runs until none is due: the thinkers a run started run in the next, the
 # same tic, as those added to the tail of Doom's list do. The fuel is
@@ -1973,17 +2267,17 @@ def Sim.thinkers.all(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: State) -> Sta
   match fuel s:
     case 0n s:
       s
-    case 1n+f State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown}:
-      State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown}
-    case 1n+f State{player, level, things, sidetex, Thinkers{ran, +t <> +due}, rnd, clock, ended, usedown}:
+    case 1n+f State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd}:
+      State{player, level, things, sidetex, Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd}
+    case 1n+f State{player, level, things, sidetex, Thinkers{ran, +t <> +due}, rnd, clock, ended, usedown, sounds, mrnd}:
       Sim.thinkers.all(f, cmd, geo, Sim.thinkers.go(t <> due, cmd, geo,
-        State{player, level, things, sidetex, Thinkers{ran, t <> due}, rnd, clock, ended, usedown}))
+        State{player, level, things, sidetex, Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd}))
 
 # The thinkers all due again, in the order they were started.
 def State.rested(s: State) -> State:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown} = s
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd} = s
   State{player, level, things, sidetex, Thinkers{[], List.append(&2, Thinker, List.reverse(&2, Thinker, ran), due)},
-    rnd, clock, ended, usedown}
+    rnd, clock, ended, usedown, sounds, mrnd}
 
 # Doom's P_RunThinkers.
 def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: State) -> State:
@@ -1994,23 +2288,27 @@ def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: State) -> State:
 def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: State) -> State:
   State{State.player(after), L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after))},
     State.things(after), State.sidetex(after), State.thinkers.of(after), State.rnd(after), (clock + 1 : U32),
-    State.ended(after), use}
+    State.ended(after), use, State.sounds(after), State.mrnd(after)}
 
-# One tic in Doom's order: the player thinks (the move, the eye, use on
-# the press, the counters), the thinkers run in the order they were
-# started (the mobjs of the map's records, the player's among them, then
-# the lights, then what play started), the clock counts. An ended level
-# stands still.
+# One tic in Doom's order: the player thinks (the move, the eye, the
+# player sprites, the counters, use on the press), the thinkers run in
+# the order they were started (the mobjs of the map's records, the
+# player's among them, whose own turn moves the player and fires the
+# lines that move crossed, then the lights, then what play started), the
+# clock counts. The tic's sounds start from none, and what the things
+# were heard doing is reported when its last thinker has run. An ended
+# level stands still: no tic runs, so its sounds stay the last live
+# tic's, and whoever gathers sounds tic by tic passes over it.
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
-    case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown}
-    case State{player, L.Level{+geo, sectors, specials}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown}:
+    case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
+      State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}
+    case State{player, L.Level{+geo, sectors, specials}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
-      +thought = Sim.counters(Sim.eye(level, clock, Sim.move(level, cmd, player)))
-      +before = {State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown} : State}
-      Sim.tic.kept(geo, clock, K.Cmd.use(cmd), Sim.thinkers(cmd, geo,
-        State.held(geo, before, Sim.use(Sim.pressed(cmd, usedown), thought, before))))
+      +thought = Sim.counters(Sim.psprites(level, clock, Sim.eye(level, clock, Sim.move(level, cmd, player))))
+      +before = {State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd} : State}
+      Sim.tic.kept(geo, clock, K.Cmd.use(cmd), State.told(Sim.thinkers(cmd, geo,
+        State.held(geo, before, Sim.use(Sim.pressed(cmd, usedown), before)))))
 
 # A tic for each command of the list, in order: a demo.
 def Sim.replay(script: List<&2, K.Cmd>, s: State) -> State:

@@ -6,6 +6,7 @@
 
 **Status:** ready-for-agent
 
+- [ ] The state holds one tic's sounds, and the loop replays a frame's tics in one call, so the loop gathers each tic's sounds as it runs them and passes over an ended level, whose state keeps its last live tic's sounds (ticket 01's note)
 - [ ] Doors, the lift, switches, pickups, the use grunt and the exit are heard in the window on both packages
 - [ ] The ticket measures the lowest queue level with no dry frame at 35 frames a second on the dev machine, sets it there, and records the level, the delay it gives against Chocolate Doom's 1024 frames, and the measurement
 - [ ] With no sound device the game prints one line and plays silent; with no sounds directory it prints one line and plays the music alone

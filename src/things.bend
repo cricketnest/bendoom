@@ -1,15 +1,18 @@
-# Doom's info.c, P_SpawnMobj, P_SpawnMapThing, P_SetThingPosition and the
-# state half of P_MobjThinker for the things Bendoom spawns: the
-# definitions of the DoomEd types either E1M1 places, less the monsters
-# and the starts, the state rows their spawn states lead to, the map's
-# THINGS records made the level's first things, a thing's tic through
-# its states, and the population with its blockmap and sector links.
+# Doom's info.c, P_SpawnMobj, P_SpawnMapThing, P_SetThingPosition,
+# P_RemoveMobj and the state half of P_MobjThinker for the things
+# Bendoom spawns: the definitions of the DoomEd types either E1M1
+# places, less the monsters and the starts, the state rows their spawn
+# states lead to and the pistol's with its entry in d_items.c's
+# weaponinfo, the map's THINGS records made the level's first things, a
+# thing's tic through its states, and the population with its blockmap
+# and sector links.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
 import ./level.bend as L
 import ./random.bend as M
 import ./vec.bend as V
+import ./sound.bend as Sn
 
 # A thing, Doom's mobj: its id, which names it for good (its THINGS
 # record's index, or the next id past every one given for a thing spawned
@@ -24,56 +27,82 @@ type Thing is Data:
 def Thing.you() -> U32:
   4294967295
 
+# What a state row does as it is entered, Doom's action pointers:
+# nothing, A_Raise, A_WeaponReady.
+type Thing.Action is Data:
+  Null{}
+  Raise{}
+  WeaponReady{}
+
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
-# (0 for A), whether it is full-bright, its tics, and the row after it.
-# A row of -1 tics lasts, and it stores itself as its next, where
-# vanilla's is S_NULL; no tic reads it, and the sprite load's chase
-# stops there.
+# (0 for A), whether it is full-bright, its tics, the row after it, and
+# its action. A row of -1 tics lasts, and it stores itself as its next,
+# where vanilla's is S_NULL; no tic reads it, and the sprite load's
+# chase stops there.
 type Thing.Row is Data:
-  Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32}
+  Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32, action: Thing.Action}
 
 # The state rows by Bendoom's number: every state the spawn states of the
-# types below lead to, in vanilla's order. None has 0 tics or an action.
+# types below lead to, in vanilla's order, then the pistol's ready and
+# raise states. None has 0 tics.
 def Thing.rows() -> List<&2, Thing.Row>:
-  [Row{"PLAY", 13, False{}, 4294967295, 0}, Row{"PLAY", 22, False{}, 4294967295, 1},
-    Row{"POSS", 11, False{}, 4294967295, 2}, Row{"SPOS", 11, False{}, 4294967295, 3},
-    Row{"TROO", 12, False{}, 4294967295, 4}, Row{"SARG", 13, False{}, 4294967295, 5},
-    Row{"ARM1", 0, False{}, 6, 7}, Row{"ARM1", 1, True{}, 7, 6}, Row{"ARM2", 0, False{}, 6, 9},
-    Row{"ARM2", 1, True{}, 6, 8}, Row{"BAR1", 0, False{}, 6, 11}, Row{"BAR1", 1, False{}, 6, 10},
-    Row{"BON1", 0, False{}, 6, 13}, Row{"BON1", 1, False{}, 6, 14}, Row{"BON1", 2, False{}, 6, 15},
-    Row{"BON1", 3, False{}, 6, 16}, Row{"BON1", 2, False{}, 6, 17}, Row{"BON1", 1, False{}, 6, 12},
-    Row{"BON2", 0, False{}, 6, 19}, Row{"BON2", 1, False{}, 6, 20}, Row{"BON2", 2, False{}, 6, 21},
-    Row{"BON2", 3, False{}, 6, 22}, Row{"BON2", 2, False{}, 6, 23}, Row{"BON2", 1, False{}, 6, 18},
-    Row{"BKEY", 0, False{}, 10, 25}, Row{"BKEY", 1, True{}, 10, 24}, Row{"STIM", 0, False{}, 4294967295, 26},
-    Row{"MEDI", 0, False{}, 4294967295, 27}, Row{"SOUL", 0, True{}, 6, 29}, Row{"SOUL", 1, True{}, 6, 30},
-    Row{"SOUL", 2, True{}, 6, 31}, Row{"SOUL", 3, True{}, 6, 32}, Row{"SOUL", 2, True{}, 6, 33},
-    Row{"SOUL", 1, True{}, 6, 28}, Row{"PSTR", 0, True{}, 4294967295, 34}, Row{"CLIP", 0, False{}, 4294967295, 35},
-    Row{"AMMO", 0, False{}, 4294967295, 36}, Row{"ROCK", 0, False{}, 4294967295, 37},
-    Row{"BROK", 0, False{}, 4294967295, 38}, Row{"CELL", 0, False{}, 4294967295, 39},
-    Row{"CELP", 0, False{}, 4294967295, 40}, Row{"SHEL", 0, False{}, 4294967295, 41},
-    Row{"SBOX", 0, False{}, 4294967295, 42}, Row{"BPAK", 0, False{}, 4294967295, 43},
-    Row{"MGUN", 0, False{}, 4294967295, 44}, Row{"CSAW", 0, False{}, 4294967295, 45},
-    Row{"LAUN", 0, False{}, 4294967295, 46}, Row{"PLAS", 0, False{}, 4294967295, 47},
-    Row{"SHOT", 0, False{}, 4294967295, 48}, Row{"COLU", 0, True{}, 4294967295, 49},
-    Row{"POL5", 0, False{}, 4294967295, 50}, Row{"POL6", 0, False{}, 6, 52}, Row{"POL6", 1, False{}, 8, 51},
-    Row{"GOR4", 0, False{}, 4294967295, 53}, Row{"SMIT", 0, False{}, 4294967295, 54},
-    Row{"CBRA", 0, True{}, 4294967295, 55}, Row{"TRE1", 0, False{}, 4294967295, 56},
-    Row{"TRE2", 0, False{}, 4294967295, 57}, Row{"ELEC", 0, False{}, 4294967295, 58}]
+  [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}},
+    Row{"POSS", 11, False{}, 4294967295, 2, Null{}}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}},
+    Row{"TROO", 12, False{}, 4294967295, 4, Null{}}, Row{"SARG", 13, False{}, 4294967295, 5, Null{}},
+    Row{"ARM1", 0, False{}, 6, 7, Null{}}, Row{"ARM1", 1, True{}, 7, 6, Null{}}, Row{"ARM2", 0, False{}, 6, 9, Null{}},
+    Row{"ARM2", 1, True{}, 6, 8, Null{}}, Row{"BAR1", 0, False{}, 6, 11, Null{}},
+    Row{"BAR1", 1, False{}, 6, 10, Null{}}, Row{"BON1", 0, False{}, 6, 13, Null{}},
+    Row{"BON1", 1, False{}, 6, 14, Null{}}, Row{"BON1", 2, False{}, 6, 15, Null{}},
+    Row{"BON1", 3, False{}, 6, 16, Null{}}, Row{"BON1", 2, False{}, 6, 17, Null{}},
+    Row{"BON1", 1, False{}, 6, 12, Null{}}, Row{"BON2", 0, False{}, 6, 19, Null{}},
+    Row{"BON2", 1, False{}, 6, 20, Null{}}, Row{"BON2", 2, False{}, 6, 21, Null{}},
+    Row{"BON2", 3, False{}, 6, 22, Null{}}, Row{"BON2", 2, False{}, 6, 23, Null{}},
+    Row{"BON2", 1, False{}, 6, 18, Null{}}, Row{"BKEY", 0, False{}, 10, 25, Null{}},
+    Row{"BKEY", 1, True{}, 10, 24, Null{}}, Row{"STIM", 0, False{}, 4294967295, 26, Null{}},
+    Row{"MEDI", 0, False{}, 4294967295, 27, Null{}}, Row{"SOUL", 0, True{}, 6, 29, Null{}},
+    Row{"SOUL", 1, True{}, 6, 30, Null{}}, Row{"SOUL", 2, True{}, 6, 31, Null{}},
+    Row{"SOUL", 3, True{}, 6, 32, Null{}}, Row{"SOUL", 2, True{}, 6, 33, Null{}},
+    Row{"SOUL", 1, True{}, 6, 28, Null{}}, Row{"PSTR", 0, True{}, 4294967295, 34, Null{}},
+    Row{"CLIP", 0, False{}, 4294967295, 35, Null{}}, Row{"AMMO", 0, False{}, 4294967295, 36, Null{}},
+    Row{"ROCK", 0, False{}, 4294967295, 37, Null{}}, Row{"BROK", 0, False{}, 4294967295, 38, Null{}},
+    Row{"CELL", 0, False{}, 4294967295, 39, Null{}}, Row{"CELP", 0, False{}, 4294967295, 40, Null{}},
+    Row{"SHEL", 0, False{}, 4294967295, 41, Null{}}, Row{"SBOX", 0, False{}, 4294967295, 42, Null{}},
+    Row{"BPAK", 0, False{}, 4294967295, 43, Null{}}, Row{"MGUN", 0, False{}, 4294967295, 44, Null{}},
+    Row{"CSAW", 0, False{}, 4294967295, 45, Null{}}, Row{"LAUN", 0, False{}, 4294967295, 46, Null{}},
+    Row{"PLAS", 0, False{}, 4294967295, 47, Null{}}, Row{"SHOT", 0, False{}, 4294967295, 48, Null{}},
+    Row{"COLU", 0, True{}, 4294967295, 49, Null{}}, Row{"POL5", 0, False{}, 4294967295, 50, Null{}},
+    Row{"POL6", 0, False{}, 6, 52, Null{}}, Row{"POL6", 1, False{}, 8, 51, Null{}},
+    Row{"GOR4", 0, False{}, 4294967295, 53, Null{}}, Row{"SMIT", 0, False{}, 4294967295, 54, Null{}},
+    Row{"CBRA", 0, True{}, 4294967295, 55, Null{}}, Row{"TRE1", 0, False{}, 4294967295, 56, Null{}},
+    Row{"TRE2", 0, False{}, 4294967295, 57, Null{}}, Row{"ELEC", 0, False{}, 4294967295, 58, Null{}},
+    Row{"PISG", 0, False{}, 1, 59, WeaponReady{}}, Row{"PISG", 0, False{}, 1, 60, Raise{}}]
 
 def Thing.row(s: U32) -> Thing.Row:
-  Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, False{}, 0, 0})
+  Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, False{}, 0, 0, Null{}})
 
 def Thing.Row.tics(r: Thing.Row) -> U32:
-  Row{sprite, frame, bright, tics, next} = r
+  Row{sprite, frame, bright, tics, next, action} = r
   tics
 
 def Thing.Row.bright(r: Thing.Row) -> Bool:
-  Row{sprite, frame, bright, tics, next} = r
+  Row{sprite, frame, bright, tics, next, action} = r
   bright
 
 def Thing.Row.next(r: Thing.Row) -> U32:
-  Row{sprite, frame, bright, tics, next} = r
+  Row{sprite, frame, bright, tics, next, action} = r
   next
+
+def Thing.Row.action(r: Thing.Row) -> Thing.Action:
+  Row{sprite, frame, bright, tics, next, action} = r
+  action
+
+# A weapon's rows in Doom's weaponinfo: the state it rises in and the
+# state it is ready in.
+type Thing.Weapon is Data:
+  Weapon{up: U32, ready: U32}
+
+def Thing.pistol() -> Thing.Weapon:
+  Weapon{60, 59}
 
 # Doom's P_MobjThinker for a thing that does not move: a lasting state
 # stays as it is; another counts its tics down, and the tic they run out
@@ -236,31 +265,38 @@ def Thing.spawn(+level: L.Level) -> Thing.Spawn:
 # The things alive by id, among ids from 0 to count, the player's id,
 # and Doom's links: the ids in each blockmap cell and in each sector,
 # the last linked first, the player's among them. A thing spawned in
-# play takes the count for its id, so no id ever names two things.
+# play takes the count for its id, so no id ever names two things. Last,
+# what the things did that is heard and the state has not reported yet:
+# a position check has no state to tell.
 type Things is Data:
   Things{tree: V.Tree<Thing>, count: U32, you: U32, cells: V.Tree<List<&2, U32>>,
-    sectors: V.Tree<List<&2, U32>>}
+    sectors: V.Tree<List<&2, U32>>, heard: List<&2, Sn.Sound.Event>}
 
 # No things, the ids under count kept for the map's records, with a
 # list for each of so many blockmap cells and sectors.
 def Things.none(+count: U32, you: U32, ncells: U32, nsectors: U32) -> Things:
   Things{V.Tree.empty(Thing, V.Vec.depth(count)), count, you, V.Tree.empty(List<&2, U32>, V.Vec.depth(ncells)),
-    V.Tree.empty(List<&2, U32>, V.Vec.depth(nsectors))}
+    V.Tree.empty(List<&2, U32>, V.Vec.depth(nsectors)), []}
 
 def Things.get(ts: Things, +id: U32) -> Maybe<&2, Thing>:
-  Things{tree, count, you, cells, sectors} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   V.Tree.get(Thing, tree, id)
 
 def Things.put(ts: Things, +id: U32, m: Maybe<&2, Thing>) -> Things:
-  Things{tree, count, you, cells, sectors} = ts
-  Things{V.Tree.set(Thing, tree, id, m), count, you, cells, sectors}
+  Things{tree, count, you, cells, sectors, heard} = ts
+  Things{V.Tree.set(Thing, tree, id, m), count, you, cells, sectors, heard}
+
+# The things after one of them was heard.
+def Things.sounded(ts: Things, e: Sn.Sound.Event) -> Things:
+  Things{tree, count, you, cells, sectors, heard} = ts
+  Things{tree, count, you, cells, sectors, List.append(&2, Sn.Sound.Event, heard, [e])}
 
 def Things.you(ts: Things) -> U32:
-  Things{tree, count, you, cells, sectors} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   you
 
 def Things.count(ts: Things) -> U32:
-  Things{tree, count, you, cells, sectors} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   count
 
 def Things.fresh.if(full: Bool, tree: V.Tree<Thing>) -> V.Tree<Thing>:
@@ -273,8 +309,9 @@ def Things.fresh.if(full: Bool, tree: V.Tree<Thing>) -> V.Tree<Thing>:
 # The population with one id more, its old count, and room for it: the
 # tree is full when the count is a power of two.
 def Things.fresh(ts: Things) -> Things:
-  Things{tree, +count, you, cells, sectors} = ts
-  Things{Things.fresh.if(U32.is_zero((count .&. (count - 1) : U32)), tree), (count + 1 : U32), you, cells, sectors}
+  Things{tree, +count, you, cells, sectors, heard} = ts
+  Things{Things.fresh.if(U32.is_zero((count .&. (count - 1) : U32)), tree), (count + 1 : U32), you, cells, sectors,
+    heard}
 
 # Links
 # -----
@@ -307,11 +344,11 @@ def Things.edit.cell(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, i
 # centre is in and in its sector's; off the map it is in no cell.
 def Things.placed(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, ts: Things, +bm: L.Level.Blockmap,
   +id: U32, x: U32, y: U32, sector: U32) -> Things:
-  Things{tree, count, you, cells, sectors} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   L.Blockmap{words, ox, oy, +cols, +rows} = bm
   +c = L.Level.cell_of(bm, x, y)
   Things{tree, count, you, Things.edit.cell(~edit, L.Level.cell.inside(cols, rows, c), cells,
-    L.Level.cell.number(cols, c), id), Things.edit(~edit, sectors, sector, id)}
+    L.Level.cell.number(cols, c), id), Things.edit(~edit, sectors, sector, id), heard}
 
 # Doom's P_SetThingPosition: the mobj goes first in its cell's list and
 # first in its sector's.
@@ -339,10 +376,11 @@ def Things.moved(ts: Things, +bm: L.Level.Blockmap, was: Thing, now: Thing) -> T
   Things.entered(Things.unlinked(ts, bm, was), bm, now)
 
 # Doom's P_RemoveMobj: the thing unlinked and gone, its id never used
-# again.
+# again, and its sound stopped.
 def Things.removed(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
   Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = th
-  Things.put(Things.unlinked(ts, bm, Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}), id, None{})
+  Things.sounded(Things.put(Things.unlinked(ts, bm,
+    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}), id, None{}), Sn.Stop{Sn.Thing{id}})
 
 def Things.linked.at(inside: Bool, cells: V.Tree<List<&2, U32>>, i: U32) -> List<&2, U32>:
   match inside:
@@ -363,7 +401,7 @@ def Things.linked.go(cs: List<&2, L.Level.Cell>, +cols: U32, +rows: U32, +cells:
 # The mobjs linked in each of some blockmap cells in turn, a cell's
 # last linked first: the order Doom's P_BlockThingsIterator meets them.
 def Things.linked(ts: Things, bm: L.Level.Blockmap, cs: List<&2, L.Level.Cell>) -> List<&2, U32>:
-  Things{tree, count, you, cells, sectors} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   L.Blockmap{words, ox, oy, cols, rows} = bm
   Things.linked.go(cs, cols, rows, cells)
 
@@ -386,7 +424,7 @@ def Things.list.go(n: Nat, +t: V.Tree<Thing>, +i: U32) -> List<&2, Thing>:
 
 # The things alive, in the order of their ids.
 def Things.list(ts: Things) -> List<&2, Thing>:
-  Things{+tree, +count, you, cells, sectors} = ts
+  Things{+tree, +count, you, cells, sectors, heard} = ts
   Things.list.go(U32.to_nat(count), tree, 0)
 
 def Things.ids(lists: V.Tree<List<&2, U32>>) -> List<&2, U32>:
@@ -407,7 +445,7 @@ def Things.those(ids: List<&2, U32>, +tree: V.Tree<Thing>) -> List<&2, Thing>:
 # list: the order Doom's R_AddSprites meets the things of a sector in.
 # The player's mobj is no thing, so it is not among them.
 def Things.shown(ts: Things) -> List<&2, Thing>:
-  Things{tree, count, you, cells, sectors} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   Things.those(Things.ids(sectors), tree)
 
 # The name of a thing the population lacks, before rest; rest alone for

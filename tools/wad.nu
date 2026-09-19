@@ -1,9 +1,11 @@
 # E1M1 as tables, for working out expected values before the code answers:
 # the lump directory, the map's lines, sides, sectors, vertices and
-# things, the sector under a point, and the events of its song.
+# things, the sector under a point, the events of its song, and the
+# WAD's sounds.
 #
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | linedefs | where special != 0'
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | song-events | song-counts'
+#   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | sound-lumps'
 
 # A WAD's directory.
 def lumps []: binary -> table<name: string, pos: int, size: int> {
@@ -275,4 +277,24 @@ def song-counts []: table -> string {
   let ticks = $events | group-by track | values | each { get delta | math sum } | math max
   let counts = $channel_kinds | append [tempo end other] | each {|k| $"($k) ($events | where kind == $k | length)" }
   $"song ticks ($ticks) events ($events | length) ($counts | str join ' ')"
+}
+
+# The WAD's digital sounds as Chocolate Doom's CacheSFX reads them: each
+# DS lump's rate, the samples it plays (the header's length less the 16
+# bytes DMX skips at either end), whether it is played at all (format 3,
+# a length over 48 that fits the lump), and the path ExpandSoundData_SDL
+# takes to 44100 Hz: SDL's converter where 44100 is the rate times a
+# power of two, its own nearest-sample loop and low-pass filter where
+# not.
+def sound-lumps []: binary -> table<name: string, rate: int, samples: int, played: bool, path: string> {
+  let wad = $in
+  $wad | lumps | where name starts-with DS | each {|l|
+    let rate = $wad | word ($l.pos + 2)
+    let length = $wad | bytes at ($l.pos + 4)..($l.pos + 7) | into int --endian little
+    {
+      name: $l.name, rate: $rate, samples: ($length - 32)
+      played: ($l.size >= 8 and ($wad | word $l.pos) == 3 and $length <= $l.size - 8 and $length > 48)
+      path: (if 44100 mod $rate == 0 and 44100 // $rate in [1 2 4] { "SDL" } else { "nearest" })
+    }
+  }
 }

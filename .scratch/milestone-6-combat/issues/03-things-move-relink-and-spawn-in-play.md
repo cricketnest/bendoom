@@ -4,12 +4,67 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The player's moves and pickups run on the general check with unchanged outputs
-- [ ] Moving a thing updates its blockmap link and its sector's list as `P_UnsetThingPosition` and `P_SetThingPosition` do; milestone 5's assumption that links are written once at spawn is removed with the code that relied on it
-- [ ] The renderer's sprite order for a sector follows the sector list's real order
-- [ ] A spawned thing takes the next identity past the records; a removed identity is never reused; scripted output names the same thing before and after
-- [ ] The thinker order is one list, and a thing spawned in a tic first thinks where vanilla's would
-- [ ] Literal-state cases move a thing across a cell border and a sector border and spawn one mid-tic, with expected links worked from the source
-- [ ] The freedom law and replay composition still check; the geometry law is restated if links leave the geometry
+- [x] The player's moves and pickups run on the general check with unchanged outputs
+- [x] Moving a thing updates its blockmap link and its sector's list as `P_UnsetThingPosition` and `P_SetThingPosition` do; milestone 5's assumption that links are written once at spawn is removed with the code that relied on it
+- [x] The renderer's sprite order for a sector follows the sector list's real order
+- [x] A spawned thing takes the next identity past the records; a removed identity is never reused; scripted output names the same thing before and after
+- [x] The thinker order is one list, and a thing spawned in a tic first thinks where vanilla's would
+- [x] Literal-state cases move a thing across a cell border and a sector border and spawn one mid-tic, with expected links worked from the source
+- [x] The freedom law and replay composition still check; the geometry law is restated if links leave the geometry
+
+## Comments
+
+### What was built
+
+One position check. `Sim.Body{id, x, y, z, radius, height, flags}` is what `P_CheckPosition` and `PIT_CheckThing` read of a mobj, whether it is the one moved or one in its way. `Player.body(p, id)` makes the player's, with `MT_PLAYER`'s flags; `Sim.body.of(th)` makes a thing's from its definition; `Sim.Body.at(m, x, y)` puts one somewhere else. `Sim.met(level, things, p, m)` is the thing half: it walks the mobjs the blockmap links in the box widened by `MAXRADIUS` and answers `Sim.Met{before, hit}`, the ones that did not stop the box, in the blockmap's order, and the first that did, which is what a missile hit. `Sim.stops` is `PIT_CheckThing`'s verdict: the boxes overlap, it is not the mover itself, and then it is solid, or, for a missile (`MF_MISSILE`), it is solid or shootable and the missile is neither over nor under it. `Sim.check(level, things, p, m, mask)` adds the line half and answers `Sim.Fit`; the mask names the line flags that stop this mover, 1 for the player and 3 for a thing. `Sim.passes(fit, z, height)` is `P_TryMove`'s three height rules. The player's move, its pickups and `P_ChangeSector` all read that one check.
+
+The links left the geometry. `Level.Things` no longer carries `heads` and `links`, and `H.Things` carries `cells` and `sectors`, a list of ids for each blockmap cell and each sector, the last linked first. `H.Things.link` and `H.Things.unlink` are `P_SetThingPosition` and `P_UnsetThingPosition`; both go through one `H.Things.placed`, which takes the edit to make on a list, so there is one place that writes a link. `H.Things.moved(things, bm, was, now)` is a move, `H.Things.entered` a spawn, `H.Things.removed` `P_RemoveMobj`. `H.Things.linked(things, bm, cells)` is `P_BlockThingsIterator`'s order and `H.Things.shown(things)` is the order `R_AddSprites` meets things in, sector by sector, each sector's list in its own order.
+
+The player is no longer the tree's special member. It was ranked into its cell by a name above every record's (`Sim.you.in`, `Sim.you.go`, `Sim.you.before`, `Things.moved`), because nothing wrote links after the spawn. Now its mobj is linked where the others are, at the turn of its start record, and `P_TryMove` relinks it. `H.Thing.you()` survives with one meaning only: the id the player takes on a map with no player-1 start. What is left of the special case is that the player is not a `H.Thing`, so `Sim.body` picks its body by id and `H.Things.shown` cannot list it; vanilla's `R_ProjectSprite` drops the viewer's own mobj on the `MINZ` test, so the frame is the same.
+
+Spawning in play. `H.Thing.mobj` is `P_SpawnMobj` less its random draw, with `H.Thing.onfloor()` and `H.Thing.onceiling()` for vanilla's `ONFLOORZ` and `ONCEILINGZ`; `H.Thing.spawn.mobj` is now the rest of `P_SpawnMapThing` over it. `Sim.spawn(def, x, y, z, s)` takes the next id past every one given (`H.Things.count`, which only ever rises, so a removed id is never given again), draws one random number, links the thing where it stands and starts its thinker last. `Sim.remove(id, s)` is `P_RemoveMobj` from a state.
+
+One thinker list. `Thinker` gained `Mobj{id}`, `P_MobjThinker` for the mobj an id names, a thing's or the player's, and `H.Things.tics`, which ran every thing's tic outside the list, is gone. `Thinkers{ran, due}` is the list with the run's cursor in it: those that have run this tic, the last first, and those due. `State.thinking` appends to `due` (`P_AddThinker`) and `State.kept` pushes to `ran`. `Sim.thinkers.go` takes one turn per element of a fuel list, which is the due list as the run began; `Sim.thinkers.all` runs it again while any is due, so a thinker started during the run runs in that same tic, as one appended to the tail of Doom's list does. `Sim.turn` gives the player's mobj its own turn, `Sim.mobj`, which moves the player and fires the lines the move crossed, and holds every other turn to the geometry and the player's place (`State.held`).
+
+### Where each expected value came from
+
+- `MT_PLAYER`'s flags, 33557510: `MF_SOLID|MF_SHOOTABLE|MF_DROPOFF|MF_PICKUP|MF_NOTDMATCH` summed from `mobjflag_t` in `p_mobj.h` (2, 4, 0x400, 0x800, 0x2000000). The same header gives `MF_MISSILE` 65536, `MF_SPECIAL` 1, `MF_SPAWNCEILING` 256 and `MF_COUNTITEM` 0x800000, each of which the code now names by number where vanilla names it by flag.
+- `ONFLOORZ` and `ONCEILINGZ`: `INT_MIN` and `INT_MAX` in `p_local.h`, 2147483648 and 2147483647 as unsigned words.
+- The one random draw a spawn makes: `P_SpawnMobj`'s `mobj->lastlook = P_Random () % MAXPLAYERS`. The second draw, `1 + (P_Random () % mobj->tics)`, is `P_SpawnMapThing`'s and stays there, so a bonus spawned in play keeps `S_BON1`'s whole 6 tics.
+- `tests/sim.bend`'s `relinks` case: the WAD read in nushell with `tools/wad.nu`. 292 THINGS records; record 58 is type 18 at (-400, 400) facing 270; record 157 is the only type 1, so it is the player's id; record 238 is at (-264, 264). The BLOCKMAP header gives the origin -712, -1072 and 32 by 27 cells, so (-400, 400) is cell 2,11 and (-400, 300) cell 2,10. `sector-at` gives 160 under the first and 140 under the second and under (-340, 288). Nine sectors carry special 1, 8 or 12, which is the count of light thinkers. 180 of the 292 records spawn a thing, and with the player's mobj that is the 181 mobjs the thinker list holds; records 155, 156 and 161 to 165 are deathmatch starts and 158 to 160 are the other players' starts, which is why the mobjs about the player's are 153, 154, 157, 166 and 167.
+- The rest of that case is `P_SpawnMapThing`, `P_SetThingPosition`, `P_UnsetThingPosition`, `P_RemoveMobj` and `P_AddThinker` read from the source and worked out in the test's header before the code answered: each spawn goes first in its cell's and its sector's list, so the start lists 58 in cell 2,11, the player's mobj 157 in cell 2,10, 58 in sector 160 and 238 then 157 in sector 140; a move takes 58 out of the first pair and puts it first in the second; a spawn in play takes 292, then 293 after 292 is removed.
+- The random index after a tic in that case is the light thinkers' draws and is a regression pin, as the test's header says.
+
+### Laws
+
+- `blocker_geometry` was rewritten over `Sim.stops` and now also pins `PIT_CheckThing`'s missile branch on numbers: a missile of radius 6 and height 8 on a barrel's top at 42 has hit it and 1/65536 higher passes over; under a barrel raised 100, its top at 99 passes and at 100 has hit; a lamp, solid and not shootable, stops it as a solid thing does, and a corpse does not. The barrel's own box is stopped by the player's mobj under 26 away and not at 26. Its last line reads the cell's list, which now lists the player's mobj first, and leaves out a barrel at x 160, off the one-cell blockmap.
+- `link_order` was rewritten from `Sim.you.in`, which no longer exists, onto the real lists: the player's mobj spawns at its record's turn, so as record 6 it is listed after record 9 and before 5 and 2, as record 1 last, and first once it has moved; at (200, 64), off the blockmap, no cell lists it. It also pins that the thinkers are started in record order.
+- `sprite_order` gained the sector's list: a state's shown things are 9, 5, 2 and become 2, 9, 5 when thing 2 moves a unit east.
+- `spawn_thinks_this_tic` is new: with the run cut short after the player's mobj's turn, a health bonus spawned then takes id 128, draws one random number, holds `S_BON1`'s 6 tics, and the rest of the run leaves it 5, with the thinkers the player's mobj's and then the bonus's.
+- `tic_keeps_geometry` holds as written. Its comment now says why: the links are no part of the geometry, they are the population's, and a tic that moves, spawns or removes a mobj changes them.
+- `replay_keeps_clear` was deleted. It said that replaying any script from a free state leaves the player's box clear of every solid thing near it, which was provable only because things stood still; once a thing can move into the player's box after the player has moved, it is false, and no law about a later tic can stand in for it. Two laws say what vanilla does guarantee. `move_is_checked`: the player's move is taken only where its mobj's box passes `Sim.check`, for all levels, things, players and places. `check_is_clear`: a place that passes the check is one no mobj near stopped, for any mover, mask, things and player. `clear_pins_things` keeps its old job under the new shapes and still reads the verdict on each mobj the blockmap lists near the box.
+- `Sim.free` is now the line half alone, which is what the wall law always asked of it, so `tic_keeps_free` and `replay_keeps_free` stand and replay composition still holds. The proof grew a `Held` predicate, free in a fixed geometry whatever the state's sectors have become, and carries it through each thinker's turn.
+
+### Evidence
+
+- `bend PROOF.bend`: `All terms check.`
+- Every `tests/*.bend` on both lanes, native and bun. Every expected line that existed before this ticket is unchanged, byte for byte, on both branches merged; the only additions are `relinks`'s 15 lines.
+- `tools/oracle.nu` against Chocolate Doom after the merge, so with the pistol compared: `1144 259 315` (the dead sergeant on its bench) 0 differing, `2752 960 0` (a near stalagmite over a far tree, the overlapping sprites case) 0, `1024 200 0` (the bars, sprites behind masked textures) 0, `-640 256 0` (the yard under the sky) 0, `-416 256 90` (the dim bench room) 0. 665 pixels masked in each, which is the pause graphic alone.
+- `nix flake check` passes.
+
+### Trade-offs and what is left open
+
+- `Sim.thinkers.all` takes a fuel of 8 rounds. Bend cannot recurse on a list that grows, so one run down the due list recurses on the list as it was, and a second run picks up what the first started. Eight rounds of that is a declared limit: a chain of more than eight spawns inside one tic would wait a tic. Nothing in E1M1 comes near it.
+- `State.held` runs after every thinker's turn and rebuilds the player and the level to hold the geometry and the player's place. It is a no-op at run time, since no thinker but the player's mobj writes either, but it makes the wall and geometry laws hold by construction for every turn instead of asking for a lemma per thinker case. It costs: a scratch measurement of 3500 tics of walking on Freedoom's E1M1 went from 2.56 s to 4.16 s, about 0.46 ms a tic more, against a frame budget of 28.6 ms. Most of it is the 181 mobj turns, each a tree read, a tree write and a state rebuilt.
+- `P_TryMove`'s dropoff test is not here. The player carries `MF_DROPOFF` and never meets it; ticket 16's monsters do, and `Sim.passes` will need `tmdropoffz`, which `Sim.check` does not yet gather.
+- `Sim.relink` relinks the player's mobj by hand, because the player is not a `H.Thing` and so has no thing to hand to `H.Things.moved`. Both go through `H.Things.link` and `H.Things.unlink`, so there is still one way to write a link, but two entry points until the player becomes a mobj like the others.
+- Lines crossed still fire after the whole move, the gap milestone 7's ticket 01 recorded. The general move did not make it natural to close: `Sim.try_move` answers a `Sim.Try` and has no state in hand to fire a line's special with, and giving it one would put the whole tic's state inside the movement loop. It stays open.
+- `tests/sim.bend`'s `south` helper, from milestone 7's ticket 01, put a fresh player somewhere else without touching the links. That was harmless while links were written once; now the stale link made `P_ChangeSector` re-clip the player from the wrong cell, and two of the eight placement lines came out wrong. The helper now relinks the player's mobj, as a teleport would, and the ticket's own expected values are restored untouched.
+
+### Surprises
+
+- The order `Sim.use` runs in was already vanilla's on this branch and on milestone 7's, arrived at twice over: `P_PlayerThink` checks use before `P_RunThinkers` moves the player's mobj. Both branches also kept the use's line search reading the player from before the move, so no output moved.
+- `turbo_floor_crossed` turned out to be the case that pins the re-entry: the player crosses a walk-over line inside its own mobj's turn, which starts a mover at the tail of the list, and that mover moves in the same tic. With one round instead of two it would not.
+- A thing spawned in play is `H.Things.count` and the tree may be too small for it, so the population grows the tree when the count is a power of two. `V.Tree` is that tree, now a copyable array of any `Data`, with the cell and sector lists built from it too.
