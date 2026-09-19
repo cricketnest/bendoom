@@ -70,7 +70,7 @@
               pkgs.jujutsu
               # tools/oracle.nu diffs our frames against Chocolate Doom's,
               # which it runs on a headless X server; tools/listen.nu
-              # records its music.
+              # records its music and its sounds.
               pkgs.chocolate-doom
               pkgs.xorg.xorgserver
               pkgs.xdotool

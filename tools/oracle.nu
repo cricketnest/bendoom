@@ -3,14 +3,14 @@
 # the same place. Writes a copy of the IWAD whose E1M1 has player 1
 # start at x, y facing angle, the records --things names rewritten and
 # its other things as they are, and the command script as a vanilla
-# demo: version 109, Hurt Me Plenty, no monsters, so none spawns, four
-# bytes a tic, then a tic whose buttons press pause, then a minute of
-# idle tics, then the end marker. Chocolate Doom plays the demo in real
-# time in a scratch directory, at screen size 10, on a headless X
-# server of its own; a paused game runs no playsim tic but keeps reading
-# the demo, so the tail holds the frame of the script's last tic for a
-# minute, and one paletted screenshot is taken inside it. A shot counts
-# once it shows the pause graphic. It is compared with the frame
+# demo (tools/demo.nu) with no monsters, so none spawns, then a tic
+# whose buttons press pause (BT_SPECIAL with BTS_PAUSE), then a minute
+# of idle tics. Chocolate Doom plays the demo in real time in a scratch
+# directory, at screen size 10, on a headless X server of its own; a
+# paused game runs no playsim tic but keeps reading the demo, so the
+# tail holds the frame of the script's last tic for a minute, and one
+# paletted screenshot is taken inside it. A shot counts once it shows
+# the pause graphic. It is compared with the frame
 # tools/frame.bend dumps from the same copy after the same script,
 # outside the status bar rows, the pause graphic, and the pistol: at
 # rest where a script that never moves leaves it, widened by the bob's
@@ -27,48 +27,7 @@
 #   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 #   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
 
-source wad.nu
-
-# An integer's low bytes, little-endian.
-def le [width: int]: int -> binary {
-  $in | into binary | bytes at 0..<$width
-}
-
-# The IWAD with record i of E1M1's THINGS replaced in place by a thing
-# of a type at x, y facing angle on every skill, and every other byte
-# kept. A whole IWAD and not a PWAD, since Doom refuses -file with the
-# shareware one.
-def rewrite [i: int, x: int, y: int, angle: int, type: int]: binary -> binary {
-  let wad = $in
-  let at = ($wad | map-lump THINGS | get pos) + $i * 10
-  let record = [($x | le 2) ($y | le 2) ($angle | le 2) ($type | le 2) (7 | le 2)] | bytes collect
-  [($wad | bytes at 0..<$at) $record ($wad | bytes at ($at + 10)..)] | bytes collect
-}
-
-# A script's runs: how many tics, and the four bytes a demo keeps of the
-# tic's command (G_ReadDemoTiccmd: forward, side, the turn's high byte,
-# the buttons, where use is bit 1).
-def runs []: string -> table<tics: int, bytes: binary> {
-  $in | split row ' ' | each {|run|
-    let f = $run | split row ',' | into int
-    {tics: $f.0, bytes: ([($f.1 | le 1) ($f.2 | le 1) ($f.3 | le 1) ($f.4 * 2 | le 1)] | bytes collect)}
-  }
-}
-
-# The script as a version 109 demo: the 13-byte header (Hurt Me Plenty,
-# E1M1, no deathmatch, respawn or fast, no monsters, console player 0,
-# player 1 alone in the game), the tics, a tic pressing pause
-# (BT_SPECIAL with BTS_PAUSE), 2100 idle tics, and the 0x80 that ends a
-# demo.
-def demo []: table<tics: int, bytes: binary> -> binary {
-  let tics = $in | each {|run| 0..<$run.tics | each { $run.bytes } } | flatten
-  [0x[6d 02 01 01 00 00 00 01 00 01 00 00 00]]
-  | append $tics
-  | append 0x[00 00 00 81]
-  | append (0..<2100 | each { 0x[00 00 00 00] })
-  | append 0x[80]
-  | bytes collect
-}
+source demo.nu
 
 # The palette indices of a Chocolate Doom screenshot, row by row. It
 # writes every byte of 0xc0 and over as 0xc1 then the byte, and no other
@@ -187,13 +146,9 @@ def main [
   if $tics < 18 { error make {msg: "the pistol is still rising before tic 18"} }
   let pause = patch-pixels $bytes M_PAUSE 126 4
   let dir = mktemp --directory
-  let iwad = $things | split row ' ' | where $it != '' | reduce --fold ($bytes
-    | rewrite ($bytes | things | where type == 1 | first | get i) $x $y $angle 1) {|t, wad|
-    let f = $t | split row ',' | into int
-    $wad | rewrite $f.0 $f.2 $f.3 0 $f.1
-  }
   let name = $wad | path basename
-  let shot = vanilla $iwad $name ($runs | demo) $tics $pause $dir
+  let paused = $runs | append [{tics: 1, bytes: 0x[00 00 00 81]} {tics: 2100, bytes: 0x[00 00 00 00]}] | demo
+  let shot = vanilla ($bytes | placed $x $y $angle $things) $name $paused $tics $pause $dir
   let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let moves = $runs | any {|run| ($run.bytes | bytes at 0..1) != 0x[00 00] }
