@@ -2343,36 +2343,24 @@ def Sim.damage(damage: U32, inflictor: Maybe<&2, U32>, source: Maybe<&2, U32>, +
 # The sector's special
 # --------------------
 
-def Sim.sector.hurt(due: Bool, damage: U32, s: State) -> State:
+def Sim.sector.hurt(due: Bool, s: State) -> State:
   match due:
     case False{}:
       s
     case True{}:
-      Sim.damage(damage, None{}, None{}, s)
+      Sim.damage(5, None{}, None{}, s)
 
-# Doom's P_PlayerInSpecialSector for the specials E1M1 carries: 7 is
-# nukage, 5 health every 32 tics of the level's clock. Neither map
-# spawns a radiation suit on this skill, so the suit's protection has no
-# code.
-def Sim.sector.special(special: U32, +clock: U32, s: State) -> State:
-  match special:
-    case 7:
-      Sim.sector.hurt(U32.is_zero((clock .&. 31 : U32)), 5, s)
-    case _:
-      s
-
-def Sim.sector.floored(floored: Bool, +sector: U32, +clock: U32, +s: State) -> State:
-  match floored:
-    case False{}:
-      s
-    case True{}:
-      Sim.sector.special(L.Level.sector.special(State.level(s), sector), clock, s)
-
-# P_PlayerThink's call on the sector under the player, which only acts
-# while the player's feet are at that sector's floor.
+# Doom's P_PlayerInSpecialSector on the sector under the player: special
+# 7 is nukage, which takes 5 health every 32 tics of the level's clock
+# while the player's feet are at that sector's floor. It is the only
+# special either map carries that hurts, so the switch is the one test.
+# Neither map spawns a radiation suit on this skill, so the suit's
+# protection has no code.
 def Sim.sector(+level: L.Level, +clock: U32, +s: State) -> State:
   +sector = L.Level.sector_at(level, Player.x(State.player(s)), Player.y(State.player(s)))
-  Sim.sector.floored(U32.is_eq(Player.z(State.player(s)), L.Level.floor(level, sector)), sector, clock, s)
+  Sim.sector.hurt(Bool.and(U32.is_eq(L.Level.sector.special(State.level(s), sector), 7),
+    Bool.and(U32.is_zero((clock .&. 31 : U32)),
+      U32.is_eq(Player.z(State.player(s)), L.Level.floor(level, sector)))), s)
 
 # Dying
 # -----
@@ -2420,15 +2408,13 @@ def Sim.death.asked(use: Bool, s: State) -> State:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, Bool.or(reborn, use)}
 
-# Doom's P_DeathThink: the player sprites move, the view sinks and is
-# worked out again, the facing turns to the attacker, and use asks for
-# the level again. Nothing else of P_PlayerThink runs: no move, no
-# sector special, no use of a line and no counters, so the damage count
-# fades here alone.
-def Sim.death(+level: L.Level, +clock: U32, use: Bool, +s: State) -> State:
-  Sim.death.asked(use, State.player.put(s, Sim.death.faced(
-    Sim.named(Sim.Hurt.attacker(Player.hurt(State.player(s))), State.things(s)), level,
-    Sim.eye(level, clock, Player.sinking(Sim.psprites(level, clock, State.player(s)))))))
+# Doom's P_DeathThink for the player alone: the player sprites move, the
+# view sinks and is worked out again, and the facing turns to the
+# attacker. Nothing else of P_PlayerThink runs: no move, no sector
+# special, no use of a line and no counters, so the damage count fades
+# here alone.
+def Sim.death(+level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, p: Player) -> Player:
+  Sim.death.faced(m, level, Sim.eye(level, clock, Player.sinking(Sim.psprites(level, clock, p))))
 
 # The tic
 # -------
@@ -2474,41 +2460,54 @@ def Sim.mobj.z(t: Sim.Try) -> Sim.Try:
 # Doom's P_MobjThinker for the player: the XY movement, with the pickups
 # its position checks make, then the vertical, against the level the tic
 # began with, whose geometry the wall law reads.
-def Sim.mobj(cmd: K.Cmd, +level: L.Level, +s: State) -> State:
-  State.moved(Sim.mobj.z(Sim.xy(level, State.things(s), cmd, State.player(s))), State.level(s), s)
+def Sim.mobj(cmd: K.Cmd, +level: L.Level, p: Player, +s: State) -> State:
+  State.moved(Sim.mobj.z(Sim.xy(level, State.things(s), cmd, p)), State.level(s), s)
 
-# Doom's P_PlayerThink for a living player, in its order: the move, the
-# eye, the sector's special, use on the press, the player sprites and
-# the counters.
-def Sim.player.live(+cmd: K.Cmd, +level: L.Level, +clock: U32, press: Bool, +s: State) -> State:
-  +walked = State.player.put(s, Sim.eye(level, clock, Sim.move(level, cmd, State.player(s))))
-  +acted = Sim.use(press, Sim.sector(level, clock, walked))
-  State.player.put(acted, Sim.counters(Sim.psprites(level, clock, State.player(acted))))
-
-# Doom's P_PlayerThink: a dead player thinks of dying alone.
-def Sim.player(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, usedown: Bool, s: State) -> State:
+# The half of P_PlayerThink that changes the state: a living player's
+# move and eye, which the sector's special then acts on, and a dying
+# one's reborn on the use button.
+def Sim.player(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State) -> State:
   match dead:
-    case True{}:
-      Sim.death(level, clock, K.Cmd.use(cmd), s)
     case False{}:
-      Sim.player.live(cmd, level, clock, Sim.pressed(cmd, usedown), s)
+      Sim.sector(level, clock, State.player.put(s, Sim.eye(level, clock, Sim.move(level, cmd, State.player(s)))))
+    case True{}:
+      Sim.death.asked(K.Cmd.use(cmd), s)
 
-# One tic in Doom's order: the player thinks, its mobj moves, the lines
-# that movement crossed fire, the mobj goes through its own states, the
+# The half that is the player's alone: the sprites and the counters
+# while it lives, and, while it dies, the sprites, the view sinking and
+# the turn to the attacker.
+def Sim.thought(dead: Bool, +level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, p: Player) -> Player:
+  match dead:
+    case False{}:
+      Sim.counters(Sim.psprites(level, clock, p))
+    case True{}:
+      Sim.death(level, clock, m, p)
+
+# One tic in Doom's order: the player thinks, use acts on the press,
+# which a dead player never makes, its mobj moves, the lines that
+# movement crossed fire, the mobj goes through its own states, the
 # things go through theirs, the thinkers run in the order they were
 # started, the clock counts. The tic's sounds start from none. An ended
 # level stands still: no tic runs, so its sounds stay the last live
 # tic's, and whoever gathers sounds tic by tic passes over it.
+def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
+  +hurt: State) -> State:
+  +thought = Sim.thought(dead, level, clock,
+    Sim.named(Sim.Hurt.attacker(Player.hurt(State.player(hurt))), State.things(hurt)), State.player(hurt))
+  +went = Sim.mobj(cmd, level, thought, Sim.use(Bool.and(Bool.not(dead), Sim.pressed(cmd, usedown)),
+    State.player.put(hurt, thought)))
+  Sim.tic.kept(geo, State.player(went), clock, K.Cmd.use(cmd), State.told(Sim.thinkers(Sim.mobj.tics(
+    Sim.cross(Player.crossed(State.player(went)), went)))))
+
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
     case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn}:
       State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn}
     case State{+player, L.Level{+geo, sectors, specials}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd, reborn}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
-      +went = Sim.mobj(cmd, level, Sim.player(Player.dead(player), cmd, level, clock, usedown,
+      +dead = Player.dead(player)
+      Sim.tic.live(cmd, level, geo, clock, usedown, dead, Sim.player(dead, cmd, level, clock,
         State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, reborn}))
-      Sim.tic.kept(geo, State.player(went), clock, K.Cmd.use(cmd), State.told(Sim.thinkers(Sim.mobj.tics(
-        Sim.cross(Player.crossed(State.player(went)), went)))))
 
 # A tic for each command of the list, in order: a demo.
 def Sim.replay(script: List<&2, K.Cmd>, s: State) -> State:
