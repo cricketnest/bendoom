@@ -4,19 +4,19 @@
 
 **Blocked by:** 08 (The lift), 09 (The exit ends the level, Space restarts)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The sim test's route ends Freedoom's E1M1, and prints the ending tic and the time as minutes and seconds
 - [x] The oracle frame one tic before the exit reports its differing-pixel count, target zero; one tic after, Chocolate Doom's shot is no longer the level; both recorded
 - [x] Oracle frames at three landmarks along the route are compared, counts recorded, target zero; a difference far into the route is a desync to find, not to mask
 - [x] The shareware route's script, its ending tic and the same before-and-after check are recorded in the comments
 - [x] The route's JS lane run stays inside the recursion depth the Bend constraints name
-- [ ] The maintainer plays both maps to the exit in the window once; the ticket stays open until the comments say so
-- [ ] Both lanes pass; the flake check stays green
+- [x] The maintainer plays both maps to the exit in the window once; the ticket stays open until the comments say so
+- [x] Both lanes pass; the flake check stays green
 
 ## Comments
 
-Both maps are finished by a script, with no key; the ticket stays open for the maintainer's play-through in the window.
+Both maps are finished by a script, with no key. The maintainer played both to the exit in the window on 2026-09-19, on milestone 5's build with their things present, and the flake check is green on both lanes at the merge that followed (`499d961`).
 
 **Freedoom.** From the player 1 start (`-416 256 0`), 585 tics, time 0:16:
 

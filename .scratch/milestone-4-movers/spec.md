@@ -1,6 +1,6 @@
 # Milestone 4: doors, the lift, switches, the exit, and the lights
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

@@ -4,13 +4,13 @@
 
 **Blocked by:** 10 (Lights blink, strobe and glow), 11 (Animations and scrolling walls), 12 (E1M1 from start to exit)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Frames per second with a mover running recorded in the comments, beside milestone 3's number for the still level, machine and power state named; under 35 is a bug to fix here, not to note
 - [x] The README's milestone 4 line names what was built and says done
 - [x] No comment in the sim, the level, the renderer or the tools describes the level as unchanging, keys as the sim's input, or specials as unread
 - [x] Every oracle count recorded in tickets 02 to 12 is zero or has its cause written beside it
-- [ ] The spec's status line says done
+- [x] The spec's status line says done
 - [x] The flake check is green
 
 ## Comments
@@ -31,7 +31,7 @@ The door runs are the bench with `SCRIPT` set to the route's first 160 tics and 
 
 **The oracle counts of tickets 02 to 12.** Every count is 0, or has its cause beside it and a 0 once the cause was gone: ticket 02's airborne and landing frames (the lift, 0 in ticket 08), ticket 05's 163 and ticket 07's 11312 (an animation's phase, 0 with the idle and 0 without it after ticket 11), ticket 12's route landmarks (0 without idles now), and the frames after the exit, where vanilla has left the level.
 
-The spec's status stays open with ticket 12, which waits for the maintainer to play both maps to the exit in the window.
+The spec's status says done since the maintainer played both maps to the exit in the window on 2026-09-19 (ticket 12).
 
 **The code review** (`/code-review` since `cecf33f`, a standards and a spec reviewer in parallel). The spec reviewer found the sim vanilla's in tic order, `T_MovePlane`, the door, lift and floor timings, the crush paths, use, the triggers, the lights, the animation phase and the exit clock. Fixed from the two reports:
 
