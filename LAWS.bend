@@ -1598,7 +1598,7 @@ law end_of_track_ends:
 type Closed.At is Data:
   At{delta: U32, event: Mi.Midi.Event}
 
-# A song's division, and its first track's events.
+# A track's events to its end, each after its delta, at most n.
 def Closed.events(n: Nat, g: Mi.Midi.Got, +d: U32) -> List<&2, Closed.At>:
   match n g:
     case _ Mi.Got{Mi.End{}, t}:
@@ -1611,6 +1611,7 @@ def Closed.events(n: Nat, g: Mi.Midi.Got, +d: U32) -> List<&2, Closed.At>:
 def Closed.track(+t: Mi.Midi.Track) -> List<&2, Closed.At>:
   Closed.events(40n, Mi.Midi.next(t), Mi.Midi.delta(t))
 
+# A song's division, and its first track's events.
 def Closed.song(f: Mi.Midi.File) -> U32 & List<&2, Closed.At>:
   Mi.File{division, tracks} = f
   (division, Closed.track(Maybe.default(&2, Mi.Midi.Track, List.head(&2, Mi.Midi.Track, tracks), Mi.Bad{""})))

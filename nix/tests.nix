@@ -13,7 +13,7 @@ llvmPackages_19.stdenv.mkDerivation {
   };
 
   nativeBuildInputs = [ bend bun ];
-  # tests/game.bend builds the game's loop, whose music opens ALSA.
+  # tests/game.bend builds the game's loop, whose music links ALSA.
   buildInputs = [ alsa-lib ];
 
   BENDOOM_IWAD = "${freedoom}/share/games/doom/freedoom1.wad";

@@ -28,6 +28,10 @@ def Music.bytes(frames: List<&2, U32>, acc: List<&2, U32>) -> List<&2, U32>:
 def Music.put(+m: S.Song, file: File) -> IO(File):
   B.Bytes.put(file, Music.bytes(S.Song.out(m), []))
 
+# The song run a buffer further.
+def Music.turn(+env: S.Song.Env, +m: S.Song) -> S.Song.Turn:
+  S.Song.turn((S.Song.made(m) + S.Song.buffer() : U32), env, m)
+
 # The pass from a turn on, each buffer written as it is made, until the
 # restart is due.
 def Music.pass.go(n: Nat, t: S.Song.Turn, +env: S.Song.Env, file: File) -> IO(S.Song):
@@ -44,13 +48,12 @@ def Music.pass.go(n: Nat, t: S.Song.Turn, +env: S.Song.Env, file: File) -> IO(S.
     case 1n+f S.More{+m}:
       do IO<S.Song>:
         kept : File <- Music.put(m, file)
-        Music.pass.go(f, S.Song.turn((S.Song.made(m) + S.Song.buffer() : U32), env, S.Song.clear(m)), env, kept)
+        Music.pass.go(f, Music.turn(env, S.Song.clear(m)), env, kept)
 
 def Music.pass(path: String, +env: S.Song.Env, +m: S.Song) -> IO(S.Song):
-  +first = S.Song.turn((S.Song.made(m) + S.Song.buffer() : U32), env, m)
   do IO<S.Song>:
     file : File <- IO.try(File, File.open(path, "w"))
-    Music.pass.go(Music.buffers(), first, env, file)
+    Music.pass.go(Music.buffers(), Music.turn(env, m), env, file)
 
 def Music.render(+env: S.Song.Env, +idle: Bool) -> IO(Unit):
   do IO<Unit>:

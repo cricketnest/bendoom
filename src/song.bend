@@ -346,5 +346,4 @@ def Song.out(m: Song) -> List<&2, U32>:
 # The song with its frames taken.
 def Song.clear(m: Song) -> Song:
   Song{sound, player, tracks, heap, now, made, running, tempo} = m
-  O.Frames{opl, out} = sound
-  Song{O.Frames{opl, []}, player, tracks, heap, now, made, running, tempo}
+  Song{O.Opl.Frames.clear(sound), player, tracks, heap, now, made, running, tempo}

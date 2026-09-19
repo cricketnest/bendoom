@@ -245,13 +245,14 @@ def midi-events []: binary -> table {
         }
         $pos += $n
       } else {
+        let program = ($status | bits and 0xE0) == 0xC0
         $event = {
           kind: ($channel_kinds | get (($status | bits shr 4) - 8))
           ch: ($status | bits and 15)
           p1: ($b | get $pos)
-          p2: (if ($status | bits and 0xE0) == 0xC0 { 0 } else { $b | get ($pos + 1) })
+          p2: (if $program { 0 } else { $b | get ($pos + 1) })
         }
-        $pos += if ($status | bits and 0xE0) == 0xC0 { 1 } else { 2 }
+        $pos += if $program { 1 } else { 2 }
       }
       $out = $out | append ({track: $track delta: $delta} | merge $event)
     }

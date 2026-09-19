@@ -1380,8 +1380,8 @@ def Laws.lamp_under_door():
 def Laws.door_opens_over_barrel():
   {==}
 
-# Music: the reader's laws split on what follows, since List.drop reads
-# the list before the count.
+# Music: the reader's laws split on what follows, since Midi.drop
+# matches the list even when its count is 0.
 
 def Laws.sysex_skipped(rest):
   match rest:

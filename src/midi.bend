@@ -5,6 +5,7 @@
 # mus2mid.c converts it to, with no MIDI bytes made in between. What
 # either would refuse reads as a Bad track.
 import Base
+import ./bytes.bend as B
 
 # A MIDI track at its next event, and the last status byte; a MUS track
 # at its next event, the delta before it, the MUS channels in the order
@@ -67,11 +68,15 @@ def Midi.vlq(bytes: List<&2, U32>, ok: Bool) -> Midi.Read:
 def Midi.no_limit() -> U32:
   4294967295
 
-# More events than a track can hold: i_oplmusic.c takes no lump of 96
-# KiB or more, every event but MUS's sixteen first-use all-notes-offs
-# reads a byte, and there are sixteen MUS channels.
+# The bytes of the smallest lump i_oplmusic.c refuses, 96 KiB.
+def Midi.limit() -> U32:
+  98304
+
+# More events than a track can hold: every event of a lump under the
+# limit but MUS's sixteen first-use all-notes-offs reads a byte, and
+# there are sixteen MUS channels.
 def Midi.most() -> U32:
-  98320
+  (Midi.limit() + 16 : U32)
 
 # The bytes after the first n, if there are n.
 def Midi.drop(n: Nat, bytes: List<&2, U32>, ok: Bool) -> Midi.Read:
@@ -145,7 +150,7 @@ def Midi.chan(two: Bool, +status: U32, r: Midi.Read) -> Midi.Got:
       Midi.chan.two(status, p1, Midi.byte(rest, ok))
     case False{}:
       Read{p1, rest, ok} = r
-      Got{Chan{(status .&. 240 : U32), (status .&. 15 : U32), p1, 0}, Midi.track(ok, rest, status)}
+      Midi.chan.two(status, p1, Read{0, rest, ok})
 
 def Midi.sysex.data(+status: U32, r: Midi.Read) -> Midi.Got:
   Read{val, rest, ok} = r
@@ -279,20 +284,20 @@ def Midi.mus.control(+ch: U32, st: Midi.Mus.State, r: Midi.Read) -> Midi.Got:
   Read{+c, rest, ok} = r
   Midi.mus.value(ch, c, st, Midi.byte(rest, ok))
 
-# The kinds of MUS event, by the descriptor's bits 4 to 6.
+# The kinds of MUS event, by the descriptor's bits 4 to 6. The score ends
+# at type 6, and at types 5 and 7, which mus2mid.c refuses.
 type Midi.Op is Data:
   Release{}
   Press{}
   Pitch{}
   System{}
   Control{}
-  Finish{}
-  Refused{}
+  Finish{fine: Bool}
 
 def Midi.mus.op(+d: U32) -> Midi.Op:
   Maybe.default(&2, Midi.Op, List.get(&2, Midi.Op,
-    [Release{}, Press{}, Pitch{}, System{}, Control{}, Refused{}, Finish{}, Refused{}],
-    U32.to_nat(((d >> 4n) .&. 7 : U32))), Refused{})
+    [Release{}, Press{}, Pitch{}, System{}, Control{}, Finish{False{}}, Finish{True{}}, Finish{False{}}],
+    U32.to_nat(((d >> 4n) .&. 7 : U32))), Finish{False{}})
 
 def Midi.mus.event(op: Midi.Op, +ch: U32, st: Midi.Mus.State, rest: List<&2, U32>, ok: Bool) -> Midi.Got:
   match op:
@@ -306,12 +311,9 @@ def Midi.mus.event(op: Midi.Op, +ch: U32, st: Midi.Mus.State, rest: List<&2, U32
       Midi.mus.system(ch, st, Midi.byte(rest, ok))
     case Control{}:
       Midi.mus.control(ch, st, Midi.byte(rest, ok))
-    case Finish{}:
+    case Finish{fine}:
       State{last, chans, vels} = st
-      Got{End{}, Midi.mus.track(ok, rest, 0, chans, vels)}
-    case Refused{}:
-      State{last, chans, vels} = st
-      Got{End{}, Midi.mus.track(False{}, rest, 0, chans, vels)}
+      Got{End{}, Midi.mus.track(Bool.and(ok, fine), rest, 0, chans, vels)}
 
 # The position of MUS channel c among those used so far, or their count
 # if it is new. The match found is a parameter, since Bool.pick over the
@@ -438,8 +440,7 @@ def Midi.header(+bytes: List<&2, U32>) -> Midi.File:
 # mus2mid.c's one track at 70 ticks a beat, from the score's start, every
 # channel's velocity 127.
 def Midi.mus(+bytes: List<&2, U32>) -> Midi.File:
-  +start = (Midi.be(1n, List.drop(&2, U32, bytes, 6n)) .|. (Midi.be(1n, List.drop(&2, U32, bytes, 7n)) << 8n)
-    : U32)
+  +start = B.Bytes.le16(Midi.be(1n, List.drop(&2, U32, bytes, 6n)), Midi.be(1n, List.drop(&2, U32, bytes, 7n)))
   File{70, [Mus{List.drop(&2, U32, bytes, U32.to_nat(start)), 0, [], List.replicate(U32, 16n, 127)}]}
 
 # Whether there are more than n bytes.
@@ -460,7 +461,7 @@ def Midi.file.of(midi: Bool, mus: Bool, +bytes: List<&2, U32>) -> Midi.File:
 # lump from "MUS" 0x1A with a whole header, 16 bytes.
 def Midi.file(+bytes: List<&2, U32>) -> Midi.File:
   +tag = Midi.be(4n, bytes)
-  +small = Bool.not(Midi.over(bytes, U32.to_nat(98303)))
+  +small = Bool.not(Midi.over(bytes, U32.to_nat((Midi.limit() - 1 : U32))))
   Midi.file.of(U32.is_eq(tag, 1297377380) && small,
     U32.is_eq(tag, 1297437466) && Midi.over(bytes, 15n) && small, bytes)
 
@@ -527,6 +528,7 @@ def Midi.fault.file(f: Midi.File) -> Maybe<&2, String>:
   Midi.span.why(Midi.spans(tracks), division)
 
 # Why Chocolate Doom would not play the lump, if it would not: the first
-# track that fails.
+# track that fails, else a song too long for the render's U32
+# microseconds.
 def Midi.fault(+bytes: List<&2, U32>) -> Maybe<&2, String>:
   Midi.fault.file(Midi.file(bytes))

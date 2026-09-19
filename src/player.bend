@@ -5,6 +5,7 @@
 # instruments. Writes are kept latest first.
 import Base
 import ./vec.bend as V
+import ./bytes.bend as B
 import ./fixed.bend as F
 import ./opl.bend as O
 import ./opl_tables.bend as T
@@ -85,7 +86,7 @@ def Player.instr(+i: U32) -> U32:
   (8 + (i * 36) : U32)
 
 def Player.flags(+t: Player.Tabs, +i: U32) -> U32:
-  (Player.byte(t, Player.instr(i)) .|. (Player.byte(t, (Player.instr(i) + 1 : U32)) << 8n) : U32)
+  B.Bytes.le16(Player.byte(t, Player.instr(i)), Player.byte(t, (Player.instr(i) + 1 : U32)))
 
 def Player.fixed(+t: Player.Tabs, +i: U32) -> Bool:
   U32.is_eq((Player.flags(t, i) .&. 1 : U32), 1)
@@ -250,7 +251,7 @@ def Player.frequency(+t: Player.Tabs, +bend: U32, +voice: Player.Voice) -> U32:
   Tabs{gm, +curve, vmt} = t
   Voice{+instr, +iv, chan, key, +note, freq, vol, car, mod} = voice
   +at = Player.gm_voice(instr, iv)
-  +offset = (Player.byte(t, (at + 14 : U32)) .|. (Player.byte(t, (at + 15 : U32)) << 8n) : U32)
+  +offset = B.Bytes.le16(Player.byte(t, (at + 14 : U32)), Player.byte(t, (at + 15 : U32)))
   +signed = Bool.pick(U32, U32.is_ge(offset, 32768), (offset - 65536 : U32), offset)
   +n = Player.octaves(Bool.pick(U32, Player.fixed(t, instr), note, (note + signed : U32)))
   +fine = Bool.pick(U32, U32.is_eq(iv, 0), 0,

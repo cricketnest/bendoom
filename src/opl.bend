@@ -291,7 +291,6 @@ def Opl.Slot.freq(+fnum: U32, +block: U32, +key: U32, s: Opl.Slot) -> Opl.Slot:
   Slot{out, prout, rout, gen, key, am, vib, egt, ksr, mt, ksl, tl, Opl.lvl(tl, ksl, fnum, block), ar, dr,
     sl, rr, wf, phase}
 
-
 def Opl.key(+s: Opl.Slot) -> U32:
   Slot{out, prout, rout, gen, key, am, vib, egt, ksr, mt, ksl, tl, lvl, ar, dr, sl, rr, wf, phase} = s
   key
@@ -439,10 +438,14 @@ def Opl.queue(+ws: List<&2, Opl.Write>, o: Opl) -> Opl:
 # Resampling
 # ----------
 
+# OPL3_GenerateResampled's rateratio, 44100 << 10 over 49716.
+def Opl.ratio() -> U32:
+  908
+
 def Opl.tick.done(+count: U32, last: U32, rcnt: U32, oldl: U32, oldr: U32, l: U32, r: U32,
   f: Opl.Flushed) -> Opl:
   Flushed{core, pending} = f
-  Opl{core, (count + 1 : U32), last, pending, (rcnt - 908 : U32), oldl, oldr, l, r}
+  Opl{core, (count + 1 : U32), last, pending, (rcnt - Opl.ratio() : U32), oldl, oldr, l, r}
 
 def Opl.tick.fin(+count: U32, last: U32, +pending: List<&2, Opl.Pending>, rcnt: U32, oldl: U32,
   oldr: U32, s: Opl.Sample) -> Opl:
@@ -450,8 +453,7 @@ def Opl.tick.fin(+count: U32, last: U32, +pending: List<&2, Opl.Pending>, rcnt: 
   Opl.tick.done(count, last, rcnt, oldl, oldr, l, r,
     Opl.flush(pending, Opl.due(count, pending), core, count))
 
-# One chip sample, if the resampler is due one: rateratio is 44100 << 10
-# over 49716, 908.
+# One chip sample, if the resampler is due one.
 def Opl.tick(due: Bool, +roms: Opl.Roms, o: Opl) -> Opl:
   match due:
     case False{}:
@@ -462,12 +464,12 @@ def Opl.tick(due: Bool, +roms: Opl.Roms, o: Opl) -> Opl:
 
 def Opl.ready(+o: Opl) -> Bool:
   Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o
-  U32.is_ge(rcnt, 908)
+  U32.is_ge(rcnt, Opl.ratio())
 
 # C's signed division by the rate ratio, toward zero.
 def Opl.lerp(+old: U32, +cur: U32, +rcnt: U32) -> U32:
-  +x = ((old * (908 - rcnt)) + (cur * rcnt) : U32)
-  Bool.pick(U32, F.Fixed.is_neg(x), (0 - ((0 - x) / 908) : U32), (x / 908 : U32))
+  +x = ((old * (Opl.ratio() - rcnt)) + (cur * rcnt) : U32)
+  Bool.pick(U32, F.Fixed.is_neg(x), (0 - ((0 - x) / Opl.ratio()) : U32), (x / Opl.ratio() : U32))
 
 # An output frame: its left and right as 16-bit two's complement, left in
 # the low half.
@@ -515,6 +517,10 @@ def Opl.reset() -> Opl:
 def Opl.Frames.out(f: Opl.Frames) -> List<&2, U32>:
   Frames{opl, out} = f
   out
+
+def Opl.Frames.clear(f: Opl.Frames) -> Opl.Frames:
+  Frames{opl, out} = f
+  Frames{opl, []}
 
 def Opl.Frames.queue(+ws: List<&2, Opl.Write>, f: Opl.Frames) -> Opl.Frames:
   Frames{opl, out} = f
