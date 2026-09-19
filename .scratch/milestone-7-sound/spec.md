@@ -16,7 +16,7 @@ Every sound vanilla starts in E1M1 plays in Bendoom, from the WAD's own sound lu
 2. As a player, I want the lift to sound when it starts and when it stops.
 3. As a player, I want a lowering floor to grind while it moves and thud when it stops.
 4. As a player, I want a switch to click when I press it and again when it pops back.
-5. As a player, I want the exit switch to make its own sound.
+5. As a player, I want the exit switch to click as vanilla's does, which is the ordinary switch's click: `P_ChangeSwitchTexture` clears the line's special before it looks for the exit's.
 6. As a player, I want a grunt when I press use on a wall that does nothing.
 7. As a player, I want a locked door to grunt at me.
 8. As a player, I want a pickup to chime, a weapon pickup to make the weapon sound, and a power to make the power sound.
