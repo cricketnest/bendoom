@@ -5,15 +5,16 @@
 
 Doom, written in [Bend 2](https://bend-lang.com).
 
-The game reads a Doom WAD at runtime, so it plays
-[Freedoom](https://freedoom.github.io) (BSD licensed, from nixpkgs) or
-id's shareware `DOOM1.WAD` (free to pass on, not to sell). The sim is
+The game reads a Doom WAD at runtime, so it plays id's shareware
+`DOOM1.WAD` (free to pass on, not to sell), which the flake fetches from
+the idgames archive, or [Freedoom](https://freedoom.github.io) (BSD
+licensed, from nixpkgs). The sim is
 integer fixed point, as the original was, and the rules that must hold
 about it are stated in `LAWS.bend` and proven in `PROOF.bend`; `nix flake
 check` refuses a build with an open or broken law.
 
     nix run github:eliesgalvira/bendoom
-    nix run github:eliesgalvira/bendoom#bendoom-shareware
+    nix run github:eliesgalvira/bendoom#bendoom-freedoom
 
 If flakes aren't enabled on your system, put this after `nix`:
 
@@ -29,8 +30,8 @@ end marker. Then `film` encodes the demo as a 1600 by 1200 MP4 at Doom's
 35 tics a second, and leaves an existing video alone. Under it runs
 E1M1's song as the package's WAD holds it, from the first frame and
 repeating for as long as the video lasts. The demo is vanilla's .lmp,
-which Chocolate Doom plays too. A demo recorded with `bendoom-shareware`
-is filmed with `film-shareware`, which carries the shareware song.
+which Chocolate Doom plays too. A demo recorded with `bendoom-freedoom`
+is filmed with `film-freedoom`, which carries Freedoom's song.
 
     RECORD=run.lmp nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4

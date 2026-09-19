@@ -27,8 +27,10 @@
           freedoom = "${wads.freedoom}/share/games/doom/freedoom1.wad";
           shareware = "${wads.doom1}/share/games/doom/doom1.wad";
           # The music is a function of the IWAD: a package that takes one
-          # renders that IWAD's song, so the shareware song builds only
-          # with the shareware packages.
+          # renders that IWAD's song. The packages play the shareware WAD
+          # unless named -freedoom. The checks and the dev shell use
+          # Freedoom, whose values the tests pin, so the flake check never
+          # needs the unfree WAD.
           music = iwad: pkgs.callPackage ./nix/music.nix { inherit bend iwad; };
           # alsa-lib loads the plugin behind the host's ALSA default from one
           # directory of its own, so on a host whose default is PipeWire or
@@ -37,16 +39,17 @@
             name = "bendoom-alsa-plugins";
             paths = map (p: "${p}/lib/alsa-lib") [ pkgs.alsa-plugins pkgs.pipewire ];
           };
-          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music alsa-plugins; iwad = freedoom; };
-          film = pkgs.callPackage ./nix/film.nix { inherit bend music; iwad = freedoom; };
+          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music alsa-plugins; iwad = shareware; };
+          film = pkgs.callPackage ./nix/film.nix { inherit bend music; iwad = shareware; };
         in {
           packages = {
             inherit bend bendoom film;
             default = bendoom;
-            music = music freedoom;
+            music = music shareware;
             doom1-wad = wads.doom1;
-            bendoom-shareware = bendoom.override { iwad = shareware; };
-            film-shareware = film.override { iwad = shareware; };
+            bendoom-freedoom = bendoom.override { iwad = freedoom; };
+            film-freedoom = film.override { iwad = freedoom; };
+            music-freedoom = music freedoom;
           };
 
           checks = {
