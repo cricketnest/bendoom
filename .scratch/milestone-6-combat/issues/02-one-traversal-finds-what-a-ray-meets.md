@@ -45,7 +45,7 @@ Sim.path(~A: Data, ~visit: @+level: L.Level -> @m: Sim.Meet -> @c: A -> Sim.Answ
 
 ### The oracle
 
-`nix develop -c nu tools/oracle.nu x y degrees script --frame`, the dump built from this tree, Freedoom, `masked` 665 in every report (the pause graphic alone). The cases that lean on the traversal: a use of the first door, a use of the special 23 switch, a run that slides along the corridor walls, the run that ends in the pit, and the plain start.
+`nix develop -c nu tools/oracle.nu x y degrees script --frame`, the dump built from this tree, Freedoom, `masked` 665 in every report (the pause graphic alone). The cases that lean on the traversal: a use of the first door, a use of the special 23 switch, a run that slides along the corridor walls, the run that ends in the pit, and the plain start. Every one was run twice, before the merge of `milestone-6-7` and again after it, with the same answer.
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
@@ -60,6 +60,10 @@ Sim.path(~A: Data, ~visit: @+level: L.Level -> @m: Sim.Meet -> @c: A -> Sim.Answ
 - `Sim.use.first`, `Sim.use.first.pick`, `Sim.use.before`, `Sim.use.insert`, `Sim.use.sort` (the sort moved to `Sim.meets.*`, unchanged), `Sim.trace.go`, `Sim.meets.add`, and the box gather inside `Sim.meets.at`.
 - Milestone 4's ticket 04 left a caveat: "Vanilla orders equal fractions by its cell walk and ours by the box's cells; a trace through a vertex shared by a special and a plain line could pick differently." That is now closed, and the comment that carried it went with the code.
 - `Sim.blocks` and `Sim.blocks.open` took a whole `Player` to read three numbers; they take the three.
+
+### The merge
+
+`milestone-6-7` at 4428326 (the tic command carrying fire and the weapon change) merged in with no conflict: it touched `K.Cmd` and the test scripts, and the six lines it changed in `src/sim.bend` are in the tic, not the traversal. `nix flake check` passed before the merge and again after it, and the five oracle cases were rerun on the merged tree.
 
 ### Surprises
 
