@@ -303,11 +303,13 @@ def Things.list(ts: Things) -> List<&2, Thing>:
   Things{+tree, +count, you} = ts
   Things.list.go(U32.to_nat(count), tree, 0)
 
-def Things.missing(m: Maybe<&2, Thing>, +id: U32, rest: String) -> String:
+# The name of a thing the population lacks, before rest; rest alone for
+# one it has.
+def Things.gone.name(m: Maybe<&2, Thing>, +id: U32, rest: String) -> String:
   match m:
     case None{}:
       " " ++ U32.show(id) ++ rest
-    case Some{th}:
+    case Some{_}:
       rest
 
 # The names of the things of a list gone from a population, as text.
@@ -316,7 +318,7 @@ def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
     case []:
       ""
     case Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      Things.missing(Things.get(after, id), id, Things.gone(rest, after))
+      Things.gone.name(Things.get(after, id), id, Things.gone(rest, after))
 
 # Every thing alive through its tic, in the order they spawned.
 def Things.tics(ts: Things) -> Things:

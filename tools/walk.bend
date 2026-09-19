@@ -34,14 +34,12 @@ def Walk.sectors(which: List<&2, String>, +level: L.Level) -> String:
 
 def Walk.line(+which: List<&2, String>, +first: S.State, +s: S.State) -> String:
   +p = S.State.player(s)
-  +things = S.State.things(s)
   "tic " ++ U32.show(S.State.clock(s)) ++ " at " ++ F.Fixed.show(S.Player.x(p)) ++ " "
     ++ F.Fixed.show(S.Player.y(p)) ++ " " ++ A.Angle.show(S.Player.angle(p)) ++ " z "
     ++ F.Fixed.show(S.Player.z(p)) ++ " floor " ++ F.Fixed.show(S.Player.floorz(p)) ++ " eye "
     ++ F.Fixed.show((S.Player.viewz(p) - S.Player.floorz(p) : U32)) ++ " ended "
     ++ Bool.show(S.State.ended(s)) ++ Walk.sectors(which, S.State.level(s)) ++ "\n  "
-    ++ I.Inventory.show(S.Player.inv(p)) ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(things)))
-    ++ " taken" ++ H.Things.gone(H.Things.list(S.State.things(first)), things)
+    ++ I.Inventory.tally(S.Player.inv(p), H.Things.list(S.State.things(first)), S.State.things(s))
 
 def Walk.go(runs: List<&2, List<&2, K.Cmd>>, +which: List<&2, String>, +first: S.State, +s: S.State) -> IO(Unit):
   match runs:

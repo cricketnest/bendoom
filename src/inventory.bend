@@ -2,6 +2,7 @@
 # P_TouchSpecialThing's grants for the types Bendoom takes.
 import Base
 import ./vec.bend as V
+import ./things.bend as H
 
 # Health; armour points and type (0 none, 1 green, 2 blue); the cards,
 # a bit each in card_t order (blue, yellow and red card, then blue,
@@ -20,20 +21,19 @@ def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
     V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0}
 
-def Inventory.words(+v: V.Vec, n: Nat, +i: U32) -> String:
-  match n:
-    case 0n:
-      ""
-    case 1n+m:
-      " " ++ U32.show(V.Vec.get(v, i)) ++ Inventory.words(v, m, (i + 1 : U32))
-
 # Every count as text, for the tests and the tools.
 def Inventory.show(inv: Inventory) -> String:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   "inventory health " ++ U32.show(health) ++ " armour " ++ U32.show(armour) ++ " type " ++ U32.show(armourtype)
-    ++ " cards " ++ U32.show(cards) ++ " ammo" ++ Inventory.words(ammo, 4n, 0) ++ " caps"
-    ++ Inventory.words(caps, 4n, 0) ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons)
-    ++ " powers" ++ Inventory.words(powers, 6n, 0) ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
+    ++ " cards " ++ U32.show(cards) ++ " ammo" ++ V.Vec.show(ammo, 4n, 0) ++ " caps" ++ V.Vec.show(caps, 4n, 0)
+    ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers"
+    ++ V.Vec.show(powers, 6n, 0) ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
+
+# The inventory, how many things are left and the names of those gone
+# since a first population, as text.
+def Inventory.tally(inv: Inventory, first: List<&2, H.Thing>, +things: H.Things) -> String:
+  Inventory.show(inv) ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(things))) ++ " taken"
+    ++ H.Things.gone(first, things)
 
 def Inventory.health(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv

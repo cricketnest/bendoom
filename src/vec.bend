@@ -89,3 +89,11 @@ def Vec.of_list(xs: List<&2, U32>, n: U32) -> Vec:
 # A list as a tree of just its length.
 def Vec.of(+xs: List<&2, U32>) -> Vec:
   Vec.of_list(xs, U32.from_nat(List.length(&2, U32, xs)))
+
+# The n entries from i, each after a space.
+def Vec.show(+v: Vec, n: Nat, +i: U32) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+m:
+      " " ++ U32.show(Vec.get(v, i)) ++ Vec.show(v, m, (i + 1 : U32))
