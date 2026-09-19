@@ -966,7 +966,7 @@ def Sim.crawling(+mom: U32) -> Bool:
   Bool.and(F.Fixed.gt(mom, F.Fixed.neg(Sim.stopspeed())), F.Fixed.lt(mom, Sim.stopspeed()))
 
 def Sim.friction.ground(+cmd: K.Cmd, +p: Player) -> Player:
-  K.Cmd{forward, side, turn, use} = cmd
+  K.Cmd{forward, side, turn, buttons} = cmd
   Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Sim.slow(Bool.and(Sim.crawling(momx), Bool.and(Sim.crawling(momy),
     Bool.and(U32.is_zero(forward), U32.is_zero(side)))), p)
@@ -1019,7 +1019,7 @@ def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
 
 # Doom's P_MovePlayer: turn, then thrust forward and sideways.
 def Sim.move(+level: L.Level, +cmd: K.Cmd, p: Player) -> Player:
-  K.Cmd{forward, side, turn, use} = cmd
+  K.Cmd{forward, side, turn, buttons} = cmd
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   +a = (angle + (turn << 16n) : U32)
   Sim.push(level, Sim.push(level, Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight,
@@ -2064,7 +2064,7 @@ def Sim.use(press: Bool, +s: State) -> State:
 
 # Use acts on the tic it goes down, not while it is held.
 def Sim.pressed(cmd: K.Cmd, usedown: Bool) -> Bool:
-  Bool.and(K.Cmd.use(cmd), Bool.not(usedown))
+  Bool.and(Bool.not(usedown), K.Cmd.use(cmd))
 
 # The player as moved, at the height, floor and ceiling a mover left,
 # holding what its re-clip picked up, the lines it crossed fired and

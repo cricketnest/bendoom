@@ -166,26 +166,36 @@ law arrows_wasd:
 # turn is 320 for its first five tics, then 640, or 1280 running; Space
 # is the use button (sanity).
 law cmd_tables:
-  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 5),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, True{}}, 0))
-    == (K.Cmd{25, 0, 0, False{}}, K.Cmd{50, 0, 0, False{}}, K.Cmd{0, 24, 0, False{}}, K.Cmd{0, 4294967256, 0, False{}},
-      K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 640, False{}}, K.Cmd{0, 0, 4294966016, False{}},
-      K.Cmd{0, 0, 0, True{}})
+  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 5),
+    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 6),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 6),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, 0))
+    == (K.Cmd{25, 0, 0, 0}, K.Cmd{50, 0, 0, 0}, K.Cmd{0, 24, 0, 0}, K.Cmd{0, 4294967256, 0, 0},
+      K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 640, 0}, K.Cmd{0, 0, 4294966016, 0},
+      K.Cmd{0, 0, 0, 2})
     : K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd}
+
+# LAW: the lowest held number key wins, whatever the higher ones do, as
+# G_BuildTiccmd's loop breaks at the first: BT_CHANGE, 4, with the key's
+# number less one at BT_WEAPONSHIFT, 3.
+law lowest_number_wins:
+  for two: Bool
+  for three: Bool
+  {(K.Keys.change(True{}, two, three), K.Keys.change(False{}, True{}, three),
+    K.Keys.change(False{}, False{}, True{}), K.Keys.change(False{}, False{}, False{}))
+    == (4, 12, 20, 0) : U32 & U32 & U32 & U32}
 
 # LAW: the held count lives in the input: seven tics of the left key
 # from a fresh input turn 320 five times, then 640 (sanity).
 law turn_script:
-  {K.Input.script(7n, K.Input{K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0})
-    == [K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}},
-      K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 640, False{}},
-      K.Cmd{0, 0, 640, False{}}] : List<&2, K.Cmd>}
+  {K.Input.script(7n, K.Input{K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0})
+    == [K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0},
+      K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 640, 0},
+      K.Cmd{0, 0, 640, 0}] : List<&2, K.Cmd>}
 
 # The sim
 # -------
@@ -242,7 +252,7 @@ def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
 # momentum over four is 9999, and half of it times the clock's sine 25
 # is 1 (sanity).
 law tic_from_rest:
-  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed()}, 0)
+  {Closed.room([K.Cmd{25, 0, 0, 0}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed()}, 0)
     == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, [], I.Inventory.start(), Closed.unarmed()} : S.Player}
 
 # LAW: standing still on the floor puts the eye 41 above it, at any
@@ -278,7 +288,7 @@ law landing_dip:
 # over four is 14745600, capped at 16 units, and half of it bobs the eye
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
-  {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, False{}}],
+  {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, 0}],
       S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Closed.unarmed()}, 5)),
     S.Player.viewz(Closed.room([K.Cmd.idle()],
       S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Closed.unarmed()}, 5)))
@@ -362,7 +372,7 @@ def Closed.east() -> S.State:
 
 # The state after a tic of use and then idle tics.
 def Closed.used(idle: Nat, s: S.State) -> S.State:
-  S.Sim.replay(K.Cmd{0, 0, 0, True{}} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
+  S.Sim.replay(K.Cmd{0, 0, 0, 2} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
 
 def Closed.ceil(s: S.State, sector: U32) -> U32:
   L.Level.ceil(S.State.level(s), sector)
@@ -567,6 +577,7 @@ law use_fires_once:
   for forward: U32
   for side: U32
   for turn: U32
+  for buttons: U32
   for +next: K.Cmd
   for player: S.Player
   for level: L.Level
@@ -578,7 +589,8 @@ law use_fires_once:
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: U32
-  {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
+  for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
+  {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
     S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
@@ -597,7 +609,7 @@ def Closed.exit() -> L.Level:
 
 # The west room's player after two idle tics and then a tic of use.
 def Closed.exited() -> S.State:
-  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
+  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
     Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}, [], 0})
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
