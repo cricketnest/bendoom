@@ -82,4 +82,3 @@ Checks:
 
 - Every test on both lanes. `bend PROOF.bend` prints "All terms check." The game, the benches and the tools build. `nix flake check` passes.
 - The start view's bench, 100 frames: 1.50 to 1.56 s at ticket 02, 1.49 to 1.65 s now (x86_64 benchmark host). The sort costs no measurable time.
-

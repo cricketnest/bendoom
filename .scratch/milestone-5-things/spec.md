@@ -1,6 +1,6 @@
 # Milestone 5: things, sprites and pickups
 
-Status: ready-for-agent
+Status: ready-for-human. The last item is ticket 11's play-through: the maintainer plays both E1M1s to the exit in the window. Then this status, and the README's milestone 5 line, say done.
 
 ## Problem Statement
 
