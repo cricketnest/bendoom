@@ -4,7 +4,7 @@
 
 **Blocked by:** 11 (Both E1M1 routes survive their things)
 
-**Status:** ready-for-human (the maintainer plays both maps to the exit in the window, ticket 11's play-through; the last two boxes wait on it)
+**Status:** resolved
 
 - [x] The window bench measures a named scene containing many things plus a running light or mover, with the machine and power state recorded
 - [x] The measured rate is at least 35 frames a second; a lower result is fixed in this ticket
@@ -13,8 +13,8 @@
 - [x] Every oracle count from tickets 01 through 11 is zero or has its explicit out-of-scope cause beside it
 - [x] A standards and spec review of the complete milestone is run and every accepted finding is fixed
 - [x] The erasure pass deletes the old masked traversal, obsolete one-player-only assumptions, dead definitions and stale comments
-- [ ] The README marks milestone 5 done and names decorations, items, pickups and sprites
-- [ ] The spec status changes to done only after every earlier ticket is complete
+- [x] The README marks milestone 5 done and names decorations, items, pickups and sprites
+- [x] The spec status changes to done only after every earlier ticket is complete
 
 ## Comments
 
@@ -123,6 +123,5 @@ The shareware route replays locally to the same ending as ticket 11: tic 645, th
 - **The scene.** It is the busiest view on the route, not the busiest the map could hold. A view picked by hand elsewhere could show more sprites, but no route goes there.
 - **The mirrored step** is fixed from vanilla's source and pinned by a closed law. No frame can show it until a spawned thing has rotated frames.
 - **The spec's wording.** Its two false lines are corrected in place, not left beside a note.
-- **The spec's status** is `ready-for-human`, not `done`, and the README's line says what was built without "Done.", both until the play-through.
 
-**What stays open.** Ticket 11's window play-through: the maintainer plays both maps to the exit in the window. The last two boxes wait on it, so this ticket stays ready-for-human, as milestone 4's ticket 13 did. Until then the README's milestone 5 line names what was built and says it is done once both maps are played to the exit in the window. The spec's status is `ready-for-human`, with that play-through named as its last item. Every other box has its evidence above.
+**Closed.** The maintainer played both maps to the exit in the window on 2026-09-19 (ticket 11). The README's milestone 5 line says done, and the spec's status is done.

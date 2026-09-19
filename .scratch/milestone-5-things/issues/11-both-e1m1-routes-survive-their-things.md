@@ -4,7 +4,7 @@
 
 **Blocked by:** 10 (The populated maps match Chocolate Doom)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] Freedoom's route runs from its original player start to the exit through the populated state
 - [x] The route records at least one solid-thing collision or avoidance, the blue-key pickup and the locked door after collection
@@ -13,7 +13,7 @@
 - [x] The exit occurs on the same tic in both games
 - [x] The shareware route is rerun locally and its adjusted script, landmarks and ending tic are recorded
 - [x] Restart restores every collected thing and resets inventory
-- [ ] Both maps are played in the window once before the ticket closes
+- [x] Both maps are played in the window once before the ticket closes
 - [x] The Freedoom route passes on both lanes and in the flake check
 
 ## Comments
@@ -81,9 +81,9 @@ The one change is milestone 4's `50,50,0,0,0 10,0,0,0,0 3,0,-40,0,0 20,0,0,0,0` 
 
 The health bonus, record 39 at 2752, -2640, is 42.79 ahead at 274 and 25.95 at 275; shell box 43 at 3008, -3968 is 38.24 east at 445 and 35.86 east, 31.55 north at 446. Both are below or behind the view, so the frames cannot show them; Chocolate Doom's status bar goes from 100% to 101% health between 274 and 275 and from 0 to 4 shells between 445 and 446.
 
-**Window QA.** The session was locked overnight, and niri writes no screenshot of a locked session. `niri msg action screenshot-window` returned 0 and saved nothing, so `tools/screenshot.nu` could not be used. The flake's `bendoom` and `bendoom-shareware` ran instead in their windows on a headless Xvfb, keys held with xdotool and the window captured with ImageMagick's `import`; every screenshot was read. Freedoom, played by hand from the start: the start room's corpse and gate; the walkway; the south door opening on Space and the south room beyond; the three armour bonuses in the corridor, one left after running past two; the lift ride into the pit; the first door; the big room; the blue door refusing Space without the key; the west door opening onto the yard with its tech column and health bonuses. Shareware, by hand: the start hall and its pedestal, the corridor to the computer room with its green armour in view. Neither map was played to the exit by hand. Held keys at half a second's resolution kept missing doors in their open time. The exit and restart ran in the game's own loop instead, `bench/window.bend` with each route's script replayed up to the tic before the exit: Space at the switch flipped its texture and ended the level, the loop printed the time, and Enter showed the start again, on both maps. That scripted exit is not a play-through, so the window checkbox stays open.
+**Window QA.** The session was locked overnight, and niri writes no screenshot of a locked session. `niri msg action screenshot-window` returned 0 and saved nothing, so `tools/screenshot.nu` could not be used. The flake's `bendoom` and `bendoom-shareware` ran instead in their windows on a headless Xvfb, keys held with xdotool and the window captured with ImageMagick's `import`; every screenshot was read. Freedoom, played by hand from the start: the start room's corpse and gate; the walkway; the south door opening on Space and the south room beyond; the three armour bonuses in the corridor, one left after running past two; the lift ride into the pit; the first door; the big room; the blue door refusing Space without the key; the west door opening onto the yard with its tech column and health bonuses. Shareware, by hand: the start hall and its pedestal, the corridor to the computer room with its green armour in view. Neither map was played to the exit by hand. Held keys at half a second's resolution kept missing doors in their open time. The exit and restart ran in the game's own loop instead, `bench/window.bend` with each route's script replayed up to the tic before the exit: Space at the switch flipped its texture and ended the level, the loop printed the time, and Enter showed the start again, on both maps. That scripted exit is not a play-through.
 
-**What remains:** The maintainer plays both maps to the exit in the window, as milestone 4's ticket 12 left it, and ticks the window checkbox.
+**The play-through.** The maintainer played both maps to the exit in the window on 2026-09-19, on the ticket 12 build (`6592545`): Freedoom along this route, the blue key and both blue doors included, in 52 seconds, then the shareware map past the barrel to its exit switch.
 
 Trade-offs, decided without the maintainer:
 
