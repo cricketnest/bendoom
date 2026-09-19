@@ -36,7 +36,7 @@
 | the view still falling, 20 | `630,0,0,0,0` | 0 |
 | the dead view at rest, 6 | `650,0,0,0,0` | 0 |
 
-The render test's new case is the last of these. Every other render case was rerun and is unchanged; the whole file is at zero but for the three hashes that never had an oracle.
+The render test's new case is the last of these, and it was run again, with the frame dump built again, after milestone 6 and 7's work was merged in: still 0. Every other render case is unchanged; the whole file is at zero but for the three hashes that never had an oracle.
 
 **What was built.**
 

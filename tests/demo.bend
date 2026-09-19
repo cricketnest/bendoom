@@ -9,6 +9,11 @@
 # the slow 320 turns 256, 512, 256, 256, carrying none; the run's 1280
 # stays. Side -40 is the byte 216. The end marker, 0x80 where a tic's
 # forward byte would be, ends the read, and so does a tic cut short.
+# The buttons are G_BuildTiccmd's from held keys: Ctrl is BT_ATTACK, 1;
+# Space BT_USE, 2; the lowest held number key i + 1 is BT_CHANGE, 4, with
+# i << BT_WEAPONSHIFT, so 1 is 4, 2 is 4 + 8 = 12, 3 is 4 + 16 = 20, 2
+# with 3 is 12 and 1 with 3 is 4; Ctrl with Space is 3, and with 3 too,
+# 23. The byte is written and read back whole.
 import Base
 import ../src/keys.bend as K
 import ../src/demo.bend as D
@@ -27,31 +32,44 @@ def cmds(xs: List<&2, K.Cmd>) -> String:
   match xs:
     case []:
       ""
-    case K.Cmd{+forward, +side, +turn, use} <> rest:
-      " " ++ int(forward) ++ "," ++ int(side) ++ "," ++ int(turn) ++ "," ++ Bool.show(use) ++ cmds(rest)
+    case K.Cmd{+forward, +side, +turn, buttons} <> rest:
+      " " ++ int(forward) ++ "," ++ int(side) ++ "," ++ int(turn) ++ "," ++ U32.show(buttons) ++ cmds(rest)
 
 def recorded(tag: String, p: List<&2, U32> & U32) -> String:
   (+tics, carry) = p
   tag ++ bytes(tics) ++ " | carry " ++ int(carry) ++ " | read" ++ cmds(D.Demo.cmds(tics))
 
 def turns(n: Nat, turn: U32) -> List<&2, K.Cmd>:
-  List.replicate(K.Cmd, n, K.Cmd{0, 0, turn, False{}})
+  List.replicate(K.Cmd, n, K.Cmd{0, 0, turn, 0})
+
+# The command of held button keys, no other key down.
+def held(use: Bool, fire: Bool, one: Bool, two: Bool, three: Bool) -> K.Cmd:
+  K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, use, fire, one, two, three}, 0)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     IO.print("header" ++ bytes(D.Demo.header()))
-    IO.print(recorded("left", D.Demo.tics(K.Cmd{50, (0 - 40 : U32), 640, True{}} <> turns(2n, 640), 0)))
-    IO.print(recorded("right", D.Demo.tics(K.Cmd{(0 - 25 : U32), 24, (0 - 640 : U32), False{}}
+    IO.print(recorded("left", D.Demo.tics(K.Cmd{50, (0 - 40 : U32), 640, 2} <> turns(2n, 640), 0)))
+    IO.print(recorded("right", D.Demo.tics(K.Cmd{(0 - 25 : U32), 24, (0 - 640 : U32), 0}
       <> turns(2n, (0 - 640 : U32)), 0)))
     IO.print(recorded("slow", D.Demo.tics(turns(4n, 320), 0)))
     IO.print(recorded("run", D.Demo.tics(turns(2n, (0 - 1280 : U32)), 0)))
+    IO.print(recorded("fire", D.Demo.tics([held(False{}, True{}, False{}, False{}, False{})], 0)))
+    IO.print(recorded("change", D.Demo.tics([held(False{}, False{}, True{}, False{}, False{}),
+      held(False{}, False{}, False{}, True{}, False{}), held(False{}, False{}, False{}, False{}, True{}),
+      held(False{}, False{}, False{}, True{}, True{}), held(False{}, False{}, True{}, False{}, True{})], 0)))
+    IO.print(recorded("use and fire", D.Demo.tics([held(True{}, True{}, False{}, False{}, False{}),
+      held(True{}, True{}, False{}, False{}, True{})], 0)))
     IO.print("marker" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 128, 0, 0, 0, 25, 0, 0, 0])))
     IO.print("cut" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 25, 0, 0])))
 
 #|header 109 2 1 1 0 0 0 1 0 1 0 0 0
-#|left 50 216 3 2 0 0 2 0 0 0 3 0 | carry -128 | read 50,-40,768,True 0,0,512,False 0,0,768,False
-#|right 231 24 254 0 0 0 253 0 0 0 254 0 | carry -128 | read -25,24,-512,False 0,0,-768,False 0,0,-512,False
-#|slow 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 | carry 0 | read 0,0,256,False 0,0,512,False 0,0,256,False 0,0,256,False
-#|run 0 0 251 0 0 0 251 0 | carry 0 | read 0,0,-1280,False 0,0,-1280,False
-#|marker 50,0,0,False
-#|cut 50,0,0,False
+#|left 50 216 3 2 0 0 2 0 0 0 3 0 | carry -128 | read 50,-40,768,2 0,0,512,0 0,0,768,0
+#|right 231 24 254 0 0 0 253 0 0 0 254 0 | carry -128 | read -25,24,-512,0 0,0,-768,0 0,0,-512,0
+#|slow 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 | carry 0 | read 0,0,256,0 0,0,512,0 0,0,256,0 0,0,256,0
+#|run 0 0 251 0 0 0 251 0 | carry 0 | read 0,0,-1280,0 0,0,-1280,0
+#|fire 0 0 0 1 | carry 0 | read 0,0,0,1
+#|change 0 0 0 4 0 0 0 12 0 0 0 20 0 0 0 12 0 0 0 4 | carry 0 | read 0,0,0,4 0,0,0,12 0,0,0,20 0,0,0,12 0,0,0,4
+#|use and fire 0 0 0 3 0 0 0 23 | carry 0 | read 0,0,0,3 0,0,0,23
+#|marker 50,0,0,0
+#|cut 50,0,0,0
