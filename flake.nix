@@ -30,7 +30,14 @@
           # renders that IWAD's song, so the shareware song builds only
           # with the shareware packages.
           music = iwad: pkgs.callPackage ./nix/music.nix { inherit bend iwad; };
-          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music; iwad = freedoom; };
+          # alsa-lib loads the plugin behind the host's ALSA default from one
+          # directory of its own, so on a host whose default is PipeWire or
+          # PulseAudio the game needs theirs, as nixpkgs's alsa-utils does.
+          alsa-plugins = pkgs.symlinkJoin {
+            name = "bendoom-alsa-plugins";
+            paths = map (p: "${p}/lib/alsa-lib") [ pkgs.alsa-plugins pkgs.pipewire ];
+          };
+          bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music alsa-plugins; iwad = freedoom; };
           film = pkgs.callPackage ./nix/film.nix { inherit bend music; iwad = freedoom; };
         in {
           packages = {
@@ -68,6 +75,7 @@
             buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = freedoom;
             BENDOOM_MUSIC = music freedoom;
+            ALSA_PLUGIN_DIR = alsa-plugins;
             BEND_NO_TELEMETRY = "1";
           };
         };

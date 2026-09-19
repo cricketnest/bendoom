@@ -112,3 +112,5 @@ Commands:
     tools/listen.nu --wad <doom1.wad> --length 200sec --keep
     BENDOOM_IWAD=<doom1.wad> tools/listen.nu render <capture> --binary music
     time ./music --threads 1; sha256sum first.raw second.raw                 (both WADs, before and after the fixes)
+
+Silent on the dev machine. The maintainer played the package and heard nothing. The game had printed "no sound device; playing silent": Nix's alsa-lib reads the host's /etc/alsa/conf.d, where the host configuration names PipeWire as ALSA's default, but loads the plugin behind it only from a directory of its own, where there is none, so Audio.open failed. Ticket 06 saw the same line and took it for a shell without a device; this ticket's bench routed its own ALSA config and never met it. The wrapper and the dev shell now set ALSA_PLUGIN_DIR to alsa-plugins and PipeWire's plugin joined in one directory, as nixpkgs's alsa-utils does. A program that only opens and closes the device fails without it and succeeds with it.

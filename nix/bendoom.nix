@@ -3,8 +3,10 @@
 # wrapper's default. The game makes no parallel call, and the runtime's
 # idle workers cost it three frames a second, so it runs on one thread.
 # The song it plays is the render of its own IWAD, so an override of the
-# IWAD carries its music along.
-{ lib, llvmPackages_19, makeWrapper, bend, libx11, alsa-lib, iwad, music }:
+# IWAD carries its music along. ALSA_PLUGIN_DIR names the plugins the
+# host's ALSA default may need; without them the device will not open
+# and the game plays silent.
+{ lib, llvmPackages_19, makeWrapper, bend, libx11, alsa-lib, alsa-plugins, iwad, music }:
 
 llvmPackages_19.stdenv.mkDerivation {
   pname = "bendoom";
@@ -36,6 +38,7 @@ llvmPackages_19.stdenv.mkDerivation {
     makeWrapper $out/libexec/bendoom $out/bin/bendoom \
       --set-default BENDOOM_IWAD ${lib.escapeShellArg iwad} \
       --set-default BENDOOM_MUSIC ${music iwad} \
+      --set-default ALSA_PLUGIN_DIR ${alsa-plugins} \
       --add-flags "--threads 1"
     runHook postInstall
   '';
