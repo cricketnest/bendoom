@@ -44,7 +44,7 @@ All thirteen rows of the table are in both WADs, read by `tools/wad.nu`'s `sound
 
 The byte counts are `du -sb` on the store paths, and both equal the sum computed from the lumps in nushell before the node ran.
 
-Times, after the program is built: `nix build .#sounds-freedoom --rebuild` twice took 0.93 and 0.94 s, `nix build .#sounds --rebuild` 0.37 and 0.34 s, of which about 0.16 s is nix evaluating the flake (`nix build .#sounds-freedoom` with nothing to do). The program itself compiles in 4.2 s and is shared by both WADs, so a cold `nix build .#sounds-freedoom` is about 5 s. Run by hand outside nix, Freedoom's thirteen sounds take 0.75 s on one thread, of which ticket 03 measured 0.22 s reading the 28 MB WAD. Both `--rebuild` runs compared equal, so the node is reproducible.
+Times, after the program is built, taken under the heavy-command lock with the load average at 4: `nix build .#sounds-freedoom --rebuild` took 1.80 s then 0.89 s, and `nix build .#sounds --rebuild` 0.36 and 0.36 s. Of each, 0.10 s is nix evaluating the flake, measured as `nix build .#sounds-freedoom` with nothing to do. Earlier runs on the same machine gave 0.93 and 0.94 s for Freedoom and 0.37 and 0.34 s for the shareware WAD. So the expansion is about 0.8 s a build for Freedoom and 0.25 s for the shareware WAD. The program itself compiles in 4.2 s and is shared by both WADs, so a cold `nix build .#sounds-freedoom` is about 5 s. Run by hand outside nix, Freedoom's thirteen sounds take 0.75 s on one thread, of which ticket 03 measured 0.22 s reading the 28 MB WAD. Every `--rebuild` compared equal, so the node is reproducible.
 
 ### The failures
 
@@ -56,6 +56,10 @@ A table row the WAD has not got, one `CacheSFX` refuses, or one at a rate SDL's 
 
 The test folds the file through `Bytes.fold`, so it holds one 4096-byte chunk at a time and never the file. Native and bun both take under 0.05 s.
 
+### Checks run
+
+`nix flake check` passes on the commit and again after the merge of `milestone-6-7`. Its tests log prints PASS on both lanes for all thirteen tests, `sounds` among them. `nix build` builds `.#sounds`, `.#sounds-freedoom`, `.#bendoom`, `.#bendoom-freedoom` and `.#film-freedoom`. The tests derivation's closure holds Freedoom, the Freedoom sounds node and the Freedoom render and no `doom1-wad`, checked with `nix-store -q --requisites`; the proof's holds no WAD at all. No oracle case applies: nothing this ticket touches reaches a frame.
+
 ### Surprises
 
 - Reading a whole file back is harder than reading a lump: `Bytes.read` pads to a power of two and cannot say how long the file was, so the test counts and hashes in the fold instead of indexing an array.
@@ -66,7 +70,7 @@ The test folds the file through `Bytes.fold`, so it holds one 4096-byte chunk at
 
     nix develop -c bend sounds.bend -o /tmp/m7-04/sounds
     BENDOOM_IWAD=<freedoom> /tmp/m7-04/sounds --threads 1
-    nix build .#sounds .#sounds-freedoom .#bendoom .#bendoom-freedoom
-    nix build .#sounds-freedoom --rebuild
+    flock /tmp/bendoom-heavy.lock nix build .#sounds .#sounds-freedoom .#bendoom .#bendoom-freedoom
+    flock /tmp/bendoom-heavy.lock nix build .#sounds-freedoom --rebuild
     nix develop -c bend tests/sounds.bend -o t; BENDOOM_SOUNDS=<dir> ./t --threads 1
-    nix flake check
+    flock /tmp/bendoom-heavy.lock nix flake check
