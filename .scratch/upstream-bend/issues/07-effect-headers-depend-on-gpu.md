@@ -13,4 +13,4 @@ Error: clang failed to build /tmp/wad_dir
 
 ## What we do about it
 
-`src/effs/bytes_read.c` includes both headers itself. That is the right habit anyway; the bug is that the guide never says which headers an effect may count on, and the answer changes with the machine.
+Bendoom's own C effect, `bytes_read.c`, included both headers itself until the repo's C went on 19 Sep 2026 (ticket 09). That is the right habit anyway; the bug is that the guide never says which headers an effect may count on, and the answer changes with the machine.
