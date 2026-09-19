@@ -24,6 +24,7 @@ import ./src/opl.bend as O
 import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
+import ./src/sfx.bend as X
 
 # Bytes and the WAD
 # -----------------
@@ -1729,3 +1730,23 @@ law quiet_offs:
   {(Pl.Player.event(t, 128, raw, key, vel, Pl.Player.start()),
     Pl.Player.event(t, 176, raw, 123, vel, Pl.Player.start()))
     == (Pl.Player.start(), Pl.Player.start()) : Pl.Player & Pl.Player}
+
+# Sound lumps
+# -----------
+
+# LAW: CacheSFX's refusals, on a 57-byte lump unless said: a lump under
+# its 8-byte header, a format other than 3, a length of 48, and a length
+# one past what follows the header are refused; a length of 49 that fits
+# is played (sanity).
+law sfx_refusals:
+  {[X.Sfx.played(7, 3, 0), X.Sfx.played(57, 2, 49), X.Sfx.played(57, 3, 48), X.Sfx.played(57, 3, 50),
+    X.Sfx.played(57, 3, 49)]
+    == [False{}, False{}, False{}, False{}, True{}] : List<&2, Bool>}
+
+# LAW: a sound at 16000 or 17990 Hz, the rates of Freedoom's two sounds
+# that SDL's converter is not given, has no run, whatever it holds.
+law sfx_rates_unserved:
+  for count: U32
+  for bytes: List<&2, U32>
+  {(X.Sfx.run(X.Sound{16000, count, bytes}), X.Sfx.run(X.Sound{17990, count, bytes}))
+    == (None{}, None{}) : Maybe<&2, X.Sfx.Run> & Maybe<&2, X.Sfx.Run>}
