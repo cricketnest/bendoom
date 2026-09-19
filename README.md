@@ -1,5 +1,8 @@
 # Bendoom
 
+> [!WARNING]
+> SLOP WARNING: There has been no adult supervision of the code.
+
 Doom, written in [Bend 2](https://bend-lang.com).
 
 The game reads a Doom WAD at runtime, so it plays
@@ -11,6 +14,13 @@ check` refuses a build with an open or broken law.
 
     nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#bendoom-shareware
+
+If flakes aren't enabled on your system, put this after `nix`:
+
+    --extra-experimental-features 'nix-command flakes'
+
+It runs on x86_64 Linux. aarch64 Linux and macOS are untested, and on
+macOS the game plays without music.
 
 To record a game and make a video of it, first play with `RECORD` naming
 the demo to write, and quit with Esc or by closing the window; the demo
@@ -50,3 +60,9 @@ for bug.
 7. Sound effects.
 8. E1M1's music: the song and the instruments of the package's WAD played in Bend as Chocolate Doom's OPL music plays them, sample for sample, rendered while the flake builds and streamed by the game on repeat, so each package plays the song of the WAD it was built with. Done.
 9. Hellbent: the game as one λ-expression.
+
+## License
+
+GPL-2.0-or-later, in `LICENSE`. `src/tables.bend` and
+`src/opl_tables.bend` are generated from Chocolate Doom's source, which
+is GPL-2.0-or-later too.

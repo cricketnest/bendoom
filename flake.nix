@@ -59,7 +59,7 @@
             program = "${bendoom}/bin/bendoom";
           };
 
-          devShells.default = pkgs.mkShell {
+          devShells.default = pkgs.mkShell ({
             packages = [
               bend
               pkgs.bun
@@ -72,12 +72,13 @@
               pkgs.xorg.xorgserver
               pkgs.xdotool
             ];
-            buildInputs = [ pkgs.libx11 pkgs.alsa-lib ];
+            buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = freedoom;
+            BEND_NO_TELEMETRY = "1";
+          } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             BENDOOM_MUSIC = music freedoom;
             ALSA_PLUGIN_DIR = alsa-plugins;
-            BEND_NO_TELEMETRY = "1";
-          };
+          });
         };
     };
 }
