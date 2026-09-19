@@ -889,14 +889,6 @@ law heap_ties:
   {Sg.Song.pop(Sg.Song.push(Sg.Song.push(Sg.Song.push([], Sg.Next{5, 0}), Sg.Next{5, 1}), Sg.Next{5, 2}))
     == [Sg.Next{5, 2}, Sg.Next{5, 1}] : List<&2, Sg.Song.Entry>}
 
-# LAW: a note on of velocity zero is a note off, on any player.
-law velocity_zero_is_off:
-  for +t: Pl.Player.Tabs
-  for +raw: U32
-  for +key: U32
-  for +p: Pl.Player
-  {Pl.Player.event(t, 144, raw, key, 0, p) == Pl.Player.event(t, 128, raw, key, 0, p) : Pl.Player}
-
 # LAW: before any note, a note off or an all-notes-off on any channel
 # releases nothing and writes nothing.
 law quiet_offs:

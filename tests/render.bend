@@ -28,13 +28,14 @@ import ../src/sim.bend as S
 import ../src/project.bend as P
 import ../src/draw.bend as D
 import ../src/render.bend as R
+import ../src/fnv.bend as H
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32}
 
 def hash.mix(h: U32, p: Array<U32> & U32) -> Hash:
   (mem, v) = p
-  Hash{mem, ((h .^. v) * 16777619 : U32)}
+  Hash{mem, H.Fnv.mix(h, v)}
 
 def hash.px(i: Nat, st: Hash) -> Hash:
   Hash{mem, h} = st
@@ -67,7 +68,7 @@ def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
 # A frame's hash, drawn over a view blanked to an index.
 def hashed(+tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, blank: U32, mem: Array<U32>) -> Hash:
   D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, gfx, s,
-    D.Draw.set(U32.to_nat(53760), mem, G.Gfx.frame(), blank)), 2166136261})
+    D.Draw.set(U32.to_nat(53760), mem, G.Gfx.frame(), blank)), H.Fnv.basis()})
 
 def again(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, st: Hash) -> Array<U32> & String:
   Hash{mem, h} = st

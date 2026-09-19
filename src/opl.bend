@@ -494,15 +494,3 @@ def Opl.Frames.out(f: Opl.Frames) -> List<&2, U32>:
 def Opl.Frames.queue(+ws: List<&2, Opl.Write>, f: Opl.Frames) -> Opl.Frames:
   Frames{opl, out} = f
   Frames{Opl.queue(ws, opl), out}
-
-def Opl.hash.go(frames: List<&2, U32>, +h: U32) -> U32:
-  match frames:
-    case []:
-      h
-    case lr <> rest:
-      Opl.hash.go(rest, ((h .^. lr) * 16777619 : U32))
-
-# FNV-1a over frames as 32-bit words, the checksum the test and the bench
-# print.
-def Opl.hash(frames: List<&2, U32>) -> U32:
-  Opl.hash.go(frames, 2166136261)

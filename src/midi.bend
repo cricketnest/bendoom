@@ -66,13 +66,19 @@ def Midi.delta(t: Midi.Track) -> U32:
   Track{bytes, status} = t
   Midi.Read.val(Midi.vlq(bytes))
 
-def Midi.meta.event(+kind: U32, +n: U32, +data: List<&2, U32>) -> Midi.Event:
-  Bool.pick(Midi.Event, U32.is_eq(kind, 47), End{},
-    Bool.pick(Midi.Event, U32.is_eq(kind, 81) && U32.is_eq(n, 3), Tempo{Midi.be(3n, data)}, Other{}))
+def Midi.meta.event(end: Bool, tempo: Bool, data: List<&2, U32>) -> Midi.Event:
+  match end tempo:
+    case True{} _:
+      End{}
+    case False{} True{}:
+      Tempo{Midi.be(3n, data)}
+    case False{} False{}:
+      Other{}
 
 def Midi.meta.data(+kind: U32, r: Midi.Read) -> Midi.Got:
   Read{+n, +rest} = r
-  Got{Midi.meta.event(kind, n, rest), Track{List.drop(&2, U32, rest, U32.to_nat(n)), 255}}
+  Got{Midi.meta.event(U32.is_eq(kind, 47), U32.is_eq(kind, 81) && U32.is_eq(n, 3), rest),
+    Track{List.drop(&2, U32, rest, U32.to_nat(n)), 255}}
 
 def Midi.meta(r: Midi.Read) -> Midi.Got:
   Read{kind, rest} = r

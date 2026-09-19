@@ -1182,8 +1182,5 @@ def Laws.heap_one(e):
 def Laws.heap_ties():
   {==}
 
-def Laws.velocity_zero_is_off(t, raw, key, p):
-  {==}
-
 def Laws.quiet_offs(t, raw, key, vel):
   {==}

@@ -137,17 +137,23 @@ def Player.Voice.key(+v: Player.Voice) -> U32:
   Voice{instr, iv, chan, key, note, freq, vol, car, mod} = v
   key
 
-def Player.on.chan(m: Maybe<&2, U32>, +ch: U32) -> Bool:
-  match m:
+def Player.Voice.freq(+v: Player.Voice) -> U32:
+  Voice{instr, iv, chan, key, note, freq, vol, car, mod} = v
+  freq
+
+# A voice's channel in the order of their pointers, which
+# ReplaceExistingVoice compares: none, the null pointer, before any.
+def Player.Voice.rank(+v: Player.Voice) -> U32:
+  Voice{instr, iv, chan, key, note, freq, vol, car, mod} = v
+  match chan:
     case None{}:
-      False{}
+      0
     case Some{c}:
-      U32.is_eq(c, ch)
+      (c + 1 : U32)
 
 # Whether voice v plays on channel ch.
 def Player.Voice.on(+v: Player.Voice, +ch: U32) -> Bool:
-  Voice{instr, iv, chan, key, note, freq, vol, car, mod} = v
-  Player.on.chan(chan, ch)
+  U32.is_eq(Player.Voice.rank(v), (ch + 1 : U32))
 
 def Player.op1(+v: U32) -> U32:
   (((v / 3) * 8) + (v % 3) : U32)
@@ -215,10 +221,9 @@ def Player.level.go(+t: Player.Tabs, +v: U32, +chvol: U32, +velocity: U32, voice
     && U32.is_ne(modv, mod)
   +car2 = Bool.pick(U32, change, (carv .|. (car .&. 192) : U32), car)
   Voiced{Voice{instr, iv, chan, key, note, freq, velocity, car2, Bool.pick(U32, write_mod, modv, mod)},
-    List.append(&2, O.Opl.Write, Bool.pick(List<&2, O.Opl.Write>, write_mod,
-      [O.Write{(64 + Player.op1(v) : U32), (modv .|. (Player.byte(t, (at + 4 : U32)) .&. 192) : U32)}], []),
-      List.append(&2, O.Opl.Write, Bool.pick(List<&2, O.Opl.Write>, change,
-        [O.Write{(64 + Player.op2(v) : U32), car2}], []), ws))}
+    List.filter.put(O.Opl.Write,
+      O.Write{(64 + Player.op1(v) : U32), (modv .|. (Player.byte(t, (at + 4 : U32)) .&. 192) : U32)},
+      List.filter.put(O.Opl.Write, O.Write{(64 + Player.op2(v) : U32), car2}, ws, change), write_mod)}
 
 def Player.level(+t: Player.Tabs, +v: U32, +chvol: U32, +velocity: U32, vw: Player.Voiced) -> Player.Voiced:
   Voiced{voice, ws} = vw
@@ -257,10 +262,6 @@ def Player.tune.go(same: Bool, +v: U32, +f: U32, voice: Player.Voice, ws: List<&
         O.Write{(176 + v : U32), ((f >> 8n) .|. 32 : U32)} <> O.Write{(160 + v : U32), (f .&. 255 : U32)} <>
           ws}
 
-def Player.Voice.freq(+v: Player.Voice) -> U32:
-  Voice{instr, iv, chan, key, note, freq, vol, car, mod} = v
-  freq
-
 def Player.tune.at(+v: U32, +f: U32, +voice: Player.Voice, ws: List<&2, O.Opl.Write>) -> Player.Voiced:
   Player.tune.go(U32.is_eq(f, Player.Voice.freq(voice)), v, f, voice, ws)
 
@@ -275,19 +276,12 @@ def Player.put(p: Player, +v: U32, vw: Player.Voiced) -> Player:
   Voiced{voice, ws} = vw
   Player{chans, List.set(&2, Player.Voice, voices, U32.to_nat(v), voice), free, alloced, ws}
 
-def Player.without.one(same: Bool, +x: U32, rest: List<&2, U32>) -> List<&2, U32>:
-  match same:
-    case True{}:
-      rest
-    case False{}:
-      x <> rest
-
 def Player.without(vs: List<&2, U32>, +v: U32) -> List<&2, U32>:
   match vs:
     case []:
       []
     case +x <> rest:
-      Player.without.one(U32.is_eq(x, v), x, Player.without(rest, v))
+      List.filter.put(U32, x, Player.without(rest, v), U32.is_ne(x, v))
 
 def Player.released(+v: U32, voice: Player.Voice, p: Player) -> Player:
   Voice{instr, iv, chan, key, note, +freq, vol, car, mod} = voice
@@ -325,19 +319,6 @@ def Player.voice_on.pick(some: Maybe<&2, U32>, +t: Player.Tabs, +ch: U32, +i: U3
 def Player.voice_key_on(+t: Player.Tabs, +ch: U32, +i: U32, +iv: U32, +key: U32, +note: U32, +velocity: U32,
   +p: Player) -> Player:
   Player.voice_on.pick(List.head(&2, U32, Player.free(p)), t, ch, i, iv, key, note, velocity, p)
-
-def Player.rank(m: Maybe<&2, U32>) -> U32:
-  match m:
-    case None{}:
-      0
-    case Some{c}:
-      (c + 1 : U32)
-
-# A voice's channel in the order of their pointers, which
-# ReplaceExistingVoice compares: none, the null pointer, before any.
-def Player.Voice.rank(+v: Player.Voice) -> U32:
-  Voice{instr, iv, chan, key, note, freq, vol, car, mod} = v
-  Player.rank(chan)
 
 # ReplaceExistingVoice's choice among vs: the last that plays an
 # instrument's second voice or sits on a channel at least as high as the
@@ -472,9 +453,8 @@ def Player.split(vs: List<&2, U32>, +p: Player, +ch: U32, +on: Bool) -> List<&2,
     case []:
       []
     case +v <> rest:
-      List.append(&2, U32, Bool.pick(List<&2, U32>,
-        Bool.xor(Player.Voice.on(Player.voice(p, v), ch), on), [], [v]),
-        Player.split(rest, p, ch, on))
+      List.filter.put(U32, v, Player.split(rest, p, ch, on),
+        Bool.not(Bool.xor(Player.Voice.on(Player.voice(p, v), ch), on)))
 
 def Player.pitch_bend.order(+ch: U32, +p: Player) -> Player:
   Player{chans, voices, free, +alloced, writes} = p
