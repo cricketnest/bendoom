@@ -40,6 +40,14 @@ def Vec.set.go(v: Vec, odd: Bool, +i: U32, x: U32) -> Vec:
 def Vec.set(v: Vec, +i: U32, x: U32) -> Vec:
   Vec.set.go(v, Vec.odd(i), i, x)
 
+# The tree with every entry doubled.
+def Vec.doubled(v: Vec) -> Vec:
+  match v:
+    case Leaf{x}:
+      Leaf{(x * 2 : U32)}
+    case Node{l, r}:
+      Node{Vec.doubled(l), Vec.doubled(r)}
+
 def Vec.split.cons(h: U32, p: List<&2, U32> & List<&2, U32>) ->
   List<&2, U32> & List<&2, U32>:
   (o, e) = p

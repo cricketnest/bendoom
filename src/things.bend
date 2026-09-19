@@ -304,13 +304,17 @@ def Things.gone.name(m: Maybe<&2, Thing>, +id: U32, rest: String) -> String:
     case Some{_}:
       rest
 
-# The names of the things of a list gone from a population, as text.
 def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
   match before:
     case []:
       ""
     case Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       Things.gone.name(Things.get(after, id), id, Things.gone(rest, after))
+
+# How many things are left and the names of those gone since a first
+# population, as text.
+def Things.tally(first: List<&2, Thing>, +things: Things) -> String:
+  " things " ++ Nat.show(List.length(&2, Thing, Things.list(things))) ++ " taken" ++ Things.gone(first, things)
 
 def Thing.Tree.tics(t: Thing.Tree) -> Thing.Tree:
   match t:

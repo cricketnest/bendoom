@@ -19,6 +19,7 @@ import ./src/segs.bend as R
 import ./src/planes.bend as N
 import ./src/gfx.bend as G
 import ./src/sprites.bend as Z
+import ./src/masked.bend as Q
 
 # Bytes and the WAD
 # -----------------
@@ -672,45 +673,42 @@ type Closed.Edit is Data:
   Items{n: U32}
   Flash{n: U32}
 
-def Closed.edit(e: Closed.Edit, inv: I.Inventory) -> I.Inventory:
-  match e inv:
-    case Health{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
+  match inv e:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Health{n}:
       I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}
-    case Armour{points, kind} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers,
-      items, bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Armour{points, kind}:
       I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}
-    case Cards{bits} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Cards{bits}:
       I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus}
-    case Ammo{rounds} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
         bonus}
-    case Backpack{} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
         powers, items, bonus}
-    case Weapons{bits} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Weapons{bits}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus}
-    case Strength{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
         V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus}
-    case Items{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Items{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus}
-    case Flash{n} I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}:
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus} Flash{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n}
-
-def Closed.edits(es: List<&2, Closed.Edit>, inv: I.Inventory) -> I.Inventory:
-  match es:
-    case []:
-      inv
-    case e <> rest:
-      Closed.edits(rest, Closed.edit(e, inv))
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
-  Closed.edits(es, I.Inventory.start())
+  List.foldl(~&2, ~Closed.Edit, ~I.Inventory, ~Closed.edit, es, I.Inventory.start())
 
 # What a pickup leaves: the names of the things alive, and the
 # inventory.
@@ -792,6 +790,9 @@ law key_through_door:
   {(Closed.kept(Closed.shut_out()), F.Fixed.le(S.Player.x(S.State.player(Closed.shut_out())), 3145728))
     == (Got{[], Closed.inv([Cards{1}, Flash{12}])}, True{}) : Closed.Got & Bool}
 
+# LAW: the health bonus is always taken and counted. From 100 it makes
+# 101, from 199 200, and at 200 it adds nothing and still goes; the
+# flash is 6 (sanity).
 law health_bonus:
   {[Closed.offer(I.Inventory.start(), 2014), Closed.offer(Closed.inv([Health{199}]), 2014),
     Closed.offer(Closed.inv([Health{200}]), 2014)]
@@ -1086,30 +1087,24 @@ law clear_pins_things:
   for clear: {True{} == S.Sim.clear(level, x, y, S.Sim.radius(), H.Thing.you()) : Bool}
   {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool}
 
-def Closed.within(defs: List<&2, H.Thing.Def>) -> Bool:
-  match defs:
-    case []:
-      True{}
-    case H.Def{kind, state, radius, height, flags} <> rest:
-      Bool.and(U32.is_le(F.Fixed.of_map(radius), S.Sim.maxradius()), Closed.within(rest))
+def Closed.within(d: H.Thing.Def) -> Bool:
+  H.Def{kind, state, radius, height, flags} = d
+  U32.is_le(F.Fixed.of_map(radius), S.Sim.maxradius())
 
 # LAW: no type Bendoom spawns is wider than Doom's MAXRADIUS, 32, which
 # the thing check widens its box by (sanity).
 law radius_within:
-  {Closed.within(H.Thing.defs()) == True{} : Bool}
+  {List.all(~&2, ~H.Thing.Def, ~Closed.within, H.Thing.defs()) == True{} : Bool}
 
-def Closed.lasting(defs: List<&2, H.Thing.Def>) -> Bool:
-  match defs:
-    case []:
-      True{}
-    case H.Def{kind, state, radius, height, +flags} <> rest:
-      Bool.and(Bool.not(U32.is_eq((flags .&. 3 : U32), 3)), Closed.lasting(rest))
+def Closed.lasting(d: H.Thing.Def) -> Bool:
+  H.Def{kind, state, radius, height, flags} = d
+  Bool.not(U32.is_eq((flags .&. 3 : U32), 3))
 
 # LAW: no type Bendoom spawns is both solid and special, info.c's flags
 # 2 and 1, so no pickup takes a solid thing away: only a grant removes a
 # thing, and only a special thing is offered one (sanity).
 law solid_stays:
-  {Closed.lasting(H.Thing.defs()) == True{} : Bool}
+  {List.all(~&2, ~H.Thing.Def, ~Closed.lasting, H.Thing.defs()) == True{} : Bool}
 
 # Solid things
 # ------------
@@ -1436,6 +1431,68 @@ law silhouettes:
     R.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 524288, 160}, 3211264))
     == ((3, 2147483647, 2147483648), (3, 524288, 2147483648), (0, 0, 0), (3, 2147483647, 2147483648))
     : (U32 & U32 & U32) & (U32 & U32 & U32) & (U32 & U32 & U32) & (U32 & U32 & U32)}
+
+# A sprite's view from the origin facing east along the x axis, the
+# eye 41 up, with the sine and cosine of the angle exactly 0 and 1; the
+# graphics hold two state rows' sprites, 64 wide with its origin 32 in
+# and 56 down, full-bright: row 0's patch at 1000, row 1's at 2000 and
+# mirrored, the same seen from every side.
+def Sprite.view() -> P.View:
+  P.View{0, 0, 2686976, 0, 0, 65536, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
+    V.Leaf{0}, V.Leaf{0}, 0}}
+
+def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      patch <> 4194304 <> 2097152 <> 3670016 <> flip <> 1 <> Sprite.slots(m, patch, flip)
+
+def Sprite.gfx() -> G.Gfx:
+  G.Gfx{V.Leaf{0}, V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0,
+    V.Vec.of_list(List.append(&2, U32, Sprite.slots(8n, 1000, 0), Sprite.slots(8n, 2000, 1)), 96),
+    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}}
+
+# Thing id in a state row, 160 ahead of the eye and y to its left.
+def Sprite.at(id: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
+  Z.Sprites.project(Sprite.view(), Closed.doors(), Sprite.gfx(), 1,
+    H.Thing{id, 2014, 10485760, y, 0, 0, 0, 0, 0, state, 4294967295}, [])
+
+# LAW: R_ProjectSprite holds a sprite's columns to the screen. At 160
+# the scale is 1, so a thing ahead spans columns 128 to 191 from its
+# patch's column 0. One 150 to the left starts at column -22 and ends
+# at 41: it is drawn from column 0, starting 22 columns into its patch.
+# A mirrored one 150 to the right spans 278 to 341: it is drawn to 319,
+# from its patch's last column, 64 less 1/65536, stepping back one a
+# column. One 400 to the left ends at -209 and is not drawn. The
+# mirrored sprite's column at 319, unclipped, steps down its patch by
+# the scale's reciprocal without the step's sign, as R_DrawVisSprite's
+# dc_iscale takes the absolute value, clipped by the screen's edges;
+# its top is at 69, the centre 84 less the 15 its top stands over the
+# eye (sanity).
+law sprite_columns:
+  {(Sprite.at(1, 0, 0), Sprite.at(2, 9830400, 0), Sprite.at(3, 4285136896, 1), Sprite.at(4, 26214400, 0),
+    Z.Sprites.col.of(319, Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760,
+      2000, 65792, 1, 3}, Z.Sprites.unclipped(), Z.Sprites.unclipped()))
+    == ([Z.Vis{128, 191, 65536, 10485760, 0, 0, 3670016, 983040, 0, 65536, 1000, 65792, 1, 1}],
+      [Z.Vis{0, 41, 65536, 10485760, 9830400, 0, 3670016, 983040, 1441792, 65536, 1000, 65792, 1, 2}],
+      [Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760, 2000, 65792, 1, 3}],
+      [], Q.Col{319, 4521984, 65536, 983040, 65536, 65792, 4294967295, 168})
+    : List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis>
+      & Q.Masked.Col}
+
+# A sprite of a scale, its sector's rank in the walk and its thing's id.
+def Sprite.vis(scale: U32, rank: U32, id: U32) -> Z.Sprites.Vis:
+  Z.Vis{0, 0, scale, 0, 0, 0, 0, 0, 0, 0, 0, 0, rank, id}
+
+# LAW: R_SortVisSprites draws the smallest scale first, and of equal
+# scales the vissprite made first: sectors in the order the walk reached
+# them, and in a sector its thing list's order, newest first (sanity).
+law sprite_order:
+  {List.sort(~Z.Sprites.Vis, ~Z.Sprites.before, [Sprite.vis(131072, 1, 5), Sprite.vis(65536, 2, 3),
+    Sprite.vis(65536, 1, 4), Sprite.vis(65536, 1, 9)])
+    == [Sprite.vis(65536, 1, 9), Sprite.vis(65536, 1, 4), Sprite.vis(65536, 2, 3), Sprite.vis(131072, 1, 5)]
+    : List<&2, Z.Sprites.Vis>}
 
 # LAW: a plane's arithmetic, looking east from the origin. The sky turns
 # a column every 2^22 of angle: column 0's view angle is column 128 of

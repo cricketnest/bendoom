@@ -39,8 +39,8 @@
 # heal 60 to 70 and 85; the berserk pack counts, heals 60 to 100, and
 # its strength counts up from 1 on the tic after, 11 ten tics on; the
 # armour bonus makes 1 point of type 1 and counts; green armour makes
-# 100 of type 1 and stays for 100. The ammo and chainsaw contact tics,
-# where the reach of 36 is first met, are regression pins.
+# 100 of type 1 and stays for 100. Every contact tic, where the reach of
+# 36 is first met, is a regression pin.
 # Then the movers and the lights, as runs of one command in a demo's
 # units from a place, each line with the clock, the thinkers running
 # and chosen sectors' floors and ceilings: the first door used, turned
@@ -241,28 +241,20 @@ def lights(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
         IO.print("lights tic " ++ U32.show(S.State.clock(s)) ++ lit([32, 33, 48, 90], S.State.level(s)))
         lights(rest, S.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
 
-def phased(hit: Bool, t: H.Thing, rest: String) -> String:
-  match hit:
-    case False{}:
-      rest
-    case True{}:
-      H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = t
+# The state row and tics of a thing, none for one gone.
+def phase(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
       " " ++ U32.show(id) ++ ":" ++ U32.show(state) ++ "/" ++ U32.show(tics)
 
-# The state row and tics of the thing named id.
-def phase(things: List<&2, H.Thing>, +id: U32) -> String:
-  match things:
-    case []:
-      ""
-    case H.Thing{+i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      phased(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}, phase(rest, id))
-
-def phases(ids: List<&2, U32>, +things: List<&2, H.Thing>) -> String:
+def phases(ids: List<&2, U32>, +things: H.Things) -> String:
   match ids:
     case []:
       ""
-    case id <> rest:
-      phase(things, id) ++ phases(rest, things)
+    case +id <> rest:
+      phase(H.Things.get(things, id)) ++ phases(rest, things)
 
 # Seven things' states after each run of idle tics.
 def states(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
@@ -272,7 +264,7 @@ def states(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
     case n <> rest:
       do IO<Unit>:
         IO.print("states tic " ++ U32.show(S.State.clock(s)) ++ phases([2, 6, 87, 24, 121, 144, 172],
-          H.Things.list(S.State.things(s))))
+          S.State.things(s)))
         states(rest, S.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
 
 # A use while the door closes sends it back up; one while it waits
@@ -322,30 +314,22 @@ def used(+before: S.State) -> IO(Unit):
     h2 : S.State <- run("use", 200n, use(), [10], h1)
     IO.print("-")
 
-def bounds(hit: Bool, t: H.Thing, rest: String) -> String:
-  match hit:
-    case False{}:
-      rest
-    case True{}:
-      H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = t
+# A thing's type, height, floor and ceiling, state and tics, none for
+# one gone.
+def bounded(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
       " thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " z " ++ F.Fixed.show(z) ++ " floor "
         ++ F.Fixed.show(floorz) ++ " ceiling " ++ F.Fixed.show(ceilz) ++ " state " ++ U32.show(state) ++ " tics "
-        ++ U32.show(tics) ++ rest
-
-# The thing named id: its type, height, floor and ceiling, state and
-# tics.
-def bounded(things: List<&2, H.Thing>, +id: U32) -> String:
-  match things:
-    case []:
-      ""
-    case H.Thing{+i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      bounds(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}, bounded(rest, id))
+        ++ U32.show(tics)
 
 # A run, then some sectors' floors and ceilings and the thing named id.
 def carry(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, +id: U32, s: S.State) -> IO(S.State):
   +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   do IO<S.State>:
-    IO.print(watch(tag, sectors, q) ++ bounded(H.Things.list(S.State.things(q)), id))
+    IO.print(watch(tag, sectors, q) ++ bounded(H.Things.get(S.State.things(q), id)))
     return q
 
 def patch.word(a: Array<U32>, +at: U32, +w: U32) -> Array<U32>:
@@ -497,23 +481,15 @@ def described(d: Maybe<&2, H.Thing.Def>) -> String:
     case Some{H.Def{kind, state, radius, height, flags}}:
       " radius " ++ U32.show(radius) ++ " height " ++ U32.show(height) ++ " flags " ++ U32.show(flags)
 
-def shown(hit: Bool, t: H.Thing, rest: String) -> String:
-  match hit:
-    case False{}:
-      rest
-    case True{}:
-      H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = t
-      "thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
-        ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle) ++ " sector " ++ U32.show(sector) ++ " state " ++ U32.show(state) ++ " tics "
-        ++ U32.show(tics) ++ described(H.Thing.def(kind))
-
-# The line of the thing named id, empty when none has that name.
-def thing(things: List<&2, H.Thing>, +id: U32) -> String:
-  match things:
-    case []:
+# A thing's line, empty for one gone.
+def thing(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
       ""
-    case H.Thing{+i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      shown(U32.is_eq(i, id), H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}, thing(rest, id))
+    case Some{H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      "thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
+        ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle) ++ " sector " ++ U32.show(sector)
+        ++ " state " ++ U32.show(state) ++ " tics " ++ U32.show(tics) ++ described(H.Thing.def(kind))
 
 def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
   match chosen:
@@ -521,7 +497,7 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
       IO.pure(Unit, Unit{})
     case id <> rest:
       do IO<Unit>:
-        IO.print(thing(H.Things.list(S.State.things(s)), id))
+        IO.print(thing(H.Things.get(S.State.things(s), id)))
         things(rest, s)
 
 # What the blockmap links hold: how many links, how many of solid
@@ -626,8 +602,8 @@ def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S
   +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   do IO<S.State>:
     IO.print(line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
-    IO.print("  " ++ I.Inventory.tally(S.Player.inv(S.State.player(q)), H.Things.list(S.State.things(first)),
-      S.State.things(q)))
+    IO.print("  " ++ I.Inventory.show(S.Player.inv(S.State.player(q)))
+      ++ H.Things.tally(H.Things.list(S.State.things(first)), S.State.things(q)))
     return q
 
 # An inventory with other health, armour points and type, and ammo in

@@ -44,13 +44,14 @@
 # off vanilla's in any frame but the exit, which is not compared:
 # vanilla never stands in it (milestone 4's ticket 09 compares it
 # another way), and the two refused frames, whose full inventory
-# vanilla's demo cannot reach. The pickup frames show their pickup: the
-# key is 44 compared pixels of the first key frame and would be 347 of
-# the second, a bonus never taken would be 1465 of the second bonus
-# frame, the green armour is 745 of its first frame and would be 419 of
-# its second, and a stimpack and a medikit taken at 100 health 2744 of
-# theirs; a refused frame differs from its taken twin only in the
-# pickup's sprite, 762 pixels of the rocket and 5092 of the chainsaw.
+# vanilla's demo cannot reach; those three hashes are regression pins.
+# The pickup frames show their pickup: the key is 44 compared pixels of
+# the first key frame and would be 347 of the second, a bonus never
+# taken would be 1465 of the second bonus frame, the green armour is 745
+# of its first frame and would be 419 of its second, and a stimpack and
+# a medikit taken at 100 health 2744 of theirs; a refused frame differs
+# from its taken twin only in the pickup's sprite, 762 pixels of the
+# rocket and 5092 of the chainsaw.
 # Each frame is drawn twice, over a view blanked to 0 and to 255: equal
 # hashes mean every pixel of the view was written. Pinned to Freedoom.
 import Base

@@ -99,6 +99,12 @@ def Laws.wall_column():
 def Laws.silhouettes():
   {==}
 
+def Laws.sprite_columns():
+  {==}
+
+def Laws.sprite_order():
+  {==}
+
 def Laws.plane_span():
   {==}
 

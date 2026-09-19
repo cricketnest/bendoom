@@ -2,7 +2,6 @@
 # P_TouchSpecialThing's grants for the types Bendoom takes.
 import Base
 import ./vec.bend as V
-import ./things.bend as H
 
 # Health; armour points and type (0 none, 1 green, 2 blue); the cards,
 # a bit each in card_t order (blue, yellow and red card, then blue,
@@ -28,12 +27,6 @@ def Inventory.show(inv: Inventory) -> String:
     ++ " cards " ++ U32.show(cards) ++ " ammo" ++ V.Vec.show(ammo, 4n, 0) ++ " caps" ++ V.Vec.show(caps, 4n, 0)
     ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers"
     ++ V.Vec.show(powers, 6n, 0) ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
-
-# The inventory, how many things are left and the names of those gone
-# since a first population, as text.
-def Inventory.tally(inv: Inventory, first: List<&2, H.Thing>, +things: H.Things) -> String:
-  Inventory.show(inv) ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(things))) ++ " taken"
-    ++ H.Things.gone(first, things)
 
 def Inventory.health(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
@@ -184,20 +177,13 @@ def Inventory.weapon(+bit: U32, gave: Bool, inv: Inventory) -> Maybe<&2, Invento
 def Inventory.armed(bit: U32, +t: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
   Inventory.weapon(bit, Inventory.room(t, inv), Inventory.give(t, 2, inv))
 
-def Inventory.doubled(v: V.Vec) -> V.Vec:
-  match v:
-    case V.Leaf{x}:
-      V.Leaf{(x * 2 : U32)}
-    case V.Node{l, r}:
-      V.Node{Inventory.doubled(l), Inventory.doubled(r)}
-
 # The caps once a backpack is taken: the first doubles each.
 def Inventory.bag(had: Bool, caps: V.Vec) -> V.Vec:
   match had:
     case True{}:
       caps
     case False{}:
-      Inventory.doubled(caps)
+      V.Vec.doubled(caps)
 
 # P_TouchSpecialThing's backpack, always taken: the caps as the bag
 # leaves them, then a clip of each ammo type in turn.

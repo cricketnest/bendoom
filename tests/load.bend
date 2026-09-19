@@ -33,7 +33,10 @@
 # PLAY's frame A, whose rotations 2 to 4 are mirrored to 8 to 6 (PLAYA1,
 # PLAYA2A8, PLAYA3A7, PLAYA4A6, PLAYA5 in the WAD); POSS's frame A, eight
 # lumps; SPOS's frame L, one lump for every side; PLAY's frame X, past
-# its last, W; and four namespaces that vanilla refuses, written here.
+# its last, W; and four namespaces that vanilla refuses, written here,
+# each refused in vanilla's I_Error words. PLAY's frame X fails the load,
+# where vanilla's R_ProjectSprite would fail drawing it and name the
+# sprite and frame by number, so its line is a regression pin.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -292,4 +295,4 @@ def main() -> IO(Unit):
 #|R_InitSprites: Sprite TEST frame A has rotations and a rot=0 lump
 #|R_InitSprites: Sprite TEST frame A has multip rot=0 lump
 #|R_InitSprites: Sprite TEST frame A is missing rotations
-#|R_InitSprites: Sprite TEST frame B has no patches
+#|R_InitSprites: No patches found for TEST frame B

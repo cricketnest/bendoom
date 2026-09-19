@@ -413,13 +413,13 @@ def Sim.touch.special(hit: Bool, +id: U32, +kind: U32, counted: Bool, +z: U32,
       (inv, +things) = got
       Sim.touch.alive(H.Things.get(things, id), id, kind, counted, z, inv, things)
 
-# Doom's PIT_CheckThing for the player's box at (x, y) with its feet at
-# z and a thing near it: a special thing the box overlaps is offered to
-# the inventory, and a solid one ends the check.
 def Sim.touch.stop(stop: Bool, got: I.Inventory & H.Things) -> Sim.Touch:
   (inv, things) = got
   Touch{stop, inv, things}
 
+# Doom's PIT_CheckThing for the player's box at (x, y) with its feet at
+# z and a thing near it: a special thing the box overlaps is offered to
+# the inventory, and a solid one ends the check.
 def Sim.touch.def(d: H.Thing.Def, +id: U32, +tx: U32, +ty: U32, +x: U32, +y: U32, +z: U32,
   got: I.Inventory & H.Things) -> Sim.Touch:
   H.Def{+kind, state, +radius, height, +flags} = d

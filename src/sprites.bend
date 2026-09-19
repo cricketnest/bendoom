@@ -92,10 +92,6 @@ def Sprites.gather.if(seen: Bool, +view: P.View, +level: L.Level, +gfx: G.Gfx, r
     case False{}:
       rest
 
-def Sprites.gather.at(+rank: U32, +view: P.View, +level: L.Level, +gfx: G.Gfx, thing: H.Thing,
-  rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
-  Sprites.gather.if(Bool.not(U32.is_zero(rank)), view, level, gfx, rank, thing, rest)
-
 # Doom's R_AddSprites: the things of each sector the walk saw, each
 # once, since each thing is met once.
 def Sprites.gather(things: List<&2, H.Thing>, +ranks: V.Vec, +view: P.View, +level: L.Level, +gfx: G.Gfx) ->
@@ -104,7 +100,8 @@ def Sprites.gather(things: List<&2, H.Thing>, +ranks: V.Vec, +view: P.View, +lev
     case []:
       []
     case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics} <> rest:
-      Sprites.gather.at(V.Vec.get(ranks, sector), view, level, gfx,
+      +rank = V.Vec.get(ranks, sector)
+      Sprites.gather.if(Bool.not(U32.is_zero(rank)), view, level, gfx, rank,
         H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics},
         Sprites.gather(rest, ranks, view, level, gfx))
 
@@ -240,16 +237,23 @@ def Sprites.Col.mem(st: Sprites.Col) -> Array<U32>:
   Col{mem, vis, frac} = st
   mem
 
+# Doom's R_DrawVisSprite's column: its top on the screen, its step down
+# the patch, dc_iscale, the step across without its sign, and the clips,
+# those no range set being the screen's edges.
+def Sprites.col.of(+x: U32, vis: Sprites.Vis, +cc: U32, +fc: U32) -> M.Masked.Col:
+  Vis{x1, x2, +scale, gx, gy, gz, gzt, +mid, f, step, patch, cmap, rank, id} = vis
+  M.Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, F.Fixed.abs(step), cmap,
+    Bool.pick(U32, U32.is_eq(cc, Sprites.unclipped()), 4294967295, cc),
+    Bool.pick(U32, U32.is_eq(fc, Sprites.unclipped()), 168, fc)}
+
 # Doom's R_DrawVisSprite for one column: the posts of the patch's column
-# drawn through the clips, those no range set being the screen's edges.
-def Sprites.col.draw(+x: U32, +vis: Sprites.Vis, frac: U32, +cc: U32, +fc: U32, p: Array<U32> & U32) ->
+# drawn through the clips.
+def Sprites.col.draw(+x: U32, +vis: Sprites.Vis, frac: U32, cc: U32, fc: U32, p: Array<U32> & U32) ->
   Sprites.Col:
-  Vis{x1, x2, +scale, gx, gy, gz, gzt, +mid, f, +step, +patch, cmap, rank, id} = vis
+  Vis{x1, x2, scale, gx, gy, gz, gzt, mid, f, +step, +patch, cmap, rank, id} = vis
   (mem, offset) = p
   Col{G.Gfx.posts(~M.Masked.Col, ~M.Masked.post, 256n, G.Post{False{}, mem, (patch + offset : U32)},
-      M.Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, step, cmap,
-        Bool.pick(U32, U32.is_eq(cc, Sprites.unclipped()), 4294967295, cc),
-        Bool.pick(U32, U32.is_eq(fc, Sprites.unclipped()), 168, fc)}),
+      Sprites.col.of(x, vis, cc, fc)),
     vis, (frac + step : U32)}
 
 def Sprites.col.bottom(+x: U32, +vis: Sprites.Vis, +frac: U32, cc: U32, p: Array<U32> & U32) -> Sprites.Col:

@@ -39,7 +39,8 @@ def Walk.line(+which: List<&2, String>, +first: S.State, +s: S.State) -> String:
     ++ F.Fixed.show(S.Player.z(p)) ++ " floor " ++ F.Fixed.show(S.Player.floorz(p)) ++ " eye "
     ++ F.Fixed.show((S.Player.viewz(p) - S.Player.floorz(p) : U32)) ++ " ended "
     ++ Bool.show(S.State.ended(s)) ++ Walk.sectors(which, S.State.level(s)) ++ "\n  "
-    ++ I.Inventory.tally(S.Player.inv(p), H.Things.list(S.State.things(first)), S.State.things(s))
+    ++ I.Inventory.show(S.Player.inv(p)) ++ H.Things.tally(H.Things.list(S.State.things(first)),
+      S.State.things(s))
 
 def Walk.go(runs: List<&2, List<&2, K.Cmd>>, +which: List<&2, String>, +first: S.State, +s: S.State) -> IO(Unit):
   match runs:

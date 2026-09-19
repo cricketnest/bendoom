@@ -706,12 +706,14 @@ def Gfx.tally.right(t: Gfx.Tally) -> Bool:
   Bool.or(Bool.and(U32.is_eq(zeros, 1), U32.is_zero(rotated)),
     Bool.and(U32.is_zero(zeros), Bool.and(U32.is_eq(rotated, 8), U32.is_eq(rots, 510))))
 
-# Doom's words for what is wrong with a frame.
-def Gfx.tally.fault(t: Gfx.Tally) -> String:
+# Doom's words for what is wrong with a sprite's frame.
+def Gfx.tally.fault(t: Gfx.Tally, +sprite: String, +frame: String) -> String:
   Tally{+zeros, +rotated, rots} = t
-  Bool.pick(String, Bool.and(U32.is_zero(zeros), U32.is_zero(rotated)), "has no patches",
-    Bool.pick(String, U32.is_zero(zeros), "is missing rotations",
-      Bool.pick(String, U32.is_zero(rotated), "has multip rot=0 lump", "has rotations and a rot=0 lump")))
+  +at = "Sprite " ++ sprite ++ " frame " ++ frame
+  "R_InitSprites: " ++ Bool.pick(String, Bool.and(U32.is_zero(zeros), U32.is_zero(rotated)),
+    "No patches found for " ++ sprite ++ " frame " ++ frame, Bool.pick(String, U32.is_zero(zeros),
+      at ++ " is missing rotations", Bool.pick(String, U32.is_zero(rotated), at ++ " has multip rot=0 lump",
+        at ++ " has rotations and a rot=0 lump")))
 
 # The first of n frames from f that vanilla refuses, or none.
 def Gfx.frames.wrong(n: Nat, +f: U32, +installs: List<&2, Gfx.Install>) -> U32:
@@ -748,8 +750,7 @@ def Gfx.sprite.frames(fine: Bool, +wrong: U32, +sprite: String, +frame: U32, +in
     case True{}:
       Done{Gfx.views(8n, 1, installs, frame)}
     case False{}:
-      Fail{(1, "R_InitSprites: Sprite " ++ sprite ++ " frame " ++ Gfx.letter(wrong) ++ " "
-        ++ Gfx.tally.fault(Gfx.tally(installs, wrong, Tally{0, 0, 0})))}
+      Fail{(1, Gfx.tally.fault(Gfx.tally(installs, wrong, Tally{0, 0, 0}), sprite, Gfx.letter(wrong)))}
 
 def Gfx.sprite.wrong(+wrong: U32, +sprite: String, +frame: U32, +installs: List<&2, Gfx.Install>) ->
   Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:

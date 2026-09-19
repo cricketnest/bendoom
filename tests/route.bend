@@ -64,7 +64,8 @@ def line(tag: String, +start: S.State, +s: S.State) -> String:
     ++ F.Fixed.show(S.Player.y(p)) ++ " " ++ A.Angle.show(S.Player.angle(p)) ++ " z "
     ++ F.Fixed.show(S.Player.z(p)) ++ " ended " ++ Bool.show(S.State.ended(s)) ++ " blue doors "
     ++ F.Fixed.show(L.Level.ceil(level, 71)) ++ " " ++ F.Fixed.show(L.Level.ceil(level, 51)) ++ "\n  "
-    ++ I.Inventory.tally(S.Player.inv(p), H.Things.list(S.State.things(start)), S.State.things(s))
+    ++ I.Inventory.show(S.Player.inv(p)) ++ H.Things.tally(H.Things.list(S.State.things(start)),
+      S.State.things(s))
 
 def leg(tag: String, runs: List<&2, List<&2, K.Cmd>>, +start: S.State, s: S.State) -> IO(S.State):
   +q = S.Sim.replay(List.concat(&2, K.Cmd, runs), s)

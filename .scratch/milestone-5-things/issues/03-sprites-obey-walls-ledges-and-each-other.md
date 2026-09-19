@@ -47,7 +47,7 @@ Trade-offs, and what later tickets inherit:
 - **Newest id first stands for a sector's thing list.** It holds while things never move between sectors, which is true in milestone 5 (removal keeps the others' order). Milestone 6's moving monsters relink, and the order then needs the list's own history.
 - **Masked middle textures still draw after every sprite**, ticket 04's to replace. The yard at -640 256 0 shows it: the grate beyond the trees draws over them, 628 pixels off vanilla's, so it is not a case here.
 - The definitions are built and checked for the sprites of spawned rows only. Vanilla checks every sprite in its table, but Bendoom has no table of the sprites it never spawns. Ticket 05's next states extend the same rows.
-- Wording: a duplicated rotation reports "is missing rotations" where vanilla says "has two lumps mapped to it", and a rotation past 8 does the same where vanilla reports bad frame characters. Both still fail the load.
+- Wording: a duplicated rotation reports "is missing rotations" where vanilla says "has two lumps mapped to it", and a rotation past 8 does the same where vanilla reports bad frame characters. Both still fail the load. Where vanilla names a lump or a sprite by number, Bendoom names the sprite: bad frame characters, and a row's frame past its sprite's last, which vanilla meets only in R_ProjectSprite. Ticket 12 gave "no patches" vanilla's words.
 
 The oracle, Freedoom, 20 idle tics unless a script is given:
 
