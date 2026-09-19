@@ -63,7 +63,7 @@ Sim.path(~A: Data, ~visit: @+level: L.Level -> @m: Sim.Meet -> @c: A -> Sim.Answ
 
 ### The merge
 
-`milestone-6-7` at 4428326 (the tic command carrying fire and the weapon change) merged in with no conflict: it touched `K.Cmd` and the test scripts, and the six lines it changed in `src/sim.bend` are in the tic, not the traversal. `nix flake check` passed before the merge and again after it, and the five oracle cases were rerun on the merged tree.
+`milestone-6-7` merged in twice with no conflict, since it moved on while this ticket ran: first at 4428326, the tic command carrying fire and the weapon change, which touched `K.Cmd`, the test scripts and six lines of `src/sim.bend`, all in the tic and none in the traversal; then at 66dc9f5, the sounds node, which touched the flake and added `sounds.bend`. `nix flake check` passed before the first merge, after it and after the second (where the proof derivation was already built from the same inputs and only the tests ran). The five oracle cases were rerun on the tree after the first merge.
 
 ### Surprises
 
