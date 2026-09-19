@@ -4,7 +4,7 @@
 
 **Blocked by:** milestone 7's 01 (The sim reports its sounds)
 
-**Status:** resolved
+**Status:** ready-for-human
 
 - [x] `P_DamageMobj`'s player branch: armour absorption, the damage count, the attacker, thrust when there is an inflictor, and health as a signed quantity
 - [x] `P_PlayerInSpecialSector` for special 7, only while the player stands on the floor
@@ -12,7 +12,7 @@
 - [x] Pickups refuse a dead toucher
 - [x] The pain and death sounds start where vanilla's do
 - [x] Sim cases: nukage tics, green and blue armour absorbing, death in the nukage and the restart, with values worked from the source
-- [x] Closed laws pin absorption at both armour types; replay composition still holds
+- [ ] Closed laws pin absorption at both armour types; replay composition still holds (written and filled, but `bend PROOF.bend` never got the machine's heavy lock, so no run says so)
 - [x] A render case shows the dead view at zero differing pixels
 
 ## Comments
@@ -72,6 +72,8 @@ The render test's new case is the last of these, and it was run again, with the 
 - The reborn is a flag on the state, read by whoever runs the tics, which is where vanilla reads `PST_REBORN`: `G_Ticker` answers it outside `P_Ticker`. The game loop reads it once a frame, so a reborn asked in the middle of a batch of tics is answered at the next frame, up to eight tics late. At 35 frames a second there is one tic a frame.
 - The press after the exit stays in the loop and the reborn comes from the sim, both reaching the one `Game.from`. Folding the exit's press into the sim would make the ended state watch the use button, which would cost the law that an ended tic changes nothing, and would drop Enter, which the game test pins. The intermission ticket owns that path and will delete the exit's branch.
 - The player's mobj state rows are appended, 62 to 70, and are marked in no sprite load, since the view never shows the player's own sprite. That keeps PLAY frames G to M out of the graphics.
+
+**What is left.** `bend PROOF.bend` and `nix flake check`. Both were queued on the machine's heavy lock behind other agents' flake checks for the whole session and never ran to the end; the one proof run that did finish is what found the `State` patterns and the freedom law's proof, both since written. Everything else was run: the sim, game and render tests natively on the merged tree, the load and route tests before the merge, and the three oracle cases, one of them again after the merge. The JS lane runs only inside the flake check, so it is unrun too. Whoever picks this up runs the two and ticks the law box.
 
 **Surprises.**
 
