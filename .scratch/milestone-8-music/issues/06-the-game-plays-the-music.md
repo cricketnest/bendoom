@@ -37,7 +37,7 @@ Left for the maintainer: both packages played and heard through at least one rep
 
 Commands:
 
-    git worktree add ../bendoom-m8-06 -b m8-06-game-music cfec5e1
+    git worktree add ../bendoom-m8-06 -b m8-06-game-music 8a25616
     nix build .#music
     nix develop -c bend tests/stream.bend -o stream; BENDOOM_MUSIC=... ./stream --threads 1
     nix develop -c bend PROOF.bend

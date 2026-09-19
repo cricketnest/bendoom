@@ -16,7 +16,7 @@
 
 ## Comments
 
-Both maps are finished by a script, with no key. The maintainer played both to the exit in the window on 2026-09-19, on milestone 5's build with their things present, and the flake check is green on both lanes at the merge that followed (`499d961`).
+Both maps are finished by a script, with no key. The maintainer played both to the exit in the window on 2026-09-19, on milestone 5's build with their things present, and the flake check is green on both lanes at the merge that followed (`353fd64`).
 
 **Freedoom.** From the player 1 start (`-416 256 0`), 585 tics, time 0:16:
 

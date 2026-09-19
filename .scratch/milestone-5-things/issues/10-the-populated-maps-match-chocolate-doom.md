@@ -19,7 +19,7 @@
 
 ## Comments
 
-Built on the merge of ticket 09 into m5-pickups (4b664fb), where every case tickets 01 to 09 reported runs at 0; its message has the merge's reruns.
+Built on the merge of ticket 09 into m5-pickups (de65316), where every case tickets 01 to 09 reported runs at 0; its message has the merge's reruns.
 
 **The oracle, verified rather than rebuilt.** Ticket 02 made `tools/oracle.nu` keep every THINGS record and write player 1's start over its own record, on every skill. Read on this branch: the demo header is `6d 02 01 01 00 00 00 01 00 01 00 00 00`, version 109, skill 2 (Hurt Me Plenty), E1M1, no deathmatch, respawn or fast, no monsters (the byte `-nomonsters` sets), console player 0, player 1 alone. The comparison covers the 168 view rows and leaves out only the pause graphic and the pistol, widened by the bob's reach when the script moves; no mask covers a world sprite, and none was added.
 

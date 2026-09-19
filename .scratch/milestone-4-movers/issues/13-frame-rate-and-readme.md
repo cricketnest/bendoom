@@ -33,7 +33,7 @@ The door runs are the bench with `SCRIPT` set to the route's first 160 tics and 
 
 The spec's status says done since the maintainer played both maps to the exit in the window on 2026-09-19 (ticket 12).
 
-**The code review** (`/code-review` since `cecf33f`, a standards and a spec reviewer in parallel). The spec reviewer found the sim vanilla's in tic order, `T_MovePlane`, the door, lift and floor timings, the crush paths, use, the triggers, the lights, the animation phase and the exit clock. Fixed from the two reports:
+**The code review** (`/code-review` since `f4bc999`, a standards and a spec reviewer in parallel). The spec reviewer found the sim vanilla's in tic order, `T_MovePlane`, the door, lift and floor timings, the crush paths, use, the triggers, the lights, the animation phase and the exit clock. Fixed from the two reports:
 
 - Special 48 scrolled both sides of its line; vanilla's `P_UpdateSpecials` moves `sidenum[0]` alone. The shareware map's eight are two-sided. `Level.seg.scroll` now asks the seg's side; the pedestal still reports 0 at 21 and 27 tics.
 - The spec's closed law on special 23's destination was missing; `floor_lowered` pins it on the switched literal level (`Closed.switched(special)`, which the lift law now shares): -1 after tic 1, -32 after tic 32, both thinkers gone on tic 33, the door sector landing at once, the special gone.

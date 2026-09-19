@@ -18,7 +18,7 @@
 
 19 Sep 2026. An x86_64 benchmark host on AC power, `balanced` profile, `powersave` governor with `balance_performance`, Linux, PipeWire 1.6.8.
 
-**The merge.** Milestone 5 came in from main and not from m5-12-close at 6592545. Since the handoff, main has taken m5-12-close through e50c390, where the maintainer played both maps and milestone 5 was marked done, and then the recorder with a fix to the route test. This branch already had the recorder, so merging main brings in milestone 5 plus the merge of the two. The merge is a4e8939, committed alone. Its conflicts:
+**The merge.** Milestone 5 came in from main and not from m5-12-close at f31ecf6. Since the handoff, main has taken m5-12-close through 9c30c99, where the maintainer played both maps and milestone 5 was marked done, and then the recorder with a fix to the route test. This branch already had the recorder, so merging main brings in milestone 5 plus the merge of the two. The merge is e3b2700, committed alone. Its conflicts:
 
 - `src/level.bend`: milestone 8 moved lump lookup to `Wad.find`, and milestone 5 added THINGS' fifth field (the options) through the old `Level.lump`. `Level.plan` now reads THINGS' five fields through `Wad.find`, and `Level.lump` stays deleted. The sim test's patched map, new in milestone 5, called `Level.lump` too and now calls `W.Wad.find`.
 - `docs/bend.md`: milestone 8's rules on `do` blocks and `List.length` and its 4096n literal limit sit beside milestone 5's rules on pairs in cases, Data-only lists and `type` as a keyword. Both sides had described the same `[]` constraint in different words, and they are now one rule.
@@ -102,7 +102,7 @@ A scan of every def in the milestone's files, and in LAWS.bend, counted the call
 
 Commands:
 
-    git worktree add ../bendoom-m8-08 -b m8-08-close f4c9d76; git merge main
+    git worktree add ../bendoom-m8-08 -b m8-08-close ca9ab5a; git merge main
     nix develop -c bend PROOF.bend; nix build .#music; sha256sum first.raw second.raw; nix flake check
     pactl load-module module-null-sink sink_name=bendoom_null rate=44100 channels=2 format=float32le
     Xvfb :97 -screen 0 1600x1200x24

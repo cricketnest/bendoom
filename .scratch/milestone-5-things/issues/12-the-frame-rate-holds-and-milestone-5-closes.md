@@ -24,13 +24,13 @@
 
 For all 600 frames the view shows 52 sprites, the key among them running its two states. The door waits, comes down on the player, goes back up, and waits again, about every 160 tics, and the map's blinking lights run in the sim throughout.
 
-**The measurement.** `bench/window.bend` on Xvfb, the game's own loop, 600 frames, one thread as the package runs it, three runs each. x86_64 benchmark host, on mains, `balanced` profile, `powersave` governor with `balance_performance`. The load average stood at 1.0 before and after, from processes outside the bench. The start and the door are milestone 4's scenes and scripts. Milestone 4's binary was built from 6316f1c and run in the same session.
+**The measurement.** `bench/window.bend` on Xvfb, the game's own loop, 600 frames, one thread as the package runs it, three runs each. x86_64 benchmark host, on mains, `balanced` profile, `powersave` governor with `balance_performance`. The load average stood at 1.0 before and after, from processes outside the bench. The start and the door are milestone 4's scenes and scripts. Milestone 4's binary was built from f639a48 and run in the same session.
 
 | build | at rest (the start) | the first door | the key room | circling (`WALK=1`) |
 | --- | --- | --- | --- | --- |
 | milestone 4, its ticket 13 | 41, 38, 40 | 47, 48, 48 | | 46, 46, 46 |
 | milestone 4, this session | 41, 41, 41 | 50, 49, 49 | | |
-| tickets 01 to 11 (26c16b5) | 39, 39, 38 | 48, 48, 48 | 31, 31, 31 | 47, 47, 47 |
+| tickets 01 to 11 (bfaaf35) | 39, 39, 38 | 48, 48, 48 | 31, 31, 31 | 47, 47, 47 |
 | the seg side asked lazily | | | 32, 33, 32 | |
 | ticket 12 | 59, 59, 59 | 59, 59, 59 | 55, 55, 56 | 59, 59, 59 |
 
@@ -46,7 +46,7 @@ The structures were measured before anything was added, and nothing was added: n
 
 **The sim's time.** The throwaway probes read the whole state after their runs (every thing's fields, every sector's heights and light, the inventory), since the runtime computes a record's field only when something reads it, and a probe reading the clock alone would miss most of the tic. Native, the same session:
 
-| | milestone 4 | 26c16b5 | ticket 12 |
+| | milestone 4 | bfaaf35 | ticket 12 |
 | --- | --- | --- | --- |
 | a level start | 10.3 ms | 16.5 ms | 13.4 ms |
 | an idle tic | 0.012 ms | 0.070 ms | 0.042 ms |
@@ -54,10 +54,10 @@ The structures were measured before anything was added, and nothing was added: n
 
 - **`Things.tics`** flattened the population tree into a list every tic, stepped each thing, and built a new tree. `Thing.tic` reads nothing but its own thing, so `Thing.Tree.tics` maps the tree in place. `Thing.tics` over lists and the rebuild are gone.
 - **`Random.at`** built a 256-entry tree from the random table on every call. perf gave it 14% of a level start: the spawn draws for 73 things. It now reads the list.
-- **Ticket 09's 50 to 88 ms and 0.22 to 0.39 ms.** Under the same probe, ticket 06's build (90ec563) and ticket 09's (ae01902) start a level in about the same time. Ticket 09's own numbers came from a measure it did not record, so they cannot be compared with these. perf on this build puts 66% of a level start in `Sim.around.go`: each of the nine lights scans all 1175 lines for its neighbours, milestone 4's code. A route tic goes 36% to the line checks, 30% to reference counts, 8% to the things' tic and 8% to the crossings. `Thing.def`'s full scan of the 40 definitions is 0.2%. Nothing past the two fixes above has evidence behind it that a frame would notice. The game runs about one tic a frame.
+- **Ticket 09's 50 to 88 ms and 0.22 to 0.39 ms.** Under the same probe, ticket 06's build (5a1364c) and ticket 09's (7226fec) start a level in about the same time. Ticket 09's own numbers came from a measure it did not record, so they cannot be compared with these. perf on this build puts 66% of a level start in `Sim.around.go`: each of the nine lights scans all 1175 lines for its neighbours, milestone 4's code. A route tic goes 36% to the line checks, 30% to reference counts, 8% to the things' tic and 8% to the crossings. `Thing.def`'s full scan of the 40 definitions is 0.2%. Nothing past the two fixes above has evidence behind it that a frame would notice. The game runs about one tic a frame.
 - **Picks.** Every `Bool.pick`, `Bool.and` and `Bool.or` the milestone added was read. The seg-side test above was the only one over a costly value on a path the frame or tic takes. The load-time ones, over a thing's spawn draw and a sprite's views, cost part of the 13.4 ms start.
 
-**The review.** Two agents reviewed `git diff 6316f1c` apart, one against AGENTS.md and docs/bend.md, one against the spec and tickets 01 to 12 with Chocolate Doom's source.
+**The review.** Two agents reviewed `git diff f639a48` apart, one against AGENTS.md and docs/bend.md, one against the spec and tickets 01 to 12 with Chocolate Doom's source.
 
 Fixed from the spec review:
 
