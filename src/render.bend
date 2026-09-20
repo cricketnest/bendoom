@@ -21,7 +21,8 @@ import ./bar.bend as Y
 import ./message.bend as Msg
 
 def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
-  P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p))
+  P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p),
+    S.Player.extralight(p))
 
 # After the walk, the planes, then the sprites of the things in the
 # sectors it saw and the masked middle textures, in depth order.
@@ -30,9 +31,11 @@ def Render.rest(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.
   D.Draw{mem, solid, walls, tasks, planes, seen} = st
   T.Sprites.masked(things, seen, view, level, gfx, walls, N.Planes.draw(view, gfx, mem, planes))
 
-# Doom's R_DrawPlayerSprites' light number: the player's sector's light.
-def Render.light(+level: L.Level, +p: S.Player) -> U32:
-  (L.Level.sector.light(level, L.Level.sector_at(level, S.Player.x(p), S.Player.y(p))) >> 4n : U32)
+# Doom's R_DrawPlayerSprites' light number: the player's sector's light
+# with the muzzle flash's extra light.
+def Render.light(+level: L.Level, +p: S.Player, +extralight: U32) -> U32:
+  P.Project.lightnum(L.Level.sector.light(level, L.Level.sector_at(level, S.Player.x(p), S.Player.y(p))),
+    extralight)
 
 def Render.psprite(psp: S.Psprite, gfx: G.Gfx, lightnum: U32, mem: Array<U32>) -> Array<U32>:
   match psp:
@@ -49,7 +52,7 @@ def Render.psprites(ps: S.Psprites, +gfx: G.Gfx, +lightnum: U32, mem: Array<U32>
 
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, +p: S.Player,
   mem: Array<U32>) -> Array<U32>:
-  Render.psprites(S.Player.psprites(p), gfx, Render.light(level, p),
+  Render.psprites(S.Player.psprites(p), gfx, Render.light(level, p, P.View.extralight(view)),
     Render.rest(view, level, gfx, things, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem))))
 
 # The heads-up line
@@ -115,7 +118,8 @@ def Render.hud(on: Bool, +gfx: G.Gfx, shown: U32, tics: U32, mem: Array<U32>) ->
 def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, messages: Bool, mem: Array<U32>) ->
   Array<U32>:
   Render.hud(messages, gfx, S.State.message(s), S.State.msgtics(s),
-    Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)), gfx,
+    Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)),
+      S.Sim.Face.index(S.State.face(s)), gfx,
       Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
         G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.shown(S.State.things(s)),
         S.State.player(s), mem)))

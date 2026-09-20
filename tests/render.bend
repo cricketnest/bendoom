@@ -1,10 +1,13 @@
 # Frames of E1M1 from the WAD named by BENDOOM_IWAD, rendered through
 # the function the game draws with: for each, a 32-bit FNV-1a hash of the
 # whole 320 by 200 frame, the view over the status bar, and the indices
-# at five pixels (the view's centre, near its top left, near its bottom
-# right, high on its centre column, and column 1 row 2 of the arms
+# at six pixels (the view's centre, near its top left, near its bottom
+# right, high on its centre column, column 1 row 2 of the arms
 # panel's second number, which is grey 96 while the shotgun is not owned
-# and yellow 160 in the two frames with a full inventory). The start,
+# and yellow 160 in the two frames with a full inventory, and row 180
+# column 155 of the marine's face, which the WAD read in nushell says is
+# 72 in STFST00, 64 in STFST01, 59 in STFST02, 79 in STFEVL0 and 8 in
+# STFDEAD0, so the pixel names the face every frame shows). The start,
 # then hand-chosen places with the eye at rest on the floor and the
 # angle a multiple of 45 degrees, each after
 # the oracle's 20 idle tics: a bright metal wall, the dim bench room
@@ -61,12 +64,19 @@
 # on that tic.
 # Every frame carries the status bar the inventory of its state fills,
 # so the bar at the start, after the rocket is taken, after the green
-# armour and after the blue key are the frames named for those pickups.
+# armour and after the blue key are the frames named for those pickups,
+# and the face ST_updateFaceWidget chose on that tic. The oracle masks
+# the face's box, since vanilla's face keeps changing under the pause,
+# but the dead one holds: its frame's face pixels are STFDEAD0's, all
+# 591 of them, and the rested start's are STFST00's, all 578, each read
+# from the WAD with tools/oracle.nu's patch-pixels.
 # tools/oracle.nu finds no pixel off vanilla's in the frames it can
 # compare, over all 200 rows. It cannot compare a frame whose script
-# lets a monster see the player, since vanilla's wakes and Bendoom's
-# cannot yet (milestone 6's ticket 15 gives them A_Look): the two run
-# east past the pit, the two of the blue key in its dim and bright
+# lets a monster see the player: both games now wake it on the same
+# tic, but vanilla's A_Chase runs the moment it does, turning the
+# monster, stepping it and drawing a random number, and Bendoom's chase
+# waits for milestone 6's ticket 16. So the two runs east past the pit,
+# the blinking wall, the two of the blue key in its dim and bright
 # states, the two of the key strafed past, the two of the green armour
 # and the chainsaw taken, and the dead view in the nukage, which stands
 # 650 tics in the yard's sight, are regression pins until then, and so
@@ -125,7 +135,8 @@ def line(+over0: U32, st: Hash) -> Array<U32> & String:
   Hash{mem, +h} = st
   pixels(U32.is_eq(h, over0), h, B.Bytes.each(~U32, ~B.Bytes.at, [(G.Gfx.frame() + 84 * 320 + 160 : U32),
     (G.Gfx.frame() + 10 * 320 + 10 : U32), (G.Gfx.frame() + 150 * 320 + 300 : U32),
-    (G.Gfx.frame() + 20 * 320 + 160 : U32), (G.Gfx.frame() + 174 * 320 + 124 : U32)], mem))
+    (G.Gfx.frame() + 20 * 320 + 160 : U32), (G.Gfx.frame() + 174 * 320 + 124 : U32),
+    (G.Gfx.frame() + 180 * 320 + 155 : U32)], mem))
 
 def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
   (mem, text) = p
@@ -225,6 +236,12 @@ def walk(n: Nat) -> List<&2, K.Cmd>:
 def back(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, 0))
 
+# Ctrl held for one tic, then the four tics S_PISTOL1 lasts: the frame
+# is the one A_FirePistol made, with the muzzle flash showing and its
+# extra light on every wall, plane and sprite.
+def fired(n: Nat) -> List<&2, K.Cmd>:
+  List.append(&2, K.Cmd, [K.Cmd.demo(0, 0, 0, 1)], idle(n))
+
 # A pickup strafed past: the idle tics, a turn, then strafing left.
 def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
   after([idle(20n), [K.Cmd.demo(0, 0, turn, 0)], strafe(n)], s)
@@ -313,8 +330,14 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       w2)
     d1 : Array<U32> <- frame("dead 1600 1000 90", tables, gfx, after([idle(650n)],
       at(level, east(1600), east(1000), 90)), w3)
+    w4 : Array<U32> <- frame("pistol firing 25", tables, gfx, after([idle(20n), fired(4n)], S.State.start(level)),
+      d1)
+    w5 : Array<U32> <- frame("pistol flash over 32", tables, gfx, after([idle(20n), fired(11n)],
+      S.State.start(level)), w4)
+    w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
+      at(level, east(704), east(256), 0)), w5)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
-      at(level, east(1631), east(1008), 90)), d1)
+      at(level, east(1631), east(1008), 90)), w6)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
       at(level, east(2246), east(592), 180)), n1)
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
@@ -331,51 +354,54 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start hash 2700636673 pixels 1 1 7 5 96 covered True
-#|lit 736 464 135 hash 2106469313 pixels 106 8 95 105 96 covered True
-#|dark -416 256 90 hash 310200639 pixels 110 107 0 238 96 covered True
-#|step 137 256 45 hash 2860679752 pixels 8 0 79 6 96 covered True
-#|grate -416 256 180 hash 1328291109 pixels 3 111 106 93 96 covered True
-#|water 3 256 0 hash 1619173338 pixels 2 6 77 6 96 covered True
-#|sky -640 256 90 hash 463986778 pixels 239 14 239 105 96 covered True
-#|pit 488 320 0 hash 1703692995 pixels 79 110 150 6 96 covered True
-#|sergeant 1144 259 315 hash 495192816 pixels 111 108 0 1 96 covered True
-#|once 256 1088 0 hash 116995530 pixels 110 79 105 7 96 covered True
-#|overlap 2752 960 0 hash 549813406 pixels 79 125 10 78 96 covered True
-#|walls 704 256 0 hash 1853415832 pixels 7 111 15 2 96 covered True
-#|ledge 256 128 90 hash 2908682710 pixels 7 5 15 110 96 covered True
-#|yard -640 256 0 hash 2573863974 pixels 1 100 78 8 96 covered True
-#|bars 1024 200 0 hash 549757620 pixels 109 79 5 5 96 covered True
-#|demon head on 48 1616 180 hash 3726312146 pixels 2 7 111 243 96 covered True
-#|shotgun guy from behind 896 2048 270 hash 3424096709 pixels 5 109 0 5 96 covered True
-#|shotgun guy from the side 987 1947 225 hash 1917549567 pixels 5 6 109 108 96 covered True
-#|demon mirrored 2448 2112 0 hash 2010430582 pixels 39 2 6 79 96 covered True
-#|stride U!:34 hash 3490826559 pixels 2 5 164 6 96 covered True
-#|air U!:56 hash 1931567747 pixels 5 110 15 6 96 covered True
-#|landed U!:66 hash 1981140472 pixels 6 110 14 79 96 covered True
-#|door half open hash 1804438924 pixels 7 14 110 79 96 covered True
-#|switch pressed hash 724704945 pixels 3 110 107 7 96 covered True
-#|exit pressed hash 982269427 pixels 102 95 102 3 96 covered True
-#|blink dark hash 2296296530 pixels 94 73 73 101 96 covered True
-#|key 2380 600 180 22 hash 2965057132 pixels 5 1 6 110 96 covered True
-#|key bright 23 hash 2965057132 pixels 5 1 6 110 96 covered True
-#|key before hash 3669536580 pixels 6 10 5 89 96 covered True
-#|key after hash 417899731 pixels 105 10 2 89 96 covered True
-#|bonus before hash 214362927 pixels 11 79 78 6 96 covered True
-#|bonus after hash 264819507 pixels 10 78 2 11 96 covered True
-#|green armour before hash 294597789 pixels 110 110 6 1 96 covered True
-#|green armour after hash 1238379616 pixels 8 110 103 2 96 covered True
-#|stimpack and medikit before hash 2244377026 pixels 111 109 7 111 96 covered True
-#|stimpack and medikit refused hash 484170876 pixels 110 108 2 107 96 covered True
-#|rocket before hash 1272649172 pixels 105 109 105 77 96 covered True
-#|rocket after hash 1410101461 pixels 106 109 105 77 96 covered True
-#|rocket refused hash 3698027594 pixels 106 109 105 77 160 covered True
-#|chainsaw after hash 4078204320 pixels 5 5 137 141 96 covered True
-#|chainsaw refused hash 2403315746 pixels 5 5 137 141 160 covered True
-#|pistol rising 8 hash 767338383 pixels 1 1 7 5 96 covered True
-#|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
-#|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
-#|dead 1600 1000 90 hash 2126758301 pixels 6 111 110 5 96 covered True
+#|start hash 3501647150 pixels 1 1 7 5 96 72 covered True
+#|lit 736 464 135 hash 1888788078 pixels 106 8 95 105 96 72 covered True
+#|dark -416 256 90 hash 1364473328 pixels 110 107 0 238 96 72 covered True
+#|step 137 256 45 hash 2880593419 pixels 8 0 79 6 96 72 covered True
+#|grate -416 256 180 hash 442390666 pixels 3 111 106 93 96 72 covered True
+#|water 3 256 0 hash 1102040513 pixels 2 6 77 6 96 72 covered True
+#|sky -640 256 90 hash 4130793025 pixels 239 14 239 105 96 72 covered True
+#|pit 488 320 0 hash 1510042988 pixels 79 110 150 6 96 72 covered True
+#|sergeant 1144 259 315 hash 4195031459 pixels 111 108 0 1 96 72 covered True
+#|once 256 1088 0 hash 2442400286 pixels 110 79 105 7 96 64 covered True
+#|overlap 2752 960 0 hash 17648109 pixels 79 125 10 78 96 72 covered True
+#|walls 704 256 0 hash 2399935752 pixels 7 111 15 2 96 64 covered True
+#|ledge 256 128 90 hash 1443497237 pixels 7 5 15 110 96 72 covered True
+#|yard -640 256 0 hash 1684750053 pixels 1 100 78 8 96 72 covered True
+#|bars 1024 200 0 hash 439285215 pixels 109 79 5 5 96 72 covered True
+#|demon head on 48 1616 180 hash 3057454219 pixels 2 7 111 243 96 59 covered True
+#|shotgun guy from behind 896 2048 270 hash 3729950378 pixels 5 109 0 5 96 72 covered True
+#|shotgun guy from the side 987 1947 225 hash 3040449328 pixels 5 6 109 108 96 72 covered True
+#|demon mirrored 2448 2112 0 hash 2350286645 pixels 39 2 6 79 96 72 covered True
+#|stride U!:34 hash 250131952 pixels 2 5 164 6 96 72 covered True
+#|air U!:56 hash 3788238705 pixels 5 110 15 6 96 64 covered True
+#|landed U!:66 hash 1149665840 pixels 6 110 14 79 96 64 covered True
+#|door half open hash 1169190636 pixels 7 14 110 79 96 64 covered True
+#|switch pressed hash 644900545 pixels 3 110 107 7 96 64 covered True
+#|exit pressed hash 786890588 pixels 102 95 102 3 96 72 covered True
+#|blink dark hash 1109576201 pixels 94 73 73 101 96 72 covered True
+#|key 2380 600 180 22 hash 491721407 pixels 5 1 6 110 96 72 covered True
+#|key bright 23 hash 491721407 pixels 5 1 6 110 96 72 covered True
+#|key before hash 398974500 pixels 6 10 5 89 96 72 covered True
+#|key after hash 1310564919 pixels 105 10 2 89 96 72 covered True
+#|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True
+#|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True
+#|green armour before hash 3593952694 pixels 110 110 6 1 96 59 covered True
+#|green armour after hash 1489547737 pixels 8 110 103 2 96 59 covered True
+#|stimpack and medikit before hash 1702492025 pixels 111 109 7 111 96 72 covered True
+#|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True
+#|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True
+#|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True
+#|rocket refused hash 3744069241 pixels 106 109 105 77 160 72 covered True
+#|chainsaw after hash 958764125 pixels 5 5 137 141 96 79 covered True
+#|chainsaw refused hash 957078586 pixels 5 5 137 141 160 64 covered True
+#|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True
+#|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True
+#|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True
+#|dead 1600 1000 90 hash 4043722533 pixels 6 111 110 5 96 8 covered True
+#|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True
+#|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True
+#|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
 #|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47

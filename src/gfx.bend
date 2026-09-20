@@ -783,7 +783,7 @@ def Gfx.sprite.check(fits: Bool, +sprite: String, +frame: U32, +count: U32,
 # vanilla refuses or that lacks the row's frame.
 def Gfx.sprite.def(+space: List<&2, W.Wad.Lump>, r: H.Thing.Row) ->
   Result<&1, &1, U32 & String, List<&2, Gfx.Install>>:
-  H.Row{+sprite, +frame, bright, tics, next, action} = r
+  H.Row{+sprite, +frame, bright, tics, next, action, light} = r
   +installs = Gfx.installs(space, sprite)
   +count = Gfx.frames(installs)
   Gfx.sprite.check(Bool.and(U32.is_lt(frame, count), U32.is_le(count, 29)), sprite, frame, count, installs)
@@ -807,13 +807,24 @@ def Gfx.sprite.defs(rows: List<&2, U32>, +space: List<&2, W.Wad.Lump>) ->
     case row <> rest:
       Gfx.sprite.defs.cons(Gfx.sprite.def(space, H.Thing.row(row)), Gfx.sprite.defs(rest, space))
 
+# A row of no tics is passed through as it is entered and never drawn,
+# so its lump is not copied: S_LIGHTDONE names a shotgun frame Freedoom
+# does not have.
+def Gfx.sprite.mark(shown: Bool, marks: V.Vec, +state: U32) -> V.Vec:
+  match shown:
+    case False{}:
+      marks
+    case True{}:
+      V.Vec.set(marks, state, 1)
+
 # A state row and each one after it in turn marked, until the next is
-# the first again.
-def Gfx.sprite.chase(fuel: Nat, back: Bool, +first: U32, +state: U32, marks: V.Vec) -> V.Vec:
-  match fuel back:
+# the first again or there is none.
+def Gfx.sprite.chase(fuel: Nat, done: Bool, +first: U32, +state: U32, marks: V.Vec) -> V.Vec:
+  match fuel done:
     case 1n+f False{}:
       +next = H.Thing.Row.next(H.Thing.row(state))
-      Gfx.sprite.chase(f, U32.is_eq(next, first), first, next, V.Vec.set(marks, state, 1))
+      Gfx.sprite.chase(f, Bool.or(U32.is_eq(next, first), U32.is_eq(next, H.Thing.null())), first, next,
+        Gfx.sprite.mark(Bool.not(U32.is_zero(H.Thing.Row.tics(H.Thing.row(state)))), marks, state))
     case _ _:
       marks
 
@@ -821,7 +832,7 @@ def Gfx.sprite.marks(things: List<&2, H.Thing>, +n: Nat, marks: V.Vec) -> V.Vec:
   match things:
     case []:
       marks
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, lastlook} <> rest:
       Gfx.sprite.marks(rest, n, Gfx.sprite.chase(n, False{}, state, state, marks))
 
 def Gfx.sprite.keep(kept: Bool, row: U32, rest: List<&2, U32>) -> List<&2, U32>:
@@ -838,19 +849,28 @@ def Gfx.sprite.rows.go(n: Nat, +row: U32, +marks: V.Vec) -> List<&2, U32>:
     case 1n+m:
       Gfx.sprite.keep(U32.is_eq(V.Vec.get(marks, row), 1), row, Gfx.sprite.rows.go(m, (row + 1 : U32), marks))
 
-# A weapon's rows and those they lead to, marked.
+# A weapon's rows and those they lead to, marked: the ones it rises,
+# rests, sinks and fires in, and its muzzle flash's.
 def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
-  H.Weapon{+up, +ready, +down, ammo} = w
-  Gfx.sprite.chase(n, False{}, down, down,
-    Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks)))
+  H.Weapon{+up, +ready, +down, ammo, +atk, +flash} = w
+  Gfx.sprite.chase(n, False{}, flash, flash, Gfx.sprite.chase(n, False{}, atk, atk,
+    Gfx.sprite.chase(n, False{}, down, down,
+      Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks)))))
 
-# The state rows the level's things spawn in, the pistol's, and those
-# they lead to, each once, in order.
+# A type spawned in play alone, whose rows no THINGS record reaches: the
+# bullet puff's.
+def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
+  H.Def{kind, +state, radius, height, flags} = d
+  Gfx.sprite.chase(n, False{}, state, state, marks)
+
+# The state rows the level's things spawn in, the pistol's, the puff's,
+# and those they lead to, each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n,
-    Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.of_list([], U32.from_nat(n)))))
+    Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n,
+      Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.of_list([], U32.from_nat(n))))))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
   match views:
@@ -924,16 +944,30 @@ def Gfx.bar.numbered(n: Nat, +name: String, +first: U32) -> List<&2, String>:
     case 1n+m:
       (name ++ U32.show(first)) <> Gfx.bar.numbered(m, name, (first + 1 : U32))
 
+# ST_loadUnloadGraphics' face states, in the order it numbers them: for
+# each of the five pain levels the three straight faces, the turn right,
+# the turn left, the ouch, the evil grin and the rampage, then the god
+# and the dead face.
+def Gfx.bar.faces(n: Nat, +i: U32) -> List<&2, String>:
+  match n:
+    case 0n:
+      ["STFGOD0", "STFDEAD0"]
+    case 1n+m:
+      +d = U32.show(i)
+      List.append(&2, String, ["STFST" ++ d ++ "0", "STFST" ++ d ++ "1", "STFST" ++ d ++ "2",
+        "STFTR" ++ d ++ "0", "STFTL" ++ d ++ "0", "STFOUCH" ++ d, "STFEVL" ++ d, "STFKILL" ++ d],
+        Gfx.bar.faces(m, (i + 1 : U32)))
+
 # The patches ST_loadGraphics loads that a single player's bar draws, in
 # the order Gfx.bar numbers them: the ten tall digits, the ten short
 # ones, the percent sign, the six key icons, the six grey weapon
-# numbers, the arms panel, and the background. STMBARL and STMBARR
-# belong to Doom 1.0, which neither WAD is; the minus sign shows on a
-# negative count alone, the face background on a net game's bar, and the
-# faces are ticket 23's.
+# numbers, the arms panel, the background, and the 42 faces. STMBARL and
+# STMBARR belong to Doom 1.0, which neither WAD is; the minus sign shows
+# on a negative count alone and the face background on a net game's bar.
 def Gfx.bar.names() -> List<&2, String>:
   List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),
-    ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"]])
+    ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"],
+    Gfx.bar.faces(5n, 0)])
 
 # The heads-up font
 # -----------------
@@ -1354,7 +1388,7 @@ def Gfx.sprite(+g: Gfx, state: U32, rot: U32, k: U32) -> U32:
 # The index in the array of status bar patch k: 0 to 9 the tall digits,
 # 10 to 19 the short ones, 20 the percent sign, 21 to 26 the key icons,
 # 27 to 32 the grey weapon numbers, 33 the arms panel, 34 the
-# background, as Gfx.bar.names() lists them.
+# background, 35 to 76 the faces, as Gfx.bar.names() lists them.
 def Gfx.bar(+g: Gfx, k: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, bar, font} = g
   V.Vec.get(bar, k)

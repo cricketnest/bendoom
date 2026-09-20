@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] Each pickup type the two E1M1s hold sets its vanilla string, and the blue door's refusal sets its own
 - [x] A new message replaces the old; the line clears after `HU_MSGTIMEOUT`
@@ -49,7 +49,6 @@
 - The native lane refuses an arity over 255 while the JS lane takes the same program, so a tree can pass `bend f.bend` and fail `bend f.bend -o f`. Two more fields on `State`, or one record-typed field on `Inventory`, each broke it, where two more U32 fields on `Inventory` did not. That is what moved the line out of the state, and it is now in `docs/bend.md`.
 - Freedoom has 68 STCFN lumps and the shareware WAD 64; both hold the 63 vanilla asks for, STCFN033 to STCFN095.
 
-### Deferred to the later pass
+### The native build and the oracle
 
-- **This branch does not build on the native lane and must not be merged as it stands.** `bend PROOF.bend` checks, every test passes on the interpreter and on bun, and the game runs there; but `bend doom.bend -o doom`, `bend tests/sim.bend -o sim` and `bend tools/frame.bend -o frame` all end in `an arity over 255`, so `nix flake check` would fail. The integration branch at c98ff58 builds all three, and one more U32 field in `Inventory` is the whole difference: the monsters and the damage work have taken the last of the native lane's room. The line is already packed into a single word for this reason. What would close it: room made elsewhere, after which nothing in this ticket need change; or the line moved into a `V.Vec` slot beside counts already there, which `docs/bend.md` names as what to do with a count that will not fit and which costs no field at all.
-- The oracle was not run on this tree; the frame dump does not build here, so it could not be. What stands in for it: every hash in `tests/render.bend` is the integration branch's, regenerated there after its own zero, and they all still hold with the message line built, which is what it means for a frame drawn with messages off to be untouched.
+The width refactor made room and the branch builds on every lane: `bend doom.bend -o doom`, `bend tests/sim.bend -o sim` and `bend tools/frame.bend -o frame` all pass, `bend PROOF.bend` checks, and every test passes natively and on bun. `tools/oracle.nu -416 256 0` reports 0 differing pixels with 1595 masked, so a frame drawn with messages off is still vanilla's, face and all. The message line's own pixels are unchanged by the face in the bar: it draws over rows 0 to 7 and the bar over 168 to 199, and the render test's three cases still report 730, 901 and 1030 pixels at the same indices as `tools/wad.nu`'s `hu-line`.

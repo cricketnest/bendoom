@@ -216,14 +216,14 @@ def Closed.unarmed() -> S.Psprites:
 # over every level can compute.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
   S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], [S.Mobj{H.Thing.you()}]}, 0, clock, False{}, False{},
-    [], 0, False{}}
+    [], S.Sim.Face.start(0), False{}}
 
 # A state with the player as given and some thinkers, among things named
 # under 128, all of them entered: linked where they stand, their mobjs
 # thinking.
 def Closed.at(p: S.Player, level: L.Level, ts: List<&2, S.Thinker>, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], ts}, 0, 0, False{},
-    False{}, [], 0, False{}})
+    False{}, [], S.Sim.Face.start(0), False{}})
 
 # The thinkers running that are no mobj's.
 def Closed.running.go(ts: List<&2, S.Thinker>) -> List<&2, S.Thinker>:
@@ -258,9 +258,9 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0, False{}}))
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}}))
     == ((clock + 1 : U32),
-      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0, False{}})
+      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}})
     : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
@@ -333,10 +333,11 @@ law step_up_dip:
 # enters the raise state, row 60, so it starts at 122; each tic's
 # A_Raise takes 6 more.
 
-# A player at rest in the room with the pistol coming up.
+# A player at rest in the room with the pistol coming up, as
+# P_SetupPsprites brings it up when the level's state is made.
 def Closed.armed() -> S.Player:
-  S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(),
-    S.Psprites.start(L.Level.sine(L.Level.room(0, 128)), H.Thing.pistol()), S.Sim.Hurt.start()}
+  S.State.player(S.Sim.psprites.start(Closed.state(S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976,
+    [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}, L.Level.room(0, 128), 0)))
 
 # LAW: the pistol is 38 after 14 tics, and the 15th puts it at the top,
 # 32, in the ready state, row 59, where A_WeaponReady with no bob sets
@@ -360,6 +361,47 @@ law pistol_bobs:
       I.Inventory.start(), S.Psprites{S.Psprite{Some{59}, 1, 65536, 2097152}, S.Psprite{None{}, 0, 65536, 2097152}}, S.Sim.Hurt.start()},
       16))
     == S.Psprites{S.Psprite{Some{59}, 1, 65136, 3145712}, S.Psprite{None{}, 0, 65136, 3145712}} : S.Psprites}
+
+# An inventory with so many bullets in the clip.
+def Closed.clip.of(inv: I.Inventory, +rounds: U32) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, V.Vec.set(ammo, I.Inventory.am_clip(), rounds), caps, backpack,
+    weapons, powers, items, bonus, line}
+
+# The pistol at rest, the state A_Raise leaves it in.
+def Closed.ready() -> S.Psprites:
+  S.Psprites{S.Psprite{Some{59}, 1, 65536, 2097152}, S.Psprite{None{}, 0, 65536, 2097152}}
+
+# The player in the empty room with the pistol ready and so many
+# bullets, holding the attack for so many tics. The room has no lines
+# and no things, so the bullet meets nothing and leaves nothing.
+def Closed.firing(n: Nat, rounds: U32) -> S.State:
+  S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.demo(0, 0, 0, 1)),
+    Closed.state(S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [],
+      Closed.clip.of(I.Inventory.start(), rounds), Closed.ready(), S.Sim.Hurt.start()}, L.Level.room(0, 128), 0))
+
+def Closed.bullets(s: S.State) -> U32:
+  I.Inventory.rounds(I.Inventory.am_clip(), S.Player.inv(S.State.player(s)))
+
+def Closed.weapon.of(ps: S.Psprites) -> Maybe<&2, U32>:
+  S.Psprites{S.Psprite{state, tics, sx, sy}, flash} = ps
+  state
+
+def Closed.weapon(s: S.State) -> Maybe<&2, U32>:
+  Closed.weapon.of(S.Player.psprites(S.State.player(s)))
+
+# LAW: a shot spends one bullet, and none is spent without one. Held
+# from the ready state, A_WeaponReady enters S_PISTOL1 on the first tic,
+# its 4 tics run out on tic 5 and A_FirePistol spends a bullet as
+# S_PISTOL2 is entered; A_ReFire fires again 14 tics later, on tic 19.
+# With an empty clip P_CheckAmmo refuses, so no bullet is spent and the
+# weapon stays in its ready state, row 59, where vanilla would lower it
+# for the weapon P_CheckAmmo picked instead (sanity).
+law pistol_spends:
+  {(Closed.bullets(Closed.firing(4n, 50)), Closed.bullets(Closed.firing(5n, 50)),
+    Closed.bullets(Closed.firing(19n, 50)), Closed.bullets(Closed.firing(19n, 0)),
+    Closed.weapon(Closed.firing(5n, 0)))
+    == (50, 49, 48, 0, Some{59}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
 
 # The damage laws are p_inter.c's P_DamageMobj by hand.
 
@@ -410,6 +452,16 @@ def Closed.blow(damage: U32) -> U32 & U32:
 law damage_count:
   {(Closed.blow(20), Closed.blow(120)) == ((80, 20), (0, 100)) : (U32 & U32) & (U32 & U32)}
 
+# LAW: ST_calcPainOffset steps the face's row by eight at each edge of
+# the five pain levels, which C's truncating (100 - health) * 5 / 101
+# puts at 80, 60, 40 and 20 health, and health over 100 reads as 100.
+law pain_offset:
+  {(S.Sim.face.pain(200), S.Sim.face.pain(100), S.Sim.face.pain(80), S.Sim.face.pain(79),
+    S.Sim.face.pain(60), S.Sim.face.pain(59), S.Sim.face.pain(40), S.Sim.face.pain(39),
+    S.Sim.face.pain(20), S.Sim.face.pain(19), S.Sim.face.pain(0))
+    == (0, 0, 0, 8, 8, 16, 16, 24, 24, 32, 32)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
 # The movers' closed laws stand on a literal level: a west room (sector
 # 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
 # 2, ceiling 72), all floors at 0, 16 units of door from x 64 to x 80.
@@ -454,7 +506,7 @@ def Closed.east() -> S.State:
 # visitor that passes over it.
 def Closed.barrel() -> S.State:
   Closed.at(Closed.player(13107200, 4194304, 0, 8388608), Closed.doors(), [],
-    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295}])
+    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295, 0, 0}])
 
 # What a ray of the use key's 64 units, east from (32, 64), meets, and
 # what the use key's visitor makes of the same ray.
@@ -615,7 +667,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, False{}})
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}})
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -704,7 +756,7 @@ law use_fires_once:
   for clock: U32
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
-  for mrnd: U32
+  for mrnd: V.Vec
   for reborn: Bool
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
@@ -728,7 +780,7 @@ def Closed.exit() -> L.Level:
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Closed.player(2097152, 4194304, 0, 8388608), Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()),
-      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, False{}}))
+      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}}))
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -767,12 +819,14 @@ law sound_places:
 # sfx_dorcls, 21, on tic 185 as the wait ends, and nothing as it shuts.
 # The door's lines span x 64 to 80 and y 0 to 128, so it sounds from
 # (72, 64), 40 east of the west room's player, who faces it: full volume,
-# and dead ahead is 129. Two starts, two draws from M_Random (sanity).
+# and dead ahead is 129. Two starts draw twice from M_Random and each of
+# the 219 tics draws once for ST_Ticker's face, so the index stands at
+# 221 (sanity).
 law door_sounds:
   {(S.State.sounds(Closed.used(0n, Closed.west())), S.State.sounds(Closed.used(1n, Closed.west())),
     S.State.sounds(Closed.used(184n, Closed.west())), S.State.sounds(Closed.used(218n, Closed.west())),
     S.State.mrnd(Closed.used(218n, Closed.west())))
-    == ([Sn.Start{20, Sn.Sector{1}, 64, 129}], [], [Sn.Start{21, Sn.Sector{1}, 64, 129}], [], 2)
+    == ([Sn.Start{20, Sn.Sector{1}, 64, 129}], [], [Sn.Start{21, Sn.Sector{1}, 64, 129}], [], 221)
     : List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event> & U32}
 
 # LAW: the lift's switch. EV_DoPlat starts sfx_pstart, 18, in each sector
@@ -806,7 +860,7 @@ law random_table:
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, False{}, False{},
-    [], 0, False{}}))
+    [], S.Sim.Face.start(0), False{}}))
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -876,9 +930,15 @@ def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2
 
 # A thing named id of a type at (x, y) and z in the west room, its state
 # lasting: the laws below are about its touch and its heights, not its
-# tics.
+# tics. Its floor is the room's, at 0.
 def Closed.thing(id: U32, kind: U32, x: U32, y: U32, z: U32) -> H.Thing:
-  H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295}
+  H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295, 0, 0}
+
+# The same on a floor of its own height, so that P_ZMovement leaves it
+# where it is: a thing under the room's floor would otherwise be lifted
+# onto it before anything reached it, as vanilla lifts one.
+def Closed.floored(id: U32, kind: U32, x: U32, y: U32, +z: U32) -> H.Thing:
+  H.Thing{id, kind, x, y, z, z, 8388608, 0, 0, 0, 4294967295, 0, 0}
 
 # The pickup laws' expected values are p_inter.c's P_TouchSpecialThing,
 # P_GiveCard, P_GiveBody, P_GiveArmor, P_GivePower, P_GiveAmmo and
@@ -952,7 +1012,7 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook} <> rest:
       id <> Closed.ids(rest)
 
 # The inventory with the heads-up line taken off it: the laws below are
@@ -1022,7 +1082,7 @@ law key_taken_once:
 
 def Closed.key_at(z: U32) -> Closed.Got:
   Closed.kept(Closed.idled(1n, Closed.among(I.Inventory.start(), 2097152, 0, 524288,
-    [Closed.thing(87, 5, 2097152, 5242880, z)])))
+    [Closed.floored(87, 5, 2097152, 5242880, z)])))
 
 # LAW: vertical reach. A tic moves the player to 72, 8 from a blue card
 # at (32, 80); the card is taken with its bottom 56 over the player's
@@ -1412,16 +1472,20 @@ law monsters_block:
 def Closed.row(+s: U32) -> Bool:
   U32.is_lt(s, U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())))
 
+def Closed.next(+next: U32) -> Bool:
+  Bool.or(Closed.row(next), U32.is_eq(next, H.Thing.null()))
+
 def Closed.leads(r: H.Thing.Row) -> Bool:
-  Closed.row(H.Thing.Row.next(r))
+  Closed.next(H.Thing.Row.next(r))
 
 def Closed.spawns(d: H.Thing.Def) -> Bool:
   H.Def{kind, state, radius, height, flags} = d
   Closed.row(state)
 
-# LAW: every type's spawn state and every row's next state is a row of
-# the table, so no thing enters the empty row Thing.row gives past its
-# end (sanity).
+# LAW: every type's spawn state is a row of the table, and every row's
+# next state is a row of it or S_NULL, which removes the thing or stops
+# the sprite showing, so nothing enters the empty row Thing.row gives
+# past its end (sanity).
 law states_exist:
   {Bool.and(List.all(~&2, ~H.Thing.Row, ~Closed.leads, H.Thing.rows()),
     List.all(~&2, ~H.Thing.Def, ~Closed.spawns, H.Thing.defs())) == True{} : Bool}
@@ -1483,7 +1547,7 @@ def Closed.ranked(you: U32, x: U32, momx: U32) -> S.State:
   S.State.populated([Closed.thing(2, 15, 2097152, 2097152, 0), Closed.thing(5, 15, 2097152, 2097152, 0),
     Closed.thing(9, 15, 2097152, 2097152, 0)], 128, S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976,
       0, 2686976, [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}, Closed.doors(), H.Things.none(0, you, 0, 0), V.Leaf{0},
-    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, False{}})
+    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}})
 
 # The mobjs the one cell lists.
 def Closed.cell(s: S.State) -> List<&2, U32>:
@@ -1522,7 +1586,7 @@ def Closed.tics(m: Maybe<&2, H.Thing>) -> Maybe<&2, U32>:
   match m:
     case None{}:
       None{}
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook}}:
       Some{tics}
 
 # LAW: a mobj spawned while the thinkers run joins the tail of the list
@@ -1576,10 +1640,10 @@ def Closed.lowering(n: Nat) -> List<&2, H.Thing>:
 # under the ceiling at 128 stays at 60, over its floor at -4 (sanity).
 law floor_carries_things:
   {(Closed.lowering(1n), Closed.lowering(2n))
-    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295}],
-      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295}])
+    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, 0},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, 0}],
+      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, 0},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, 0}])
     : List<&2, H.Thing> & List<&2, H.Thing>}
 
 # The door open at 68 and closing, 2 a tic, over a thing, the west room's
@@ -1605,7 +1669,7 @@ law barrel_stops_door:
     == (2752512, 2752512,
       [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
         [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], S.Sim.noise.door()}],
-      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295}], 2883584)
+      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295, 0, 0}], 2883584)
     : U32 & U32 & List<&2, S.Thinker> & List<&2, H.Thing> & U32}
 
 # LAW: a lamp is solid but not shootable, and vanilla's PIT_ChangeSector
@@ -1616,7 +1680,7 @@ law lamp_under_door:
   {(Closed.ceil(Closed.idled(34n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0))), 1),
     Closed.running(Closed.idled(35n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0)))),
     Closed.things(Closed.idled(35n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0)))))
-    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295}])
+    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295, 0, 0}])
     : U32 & List<&2, S.Thinker> & List<&2, H.Thing>}
 
 def Closed.over_barrel() -> S.State:
@@ -1630,7 +1694,7 @@ def Closed.over_barrel() -> S.State:
 # (sanity).
 law door_opens_over_barrel:
   {(Closed.ceil(Closed.used(0n, Closed.over_barrel()), 1), Closed.things(Closed.used(1n, Closed.over_barrel())))
-    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295}]) : U32 & List<&2, H.Thing>}
+    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295, 0, 0}]) : U32 & List<&2, H.Thing>}
 
 # Things
 # ------
@@ -1648,16 +1712,18 @@ def Closed.stocked() -> S.State:
 
 # The bonus and the armour as they spawned, in a state for some tics.
 def Closed.bonus(state: U32, tics: U32) -> H.Thing:
-  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics}
+  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, 1}
 
 def Closed.armour(state: U32, tics: U32) -> H.Thing:
-  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics}
+  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, 2}
 
 # LAW: the spawn's phase, vanilla's P_SpawnMapThing. The player draws
 # the random table's entry 1. The bonus draws entry 2 for P_SpawnMobj,
 # then entry 3, 220, for its first state's tics: 1 + 220 mod 6 = 5. The
 # armour draws entry 4, then entry 5, 241: 1 + 241 mod 6 = 2. The index
-# is 5 (sanity).
+# is 5. P_SpawnMobj's own draw is each one's lastlook, the entry modulo
+# MAXPLAYERS: 109 mod 4 = 1 for the bonus and 222 mod 4 = 2 for the
+# armour (sanity).
 law spawn_phase:
   {(Closed.things(Closed.stocked()), S.State.rnd(Closed.stocked()))
     == ([Closed.bonus(12, 5), Closed.armour(6, 2)], 5)
@@ -1685,21 +1751,78 @@ law bonus_cycle:
     : List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing>
       & List<&2, H.Thing> & List<&2, H.Thing> & U32 & U32}
 
-# LAW: a thing in a lasting state, of -1 tics, is the same thing after
-# its tic, for every thing.
+# LAW: a thing in a lasting state, of -1 tics, leaves the state where
+# its tic found it, for every thing, every name and every state: Doom's
+# P_MobjThinker counts no state of -1 tics down and enters no other.
 law lasting_stays:
-  for id: U32
-  for kind: U32
-  for x: U32
-  for y: U32
-  for z: U32
-  for floorz: U32
-  for ceilz: U32
-  for angle: U32
-  for sector: U32
-  for state: U32
-  {H.Thing.tic(H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, 4294967295})
-    == H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, 4294967295} : H.Thing}
+  for +id: U32
+  for +kind: U32
+  for +x: U32
+  for +y: U32
+  for +z: U32
+  for s: S.State
+  {S.Sim.thing.step(H.Thing.lasting(Closed.thing(id, kind, x, y, z)),
+    H.Thing.over(Closed.thing(id, kind, x, y, z)), Closed.thing(id, kind, x, y, z), id, s) == s : S.State}
+
+# Sight
+# -----
+
+# LAW: P_DivlineSide's three answers. A line up the y axis through
+# x 64 has a point at x 64 on it, one west of it behind it and one east
+# of it in front. A line east along y 64 from x 0 answers on for the
+# point (64, 32), because vanilla compares the point's x with the line's
+# y where it means its y; (0, 32) is south of it and in front, and
+# (0, 96) north of it and behind. A line out along (1, 1) from the
+# origin has (1, 0) in front, (0, 1) behind and (1, 1) on it, from the
+# whole-unit products 1 against 0, 0 against 1 and 1 against 1.
+law divline_sides:
+  {[S.Sim.sight.side(4194304, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(2097152, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(6291456, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(4194304, 2097152, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(0, 2097152, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(0, 6291456, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(65536, 0, 0, 0, 65536, 65536),
+    S.Sim.sight.side(0, 65536, 0, 0, 65536, 65536),
+    S.Sim.sight.side(65536, 65536, 0, 0, 65536, 65536)]
+    == [2, 1, 0, 2, 0, 1, 0, 1, 2] : List<&2, U32>}
+
+# LAW: a pair of sectors REJECT rules out never sees, for any two mobjs
+# in any level: P_CheckSight answers the lump before it walks the BSP,
+# and nothing the walk could find brings the sight back.
+law rejected_never_sees:
+  for level: L.Level
+  for m: S.Sim.Body
+  for t: S.Sim.Body
+  {S.Sim.sight.between(True{}, level, m, t) == False{} : Bool}
+
+def Closed.looking(a: H.Thing.Action) -> Bool:
+  match a:
+    case H.Look{}:
+      True{}
+    case _:
+      False{}
+
+def Closed.chasing(a: H.Thing.Action) -> Bool:
+  match a:
+    case H.Chase{}:
+      True{}
+    case _:
+      False{}
+
+def Closed.wakes(d: H.Thing.Def) -> Bool:
+  H.Def{+kind, +state, radius, height, flags} = d
+  Bool.or(U32.is_zero(H.Thing.seesound(kind)),
+    Bool.and(Closed.looking(H.Thing.Row.action(H.Thing.row(state))),
+      Bool.and(Closed.row(H.Thing.see(kind)),
+        Closed.chasing(H.Thing.Row.action(H.Thing.row(H.Thing.see(kind)))))))
+
+# LAW: every type that calls out on sight stands in a row that runs
+# A_Look and chases in a row of the table that runs A_Chase, so no
+# monster can wake without a state to wake into and none can watch for
+# the player without A_Look to do it (sanity).
+law monsters_wake:
+  {List.all(~&2, ~H.Thing.Def, ~Closed.wakes, H.Thing.defs()) == True{} : Bool}
 
 # The renderer
 # ------------
@@ -1766,16 +1889,16 @@ law view_rows:
 # sine 25 makes it 25/65536, raised to 256 (sanity).
 law wall_scale:
   {(P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 0, 10485760),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 0, 10485760),
     P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 537395200, 0,
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 537395200, 0,
       10485760),
     P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 0, 100),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 0, 100),
     P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 0, 131072),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 0, 131072),
     P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0, 1073741824,
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 1073741824,
       10485760))
     == (65536, 65536, 4194304, 4194304, 256) : U32 & U32 & U32 & U32 & U32}
 
@@ -1801,10 +1924,10 @@ law light_tables:
 # at 47, colormap 5 (sanity).
 law wall_column:
   {(R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}},
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0},
       10485760, 4194304, 1073741824, 0),
     R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}},
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0},
       10485760, 4194304, 1073741824, 0),
     R.Segs.iscale(65536), R.Segs.iscale(4194304), R.Segs.iscale(256),
     R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
@@ -1833,7 +1956,7 @@ law silhouettes:
 # mirrored, the same seen from every side.
 def Sprite.view() -> P.View:
   P.View{0, 0, 2686976, 0, 0, 65536, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-    V.Leaf{0}, V.Leaf{0}, 0}}
+    V.Leaf{0}, V.Leaf{0}, 0}, 0}
 
 def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
   match n:
@@ -1850,7 +1973,7 @@ def Sprite.gfx() -> G.Gfx:
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(+id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
   Z.Sprites.project(Sprite.view(), Closed.doors(), Sprite.gfx(), 1, id,
-    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295}, [])
+    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295, 0, 0}, [])
 
 # LAW: R_ProjectSprite holds a sprite's columns to the screen, and
 # R_DrawVisSprite steps down a column by the scale's reciprocal. Facing
@@ -1935,16 +2058,16 @@ law sprite_order:
 # (sanity).
 law plane_span:
   {(N.Planes.skycol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0),
+      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0),
     N.Planes.skycol(P.View{0, 0, 0, 1073741824, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}, 0),
+      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0),
     N.Planes.colormap(8, 13107200), N.Planes.colormap(8, 859832320),
     N.Planes.xscale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0},
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}),
     N.Planes.yscale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0},
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}}),
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}),
     N.Planes.step(N.Flat{P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{20971520}, V.Leaf{65537}, V.Leaf{0}, 0}},
+      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{20971520}, V.Leaf{65537}, V.Leaf{0}, 0}, 0},
       0, 409, 2686976, 8, 0}, 84, 0),
     D.Draw.span.pack(98304, 147456), D.Draw.span.spot(100665600))
     == (128, 384, 71424, 72960, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 72960}, 100665600, 129)

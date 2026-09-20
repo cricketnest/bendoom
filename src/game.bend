@@ -11,6 +11,7 @@ import ./project.bend as P
 import ./render.bend as R
 import ./show.bend as V
 import ./demo.bend as D
+import ./sound.bend as Sn
 import ./stream.bend as M
 
 # The clock is read each frame; the tics it owes accumulate in
@@ -20,7 +21,8 @@ import ./stream.bend as M
 # level holds its last frame. The level is the map as loaded, which a
 # fresh state is built from. Again is whether Space or Enter is down.
 # The demo is the one being recorded, until the level ends, and the
-# music the song being streamed, if there is one.
+# music the mixer, which carries the song and the channels the tics'
+# sounds play on, if there is a device.
 type Game is Type:
   Game{level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, state: S.State, input: K.Input,
     again: Bool, last: Nat, owed: Nat, mem: Array<U32>, demo: Maybe<D.Demo.Rec>, music: Maybe<M.Stream>}
@@ -94,15 +96,45 @@ def Game.ended(ending: Bool, clock: U32, demo: Maybe<D.Demo.Rec>) -> IO(Maybe<D.
     case False{}:
       IO.pure(Maybe<D.Demo.Rec>, demo)
 
+# An ended level runs no tic and its state keeps the sounds of the last
+# tic that did, so the sounds of a tic it stood through are passed over.
+def Game.gathered(+was: Bool, events: List<&2, Sn.Sound.Event>, +after: S.State) ->
+  List<&2, Sn.Sound.Event>:
+  match was:
+    case True{}:
+      events
+    case False{}:
+      List.append(&2, Sn.Sound.Event, events, S.State.sounds(after))
+
+# The frame's tics, a Sim.replay run one tic at a time so that the
+# sounds of each are gathered: the state holds one tic's only.
+def Game.tics(cmds: List<&2, K.Cmd>, events: List<&2, Sn.Sound.Event>, +s: S.State) ->
+  S.State & List<&2, Sn.Sound.Event>:
+  match cmds:
+    case []:
+      (s, events)
+    case cmd <> rest:
+      +was = S.State.ended(s)
+      +next = S.Sim.tic(cmd, s)
+      Game.tics(rest, Game.gathered(was, events, next), next)
+
+def Game.started(+was: Bool, demo: Maybe<D.Demo.Rec>, level: L.Level, gfx: G.Gfx,
+  tables: P.Project.Tables, input: K.Input, again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
+  music: Maybe<M.Stream>, p: S.State & List<&2, Sn.Sound.Event>) -> IO(Bool & Game):
+  (+next, events) = p
+  do IO<Bool & Game>:
+    playing : Maybe<M.Stream> <- M.Stream.hear(events, music)
+    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(S.State.ended(next), Bool.not(was)),
+      S.State.clock(next), demo)
+    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, playing})
+
 def Game.advanced(+from: S.State, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, level: L.Level, gfx: G.Gfx,
   tables: P.Project.Tables, input: K.Input, again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
   music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
-  +next = S.Sim.replay(cmds, from)
-  do IO<Bool & Game>:
-    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(S.State.ended(next), Bool.not(S.State.ended(from))),
-      S.State.clock(next), demo)
-    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, music})
+  +was = S.State.ended(from)
+  Game.started(was, demo, level, gfx, tables, input, again, last, owed, mem, music,
+    Game.tics(cmds, [], from))
 
 # The one path back to a fresh level, from the map as loaded: a press of
 # Space or Enter after the exit, or the sim's own reborn, which
@@ -151,18 +183,29 @@ def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
   Game.stepped(now, again, Game.events(events, (False{}, Game{level, gfx, tables, state, input, again, last,
     owed, mem, demo, music})))
 
-# The device's queue is topped up before the frame's events and tics, so
-# that the song plays on whatever the tics cost.
-def Game.tick(events: List<Event>, g: Game) -> IO(Bool & Game):
+def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
   Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
-  do IO<Bool & Game>:
-    playing : Maybe<M.Stream> <- M.Stream.play(music)
-    now : Nat <- IO.now()
-    Game.frame(now, events, Game{level, gfx, tables, state, input, again, last, owed, mem, demo, playing})
+  IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(music),
+    playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, state, input, again, last, owed, mem,
+      demo, playing})))
 
-# The window, the demo and the song let go, whether the game quits or
-# its fuel runs out: the frames whose top-up found the device's queue
-# empty, if the music played.
+def Game.mixed(p: Bool & Game) -> IO(Bool & Game):
+  (+quit, g) = p
+  Game.wrote(quit, g)
+
+# The frame's events and tics run first, so that the sounds they start
+# are in the write that follows them; then the device's queue is topped
+# up with the song and those sounds mixed, one write a frame, so that
+# both play on whatever the tics cost.
+def Game.tick(events: List<Event>, g: Game) -> IO(Bool & Game):
+  do IO<Bool & Game>:
+    now : Nat <- IO.now()
+    stepped : Bool & Game <- Game.frame(now, events, g)
+    Game.mixed(stepped)
+
+# The window, the demo, the song and the playing sounds let go, whether
+# the game quits or its fuel runs out: the frames whose top-up found the
+# device's queue empty, if the mixer ran.
 def Game.shut(window: Window, g: Game) -> IO(Maybe<U32>):
   Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
   do IO<Maybe<U32>>:

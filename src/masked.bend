@@ -87,7 +87,7 @@ def Masked.range(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg,
   Range{gfx, G.Gfx.mid(gfx, side), x1, scale1, step,
     Masked.mid(L.Level.sector(level, front), L.Level.sector(level, back), L.Level.side(level, side), flags,
       G.Gfx.tex.height(gfx, G.Gfx.mid(gfx, side)), P.View.z(view)),
-    S.Segs.lightnum(seg, L.Level.sector.light(level, front))}
+    S.Segs.lightnum(seg, L.Level.sector.light(level, front), P.View.extralight(view))}
 
 def Masked.wall.left(wall: D.Draw.Wall, st: Array<U32> & List<&2, U32>) -> Array<U32> & D.Draw.Wall:
   D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms} = wall
