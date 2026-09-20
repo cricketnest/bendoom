@@ -12,6 +12,7 @@ import ./src/keys.bend as K
 import ./src/sim.bend as S
 import ./src/things.bend as H
 import ./src/inventory.bend as I
+import ./src/message.bend as Msg
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
@@ -322,7 +323,7 @@ def Laws.lift_crushed():
   {==}
 
 def Laws.use_fires_once(forward, side, turn, next, player, level, things, sidetex, thinkers, rnd, clock, usedown, sounds,
-  mrnd):
+  mrnd, message, msgtics):
   match next level:
     case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
       {==}
@@ -345,7 +346,7 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
@@ -855,7 +856,7 @@ def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(
 def moved_free(+level: L.Level, t: S.Sim.Try, at: L.Level, s: S.State, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.State.player(S.State.moved(t, at, s))):
   match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
       ht
 
 # Free reads the geometry alone
@@ -998,6 +999,30 @@ def stood_y(moved: S.Player, +q: S.Player) -> {S.Player.y(moved) == S.Player.y(S
     case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}:
       {==}
 
+# Taking the message off the player, which HU_Ticker does at the end of
+# the tic, writes the inventory and leaves the place.
+def holding_x(p: S.Player, +inv: I.Inventory) -> {S.Player.x(p) == S.Player.x(S.Player.holding(p, inv)) : U32}:
+  match p:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, held, psprites}:
+      {==}
+
+def holding_y(p: S.Player, +inv: I.Inventory) -> {S.Player.y(p) == S.Player.y(S.Player.holding(p, inv)) : U32}:
+  match p:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, held, psprites}:
+      {==}
+
+# HU_Ticker writes the line and takes the message off the player, which
+# leaves the place its position check passed.
+def hud_free(s: S.State, h: Laws.Free(s)) -> Laws.Free(S.State.hud(s)):
+  match s:
+    case S.State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message,
+      msgtics}:
+      +held = {I.Inventory.saying(Msg.Message.none(), S.Player.inv(player)) : I.Inventory}
+      %holding_x(player, held)
+        : {True{} == S.Sim.free(level, _, S.Player.y(S.Player.holding(player, held))) : Bool}
+      %holding_y(player, held) : {True{} == S.Sim.free(level, S.Player.x(player), _) : Bool}
+      h
+
 # What the tic keeps is free where the player it moved was: the level
 # it packs has the geometry the move was checked against, and the
 # player it packs the place.
@@ -1018,29 +1043,31 @@ def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Pl
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, message, msgtics}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, message, msgtics}:
       {==}
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, message, msgtics}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +message, +msgtics}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = S.Sim.counters(S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))))
       +used = S.Sim.use(S.Sim.pressed(cmd, usedown),
-        {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd} : S.State})
+        {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, message, msgtics} : S.State})
       +went = S.Sim.mobj(cmd, level, thought, used)
-      kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
+      hud_free(S.Sim.tic.kept(geo, S.State.player(went), clock, K.Cmd.use(cmd),
+        S.State.told(S.Sim.thinkers(S.Sim.cross(S.Player.crossed(S.State.player(went)), went)))),
+        kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
         S.State.told(S.Sim.thinkers(S.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
         moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, S.State.things(used), cmd, thought)), S.State.level(used), used,
           mobj_z_free(level, S.Sim.xy(level, S.State.things(used), cmd, thought), xy_free(level,
             S.State.things(used), cmd, thought,
             counters_free(level, S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
               psprites_free(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
-                eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free))))))))
+                eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free)))))))))
 
 def Laws.replay_keeps_free(script, s, free):
   match script:

@@ -22,7 +22,7 @@ def Bench.go(n: Nat, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: A
     case 0n:
       mem
     case 1n+m:
-      Bench.go(m, tables, gfx, s, Bench.drop(V.Show.image(R.Render.frame(tables, gfx, s, mem))))
+      Bench.go(m, tables, gfx, s, Bench.drop(V.Show.image(R.Render.frame(tables, gfx, s, True{}, mem))))
 
 def Bench.peek(p: Array<U32> & U32) -> U32:
   (mem, v) = p

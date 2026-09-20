@@ -109,7 +109,7 @@ def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
 
 # A frame's hash, drawn over a view blanked to an index.
 def hashed(+tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, blank: U32, mem: Array<U32>) -> Hash:
-  D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, gfx, s,
+  D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, gfx, s, False{},
     D.Draw.set(U32.to_nat(53760), mem, G.Gfx.frame(), blank)), H.Fnv.basis()})
 
 def again(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, st: Hash) -> Array<U32> & String:
@@ -166,13 +166,13 @@ def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
 # Every weapon and every ammo type at its cap, so that no ammo or weapon
 # pickup can be taken.
 def maxed(inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus} = inv
-  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus}
+  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus, message} = inv
+  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus, message}
 
 def full(s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics} = s
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd}
+    usedown, sounds, mrnd, message, msgtics}
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl

@@ -120,6 +120,7 @@ import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/vec.bend as V
 import ../src/sound.bend as Sn
+import ../src/message.bend as Msg
 
 def line(tag: String, s: S.State) -> String:
   +p = S.State.player(s)
@@ -287,8 +288,9 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 
 # The state with the player holding an inventory.
 def holding(inv: I.Inventory, s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd,
+    message, msgtics}
 
 # The blue key, record 87, taken strafing past it, the oracle's script:
 # 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
@@ -302,7 +304,7 @@ def blue(+level: L.Level) -> IO(Unit):
     k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
     k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
     b0 : S.State <- keyed("blue walk with the skull", 87, 30n, forward(),
-      holding(I.Inventory.card(8, I.Inventory.start()), at(level, 832, 1400, 90)))
+      holding(I.Inventory.card(8, Msg.Message.none(), I.Inventory.start()), at(level, 832, 1400, 90)))
     b1 : S.State <- keyed("use", 87, 1n, use(), b0)
     b2 : S.State <- keyed("-", 87, 10n, idle(), b1)
     b3 : S.State <- keyed("-", 87, 51n, idle(), b2)
@@ -410,9 +412,9 @@ def opens(+open: S.State) -> IO(Unit):
 # A state with a fresh player at rest some way south of the first
 # door's sound origin, 832, 528, facing an angle.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  S.State{p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics} = s
   S.State{S.Player.at(level, L.Start{F.Fixed.of_map(832), F.Fixed.of_map((528 - d : U32)), A.Angle.of_thing(degrees)}),
-    level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+    level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -749,9 +751,9 @@ def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
 def stocked(health: U32, armour: U32, armourtype: U32, ammo: List<&2, U32>, inv: I.Inventory) -> I.Inventory:
-  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus} = inv
+  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, message} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(ammo, 4), caps, backpack, weapons, powers, items,
-    bonus}
+    bonus, message}
 
 # Walking forward from a place for some tics, then one more: the tic
 # before contact and the tic of it.

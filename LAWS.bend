@@ -13,6 +13,7 @@ import ./src/random.bend as M
 import ./src/things.bend as H
 import ./src/inventory.bend as I
 import ./src/sound.bend as Sn
+import ./src/message.bend as Msg
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
@@ -201,7 +202,7 @@ def Closed.unarmed() -> S.Psprites:
 
 # A level's first state with the player as given, at a clock.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
-  S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, False{}, False{}, [], 0}
+  S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, False{}, False{}, [], 0, 0, 0}
 
 # LAW: one tic of the idle command from rest leaves the player where it
 # was, on any level, at any position.
@@ -223,8 +224,8 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0}))
-    == ((clock + 1 : U32), S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0}) : U32 & S.State}
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0, 0, 0}))
+    == ((clock + 1 : U32), S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0, 0, 0}) : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
 # floor at 0 and the ceiling at 128 map units. Every number is computed
@@ -398,7 +399,7 @@ law blazing_door_timeline:
 # A state of the literal level with one mover running and a player at
 # rest at a place under a ceiling.
 def Closed.moving(level: L.Level, t: S.Thinker, x: U32, y: U32, ceilz: U32) -> S.State:
-  S.State{Closed.player(x, y, 0, ceilz), level, Closed.none(), V.Leaf{0}, [t], 0, 0, False{}, False{}, [], 0}
+  S.State{Closed.player(x, y, 0, ceilz), level, Closed.none(), V.Leaf{0}, [t], 0, 0, False{}, False{}, [], 0, 0, 0}
 
 def Closed.idled(n: Nat, s: S.State) -> S.State:
   S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
@@ -454,7 +455,8 @@ law door_crushed:
 def Closed.turbo(x: U32, momx: U32) -> S.State:
   S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed()},
     L.Level.special.put(L.Level.plane.put(L.Level.plane.put(L.Level.plane.put(Closed.doors(), 1, False{},
-      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0}
+      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{},
+    [], 0, 0, 0}
 
 def Closed.floors(+s: S.State) -> U32 & U32 & U32:
   (L.Level.floor(S.State.level(s), 0), L.Level.floor(S.State.level(s), 1), L.Level.floor(S.State.level(s), 2))
@@ -489,7 +491,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}, [], 0}
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}, [], 0, 0, 0}
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -578,8 +580,11 @@ law use_fires_once:
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: U32
+  for message: U32
+  for msgtics: U32
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, message,
+      msgtics}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -598,7 +603,7 @@ def Closed.exit() -> L.Level:
 # The west room's player after two idle tics and then a tic of use.
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}, [], 0})
+    Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}, [], 0, 0, 0})
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -675,7 +680,7 @@ law random_table:
 # spawned the player.
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, [], 1, 0, False{}, False{}, [], 0})
+    L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, [], 1, 0, False{}, False{}, [], 0, 0, 0})
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -731,9 +736,9 @@ def Closed.locked(inv: I.Inventory) -> S.State:
 # up after that tic (sanity).
 law blue_door_locked:
   {(Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.start())), 1),
-    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(2, I.Inventory.start()))), 1),
-    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(1, I.Inventory.start()))), 1),
-    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, I.Inventory.start()))), 1))
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(2, Msg.Message.none(), I.Inventory.start()))), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start()))), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, Msg.Message.none(), I.Inventory.start()))), 1))
     == (0, 0, 131072, 131072) : U32 & U32 & U32 & U32}
 
 # The west room's player holding an inventory at (x, 64), on the floor
@@ -741,7 +746,7 @@ law blue_door_locked:
 # under 128, on the literal level.
 def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [],
-    inv, Closed.unarmed()}, Closed.doors(), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0})
+    inv, Closed.unarmed()}, Closed.doors(), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0, 0, 0})
 
 # A thing named id of a type at (x, y) and z in the west room, its state
 # lasting: the laws below are about its touch and its heights, not its
@@ -773,35 +778,35 @@ type Closed.Edit is Data:
 def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
   match inv e:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Health{n}:
-      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, message} Health{n}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Armour{points, kind}:
-      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, message} Armour{points, kind}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Cards{bits}:
-      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, message} Cards{bits}:
+      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Ammo{rounds}:
+      bonus, message} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
-        bonus}
+        bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Backpack{}:
+      bonus, message} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
-        powers, items, bonus}
+        powers, items, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Weapons{bits}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus}
+      bonus, message} Weapons{bits}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Strength{n}:
+      bonus, message} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus}
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Items{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus}
+      bonus, message} Items{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, message}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Flash{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n}
+      bonus, message} Flash{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, message}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -1548,7 +1553,7 @@ def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
 def Sprite.gfx() -> G.Gfx:
   G.Gfx{V.Leaf{0}, V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0,
     V.Vec.of_list(List.append(&2, U32, Sprite.slots(8n, 1000, 0), Sprite.slots(8n, 2000, 1)), 96),
-    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}}
+    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}, V.Leaf{0}}
 
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
