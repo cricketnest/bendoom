@@ -104,9 +104,10 @@ def Game.advanced(+from: S.State, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, l
       S.State.clock(next), demo)
     return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, music})
 
-# After the exit a press of Space or Enter starts the level again, from
-# the map as loaded. A match and not a pick, which would build the fresh
-# state every frame.
+# The one path back to a fresh level, from the map as loaded: a press of
+# Space or Enter after the exit, or the sim's own reborn, which
+# P_DeathThink asks for on the use button. A match and not a pick, which
+# would build the fresh state every frame.
 def Game.from(again: Bool, +level: L.Level, state: S.State) -> S.State:
   match again:
     case True{}:
@@ -124,7 +125,8 @@ def Game.advance(+now: Nat, was: Bool, g: Game) -> IO(Bool & Game):
   +due = Nat.add(owed, Nat.mul(Nat.sub(now, last), 35n))
   +capped = Nat.is_gt(Nat.div(due, 1000n), 8n)
   +tics = Bool.pick(Nat, capped, 8n, Nat.div(due, 1000n))
-  +from = Game.from(Bool.and(Bool.and(again, Bool.not(was)), S.State.ended(state)), level, state)
+  +from = Game.from(Bool.or(Bool.and(Bool.and(again, Bool.not(was)), S.State.ended(state)),
+    S.State.reborn(state)), level, state)
   do IO<Bool & Game>:
     played : Maybe<D.Demo.Rec> & List<&2, K.Cmd> <- D.Demo.record(demo, K.Input.script(tics, input))
     Game.advanced(from, played, level, gfx, tables, K.Input.after(tics, input), again, now,
