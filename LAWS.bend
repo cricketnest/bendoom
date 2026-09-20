@@ -215,14 +215,14 @@ def Closed.unarmed() -> S.Psprites:
 # over every level can compute.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
   S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], [S.Mobj{H.Thing.you()}]}, 0, clock, False{}, False{},
-    [], 0, False{}}
+    [], S.Sim.Face.start(0), False{}}
 
 # A state with the player as given and some thinkers, among things named
 # under 128, all of them entered: linked where they stand, their mobjs
 # thinking.
 def Closed.at(p: S.Player, level: L.Level, ts: List<&2, S.Thinker>, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], ts}, 0, 0, False{},
-    False{}, [], 0, False{}})
+    False{}, [], S.Sim.Face.start(0), False{}})
 
 # The thinkers running that are no mobj's.
 def Closed.running.go(ts: List<&2, S.Thinker>) -> List<&2, S.Thinker>:
@@ -257,9 +257,9 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0, False{}}))
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}}))
     == ((clock + 1 : U32),
-      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0, False{}})
+      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}})
     : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
@@ -450,6 +450,16 @@ def Closed.blow(damage: U32) -> U32 & U32:
 # where a blow past the health leaves none.
 law damage_count:
   {(Closed.blow(20), Closed.blow(120)) == ((80, 20), (0, 100)) : (U32 & U32) & (U32 & U32)}
+
+# LAW: ST_calcPainOffset steps the face's row by eight at each edge of
+# the five pain levels, which C's truncating (100 - health) * 5 / 101
+# puts at 80, 60, 40 and 20 health, and health over 100 reads as 100.
+law pain_offset:
+  {(S.Sim.face.pain(200), S.Sim.face.pain(100), S.Sim.face.pain(80), S.Sim.face.pain(79),
+    S.Sim.face.pain(60), S.Sim.face.pain(59), S.Sim.face.pain(40), S.Sim.face.pain(39),
+    S.Sim.face.pain(20), S.Sim.face.pain(19), S.Sim.face.pain(0))
+    == (0, 0, 0, 8, 8, 16, 16, 24, 24, 32, 32)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # The movers' closed laws stand on a literal level: a west room (sector
 # 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
@@ -656,7 +666,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, False{}})
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}})
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -745,7 +755,7 @@ law use_fires_once:
   for clock: U32
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
-  for mrnd: U32
+  for mrnd: V.Vec
   for reborn: Bool
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
@@ -769,7 +779,7 @@ def Closed.exit() -> L.Level:
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Closed.player(2097152, 4194304, 0, 8388608), Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()),
-      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, False{}}))
+      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}}))
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -808,12 +818,14 @@ law sound_places:
 # sfx_dorcls, 21, on tic 185 as the wait ends, and nothing as it shuts.
 # The door's lines span x 64 to 80 and y 0 to 128, so it sounds from
 # (72, 64), 40 east of the west room's player, who faces it: full volume,
-# and dead ahead is 129. Two starts, two draws from M_Random (sanity).
+# and dead ahead is 129. Two starts draw twice from M_Random and each of
+# the 219 tics draws once for ST_Ticker's face, so the index stands at
+# 221 (sanity).
 law door_sounds:
   {(S.State.sounds(Closed.used(0n, Closed.west())), S.State.sounds(Closed.used(1n, Closed.west())),
     S.State.sounds(Closed.used(184n, Closed.west())), S.State.sounds(Closed.used(218n, Closed.west())),
     S.State.mrnd(Closed.used(218n, Closed.west())))
-    == ([Sn.Start{20, Sn.Sector{1}, 64, 129}], [], [Sn.Start{21, Sn.Sector{1}, 64, 129}], [], 2)
+    == ([Sn.Start{20, Sn.Sector{1}, 64, 129}], [], [Sn.Start{21, Sn.Sector{1}, 64, 129}], [], 221)
     : List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event> & U32}
 
 # LAW: the lift's switch. EV_DoPlat starts sfx_pstart, 18, in each sector
@@ -847,7 +859,7 @@ law random_table:
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, False{}, False{},
-    [], 0, False{}}))
+    [], S.Sim.Face.start(0), False{}}))
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -1484,7 +1496,7 @@ def Closed.ranked(you: U32, x: U32, momx: U32) -> S.State:
   S.State.populated([Closed.thing(2, 15, 2097152, 2097152, 0), Closed.thing(5, 15, 2097152, 2097152, 0),
     Closed.thing(9, 15, 2097152, 2097152, 0)], 128, S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976,
       0, 2686976, [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}, Closed.doors(), H.Things.none(0, you, 0, 0), V.Leaf{0},
-    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, False{}})
+    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}})
 
 # The mobjs the one cell lists.
 def Closed.cell(s: S.State) -> List<&2, U32>:

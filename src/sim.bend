@@ -239,6 +239,266 @@ def Player.onground(+p: Player) -> Bool:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   F.Fixed.le(z, floorz)
 
+# The face
+# --------
+
+# ST_updateFaceWidget's statics and ST_initData's, in one vector as the
+# wound is, since a record's width is a budget the whole program shares
+# (docs/bend.md): the index of the face w_faces draws, the tics that
+# face has left, the priority of whatever put it there, the health
+# ST_Ticker saw on the tic before, the count of tics fire has been held,
+# and the weapons owned when the grin last looked. The two counts that
+# start below zero hold the word C's -1 is, so its arithmetic carries
+# over unchanged. M_Random's index shares the vector rather than a field
+# of its own, for the same budget: the state has no word to spare, and
+# ST_Ticker draws from it for the face's glance.
+def Sim.face.index() -> U32:
+  0
+
+def Sim.face.count() -> U32:
+  1
+
+def Sim.face.priority() -> U32:
+  2
+
+def Sim.face.oldhealth() -> U32:
+  3
+
+def Sim.face.lastattack() -> U32:
+  4
+
+def Sim.face.weapons() -> U32:
+  5
+
+def Sim.face.mrnd() -> U32:
+  6
+
+# ST_initData at a fresh game, with M_Random's index where the caller
+# says: the face index, its count and the priority are what the program
+# started with, the health seen last is -1, and the weapons owned are
+# the ones G_PlayerReborn hands out.
+def Sim.Face.start(+mrnd: U32) -> V.Vec:
+  V.Vec.of_list([0, 0, 0, 4294967295, 4294967295, I.Inventory.weapons(I.Inventory.start()), mrnd], 7)
+
+def Sim.Face.index(+f: V.Vec) -> U32:
+  V.Vec.get(f, Sim.face.index())
+
+def Sim.Face.count(+f: V.Vec) -> U32:
+  V.Vec.get(f, Sim.face.count())
+
+def Sim.Face.mrnd(+f: V.Vec) -> U32:
+  V.Vec.get(f, Sim.face.mrnd())
+
+# The vector once a sound has drawn its pitch from M_Random, and as it
+# was where that sound drew none.
+def Sim.Face.drew(draws: Bool, +f: V.Vec) -> V.Vec:
+  match draws:
+    case False{}:
+      f
+    case True{}:
+      V.Vec.set(f, Sim.face.mrnd(), M.Random.next(Sim.Face.mrnd(f)))
+
+# Doom's ST_calcPainOffset: the first of the eight faces of the pain
+# level a health falls in, five levels over 101 points. Its static cache
+# answers the same offset for the same health, so nothing is kept for
+# it.
+def Sim.face.pain(+health: U32) -> U32:
+  ((100 - U32.min(health, 100)) * 5 / 101 * 8 : U32)
+
+def Sim.face.put(+priority: U32, +index: U32, +count: U32, f: V.Vec) -> V.Vec:
+  V.Vec.set(V.Vec.set(V.Vec.set(f, Sim.face.priority(), priority), Sim.face.index(), index),
+    Sim.face.count(), count)
+
+# The face a stage chose where its test passed, and the one standing
+# where it did not.
+def Sim.face.chose(take: Bool, +priority: U32, +index: U32, +count: U32, +f: V.Vec) -> V.Vec:
+  match take:
+    case False{}:
+      f
+    case True{}:
+      Sim.face.put(priority, index, count, f)
+
+# A stage runs while nothing of a higher priority holds the face.
+def Sim.face.under(+f: V.Vec, +priority: U32) -> Bool:
+  U32.is_lt(V.Vec.get(f, Sim.face.priority()), priority)
+
+# ST_DEADFACE, chosen afresh every tic the player has no health.
+def Sim.face.dead(+health: U32, +f: V.Vec) -> V.Vec:
+  Sim.face.chose(Bool.and(Sim.face.under(f, 10), U32.is_zero(health)), 9, 41, 1, f)
+
+def Sim.face.grin.took(grins: Bool, +weapons: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  match grins:
+    case False{}:
+      f
+    case True{}:
+      V.Vec.set(Sim.face.put(8, (Sim.face.pain(health) + 6 : U32), 70, f), Sim.face.weapons(), weapons)
+
+# ST_EVILGRINOFFSET for ST_EVILGRINCOUNT tics: while the pickup flash is
+# on and the weapons owned differ from the ones the grin last looked at,
+# which it then remembers. A flash that is out leaves them unlooked at,
+# so a weapon taken while a higher priority holds the face is grinned at
+# as soon as the flash allows.
+def Sim.face.grin(+bonus: U32, +weapons: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  Sim.face.grin.took(Bool.and(Sim.face.under(f, 9), Bool.and(Bool.not(U32.is_zero(bonus)),
+    Bool.not(U32.is_eq(V.Vec.get(f, Sim.face.weapons()), weapons)))), weapons, health, f)
+
+# Vanilla's ouch test, with the bug it still carries: the subtraction is
+# the wrong way round, so the face winces at a health that has RISEN by
+# more than ST_MUCHPAIN since the tic before. C compares signed, which
+# adding the twenty to the older health says in words, and the -1 of the
+# first tic wraps to 19 exactly as C's arithmetic leaves it.
+def Sim.face.ouch(+health: U32, +oldhealth: U32) -> Bool:
+  U32.is_lt((oldhealth + 20 : U32), health)
+
+# The side the face turns: an attacker within ANG45 of dead ahead takes
+# the rampage face instead of a turn.
+def Sim.face.turn(+diff: U32, right: Bool, +health: U32) -> U32:
+  (Sim.face.pain(health) + Bool.pick(U32, U32.is_lt(diff, A.Angle.ang45()), 7,
+    (3 + Bool.to_u32(Bool.not(right)) : U32)) : U32)
+
+# ST_updateFaceWidget's turn, confusing as its own comment says it is:
+# the angle to the attacker against the player's facing, the difference
+# taken the way round that keeps it positive, and the side read off
+# whether that difference passed ANG180.
+def Sim.face.wince(gt: Bool, +bad: U32, +facing: U32, +health: U32) -> U32:
+  match gt:
+    case True{}:
+      +diff = (bad - facing : U32)
+      Sim.face.turn(diff, U32.is_gt(diff, A.Angle.ang180()), health)
+    case False{}:
+      +diff = (facing - bad : U32)
+      Sim.face.turn(diff, Bool.not(U32.is_gt(diff, A.Angle.ang180())), health)
+
+def Sim.face.hit.index(ouch: Bool, +bad: U32, +facing: U32, +health: U32) -> U32:
+  match ouch:
+    case True{}:
+      (Sim.face.pain(health) + 5 : U32)
+    case False{}:
+      Sim.face.wince(U32.is_gt(bad, facing), bad, facing, health)
+
+def Sim.face.hit.at(m: Maybe<&2, H.Thing>, +level: L.Level, +p: Player, +health: U32, +oldhealth: U32,
+  +f: V.Vec) -> V.Vec:
+  match m:
+    case None{}:
+      f
+    case Some{H.Thing{id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+      Sim.face.put(7, Sim.face.hit.index(Sim.face.ouch(health, oldhealth),
+        A.Angle.of(L.Level.tanto(level), (x - Player.x(p) : U32), (y - Player.y(p) : U32)),
+        Player.angle(p), health), 35, f)
+
+# The thing the face winces at: the wound's attacker, unless the stage
+# does not run or the attacker is the player's own mobj, which is how
+# this sim says nobody hit.
+def Sim.face.attacker(runs: Bool, +things: H.Things, +p: Player) -> Maybe<&2, H.Thing>:
+  match runs:
+    case False{}:
+      None{}
+    case True{}:
+      H.Things.get(things, Sim.Hurt.attacker(Player.hurt(p)))
+
+# "Being attacked": a damage count with somebody to blame turns the face
+# that way for ST_TURNCOUNT tics, or puts up the ouch face.
+def Sim.face.hit(+level: L.Level, +things: H.Things, +p: Player, +health: U32, +oldhealth: U32,
+  +f: V.Vec) -> V.Vec:
+  Sim.face.hit.at(Sim.face.attacker(Bool.and(Sim.face.under(f, 8),
+    Bool.and(Bool.not(U32.is_zero(Sim.Hurt.damage(Player.hurt(p)))),
+      Bool.not(U32.is_eq(Sim.Hurt.attacker(Player.hurt(p)), H.Thing.you())))), things, p),
+    level, p, health, oldhealth, f)
+
+def Sim.face.own.at(runs: Bool, ouch: Bool, +health: U32, +f: V.Vec) -> V.Vec:
+  match runs ouch:
+    case False{} _:
+      f
+    case True{} True{}:
+      Sim.face.put(7, (Sim.face.pain(health) + 5 : U32), 35, f)
+    case True{} False{}:
+      Sim.face.put(6, (Sim.face.pain(health) + 7 : U32), 35, f)
+
+# "Getting hurt because of your own damn stupidity": a damage count with
+# nobody to blame, which the nukage leaves, takes the ouch face or the
+# rampage face.
+def Sim.face.own(+damage: U32, +health: U32, +oldhealth: U32, +f: V.Vec) -> V.Vec:
+  Sim.face.own.at(Bool.and(Sim.face.under(f, 7), Bool.not(U32.is_zero(damage))),
+    Sim.face.ouch(health, oldhealth), health, f)
+
+def Sim.face.rampage.due(due: Bool, +last: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  match due:
+    case False{}:
+      V.Vec.set(f, Sim.face.lastattack(), last)
+    case True{}:
+      Sim.face.put(5, (Sim.face.pain(health) + 7 : U32), 1, V.Vec.set(f, Sim.face.lastattack(), 1))
+
+def Sim.face.rampage.count(first: Bool, +last: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  match first:
+    case True{}:
+      V.Vec.set(f, Sim.face.lastattack(), 70)
+    case False{}:
+      Sim.face.rampage.due(U32.is_zero((last - 1 : U32)), (last - 1 : U32), health, f)
+
+def Sim.face.rampage.held(fires: Bool, +last: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  match fires:
+    case False{}:
+      V.Vec.set(f, Sim.face.lastattack(), 4294967295)
+    case True{}:
+      Sim.face.rampage.count(U32.is_eq(last, 4294967295), last, health, f)
+
+def Sim.face.rampage.runs(runs: Bool, +attack: Bool, +health: U32, +f: V.Vec) -> V.Vec:
+  match runs:
+    case False{}:
+      f
+    case True{}:
+      Sim.face.rampage.held(attack, V.Vec.get(f, Sim.face.lastattack()), health, f)
+
+# ST_RAMPAGEDELAY tics of held fire and the face grimaces, once a tic
+# from then on. Vanilla's priority test wraps the count as well as the
+# face, so a stage above this one stops it running at all, and a tic
+# with fire up clears it.
+def Sim.face.rampage(+attack: Bool, +health: U32, +f: V.Vec) -> V.Vec:
+  Sim.face.rampage.runs(Sim.face.under(f, 6), attack, health, f)
+
+def Sim.face.glance.at(timed: Bool, +rnd: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  match timed:
+    case False{}:
+      f
+    case True{}:
+      Sim.face.put(0, (Sim.face.pain(health) + (rnd % 3) : U32), 17, f)
+
+# The idle glance: with the face's count run out, one of the pain
+# level's three straight faces, chosen by the tic's own M_Random draw,
+# for ST_STRAIGHTFACECOUNT tics.
+def Sim.face.glance(+rnd: U32, +health: U32, +f: V.Vec) -> V.Vec:
+  Sim.face.glance.at(U32.is_zero(Sim.Face.count(f)), rnd, health, f)
+
+def Sim.face.ticked(+f: V.Vec) -> V.Vec:
+  V.Vec.set(f, Sim.face.count(), (Sim.Face.count(f) - 1 : U32))
+
+# ST_Ticker's last line: the health the next tic's ouch test looks back
+# at.
+def Sim.face.seen(+health: U32, f: V.Vec) -> V.Vec:
+  V.Vec.set(f, Sim.face.oldhealth(), health)
+
+# Doom's ST_updateFaceWidget: each priority in its order, dead first,
+# then the grin at a weapon picked up, the wince toward whoever hit, the
+# pain of a blow with nobody to blame, the grimace of held fire and, if
+# the face standing has timed out, the idle glance; then the face's
+# count comes down by one. Invulnerability has no stage: this game has
+# no cheat and no sphere, so vanilla's test there is never true.
+def Sim.face.widget(+attack: Bool, +level: L.Level, +things: H.Things, +p: Player, +rnd: U32, +health: U32,
+  +oldhealth: U32, f: V.Vec) -> V.Vec:
+  Sim.face.ticked(Sim.face.glance(rnd, health, Sim.face.rampage(attack, health,
+    Sim.face.own(Sim.Hurt.damage(Player.hurt(p)), health, oldhealth,
+      Sim.face.hit(level, things, p, health, oldhealth,
+        Sim.face.grin(I.Inventory.bonus(Player.inv(p)), I.Inventory.weapons(Player.inv(p)), health,
+          Sim.face.dead(health, f)))))))
+
+# The rest of ST_Ticker once M_Random has been drawn: the face widget
+# over the number that draw left, then the health the next tic's ouch
+# test looks back at.
+def Sim.face.tic(+attack: Bool, +level: L.Level, +things: H.Things, +p: Player, +f: V.Vec) -> V.Vec:
+  Sim.face.seen(I.Inventory.health(Player.inv(p)),
+    Sim.face.widget(attack, level, things, p, M.Random.at(Sim.Face.mrnd(f)),
+      I.Inventory.health(Player.inv(p)), V.Vec.get(f, Sim.face.oldhealth()), f))
+
 # The weapon's rows
 # -----------------
 
@@ -1551,14 +1811,16 @@ type Thinkers is Data:
 # the graphics number them), the thinkers, the random table's index, the
 # clock (Doom's leveltime), whether the level has ended, whether use was
 # down on the last tic, the sounds the last tic started and stopped, in
-# order, M_Random's index, the random numbers no demo depends on, and
-# whether the state asks to be built again, which P_DeathThink sets as
-# vanilla's PST_REBORN and whoever runs the tics answers, since a fresh
-# state comes from the map as loaded.
+# order, everything ST_Ticker and M_Random keep outside the playsim
+# (M_Random's index, the random numbers no demo depends on, and the
+# status bar face's counters, all in one vector as Sim.Face lays it
+# out), and whether the state asks to be built again, which P_DeathThink
+# sets as vanilla's PST_REBORN and whoever runs the tics answers, since
+# a fresh state comes from the map as loaded.
 type State is Data:
   State{player: Player, level: L.Level, things: H.Things, sidetex: V.Vec,
     thinkers: Thinkers, rnd: U32, clock: U32, ended: Bool, usedown: Bool,
-    sounds: List<&2, Sn.Sound.Event>, mrnd: U32, reborn: Bool}
+    sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool}
 
 def State.player(s: State) -> Player:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
@@ -1605,9 +1867,13 @@ def State.sounds(s: State) -> List<&2, Sn.Sound.Event>:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   sounds
 
-def State.mrnd(s: State) -> U32:
+# ST_Ticker's and M_Random's own state, which Sim.Face lays out.
+def State.face(s: State) -> V.Vec:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   mrnd
+
+def State.mrnd(s: State) -> U32:
+  Sim.Face.mrnd(State.face(s))
 
 def State.reborn(s: State) -> Bool:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
@@ -1636,10 +1902,9 @@ def State.kept(s: State, t: Thinker) -> State:
 # The state after the tic reports an event: a start draws from M_Random
 # as S_StartSound does.
 def State.heard(+e: Sn.Sound.Event, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, +mrnd, reborn} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown,
-    List.append(&2, Sn.Sound.Event, sounds, [e]), Bool.pick(U32, Sn.Sound.Event.draws(e), M.Random.next(mrnd), mrnd),
-    reborn}
+    List.append(&2, Sn.Sound.Event, sounds, [e]), Sim.Face.drew(Sn.Sound.Event.draws(e), mrnd), reborn}
 
 def State.told.go(events: List<&2, Sn.Sound.Event>, s: State) -> State:
   match events:
@@ -2814,7 +3079,7 @@ def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn
   Sim.psprites.start(Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
     State.populated(things, L.Level.nthings(level),
       State{Player.at(level, place), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), Thinkers{[], []},
-        rnd, 0, False{}, True{}, [], 64, False{}})))
+        rnd, 0, False{}, True{}, [], Sim.Face.start(64), False{}})))
 
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
   State.at.spawned(level, place, H.Thing.spawn(level))
@@ -3519,7 +3784,7 @@ def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: State) -> State:
 def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: State) -> State:
   State{State.player(after), L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after))},
     State.things(after), State.sidetex(after), State.thinkers.of(after), State.rnd(after), (clock + 1 : U32),
-    State.ended(after), use, State.sounds(after), State.mrnd(after), State.reborn(after)}
+    State.ended(after), use, State.sounds(after), State.face(after), State.reborn(after)}
 
 # One tic in Doom's order: the player thinks (the move, the eye, use on
 # the press, the player sprites, the counters), the thinkers run in
@@ -3571,10 +3836,20 @@ def Sim.player(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State)
 def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, before: State, after: State) -> State:
   Sim.tic.kept(geo, clock, K.Cmd.use(cmd), State.told(Sim.thinkers(cmd, geo, State.held(geo, before, after))))
 
+# Doom's ST_Ticker, which G_Ticker runs after P_Ticker, so its draw
+# comes after every sound that tic started: a number from M_Random for
+# the tic, the face widget over it, and the health the next tic looks
+# back at. Held fire is read from the tic command, since A_WeaponReady's
+# attackdown has no field of its own (ticket 11).
+def Sim.st.ticker(attack: Bool, s: State) -> State:
+  State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
+    Sim.face.tic(attack, level, things, player, Sim.Face.drew(True{}, mrnd)), reborn}
+
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: State) -> State:
-  Sim.tic.done(cmd, geo, clock, before, Sim.use(Bool.and(Bool.not(dead), Sim.pressed(cmd, usedown)),
-    Sim.player(dead, cmd, level, clock, before)))
+  Sim.st.ticker(K.Cmd.attack(cmd), Sim.tic.done(cmd, geo, clock, before,
+    Sim.use(Bool.and(Bool.not(dead), Sim.pressed(cmd, usedown)), Sim.player(dead, cmd, level, clock, before))))
 
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:

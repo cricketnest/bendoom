@@ -14,7 +14,9 @@
 # after the same script, over all 200 rows but for the pause graphic and
 # the box the marine's face covers: the status bar's ticker runs on
 # while the playsim is paused, so the face keeps changing under the
-# screenshot. The default script idles 20 tics, past the pistol's rise.
+# screenshot. The report counts that box separately, as `face`, which is
+# 0 only where the face holds still under the pause, as the dead one
+# does. The default script idles 20 tics, past the pistol's rise.
 # Vanilla's monsters wake when they see the player and Bendoom's do not
 # yet, so a place compares the two only while none sees the player.
 #
@@ -165,13 +167,16 @@ def main [
   let shot = vanilla ($bytes | placed $x $y $angle $things) $name $paused $tics $pause $dir
   let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let masked = ($pause | get at) ++ (face-box $bytes)
-  let differing = 0..<(200 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
+  let box = face-box $bytes
+  let masked = ($pause | get at) ++ $box
+  let off = 0..<(200 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) }
+  let differing = $off | where $it not-in $masked
   if not $keep { rm --recursive $dir }
   {
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
+    face: ($off | where $it in $box | length)
     masked: ($masked | uniq | where $it < 200 * 320 | length)
     first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })

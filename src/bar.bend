@@ -3,8 +3,8 @@
 # where ST_createWidgets puts its widget and written as V_DrawPatch
 # writes one, over the background and under nothing. Single player, so
 # the frags widget and the net game's face background are never drawn
-# and the arms panel always is. The face is ticket 23's; until then the
-# background shows in its box.
+# and the arms panel always is. The face is drawn from the index the
+# sim's ST_Ticker chose.
 import Base
 import ./bytes.bend as B
 import ./vec.bend as V
@@ -14,7 +14,8 @@ import ./inventory.bend as I
 
 # The slots of Gfx.bar.names(): the ten tall digits from 0, the ten
 # short ones from 10, the percent sign, the six key icons from 21, the
-# six grey weapon numbers from 27, the arms panel, the background.
+# six grey weapon numbers from 27, the arms panel, the background, and
+# the 42 faces from 35, which the face index numbers.
 def Bar.tall() -> U32:
   0
 
@@ -35,6 +36,9 @@ def Bar.arms() -> U32:
 
 def Bar.back() -> U32:
   34
+
+def Bar.face() -> U32:
+  35
 
 # Patches
 # -------
@@ -193,15 +197,18 @@ def Bar.numbers(+inv: I.Inventory, +ammo: U32, +gfx: G.Gfx, mem: Array<U32>) -> 
       Bar.ammo.go(4n, 0, Bar.ammo.rows(), inv, gfx,
         Bar.num(3n, I.Inventory.rounds(ammo, inv), 44, 171, Bar.tall(), gfx, mem))))
 
-# ST_drawWidgets' icons: the arms panel with its six weapon numbers, and
-# the key slot of each colour.
-def Bar.icons(+inv: I.Inventory, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+# ST_drawWidgets' icons: the arms panel with its six weapon numbers, the
+# face the sim chose at ST_FACESX, ST_FACESY, and the key slot of each
+# colour.
+def Bar.icons(+inv: I.Inventory, +face: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   Bar.keys.go(3n, 0, I.Inventory.cards(inv), gfx,
-    Bar.arms.go(6n, 0, I.Inventory.weapons(inv), gfx,
-      Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem)))
+    Bar.patch(G.Gfx.bar(gfx, (Bar.face() + face : U32)), 143, 168,
+      Bar.arms.go(6n, 0, I.Inventory.weapons(inv), gfx,
+        Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem))))
 
 # Doom's ST_Drawer with the bar on: the background, then the widgets in
 # ST_drawWidgets' order.
-def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
-  Bar.icons(inv, gfx,
+def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +face: U32, +gfx: G.Gfx, mem: Array<U32>) ->
+  Array<U32>:
+  Bar.icons(inv, face, gfx,
     Bar.numbers(inv, H.Thing.Weapon.ammo(ready), gfx, Bar.patch(G.Gfx.bar(gfx, Bar.back()), 0, 168, mem)))
