@@ -820,7 +820,7 @@ def Gfx.sprite.marks(things: List<&2, H.Thing>, +n: Nat, marks: V.Vec) -> V.Vec:
   match things:
     case []:
       marks
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, lastlook} <> rest:
       Gfx.sprite.marks(rest, n, Gfx.sprite.chase(n, False{}, state, state, marks))
 
 def Gfx.sprite.keep(kept: Bool, row: U32, rest: List<&2, U32>) -> List<&2, U32>:

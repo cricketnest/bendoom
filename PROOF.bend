@@ -969,7 +969,7 @@ def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, 
   {S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i) == S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, r, mask, i)
     : Bool}:
   match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches, reject}:
       {==}
 
 # Past a line the box does not stop, the verdict is True in any level.
@@ -1029,7 +1029,7 @@ def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
   {S.Sim.lines(L.Level{geo, sa, pa}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb}, x0, y0, x1, y1)
     : List<&2, U32>}:
   match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches, reject}:
       {==}
 
 # Free is the same in two levels of one geometry: the lines gathered are
@@ -1261,7 +1261,16 @@ def Laws.spawn_phase():
 def Laws.bonus_cycle():
   {==}
 
-def Laws.lasting_stays(id, kind, x, y, z, floorz, ceilz, angle, sector, state):
+def Laws.lasting_stays(id, kind, x, y, z, s):
+  {==}
+
+def Laws.divline_sides():
+  {==}
+
+def Laws.rejected_never_sees(level, m, t):
+  {==}
+
+def Laws.monsters_wake():
   {==}
 
 # The solid columns stay sorted

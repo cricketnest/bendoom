@@ -30,6 +30,20 @@ def Sound.swtchn() -> U32:
 def Sound.itemup() -> U32:
   32
 
+# The sight calls of the four monster types: the former humans share
+# three, the imp two, and the demon has its own.
+def Sound.posit1() -> U32:
+  36
+
+def Sound.posit3() -> U32:
+  38
+
+def Sound.bgsit1() -> U32:
+  39
+
+def Sound.bgsit2() -> U32:
+  40
+
 def Sound.wpnup() -> U32:
   33
 
@@ -57,7 +71,8 @@ def Sound.table() -> List<&2, Sound.Sfx>:
   [Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100}, Sfx{21, "DSDORCLS", 100},
     Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78},
     Sfx{34, "DSOOF", 96}, Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100},
-    Sfx{93, "DSGETPOW", 60}]
+    Sfx{93, "DSGETPOW", 60}, Sfx{36, "DSPOSIT1", 98}, Sfx{37, "DSPOSIT2", 98}, Sfx{38, "DSPOSIT3", 98},
+    Sfx{39, "DSBGSIT1", 98}, Sfx{40, "DSBGSIT2", 98}, Sfx{41, "DSSGTSIT", 98}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel
