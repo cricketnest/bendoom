@@ -45,9 +45,13 @@ type Level.Thing is Data:
 # ceiling flats, as the lumps spell them. A sector's box is the top,
 # bottom, left and right of its lines' ends, in fixed point. The
 # counts are of lines and of sectors. The sector tags are special and
-# tag a sector. The side textures are top, bottom and middle a side as
+# tag a sector, with the REJECT lump's bytes after them, one an entry:
+# a record's width is a budget the whole program shares, so the two
+# lumps share one store and Level.rejected reads past the tags.
+# The side textures are top, bottom and middle a side as
 # the map gives them, and the switches a texture's partner or 0, both in
-# the graphics' numbers, which the graphics' loader fills in.
+# the graphics' numbers, which the graphics' loader fills in. Last is
+# REJECT, one entry a byte of the lump, which Level.rejected reads.
 type Level.Geo is Data:
   Geo{lines: V.Vec, sides: V.Vec, verts: V.Vec, segs: V.Vec, subs: V.Vec, nodes: V.Vec, root: U32,
     blockmap: Level.Blockmap, things: Level.Things, texnames: List<&2, String>,
@@ -126,6 +130,12 @@ def Level.line.side(+l: Level, line: U32, side: U32) -> U32:
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
   Level.word(lines, line, 5, (3 + side : U32))
+
+# The linedef a seg lies along.
+def Level.seg.line(+l: Level, +i: U32) -> U32:
+  Level{Geo{lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+    sectors, specials} = l
+  Level.word(segs, i, 6, 3)
 
 # Doom's P_LoadSegs: the angle and offset as the lump stores them, the
 # back sector only behind a line flagged two-sided.
@@ -219,6 +229,19 @@ def Level.sidetex(+l: Level) -> V.Vec:
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
   sidetex
+
+def Level.rejected.bit(+reject: V.Vec, +at: U32, +pnum: U32) -> Bool:
+  Bool.not(U32.is_zero((V.Vec.get(reject, (at + (pnum >> 3n : U32) : U32))
+    .&. (1 << U32.to_nat((pnum .&. 7 : U32)) : U32) : U32)))
+
+# Doom's REJECT test at the head of P_CheckSight: the bit for the pair
+# of sectors, row s1 and column s2 of a square of nsectors, set when the
+# two can never see each other. Its bytes sit after the sector tags, two
+# words a sector. A level with no REJECT lump rejects nothing.
+def Level.rejected(+l: Level, +s1: U32, +s2: U32) -> Bool:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, +nsectors, +sectags, sidetex, switches},
+    sectors, specials} = l
+  Level.rejected.bit(sectags, (nsectors + nsectors : U32), ((s1 * nsectors : U32) + s2 : U32))
 
 # A switch texture's partner, 0 for a texture that is no switch.
 def Level.switch(+l: Level, texture: U32) -> U32:
@@ -451,13 +474,18 @@ def Level.node.child(+l: Level, n: U32, side: U32) -> U32:
     sectors, specials} = l
   Level.word(nodes, n, 14, (12 + side : U32))
 
-# Doom's R_PointOnSide against node n: 1 on the back (left) side.
-def Level.side_of(+l: Level, +n: U32, +x: U32, +y: U32) -> U32:
+# A node's partition line: x, y, dx and dy in fixed point as words 0 to
+# 3 of its record.
+def Level.node.part(+l: Level, +n: U32, +i: U32) -> U32:
   Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
-  Bool.to_u32(Level.node_side(x, y, F.Fixed.of_map(Level.word(nodes, n, 14, 0)),
-    F.Fixed.of_map(Level.word(nodes, n, 14, 1)), F.Fixed.of_map(Level.word(nodes, n, 14, 2)),
-    F.Fixed.of_map(Level.word(nodes, n, 14, 3))))
+  Level.word(nodes, n, 14, i)
+
+# Doom's R_PointOnSide against node n: 1 on the back (left) side.
+def Level.side_of(+l: Level, +n: U32, +x: U32, +y: U32) -> U32:
+  Bool.to_u32(Level.node_side(x, y, F.Fixed.of_map(Level.node.part(l, n, 0)),
+    F.Fixed.of_map(Level.node.part(l, n, 1)), F.Fixed.of_map(Level.node.part(l, n, 2)),
+    F.Fixed.of_map(Level.node.part(l, n, 3))))
 
 def Level.is_leaf(+n: U32) -> Bool:
   U32.is_ge(n, 32768)
@@ -506,7 +534,10 @@ def Level.fields(ps: U32 & U32, +stride: U32, fields: List<&2, U32>) -> List<&2,
   B.Bytes.fields(U32.to_nat((size / stride : U32)), pos, stride, fields)
 
 # Every word the level keeps, lump by lump in the order Level.pack
-# takes them.
+# takes them. REJECT follows the sector tags in one store, and is read a
+# byte at a time, so each of its entries holds its own byte in the low
+# eight bits and the next one above them, which the bit index never
+# reaches.
 def Level.plan(+map: List<&2, W.Wad.Lump>) -> List<&2, List<&2, U32>>:
   [Level.fields(W.Wad.find(map, "THINGS"), 10, [0, 2, 4, 6, 8]),
     Level.fields(W.Wad.find(map, "LINEDEFS"), 14, [0, 2, 4, 10, 12]),
@@ -518,7 +549,8 @@ def Level.plan(+map: List<&2, W.Wad.Lump>) -> List<&2, List<&2, U32>>:
     Level.fields(W.Wad.find(map, "SECTORS"), 26, [0, 2, 20]),
     Level.fields(W.Wad.find(map, "BLOCKMAP"), 2, [0]),
     Level.fields(W.Wad.find(map, "LINEDEFS"), 14, [6, 8]),
-    Level.fields(W.Wad.find(map, "SECTORS"), 26, [22, 24])]
+    List.append(&2, U32, Level.fields(W.Wad.find(map, "SECTORS"), 26, [22, 24]),
+      Level.fields(W.Wad.find(map, "REJECT"), 1, [0]))]
 
 def Level.vecs(lists: List<&2, List<&2, U32>>) -> List<&2, V.Vec>:
   match lists:

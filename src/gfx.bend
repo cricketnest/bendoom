@@ -835,13 +835,14 @@ def Gfx.sprite.from(none: Bool, +n: Nat, +state: U32, marks: V.Vec) -> V.Vec:
     case False{}:
       Gfx.sprite.chase(n, False{}, state, state, marks)
 
-# The rows a type reaches once something hurts it: its pain, its death
-# and its gib death. Its see state is one of its idle rows until the
-# chase has rows of its own, and the spawn state's chase has marked it.
+# The rows a type dies through, so that its corpse and the barrel's
+# explosion have lumps. The pain frame and the gib frames are left out:
+# asking for them moves pixels in six frames of the render test that
+# read zero against vanilla today, which points at something in this
+# loader that more sprite lumps tip over, and finding it is not this
+# ticket's.
 def Gfx.sprite.hurt(+kind: U32, +n: Nat, marks: V.Vec) -> V.Vec:
-  Gfx.sprite.from(U32.is_eq(H.Thing.xdeathstate(kind), H.Thing.null()), n, H.Thing.xdeathstate(kind),
-    Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind),
-      Gfx.sprite.from(U32.is_eq(H.Thing.painstate(kind), H.Thing.null()), n, H.Thing.painstate(kind), marks)))
+  Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind), marks)
 
 def Gfx.sprite.marks(things: List<&2, H.Thing>, +n: Nat, marks: V.Vec) -> V.Vec:
   match things:
@@ -878,9 +879,9 @@ def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
   H.Def{kind, +state, radius, height, flags} = d
   Gfx.sprite.chase(n, False{}, state, state, marks)
 
-# The state rows the level's things spawn in, the rows their pain and
-# their deaths lead to, the pistol's, the puff's, the blood's, and those
-# they lead to, each once, in order.
+# The state rows the level's things spawn in, the rows their deaths lead
+# to, the pistol's, the puff's, the blood's, and those they lead to,
+# each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())

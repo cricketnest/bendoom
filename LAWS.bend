@@ -1650,18 +1650,25 @@ def Closed.stocked() -> S.State:
   S.State.at(Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 2014, 7, 16, 96, 0, 2018, 7], 15), 3),
     L.Start{2097152, 4194304, 0})
 
+# What P_SpawnMobj leaves on a thing of a type that looked at a player.
+def Closed.spawned.hurt(+kind: U32, lastlook: U32) -> V.Vec:
+  H.Thing.Hurt.start(kind, H.Thing.Def.flags(H.Thing.info(kind)),
+    F.Fixed.of_map(H.Thing.Def.height(H.Thing.info(kind))), lastlook)
+
 # The bonus and the armour as they spawned, in a state for some tics.
 def Closed.bonus(state: U32, tics: U32) -> H.Thing:
-  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, H.Thing.Hurt.of(2014)}
+  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, Closed.spawned.hurt(2014, 1)}
 
 def Closed.armour(state: U32, tics: U32) -> H.Thing:
-  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, H.Thing.Hurt.of(2018)}
+  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, Closed.spawned.hurt(2018, 2)}
 
 # LAW: the spawn's phase, vanilla's P_SpawnMapThing. The player draws
 # the random table's entry 1. The bonus draws entry 2 for P_SpawnMobj,
 # then entry 3, 220, for its first state's tics: 1 + 220 mod 6 = 5. The
 # armour draws entry 4, then entry 5, 241: 1 + 241 mod 6 = 2. The index
-# is 5 (sanity).
+# is 5. P_SpawnMobj's own draw is each one's lastlook, the entry modulo
+# MAXPLAYERS: 109 mod 4 = 1 for the bonus and 222 mod 4 = 2 for the
+# armour (sanity).
 law spawn_phase:
   {(Closed.things(Closed.stocked()), S.State.rnd(Closed.stocked()))
     == ([Closed.bonus(12, 5), Closed.armour(6, 2)], 5)
@@ -1689,22 +1696,78 @@ law bonus_cycle:
     : List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing>
       & List<&2, H.Thing> & List<&2, H.Thing> & U32 & U32}
 
-# LAW: a thing in a lasting state, of -1 tics, standing on its floor
-# with no vertical momentum, is the same thing after its tic, for every
-# thing. The heights are 0 because P_MobjThinker asks whether the mobj
-# is off its floor, and a word operation on a symbolic word is stuck.
+# LAW: a thing in a lasting state, of -1 tics, leaves the state where
+# its tic found it, for every thing, every name and every state: Doom's
+# P_MobjThinker counts no state of -1 tics down and enters no other.
 law lasting_stays:
-  for id: U32
-  for kind: U32
-  for x: U32
-  for y: U32
-  for ceilz: U32
-  for angle: U32
-  for sector: U32
-  for state: U32
-  for hurt: V.Vec
-  {H.Thing.tic(H.Thing{id, kind, x, y, 0, 0, ceilz, angle, sector, state, 4294967295, 0, hurt})
-    == H.Thing{id, kind, x, y, 0, 0, ceilz, angle, sector, state, 4294967295, 0, hurt} : H.Thing}
+  for +id: U32
+  for +kind: U32
+  for +x: U32
+  for +y: U32
+  for +z: U32
+  for s: S.State
+  {S.Sim.thing.step(H.Thing.lasting(Closed.thing(id, kind, x, y, z)),
+    H.Thing.over(Closed.thing(id, kind, x, y, z)), Closed.thing(id, kind, x, y, z), id, s) == s : S.State}
+
+# Sight
+# -----
+
+# LAW: P_DivlineSide's three answers. A line up the y axis through
+# x 64 has a point at x 64 on it, one west of it behind it and one east
+# of it in front. A line east along y 64 from x 0 answers on for the
+# point (64, 32), because vanilla compares the point's x with the line's
+# y where it means its y; (0, 32) is south of it and in front, and
+# (0, 96) north of it and behind. A line out along (1, 1) from the
+# origin has (1, 0) in front, (0, 1) behind and (1, 1) on it, from the
+# whole-unit products 1 against 0, 0 against 1 and 1 against 1.
+law divline_sides:
+  {[S.Sim.sight.side(4194304, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(2097152, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(6291456, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(4194304, 2097152, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(0, 2097152, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(0, 6291456, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(65536, 0, 0, 0, 65536, 65536),
+    S.Sim.sight.side(0, 65536, 0, 0, 65536, 65536),
+    S.Sim.sight.side(65536, 65536, 0, 0, 65536, 65536)]
+    == [2, 1, 0, 2, 0, 1, 0, 1, 2] : List<&2, U32>}
+
+# LAW: a pair of sectors REJECT rules out never sees, for any two mobjs
+# in any level: P_CheckSight answers the lump before it walks the BSP,
+# and nothing the walk could find brings the sight back.
+law rejected_never_sees:
+  for level: L.Level
+  for m: S.Sim.Body
+  for t: S.Sim.Body
+  {S.Sim.sight.between(True{}, level, m, t) == False{} : Bool}
+
+def Closed.looking(a: H.Thing.Action) -> Bool:
+  match a:
+    case H.Look{}:
+      True{}
+    case _:
+      False{}
+
+def Closed.chasing(a: H.Thing.Action) -> Bool:
+  match a:
+    case H.Chase{}:
+      True{}
+    case _:
+      False{}
+
+def Closed.wakes(d: H.Thing.Def) -> Bool:
+  H.Def{+kind, +state, radius, height, flags} = d
+  Bool.or(U32.is_zero(H.Thing.seesound(kind)),
+    Bool.and(Closed.looking(H.Thing.Row.action(H.Thing.row(state))),
+      Bool.and(Closed.row(H.Thing.see(kind)),
+        Closed.chasing(H.Thing.Row.action(H.Thing.row(H.Thing.see(kind)))))))
+
+# LAW: every type that calls out on sight stands in a row that runs
+# A_Look and chases in a row of the table that runs A_Chase, so no
+# monster can wake without a state to wake into and none can watch for
+# the player without A_Look to do it (sanity).
+law monsters_wake:
+  {List.all(~&2, ~H.Thing.Def, ~Closed.wakes, H.Thing.defs()) == True{} : Bool}
 
 # The renderer
 # ------------
