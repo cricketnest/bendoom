@@ -1310,6 +1310,45 @@ def fit_taken(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Invent
         fin_taken(S.Sim.passes(S.Fit{ok, floor, ceil, drop}, S.Player.z(p), S.Sim.height()), level,
           S.Player.holding(p, inv), things, x, y, floor, ceil, over, taken))
 
+def thing_fin_taken(go: Bool, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32,
+  +r: U32, +floor: U32, +ceil: U32, s: S.State,
+  taken: {True{} == S.Sim.Walk.ok(S.Sim.thing.move.fin(go, th, id, level, ox, oy, x, y, r, floor, ceil,
+    s)) : Bool}) -> {True{} == go : Bool}:
+  match go:
+    case False{}:
+      taken
+    case True{}:
+      {==}
+
+# Sim.walks ands the shared rules with the ledge, and Sim.passes ands
+# the verdict with the heights, so a thing that walked stood where the
+# check passed.
+def walks_taken(f: S.Sim.Fit, +z: U32, +height: U32, e: {True{} == S.Sim.walks(f, z, height) : Bool}) ->
+  {True{} == S.Sim.Fit.ok(f) : Bool}:
+  match f:
+    case S.Fit{+ok, +floor, +ceil, +drop}:
+      and_true_left(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), height),
+          Bool.and(F.Fixed.ge((ceil - z : U32), height),
+            F.Fixed.le((floor - z : U32), S.Sim.step_up()))),
+        and_true_left(S.Sim.passes(S.Fit{ok, floor, ceil, drop}, z, height),
+          F.Fixed.le((floor - drop : U32), S.Sim.step_up()), e))
+
+def thing_fit_taken(+z: U32, +height: U32, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32,
+  +x: U32, +y: U32, +r: U32, f: S.Sim.Fit, s: S.State,
+  taken: {True{} == S.Sim.Walk.ok(S.Sim.thing.move.fit(z, height, th, id, level, ox, oy, x, y, r, f,
+    s)) : Bool}) -> {True{} == S.Sim.Fit.ok(f) : Bool}:
+  match f:
+    case S.Fit{+ok, +floor, +ceil, +drop}:
+      walks_taken(S.Fit{ok, floor, ceil, drop}, z, height,
+        thing_fin_taken(S.Sim.walks(S.Fit{ok, floor, ceil, drop}, z, height), th, id, level, ox, oy, x, y, r,
+          floor, ceil, s, taken))
+
+def Laws.thing_move_is_checked(m, th, id, level, x, y, ts, p, s, taken):
+  match m:
+    case S.Body{i, ox, oy, +z, +radius, +height, flags}:
+      thing_fit_taken(z, height, th, id, level, ox, oy, x, y, radius,
+        S.Sim.check(level, ts, p, S.Body{i, x, y, z, radius, height, flags}, 3), s, taken)
+
 def Laws.move_is_checked(level, things, p, x, y, taken):
   +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
   fit_taken(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
