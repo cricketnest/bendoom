@@ -3771,20 +3771,21 @@ def Sim.death(+level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, s: State) -> 
 def Sim.pressed(cmd: K.Cmd, usedown: Bool) -> Bool:
   Bool.and(Bool.not(usedown), K.Cmd.use(cmd))
 
-# The player where it stood before a thinker's turn, as the turn left
-# it otherwise, the lines it crossed fired and forgotten.
-def Player.held(before: Player, after: Player) -> Player:
-  Player{x, y, bz, ba, bmomx, bmomy, bmomz, bfloorz, bceilz, bviewheight, bdeltaview, bviewz, bcrossed, binv, bpsprites, bhurt} = before
+# The player back at the place it stood before a thinker's turn, as the
+# turn left it otherwise, the lines it crossed fired and forgotten.
+def Player.held(+x: U32, +y: U32, after: Player) -> Player:
   Player{ax, ay, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = after
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, [], inv, psprites, hurt}
 
 # What a turn keeps of the state it began with, whatever it did: the
 # geometry, so no tic writes a wall, and the player's place, so nothing
-# but the player's own movement moves the player sideways.
-def State.held(geo: L.Level.Geo, before: State, after: State) -> State:
-  State{was, wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn} = before
+# but the player's own movement moves the player sideways. Those two
+# pieces come in on their own: a hold that took the whole state before
+# would hold two states at once, and the budget of docs/bend.md's width
+# cap has no room for that.
+def State.held(geo: L.Level.Geo, +x: U32, +y: U32, after: State) -> State:
   State{player, L.Level{g, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = after
-  State{Player.held(was, player), L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended,
+  State{Player.held(x, y, player), L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended,
     usedown, sounds, mrnd, reborn}
 
 # P_PlayerThink's counters, the damage count's fade among them.
@@ -3809,12 +3810,18 @@ def Sim.mobj.z(t: Sim.Try) -> Sim.Try:
 # its position checks make, then the vertical, against the level the tic
 # began with, whose geometry the wall law reads; the lines that movement
 # crossed fire, the mobj goes through its own states, which time its
-# pain and its death, and the thinker is kept.
+# pain and its death, and the thinker is kept. Each let ends a state:
+# the thinker's id is read before the move, so the state the tic began
+# with is gone once it has moved, and the place before the states run,
+# so the state the move left is gone once they have.
 def Sim.mobj(+cmd: K.Cmd, +geo: L.Level.Geo, +s: State) -> State:
   +level = {L.Level{geo, L.Level.sectors(State.level(s)), L.Level.specials(State.level(s))} : L.Level}
+  +you = H.Things.you(State.things(s))
   +went = State.moved(Sim.mobj.z(Sim.xy(level, State.things(s), cmd, State.player(s))), level, s)
-  State.kept(State.held(geo, went, Sim.mobj.tics(Sim.cross(Player.crossed(State.player(went)), went))),
-    Mobj{H.Things.you(State.things(s))})
+  +x = Player.x(State.player(went))
+  +y = Player.y(State.player(went))
+  State.kept(State.held(geo, x, y, Sim.mobj.tics(Sim.cross(Player.crossed(State.player(went)), went))),
+    Mobj{you})
 
 # Whether a thinker is the player's mobj's.
 def Sim.mine(t: Thinker, you: U32) -> Bool:
@@ -3831,7 +3838,9 @@ def Sim.turn(mine: Bool, t: Thinker, cmd: K.Cmd, +geo: L.Level.Geo, +s: State) -
     case True{}:
       Sim.mobj(cmd, geo, s)
     case False{}:
-      State.held(geo, s, Sim.think(t, s))
+      +x = Player.x(State.player(s))
+      +y = Player.y(State.player(s))
+      State.held(geo, x, y, Sim.think(t, s))
 
 # One run down the thinkers due, its fuel the list of them as it began:
 # each in turn, in the order they were started. Those started meanwhile
@@ -3923,12 +3932,14 @@ def Sim.player(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State)
 # the things were heard doing is reported when its last thinker has run.
 # An ended level stands still: no tic runs, so its sounds stay the last
 # live tic's, and whoever gathers sounds tic by tic passes over it.
-def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, before: State, after: State) -> State:
-  Sim.tic.kept(geo, clock, K.Cmd.use(cmd), State.told(Sim.thinkers(cmd, geo, State.held(geo, before, after))))
+def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +x: U32, +y: U32, after: State) -> State:
+  Sim.tic.kept(geo, clock, K.Cmd.use(cmd), State.told(Sim.thinkers(cmd, geo, State.held(geo, x, y, after))))
 
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: State) -> State:
-  Sim.tic.done(cmd, geo, clock, before, Sim.use(Bool.and(Bool.not(dead), Sim.pressed(cmd, usedown)),
+  +x = Player.x(State.player(before))
+  +y = Player.y(State.player(before))
+  Sim.tic.done(cmd, geo, clock, x, y, Sim.use(Bool.and(Bool.not(dead), Sim.pressed(cmd, usedown)),
     Sim.player(dead, cmd, level, clock, before)))
 
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
