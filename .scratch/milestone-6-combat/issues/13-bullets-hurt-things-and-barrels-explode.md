@@ -37,7 +37,7 @@
 
 - `bend PROOF.bend`: `All terms check.`
 - Every `tests/*.bend` passes native and on bun, before and after the merge of `milestone-6-7`.
-- The oracle, `nu tools/oracle.nu x y degrees script --frame`, Freedoom, `masked` 1595 in every report:
+- The oracle, `nu tools/oracle.nu x y degrees script --frame`, Freedoom, `masked` 1595 in every report, the frame dump built from this tree after the last merge of `milestone-6-7`, which carries the sight ticket, the sound pass, the width refactor, the face and the heads-up line:
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
