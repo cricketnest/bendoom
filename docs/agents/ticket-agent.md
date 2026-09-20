@@ -7,7 +7,7 @@ What every agent dispatched to a ticket does. The dispatch prompt names the work
 - Only in the worktree the prompt names. Never touch the main checkout or a sibling worktree. Never rebase or push, and never commit to another branch. The one merge you make is the last step: once your work is committed, merge the integration branch the prompt names INTO your branch, resolve the conflicts by reading both sides, and run the proof and the tests again, so that your branch merges back clean.
 - Run tools through the dev shell, `nix develop -c <command>` from the worktree: bend, bun, nu, chocolate-doom, Xvfb and xdotool are in it, and `BENDOOM_IWAD` is Freedoom there. The shareware WAD is `doom1.wad` under the `doom1-wad` store path (`nix build .#doom1-wad --print-out-paths`).
 - Other agents run the same commands beside you. Never kill processes by a pattern (`pkill -f`, `killall`); kill only a PID you started.
-- Proof checks peak at about 4 GB of memory. At most four agents run at a time, which fits with no lock. Do not run `nix flake check`: the orchestrator runs it on the integration branch after each merge.
+- Proof checks peak at about 4 GB of memory. Run the proof under the one lock, so that one runs at a time across all agents: `flock /tmp/bendoom-heavy.lock nix develop -c bend PROOF.bend`. Do not run `nix flake check`: the orchestrator runs it on the integration branch after each merge, under the same lock.
 - Scratch files go under `/tmp/<branch>/`, never in the repo.
 
 ## Read before editing
