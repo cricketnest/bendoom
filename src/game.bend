@@ -98,9 +98,10 @@ def Game.advanced(+from: S.State, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, l
   tables: P.Project.Tables, input: K.Input, again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
   music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
+  +was = S.State.ended(from)
   +next = S.Sim.replay(cmds, from)
   do IO<Bool & Game>:
-    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(S.State.ended(next), Bool.not(S.State.ended(from))),
+    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(S.State.ended(next), Bool.not(was)),
       S.State.clock(next), demo)
     return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, music})
 
