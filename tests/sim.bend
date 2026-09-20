@@ -52,6 +52,48 @@
 # armour bonus makes 1 point of type 1 and counts; green armour makes
 # 100 of type 1 and stays for 100. Every contact tic, where the reach of
 # 36 is first met, is a regression pin.
+# Then the damage, each run printed with the place line, the health, the
+# armour, the momentum, the mobj's state row and tics, the damage count,
+# the attacker, the player sprites, the random index and whether the
+# state asks for the level again. The nukage of Freedoom's sector 173,
+# stood in from 1600, 1000: P_PlayerInSpecialSector takes 5 health every
+# 32 tics of the clock, the first on the tic the level begins, and
+# P_DamageMobj puts the mobj into its pain state, whose second row
+# sounds sfx_plpain where P_MobjThinker's count of 4 runs out, three
+# tics later; the pain state is entered unless the draw reaches the
+# player's pain chance of 255, which none of these does.
+# P_PlayerThink's counters fade the damage count on the tic that raises
+# it. Armour takes a third of the blow when green and a half when blue,
+# rounded down, so 1 and 2 of 5, and green armour of a single point
+# gives it and loses its type. The twentieth blow, on the tic the clock
+# reads 608, leaves no health: P_KillMobj drops the weapon, which
+# A_Lower sinks 6 as it enters the down state and 6 more in
+# P_MovePsprites, and puts the mobj in its death state for 10 tics less
+# a random 0 to 3, a regression pin, since the level's random blinks
+# draw between the blows; its second row sounds sfx_pldeth.
+# P_DeathThink then sinks the view a unit a tic from 41 to 6 and leaves
+# the corpse in the last death row, and a use asks for the level again.
+# The health, the shares, the rows and the tics are p_inter.c, p_spec.c,
+# p_user.c, p_pspr.c and info.c worked by hand.
+# Then two blows no monster exists to deal yet, dealt by hand in the
+# one-sector room of the closed laws on a barrel of the state's own: 20
+# points from 64 units south thrust the player by 20 * 8192 along the
+# angle from the inflictor, which for a thing due south is ANG90 - 1,
+# fine index 2047, sine 65535 and cosine 25, so 2.499954 north and
+# 0.000946 east, and the pain roll draws 8 at index 1. A lethal 20
+# points from 512 units south and 128 below draw first for the fall
+# forwards, 109 at index 2, which is odd, so the angle turns by 180 and
+# the thrust is four times as much, 9.999847 south; P_KillMobj's draw
+# is then 220 at index 3, whose low two bits are 0, so the death state
+# keeps its 10 tics. The view turns to the attacker 5 degrees a tic
+# from 0 degrees toward 270: 18 steps of ANG90/18 leave 10 units of
+# angle, inside ANG5, so the nineteenth snaps to it, and the damage
+# count holds until the view is on the attacker and fades from then on.
+# The sine, the cosine and the draws are Chocolate Doom's tables.c and
+# m_random.c.
+# Then the clip west of 672, 992: a player killed on the spot and slid
+# west at 5 a tic passes over it and takes nothing, where a living one
+# slid the same way takes it.
 # Then the movers and the lights, as runs of one command in a demo's
 # units from a place, each line with the clock, the thinkers running
 # and chosen sectors' floors and ceilings: the first door used, turned
@@ -335,8 +377,8 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 
 # The state with the player holding an inventory.
 def holding(inv: I.Inventory, s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
 
 # The blue key, record 87, taken strafing past it, the oracle's script:
 # 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
@@ -460,12 +502,12 @@ def opens(+open: S.State) -> IO(Unit):
 # where it now stands, as P_UnsetThingPosition and P_SetThingPosition
 # relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
   S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
-    sounds, mrnd}
+    sounds, mrnd, reborn}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -665,7 +707,7 @@ def kinds(defs: List<&2, H.Thing.Def>, +things: List<&2, H.Thing>) -> String:
   match defs:
     case []:
       ""
-    case H.Def{+kind, state, radius, height, flags, see, seesound} <> rest:
+    case H.Def{+kind, state, radius, height, flags} <> rest:
       " " ++ U32.show(kind) ++ ":" ++ U32.show(count(things, kind)) ++ kinds(rest, things)
 
 def ids(things: List<&2, H.Thing>) -> String:
@@ -679,7 +721,7 @@ def described(d: Maybe<&2, H.Thing.Def>) -> String:
   match d:
     case None{}:
       " undefined"
-    case Some{H.Def{kind, state, radius, height, flags, see, seesound}}:
+    case Some{H.Def{kind, state, radius, height, flags}}:
       " radius " ++ U32.show(radius) ++ " height " ++ U32.show(height) ++ " flags " ++ U32.show(flags)
 
 # A thing's line, empty for one gone.
@@ -708,7 +750,7 @@ type Links is Data:
   Links{links: U32, solid: U32, wrong: U32}
 
 def solid.def(d: H.Thing.Def) -> Bool:
-  H.Def{k, state, radius, height, +flags, see, seesound} = d
+  H.Def{k, state, radius, height, +flags} = d
   Bool.not(U32.is_zero((flags .&. 2 : U32)))
 
 def solid(+kind: U32) -> Bool:
@@ -1036,6 +1078,148 @@ def weapon(+level: L.Level) -> IO(Unit):
     w10 : S.State <- armed(59n, idle(), w9)
     IO.print("-")
 
+# What a blow left on the player: its mobj's state row and the tics in
+# it, the damage count and who is to blame.
+def wound(+h: V.Vec) -> String:
+  " state " ++ U32.show(S.Sim.Hurt.state(h)) ++ "/" ++ U32.show(S.Sim.Hurt.tics(h)) ++ " damage "
+    ++ U32.show(S.Sim.Hurt.damage(h)) ++ " attacker " ++ U32.show(S.Sim.Hurt.attacker(h))
+
+# A state's place line, then the health, the armour, the momentum the
+# blow left, the wound, the player sprites and whether the state asks
+# for the level again.
+def bruised(tag: String, +q: S.State) -> String:
+  +p = S.State.player(q)
+  +inv = S.Player.inv(p)
+  line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q) ++ " health " ++ U32.show(I.Inventory.health(inv))
+    ++ " armour " ++ U32.show(I.Inventory.armour(inv)) ++ " type " ++ U32.show(I.Inventory.armourtype(inv))
+    ++ " momentum " ++ F.Fixed.show(S.Player.momx(p)) ++ " " ++ F.Fixed.show(S.Player.momy(p))
+    ++ wound(S.Player.hurt(p)) ++ psprites(S.Player.psprites(p)) ++ " random "
+    ++ U32.show(S.State.rnd(q)) ++ " reborn " ++ Bool.show(S.State.reborn(q))
+
+# A state as it stands, with what it has been heard to start.
+def shown(tag: String, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ bruised(tag, s))
+    return s
+
+# A run, then the same.
+def hurt(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+  +r = ran(n, cmd, s)
+  +q = Run.state(r)
+  do IO<S.State>:
+    IO.print(Run.log(r) ++ bruised(tag, q))
+    return q
+
+# The nukage of Freedoom's sector 173, stood in from its middle: 5
+# health every 32 tics of the clock, the first on the tic the level
+# begins, and armour taking its share of each blow.
+def nukage(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    n0 : S.State <- hurt("nukage", 1n, idle(), at(level, 1600, 1000, 90))
+    n1 : S.State <- hurt("-", 3n, idle(), n0)
+    n2 : S.State <- hurt("-", 4n, idle(), n1)
+    n3 : S.State <- hurt("-", 25n, idle(), n2)
+    n4 : S.State <- hurt("-", 4n, idle(), n3)
+    g0 : S.State <- hurt("green armour nukage", 1n, idle(),
+      holding(stocked(100, 100, 1, [50, 0, 0, 0], I.Inventory.start()), at(level, 1600, 1000, 90)))
+    g1 : S.State <- hurt("green armour worn out", 1n, idle(),
+      holding(stocked(100, 1, 1, [50, 0, 0, 0], I.Inventory.start()), at(level, 1600, 1000, 90)))
+    b0 : S.State <- hurt("blue armour nukage", 1n, idle(),
+      holding(stocked(100, 100, 2, [50, 0, 0, 0], I.Inventory.start()), at(level, 1600, 1000, 90)))
+    IO.print(drawn(n4))
+    IO.print("-")
+
+# The nukage from the same place until it kills: the twentieth blow, on
+# the tic the clock reads 608, leaves no health. The view then sinks a
+# unit a tic to 6 over the floor, the pistol sinks 6 a tic to the
+# bottom of the screen, and a use asks for the level again.
+def dying(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    d0 : S.State <- hurt("nukage until it kills", 608n, idle(), at(level, 1600, 1000, 90))
+    d1 : S.State <- hurt("death", 1n, idle(), d0)
+    d2 : S.State <- hurt("-", 6n, idle(), d1)
+    d3 : S.State <- hurt("-", 1n, idle(), d2)
+    d4 : S.State <- hurt("-", 7n, idle(), d3)
+    d5 : S.State <- hurt("-", 27n, idle(), d4)
+    d6 : S.State <- hurt("-", 32n, idle(), d5)
+    d7 : S.State <- hurt("use", 1n, use(), d6)
+    d8 : S.State <- hurt("-", 1n, idle(), d7)
+    IO.print(drawn(d8))
+    IO.print("-")
+
+def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
+  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{p, level, H.Things.put(H.Things.none(1, H.Thing.you(), 1, 1), 0, Some{thing}), sidetex, thinkers, rnd,
+    clock, ended, usedown, sounds, mrnd, reborn}
+
+# A state in the one-sector room of the closed laws: the player at rest
+# at the origin facing east with some health, the random index a blow's
+# draw is to start from, and a barrel named 0 at a place, which is only
+# a name and a place, since it is linked in no blockmap and nothing but
+# the blow reads it.
+def struck(health: U32, rnd: U32, tx: U32, ty: U32, tz: U32) -> S.State:
+  struck.in(holding(stocked(health, 0, 0, [50, 0, 0, 0], I.Inventory.start()),
+    S.State.at(L.Level.room(0, 128), L.Start{0, 0, 0})), rnd,
+    H.Thing{0, 2035, F.Fixed.of_map(tx), F.Fixed.of_map(ty), tz, 0, 8388608, 0, 0, 10, 6, 0})
+
+def blown(damage: U32, s: S.State) -> S.State:
+  S.Sim.damage(damage, 0, 0, s)
+
+# A blow from a thing, which nothing on the map can deal yet: the thrust
+# away from the inflictor, the attacker kept, and after a lethal one the
+# view turning to it 5 degrees a tic while the damage count holds.
+def blows() -> IO(Unit):
+  do IO<Unit>:
+    h0 : S.State <- shown("blow from the south", blown(20, struck(100, 0, 0, 4294967232, 0)))
+    h1 : S.State <- hurt("-", 1n, idle(), h0)
+    f0 : S.State <- shown("lethal blow from below", blown(20, struck(10, 1, 0, 4294966784, 4286578688)))
+    f1 : S.State <- hurt("-", 1n, idle(), f0)
+    f2 : S.State <- hurt("-", 16n, idle(), f1)
+    f3 : S.State <- hurt("-", 1n, idle(), f2)
+    f4 : S.State <- hurt("-", 1n, idle(), f3)
+    f5 : S.State <- hurt("-", 1n, idle(), f4)
+    IO.print(drawn(f5))
+    IO.print("-")
+
+# The state's player sliding, a corpse pushed by a blow no run can give
+# it here.
+def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
+  S.State{S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+
+# The clip west of 672, 992, which a walk from there takes on its tenth
+# tic: a corpse killed on the spot and slid west over it at 5 a tic
+# takes nothing, where a living player slid the same way takes it.
+def corpses(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    c0 : S.State <- picked("corpse slide", 20n, idle(), at(level, 672, 992, 180),
+      sliding(4294639616, 0, S.Sim.damage(100, H.Thing.you(), H.Thing.you(), at(level, 672, 992, 180))))
+    c1 : S.State <- picked("live slide", 20n, idle(), at(level, 672, 992, 180),
+      sliding(4294639616, 0, at(level, 672, 992, 180)))
+    IO.print("-")
+
+# The nukage, the armour, the death and the restart, the blows no
+# monster can deal yet, and the corpse that takes nothing.
+def damaged(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    nukage(level)
+    dying(level)
+    blows()
+    corpses(level)
+
+# Everything the two walks do not cover, from the map as loaded and from
+# the map with three records rewritten.
+def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    weapon(level)
+    pickups(level)
+    damaged(level)
+    door(level)
+    patched.cases(level, patched(W.Wad.dir(a)))
+    relinks(level)
+
 # Whether a sector pair is rejected, as REJECT's bit for it says.
 def rejects(pairs: List<&2, U32>, +level: L.Level) -> String:
   match pairs:
@@ -1087,7 +1271,9 @@ def sighting(tag: String, ids: List<&2, U32>, n: Nat, x: U32, y: U32, degrees: U
 # A_Look over Freedoom's monsters. First REJECT, read from the lump in
 # nushell: Freedoom's E1M1 has 182 sectors, so the lump is 4141 bytes
 # and its last one holds the pairs (181, 178) to (181, 181), which the
-# loader would lose if it read the lump as whole words.
+# loader would lose if it read the lump as whole words. It keeps the
+# bytes after the sector tags in one store, since a record's width is a
+# budget the whole program shares.
 # Sector 36's demon, record 92, stands
 # at (-48, 1616) facing east and is deaf; the player 96 units due east
 # of it is dead ahead, so it wakes on its first look, the tic its spawn
@@ -1141,11 +1327,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     IO.print("the walks: " ++ drawn(p14) ++ ", " ++ drawn(q6))
-    weapon(level)
-    pickups(level)
-    door(level)
-    patched.cases(level, patched(W.Wad.dir(a)))
-    relinks(level)
+    cases(a, level)
     sights(level)
 
 def main() -> IO(Unit):
@@ -1389,6 +1571,86 @@ def main() -> IO(Unit):
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
 #|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 68
+#|-
+#|nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 4 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
+#|sound tic 4 DSBGSIT1 from thing 85 vol 32 sep 219
+#|sound tic 4 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|- tic 4 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 72/4 damage 1 attacker 4294967295 state Some(60) tics 1 at 0.000000 98.000000 flash None tics 0 at 0.000000 98.000000 random 64 reborn False
+#|sound tic 6 DSPOSIT2 from thing 240 vol 34 sep 33
+#|sound tic 8 DSBGSIT2 from thing 81 vol 26 sep 33
+#|- tic 8 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 4294967295 state Some(60) tics 1 at 0.000000 74.000000 flash None tics 0 at 0.000000 74.000000 random 68 reborn False
+#|sound tic 9 DSBGSIT1 from thing 82 vol 23 sep 35
+#|sound tic 14 DSBGSIT1 from thing 84 vol 45 sep 91
+#|- tic 33 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 90 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 4 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 78 reborn False
+#|sound tic 36 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|- tic 37 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 90 armour 0 type 0 momentum 0.000000 0.000000 state 72/3 damage 0 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 78 reborn False
+#|green armour nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 96 armour 99 type 1 momentum 0.000000 0.000000 state 71/3 damage 3 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
+#|green armour worn out tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 96 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 3 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
+#|blue armour nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 97 armour 98 type 2 momentum 0.000000 0.000000 state 71/3 damage 2 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
+#|sounds drew to 71
+#|-
+#|sound tic 4 DSBGSIT1 from thing 85 vol 32 sep 219
+#|sound tic 4 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 6 DSPOSIT2 from thing 240 vol 34 sep 33
+#|sound tic 8 DSBGSIT2 from thing 81 vol 26 sep 33
+#|sound tic 9 DSBGSIT1 from thing 82 vol 23 sep 35
+#|sound tic 14 DSBGSIT1 from thing 84 vol 45 sep 91
+#|sound tic 36 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 68 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 100 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 132 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 164 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 196 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 228 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 260 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 292 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 324 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 356 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 388 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 420 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 452 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 484 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 516 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 548 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 580 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|nukage until it kills tic 608 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 5 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 192 reborn False
+#|death tic 609 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 73/8 damage 4 attacker 4294967295 state Some(69) tics 1 at 1.000000 44.000000 flash None tics 0 at 1.000000 44.000000 random 195 reborn False
+#|- tic 615 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 35.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 73/2 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 80.000000 flash None tics 0 at 1.000000 80.000000 random 197 reborn False
+#|- tic 616 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 34.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 73/1 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 86.000000 flash None tics 0 at 1.000000 86.000000 random 198 reborn False
+#|sound tic 617 DSPLDETH from thing 4294967295 vol 64 sep 128
+#|- tic 623 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 27.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 74/4 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 202 reborn False
+#|- tic 650 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 77/7 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 204 reborn False
+#|- tic 682 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn False
+#|use tic 683 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn True
+#|- tic 684 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn True
+#|sounds drew to 89
+#|-
+#|blow from the south tic 0 0.000000 0.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000 health 80 armour 0 type 0 momentum 0.000946 2.499954 state 71/4 damage 20 attacker 0 state Some(60) tics 1 at 0.000000 122.000000 flash None tics 0 at 0.000000 0.000000 random 1 reborn False
+#|- tic 1 0.000946 2.499954 0.000 z 0.000000 floor 0.000000 eye 41.000289 health 80 armour 0 type 0 momentum 0.000854 2.265579 state 71/3 damage 19 attacker 0 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 1 reborn False
+#|lethal blow from below tic 0 0.000000 0.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000 health 0 armour 0 type 0 momentum -0.003814 -9.999847 state 73/10 damage 20 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 0.000000 random 3 reborn False
+#|- tic 1 -0.003814 -9.999847 354.995 z 0.000000 floor 0.000000 eye 40.003051 health 0 armour 0 type 0 momentum -0.003463 -9.062362 state 73/9 damage 20 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
+#|sound tic 10 DSPLDETH from thing 4294967295 vol 64 sep 128
+#|- tic 17 -0.033691 -86.656158 274.998 z 0.000000 floor 0.000000 eye 23.489440 health 0 armour 0 type 0 momentum -0.000778 -1.875976 state 74/3 damage 20 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
+#|- tic 18 -0.034469 -88.532135 270.000 z 0.000000 floor 0.000000 eye 22.642181 health 0 armour 0 type 0 momentum -0.000717 -1.700103 state 74/2 damage 20 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
+#|- tic 19 -0.035186 -90.232238 270.000 z 0.000000 floor 0.000000 eye 21.785339 health 0 armour 0 type 0 momentum -0.000656 -1.540725 state 74/1 damage 19 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
+#|- tic 20 -0.035842 -91.772964 270.000 z 0.000000 floor 0.000000 eye 20.905944 health 0 armour 0 type 0 momentum -0.000595 -1.396286 state 75/10 damage 18 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
+#|sounds drew to 65
+#|-
+#|sound tic 6 DSPOSIT2 from thing 240 vol 54 sep 148
+#|sound tic 8 DSBGSIT2 from thing 81 vol 61 sep 157
+#|sound tic 9 DSBGSIT1 from thing 82 vol 57 sep 191
+#|sound tic 10 DSPLDETH from thing 4294967295 vol 64 sep 128
+#|sound tic 14 DSBGSIT1 from thing 84 vol 12 sep 173
+#|corpse slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 20.976486
+#|  inventory health 0 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|sound tic 6 DSPOSIT3 from thing 240 vol 54 sep 148
+#|sound tic 8 DSBGSIT1 from thing 81 vol 61 sep 157
+#|sound tic 8 stop thing 140
+#|sound tic 8 DSITEMUP from nobody vol 64 sep 128
+#|sound tic 9 DSBGSIT2 from thing 82 vol 57 sep 191
+#|sound tic 14 DSBGSIT2 from thing 84 vol 12 sep 173
+#|live slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 40.976486
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 208 taken 140
 #|-
 #|sound tic 5 DSPOSIT2 from thing 176 vol 64 sep 65
 #|door walk tic 40 871.974029 448.783554 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000
@@ -1692,20 +1954,20 @@ def main() -> IO(Unit):
 #|links 210 of 210 things, solid 108 of 108, wrong 0, unlinked 0
 #|reject 17,17 False 36,36 False 17,5 False 36,87 False 36,56 False 5,66 True 181,178 True 181,179 True 181,180 True 181,181 False
 #|sound tic 7 DSSGTSIT from thing 92 vol 64 sep 129
-#|front and deaf tic 12 92:95/1 90:64/8 96:64/4 sight 92 True 90 True 96 False random 64
+#|front and deaf tic 12 92:105/1 90:64/8 96:64/4 sight 92 True 90 True 96 False random 64
 #|sounds drew to 65
 #|sound tic 7 DSSGTSIT from thing 92 vol 49 sep 132
-#|behind tic 30 90:64/10 92:96/1 sight 90 True 92 True random 65
+#|behind tic 30 90:64/10 92:106/1 sight 90 True 92 True random 65
 #|sounds drew to 65
 #|sound tic 7 DSSGTSIT from thing 92 vol 49 sep 125
 #|sound tic 10 DSPOSIT3 from thing 90 vol 64 sep 224
-#|behind in reach tic 12 90:77/1 92:95/1 sight 90 True 92 True random 65
+#|behind in reach tic 12 90:87/1 92:105/1 sight 90 True 92 True random 65
 #|sounds drew to 66
 #|sound tic 6 DSPOSIT2 from thing 96 vol 64 sep 33
-#|through the wall tic 20 96:81/1 sight 96 True random 70
+#|through the wall tic 20 96:91/1 sight 96 True random 70
 #|sounds drew to 65
 #|sound tic 15 DSPOSIT3 from thing 177 vol 57 sep 101
-#|over the pit tic 20 177:70/3 176:61/5 sight 177 True 176 False random 69
+#|over the pit tic 20 177:80/3 176:61/5 sight 177 True 176 False random 69
 #|sounds drew to 65
 #|off the pit tic 20 177:61/5 176:61/5 sight 177 False 176 False random 65
 #|sounds drew to 64

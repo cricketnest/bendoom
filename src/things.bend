@@ -29,12 +29,17 @@ type Thing is Data:
 def Thing.you() -> U32:
   4294967295
 
-# What a state row does as it is entered, Doom's action pointers:
-# nothing, A_Raise, A_WeaponReady, A_Look, A_Chase.
+# What a state row does as it is entered, Doom's action pointers: a
+# weapon's A_Raise, A_WeaponReady and A_Lower, a mobj's A_Pain,
+# A_PlayerScream, A_Look and A_Chase, or nothing. A row of one kind
+# never holds the other's.
 type Thing.Action is Data:
   Null{}
   Raise{}
   WeaponReady{}
+  Lower{}
+  Pain{}
+  Scream{}
   Look{}
   Chase{}
 
@@ -49,8 +54,10 @@ type Thing.Row is Data:
 # The state rows by Bendoom's number: every state the spawn states of the
 # types below lead to, in vanilla's order, then the pistol's ready and
 # raise states, then the monsters' two idle states each, where A_Look
-# watches for the player, and their eight run states each, where
-# A_Chase would chase it. None has 0 tics, so no state entry chains
+# watches for the player, then the pistol's down state and the player
+# mobj's own, whose death ends in row 0, the corpse a dead marine record
+# spawns in, and last the monsters' eight run states each, where A_Chase
+# would chase the player. None has 0 tics, so no state entry chains
 # through a row of no length.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}},
@@ -87,22 +94,27 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"SPOS", 0, False{}, 10, 64, Look{}}, Row{"SPOS", 1, False{}, 10, 63, Look{}},
     Row{"TROO", 0, False{}, 10, 66, Look{}}, Row{"TROO", 1, False{}, 10, 65, Look{}},
     Row{"SARG", 0, False{}, 10, 68, Look{}}, Row{"SARG", 1, False{}, 10, 67, Look{}},
-    Row{"POSS", 0, False{}, 4, 70, Chase{}}, Row{"POSS", 0, False{}, 4, 71, Chase{}},
-    Row{"POSS", 1, False{}, 4, 72, Chase{}}, Row{"POSS", 1, False{}, 4, 73, Chase{}},
-    Row{"POSS", 2, False{}, 4, 74, Chase{}}, Row{"POSS", 2, False{}, 4, 75, Chase{}},
-    Row{"POSS", 3, False{}, 4, 76, Chase{}}, Row{"POSS", 3, False{}, 4, 69, Chase{}},
-    Row{"SPOS", 0, False{}, 3, 78, Chase{}}, Row{"SPOS", 0, False{}, 3, 79, Chase{}},
-    Row{"SPOS", 1, False{}, 3, 80, Chase{}}, Row{"SPOS", 1, False{}, 3, 81, Chase{}},
-    Row{"SPOS", 2, False{}, 3, 82, Chase{}}, Row{"SPOS", 2, False{}, 3, 83, Chase{}},
-    Row{"SPOS", 3, False{}, 3, 84, Chase{}}, Row{"SPOS", 3, False{}, 3, 77, Chase{}},
-    Row{"TROO", 0, False{}, 3, 86, Chase{}}, Row{"TROO", 0, False{}, 3, 87, Chase{}},
-    Row{"TROO", 1, False{}, 3, 88, Chase{}}, Row{"TROO", 1, False{}, 3, 89, Chase{}},
-    Row{"TROO", 2, False{}, 3, 90, Chase{}}, Row{"TROO", 2, False{}, 3, 91, Chase{}},
-    Row{"TROO", 3, False{}, 3, 92, Chase{}}, Row{"TROO", 3, False{}, 3, 85, Chase{}},
-    Row{"SARG", 0, False{}, 2, 94, Chase{}}, Row{"SARG", 0, False{}, 2, 95, Chase{}},
-    Row{"SARG", 1, False{}, 2, 96, Chase{}}, Row{"SARG", 1, False{}, 2, 97, Chase{}},
-    Row{"SARG", 2, False{}, 2, 98, Chase{}}, Row{"SARG", 2, False{}, 2, 99, Chase{}},
-    Row{"SARG", 3, False{}, 2, 100, Chase{}}, Row{"SARG", 3, False{}, 2, 93, Chase{}}]
+    Row{"PISG", 0, False{}, 1, 69, Lower{}}, Row{"PLAY", 0, False{}, 4294967295, 70, Null{}},
+    Row{"PLAY", 6, False{}, 4, 72, Null{}}, Row{"PLAY", 6, False{}, 4, 70, Pain{}},
+    Row{"PLAY", 7, False{}, 10, 74, Null{}}, Row{"PLAY", 8, False{}, 10, 75, Scream{}},
+    Row{"PLAY", 9, False{}, 10, 76, Null{}}, Row{"PLAY", 10, False{}, 10, 77, Null{}},
+    Row{"PLAY", 11, False{}, 10, 78, Null{}}, Row{"PLAY", 12, False{}, 10, 0, Null{}},
+    Row{"POSS", 0, False{}, 4, 80, Chase{}}, Row{"POSS", 0, False{}, 4, 81, Chase{}},
+    Row{"POSS", 1, False{}, 4, 82, Chase{}}, Row{"POSS", 1, False{}, 4, 83, Chase{}},
+    Row{"POSS", 2, False{}, 4, 84, Chase{}}, Row{"POSS", 2, False{}, 4, 85, Chase{}},
+    Row{"POSS", 3, False{}, 4, 86, Chase{}}, Row{"POSS", 3, False{}, 4, 79, Chase{}},
+    Row{"SPOS", 0, False{}, 3, 88, Chase{}}, Row{"SPOS", 0, False{}, 3, 89, Chase{}},
+    Row{"SPOS", 1, False{}, 3, 90, Chase{}}, Row{"SPOS", 1, False{}, 3, 91, Chase{}},
+    Row{"SPOS", 2, False{}, 3, 92, Chase{}}, Row{"SPOS", 2, False{}, 3, 93, Chase{}},
+    Row{"SPOS", 3, False{}, 3, 94, Chase{}}, Row{"SPOS", 3, False{}, 3, 87, Chase{}},
+    Row{"TROO", 0, False{}, 3, 96, Chase{}}, Row{"TROO", 0, False{}, 3, 97, Chase{}},
+    Row{"TROO", 1, False{}, 3, 98, Chase{}}, Row{"TROO", 1, False{}, 3, 99, Chase{}},
+    Row{"TROO", 2, False{}, 3, 100, Chase{}}, Row{"TROO", 2, False{}, 3, 101, Chase{}},
+    Row{"TROO", 3, False{}, 3, 102, Chase{}}, Row{"TROO", 3, False{}, 3, 95, Chase{}},
+    Row{"SARG", 0, False{}, 2, 104, Chase{}}, Row{"SARG", 0, False{}, 2, 105, Chase{}},
+    Row{"SARG", 1, False{}, 2, 106, Chase{}}, Row{"SARG", 1, False{}, 2, 107, Chase{}},
+    Row{"SARG", 2, False{}, 2, 108, Chase{}}, Row{"SARG", 2, False{}, 2, 109, Chase{}},
+    Row{"SARG", 3, False{}, 2, 110, Chase{}}, Row{"SARG", 3, False{}, 2, 103, Chase{}}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, False{}, 0, 0, Null{}})
@@ -123,19 +135,34 @@ def Thing.Row.action(r: Thing.Row) -> Thing.Action:
   Row{sprite, frame, bright, tics, next, action} = r
   action
 
-# A weapon's row in Doom's weaponinfo: the state it rises in, the state
-# it is ready in, and the ammotype_t it spends, which the status bar
-# counts.
+# A weapon's row in Doom's weaponinfo: the states it rises, is ready and
+# sinks in, and the ammotype_t it spends, which the status bar counts.
 type Thing.Weapon is Data:
-  Weapon{up: U32, ready: U32, ammo: U32}
+  Weapon{up: U32, ready: U32, down: U32, ammo: U32}
 
 # d_items.c's weaponinfo for the pistol: it rises in row 60, rests in
 # row 59 and spends am_clip, ammotype_t 0.
 def Thing.pistol() -> Thing.Weapon:
-  Weapon{60, 59, 0}
+  Weapon{60, 59, 69, 0}
+
+def Thing.Weapon.down(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo} = w
+  down
+
+# The player mobj's rows in Doom's mobjinfo: the state it stands in,
+# the one it flinches in and the one its death begins with. Its spawn
+# health, 100, is the inventory's.
+def Thing.play() -> U32:
+  70
+
+def Thing.play.pain() -> U32:
+  71
+
+def Thing.play.death() -> U32:
+  73
 
 def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
-  Weapon{up, ready, ammo} = w
+  Weapon{up, ready, down, ammo} = w
   ammo
 
 def Thing.state(th: Thing) -> U32:
@@ -157,13 +184,6 @@ def Thing.spent(th: Thing) -> Thing:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, lastlook} = th
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, (tics - 1 : U32), lastlook}
 
-# The state half of Doom's P_SetMobjState: the thing in a state, for
-# that state's tics. The action the state runs on entry is the sim's,
-# which has the rest of the game to run it against.
-def Thing.entering(th: Thing, +state: U32) -> Thing:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, was, tics, lastlook} = th
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, Thing.Row.tics(Thing.row(state)), lastlook}
-
 # The thing having looked: Doom's P_LookForPlayers leaves lastlook at
 # the one player in the game whether it found it or not.
 def Thing.looked(th: Thing) -> Thing:
@@ -178,47 +198,56 @@ def Thing.blind(th: Thing) -> Bool:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, +lastlook} = th
   U32.is_eq(lastlook, 1)
 
+# The state half of Doom's P_SetMobjState: the thing in a state, for
+# that state's tics. The action the state runs on entry is the sim's,
+# which has the rest of the game to run it against.
+def Thing.entering(th: Thing, +state: U32) -> Thing:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, was, tics, lastlook} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, Thing.Row.tics(Thing.row(state)), lastlook}
+
 # A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
 # radius and height in map units, vanilla's flags: 1 special, 2
 # solid, 4 shootable, 256 hung from the ceiling, 512 no gravity, 524288
 # no blood, 4194304 a kill and 8388608 an item the tally counts, 33554432
-# not in deathmatch; and, for a type that wakes, the state it chases in
-# and the sound it makes on sight, both 0 for one that never does.
+# not in deathmatch.
 type Thing.Def is Data:
-  Def{kind: U32, state: U32, radius: U32, height: U32, flags: U32, see: U32, seesound: U32}
+  Def{kind: U32, state: U32, radius: U32, height: U32, flags: U32}
 
 def Thing.defs() -> List<&2, Thing.Def>:
-  [Def{5, 24, 20, 16, 33554433, 0, 0}, Def{8, 43, 20, 16, 1, 0, 0}, Def{10, 1, 20, 16, 0, 0, 0}, Def{12, 1, 20, 16, 0, 0, 0},
-    Def{15, 0, 20, 16, 0, 0, 0}, Def{17, 40, 20, 16, 1, 0, 0}, Def{18, 2, 20, 16, 0, 0, 0}, Def{19, 3, 20, 16, 0, 0, 0},
-    Def{20, 4, 20, 16, 0, 0, 0}, Def{21, 5, 20, 16, 0, 0, 0}, Def{24, 50, 20, 16, 0, 0, 0}, Def{26, 51, 16, 16, 2, 0, 0},
-    Def{35, 55, 16, 16, 2, 0, 0}, Def{43, 56, 16, 16, 2, 0, 0}, Def{47, 54, 16, 16, 2, 0, 0}, Def{48, 58, 16, 16, 2, 0, 0},
-    Def{54, 57, 32, 16, 2, 0, 0}, Def{60, 53, 20, 68, 768, 0, 0}, Def{2001, 48, 20, 16, 1, 0, 0}, Def{2002, 44, 20, 16, 1, 0, 0},
-    Def{2003, 46, 20, 16, 1, 0, 0}, Def{2004, 47, 20, 16, 1, 0, 0}, Def{2005, 45, 20, 16, 1, 0, 0}, Def{2007, 35, 20, 16, 1, 0, 0},
-    Def{2008, 41, 20, 16, 1, 0, 0}, Def{2010, 37, 20, 16, 1, 0, 0}, Def{2011, 26, 20, 16, 1, 0, 0}, Def{2012, 27, 20, 16, 1, 0, 0},
-    Def{2013, 28, 20, 16, 8388609, 0, 0}, Def{2014, 12, 20, 16, 8388609, 0, 0}, Def{2015, 18, 20, 16, 8388609, 0, 0},
-    Def{2018, 6, 20, 16, 1, 0, 0}, Def{2019, 8, 20, 16, 1, 0, 0}, Def{2023, 34, 20, 16, 8388609, 0, 0}, Def{2028, 49, 16, 16, 2, 0, 0},
-    Def{2035, 10, 10, 42, 524294, 0, 0}, Def{2046, 38, 20, 16, 1, 0, 0}, Def{2047, 39, 20, 16, 1, 0, 0}, Def{2048, 36, 20, 16, 1, 0, 0},
-    Def{2049, 42, 20, 16, 1, 0, 0}, Def{3004, 61, 20, 56, 4194310, 69, 36}, Def{9, 63, 20, 56, 4194310, 77, 37},
-    Def{3001, 65, 20, 56, 4194310, 85, 39}, Def{3002, 67, 30, 56, 4194310, 93, 41}]
+  [Def{5, 24, 20, 16, 33554433}, Def{8, 43, 20, 16, 1}, Def{10, 1, 20, 16, 0}, Def{12, 1, 20, 16, 0},
+    Def{15, 0, 20, 16, 0}, Def{17, 40, 20, 16, 1}, Def{18, 2, 20, 16, 0}, Def{19, 3, 20, 16, 0},
+    Def{20, 4, 20, 16, 0}, Def{21, 5, 20, 16, 0}, Def{24, 50, 20, 16, 0}, Def{26, 51, 16, 16, 2},
+    Def{35, 55, 16, 16, 2}, Def{43, 56, 16, 16, 2}, Def{47, 54, 16, 16, 2}, Def{48, 58, 16, 16, 2},
+    Def{54, 57, 32, 16, 2}, Def{60, 53, 20, 68, 768}, Def{2001, 48, 20, 16, 1}, Def{2002, 44, 20, 16, 1},
+    Def{2003, 46, 20, 16, 1}, Def{2004, 47, 20, 16, 1}, Def{2005, 45, 20, 16, 1}, Def{2007, 35, 20, 16, 1},
+    Def{2008, 41, 20, 16, 1}, Def{2010, 37, 20, 16, 1}, Def{2011, 26, 20, 16, 1}, Def{2012, 27, 20, 16, 1},
+    Def{2013, 28, 20, 16, 8388609}, Def{2014, 12, 20, 16, 8388609}, Def{2015, 18, 20, 16, 8388609},
+    Def{2018, 6, 20, 16, 1}, Def{2019, 8, 20, 16, 1}, Def{2023, 34, 20, 16, 8388609}, Def{2028, 49, 16, 16, 2},
+    Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
+    Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
+    Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}]
 
 def Thing.Def.kind(d: Thing.Def) -> U32:
-  Def{kind, state, radius, height, flags, see, seesound} = d
+  Def{kind, state, radius, height, flags} = d
   kind
 
 # A type's radius in fixed point.
 def Thing.Def.radius(d: Thing.Def) -> U32:
-  Def{kind, state, radius, height, flags, see, seesound} = d
+  Def{kind, state, radius, height, flags} = d
   F.Fixed.of_map(radius)
 
-# The state a type chases the player in, Doom's seestate, and the sound
-# it makes on sight, Doom's seesound.
-def Thing.Def.see(d: Thing.Def) -> U32:
-  Def{kind, state, radius, height, flags, see, seesound} = d
-  see
+# Doom's mobjinfo seestate and seesound for the four types that wake:
+# the state each chases the player in and the sound it makes on sight,
+# both 0 for a type that never does. They are read by kind and not kept
+# in the definition, because a record's width is a budget the whole
+# program shares.
+def Thing.see(+kind: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(kind, 3004), 79, Bool.pick(U32, U32.is_eq(kind, 9), 87,
+    Bool.pick(U32, U32.is_eq(kind, 3001), 95, Bool.pick(U32, U32.is_eq(kind, 3002), 103, 0))))
 
-def Thing.Def.seesound(d: Thing.Def) -> U32:
-  Def{kind, state, radius, height, flags, see, seesound} = d
-  seesound
+def Thing.seesound(+kind: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(kind, 3004), 36, Bool.pick(U32, U32.is_eq(kind, 9), 37,
+    Bool.pick(U32, U32.is_eq(kind, 3001), 39, Bool.pick(U32, U32.is_eq(kind, 3002), 41, 0))))
 
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:
@@ -241,7 +270,7 @@ def Thing.def(kind: U32) -> Maybe<&2, Thing.Def>:
 
 # The definition of a spawned thing's type.
 def Thing.info(+kind: U32) -> Thing.Def:
-  Maybe.default(&2, Thing.Def, Thing.def(kind), Def{kind, 0, 0, 0, 0, 0, 0})
+  Maybe.default(&2, Thing.Def, Thing.def(kind), Def{kind, 0, 0, 0, 0})
 
 # Doom's ONFLOORZ and ONCEILINGZ: a z that asks P_SpawnMobj for the
 # floor, or for the thing's height under the ceiling.
@@ -257,7 +286,7 @@ def Thing.onceiling() -> U32:
 # facing east, held between the floor and ceiling of the sector under
 # it.
 def Thing.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, +z: U32, lastlook: U32) -> Thing:
-  Def{kind, +state, radius, height, flags, see, seesound} = d
+  Def{kind, +state, radius, height, flags} = d
   +sector = L.Level.sector_at(level, x, y)
   +floor = L.Level.floor(level, sector)
   +ceil = L.Level.ceil(level, sector)
@@ -287,7 +316,7 @@ def Thing.spawn.facing(th: Thing, angle: U32, tics: U32) -> Thing:
 # record's angle.
 def Thing.spawn.mobj(+d: Thing.Def, +level: L.Level, id: U32, x: U32, y: U32, angle: U32, s: Thing.Spawn) ->
   Thing.Spawn:
-  Def{kind, state, radius, height, flags, see, seesound} = d
+  Def{kind, state, radius, height, flags} = d
   Spawn{things, rnd, you} = s
   +tics = Thing.Row.tics(Thing.row(state))
   +drawn = M.Random.next(rnd)

@@ -5,17 +5,21 @@
 # of sector 64 (the exit room's door), line 407's special (the exit
 # switch, 11 as loaded), whether its side shows the switch's partner, how
 # many things there are and the random index.
-# First the state the game starts with. Then a game handed the state
-# a script leaves beside Freedoom's exit switch with the room's door
-# open behind the player, 41 tics in. A frame 200 ms on with Space
-# pressed runs 7 tics: the first ends the level and the rest change
-# nothing, and the frame prints the time, 42 tics, a second. A held
-# Space repeating, as X sends it, a release and a press in one frame,
-# restarts nothing, nor does its release; a press of Enter does,
-# and with no time gone the state is the one the game started with:
-# the door shut, the switch's special back, the things and the random
-# index as they spawned (tests/route.bend restarts a level whose things
-# the route took). Esc quits.
+# First the state the game starts with. Then a game handed a player
+# killed on the spot in the nukage at 1600, 1000: a frame 200 ms on with
+# Space pressed runs 7 tics of dying, and the use asks for the level
+# again, which the next frame answers through the same path as the
+# restart after the exit, with no time gone, so the state is a fresh
+# level at tic 0. The same game is then handed the state a script leaves
+# beside Freedoom's exit switch with the room's door open behind the
+# player, 41 tics in. A frame 200 ms on with Space pressed runs 7 tics:
+# the first ends the level and the rest change nothing, and the frame
+# prints the time, 42 tics, a second. A held Space repeating, as X sends
+# it, a release and a press in one frame, restarts nothing, nor does its
+# release; a press of Enter does, and with no time gone the state is the
+# one the game started with: the door shut, the switch's special back,
+# the things and the random index as they spawned (tests/route.bend
+# restarts a level whose things the route took). Esc quits.
 # Before the game, what a tic of use beside the switch is heard to
 # start, and M_Random's index after it. P_ChangeSwitchTexture clears the
 # line's special before it looks for the exit's 11, so the click is
@@ -109,6 +113,31 @@ def route() -> List<&2, K.Cmd>:
     [K.Cmd.demo(0, 0, 64, 0)], List.replicate(K.Cmd, 25n, K.Cmd.demo(25, 0, 0, 0)),
     List.replicate(K.Cmd, 8n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 16, 0)]])
 
+# The game handed another state, to put a second case to the same loop.
+def restaged(g: M.Game, s: S.State) -> M.Game:
+  M.Game{level, gfx, tables, was, input, again, last, owed, mem, demo, music} = g
+  M.Game{level, gfx, tables, s, input, again, last, owed, mem, demo, music}
+
+def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
+  match m:
+    case None{}:
+      None{}
+    case Some{g}:
+      Some{restaged(g, s)}
+
+# A player killed where it stands in the nukage of sector 173, which
+# five health a blow would take 609 tics to do.
+def killed(level: L.Level) -> S.State:
+  S.Sim.damage(100, H.Thing.you(), H.Thing.you(), S.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000),
+    A.Angle.of_thing(90)}))
+
+# A game whose player is dead: a frame with Space pressed asks for the
+# level again, and the next frame, with no time gone, answers it.
+def reborn(g: Maybe<M.Game>) -> IO(Maybe<M.Game>):
+  do IO<Maybe<M.Game>>:
+    d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], g)
+    frame("reborn", 200n, [Key{32, False{}}], d)
+
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +level) = gl
   +beside = S.Sim.replay(route(), S.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(224)), F.Fixed.of_map(1340),
@@ -117,12 +146,13 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
     IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
-    g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
-    g2 : Maybe<M.Game> <- frame("repeat", 400n, [Key{32, False{}}, Key{32, True{}}], g1)
-    g3 : Maybe<M.Game> <- frame("release", 600n, [Key{32, False{}}], g2)
-    g4 : Maybe<M.Game> <- frame("enter", 600n, [Key{13, True{}}], g3)
-    g5 : Maybe<M.Game> <- frame("esc", 1200n, [Key{27, True{}}], g4)
+    d : Maybe<M.Game> <- reborn(Some{M.Game{level, gfx, P.Project.tables(level), killed(level),
+      K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
+    g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
+    g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)
+    g3 : Maybe<M.Game> <- frame("release", 800n, [Key{32, False{}}], g2)
+    g4 : Maybe<M.Game> <- frame("enter", 800n, [Key{13, True{}}], g3)
+    g5 : Maybe<M.Game> <- frame("esc", 1400n, [Key{27, True{}}], g4)
     IO.print(M.Game.time(21) ++ ", " ++ M.Game.time(2099) ++ ", " ++ M.Game.time(2100) ++ ", " ++ M.Game.time(4321))
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -136,6 +166,8 @@ def main() -> IO(Unit):
 #|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|beside tic 41 ended False at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 209 random 76
 #|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 67
+#|dead space tic 7 ended False at 1600.000000 1000.000000 90.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
+#|reborn tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|Time 0:01
 #|space tic 42 ended True at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 209 random 76
 #|repeat tic 42 ended True at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 209 random 76

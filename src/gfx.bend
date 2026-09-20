@@ -839,8 +839,9 @@ def Gfx.sprite.rows.go(n: Nat, +row: U32, +marks: V.Vec) -> List<&2, U32>:
 
 # A weapon's rows and those they lead to, marked.
 def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
-  H.Weapon{+up, +ready, ammo} = w
-  Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks))
+  H.Weapon{+up, +ready, +down, ammo} = w
+  Gfx.sprite.chase(n, False{}, down, down,
+    Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks)))
 
 # The state rows the level's things spawn in, the pistol's, and those
 # they lead to, each once, in order.

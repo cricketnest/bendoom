@@ -53,9 +53,12 @@
 # frame below. Last the pistol, which every frame above holds at rest or
 # bobbing: 8 tics into its rise, 74 down the screen, and on a walk east
 # from the start at the bob's lowest, tic 48, and at its farthest right,
-# tic 64; the stride has it far left. Every frame holds the things E1M1
-# spawns on Hurt Me Plenty, monsters among them, each in its state on
-# that tic.
+# tic 64; the stride has it far left. Then the dead view: 650 tics stood
+# in the nukage of sector 173, which kills on the tic the clock reads
+# 608, leave the eye 6 units over the floor, the pistol off the bottom
+# of the screen and the bar at no health. Every frame holds the things
+# E1M1 spawns on Hurt Me Plenty, monsters among them, each in its state
+# on that tic.
 # Every frame carries the status bar the inventory of its state fills,
 # so the bar at the start, after the rocket is taken, after the green
 # armour and after the blue key are the frames named for those pickups.
@@ -67,8 +70,9 @@
 # waits for milestone 6's ticket 16. So the two runs east past the pit,
 # the blinking wall, the two of the blue key in its dim and bright
 # states, the two of the key strafed past, the two of the green armour
-# and the chainsaw taken are regression pins until then, and so are the
-# exit, which vanilla never stands in (milestone 4's ticket 09 compares
+# and the chainsaw taken, and the dead view in the nukage, which stands
+# 650 tics in the yard's sight, are regression pins until then, and so
+# are the exit, which vanilla never stands in (milestone 4's ticket 09 compares
 # it another way), and the two refused frames, whose full inventory
 # vanilla's demo cannot reach.
 # The pickup frames show their pickup: the key is 44 pixels of the first
@@ -193,9 +197,9 @@ def maxed(inv: I.Inventory) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus}
 
 def full(s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd}
+    usedown, sounds, mrnd, reborn}
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
@@ -268,6 +272,8 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     w2 : Array<U32> <- frame("pistol bob low 48", tables, gfx, after([idle(20n), walk(28n)], S.State.start(level)), w1)
     w3 : Array<U32> <- frame("pistol bob right 64", tables, gfx, after([idle(20n), walk(44n)], S.State.start(level)),
       w2)
+    d1 : Array<U32> <- frame("dead 1600 1000 90", tables, gfx, after([idle(650n)],
+      at(level, east(1600), east(1000), 90)), w3)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -322,4 +328,5 @@ def main() -> IO(Unit):
 #|pistol rising 8 hash 767338383 pixels 1 1 7 5 96 covered True
 #|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
 #|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
+#|dead 1600 1000 90 hash 2370444204 pixels 6 111 110 5 96 covered True
 #|end
