@@ -184,6 +184,12 @@ def walk(n: Nat) -> List<&2, K.Cmd>:
 def back(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, 0))
 
+# Ctrl held for one tic, then the four tics S_PISTOL1 lasts: the frame
+# is the one A_FirePistol made, with the muzzle flash showing and its
+# extra light on every wall, plane and sprite.
+def fired(n: Nat) -> List<&2, K.Cmd>:
+  List.append(&2, K.Cmd, [K.Cmd.demo(0, 0, 0, 1)], idle(n))
+
 # A pickup strafed past: the idle tics, a turn, then strafing left.
 def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
   after([idle(20n), [K.Cmd.demo(0, 0, turn, 0)], strafe(n)], s)
@@ -272,6 +278,12 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       w2)
     d1 : Array<U32> <- frame("dead 1600 1000 90", tables, gfx, after([idle(650n)],
       at(level, east(1600), east(1000), 90)), w3)
+    w4 : Array<U32> <- frame("pistol firing 25", tables, gfx, after([idle(20n), fired(4n)], S.State.start(level)),
+      d1)
+    w5 : Array<U32> <- frame("pistol flash over 32", tables, gfx, after([idle(20n), fired(11n)],
+      S.State.start(level)), w4)
+    w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
+      at(level, east(704), east(256), 0)), w5)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -328,4 +340,7 @@ def main() -> IO(Unit):
 #|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
 #|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
 #|dead 1600 1000 90 hash 2126758301 pixels 6 111 110 5 96 covered True
+#|pistol firing 25 hash 2802859285 pixels 1 1 7 111 96 covered True
+#|pistol flash over 32 hash 1410065273 pixels 1 1 7 5 96 covered True
+#|puff on the ledge 25 hash 1011791530 pixels 7 110 15 2 96 covered True
 #|end

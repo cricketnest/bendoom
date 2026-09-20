@@ -203,7 +203,7 @@ def test(names: List<&2, String>) -> List<&2, W.Wad.Lump>:
 
 # A row of a sprite's frame; the definition reads nothing else of it.
 def row(sprite: String, frame: U32) -> H.Thing.Row:
-  H.Row{sprite, frame, False{}, 0, 0, H.Null{}}
+  H.Row{sprite, frame, False{}, 0, 0, H.Null{}, 0}
 
 def defs(p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
   (bytes, lumps) = p

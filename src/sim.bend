@@ -47,6 +47,12 @@ def Sim.hurt.damage() -> U32:
 def Sim.hurt.attacker() -> U32:
   3
 
+# Doom's player->refire, how many shots the held attack has taken: in
+# the same vector, since a record's width is a budget the whole program
+# shares (docs/bend.md).
+def Sim.hurt.refire() -> U32:
+  4
+
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
 # height and its delta, the eye's height, the special lines this tic's
@@ -119,7 +125,7 @@ def Sim.maxbob() -> U32:
 # The player's mobj at rest and unhurt, as P_SpawnPlayer and
 # G_PlayerReborn leave it: its standing state, which lasts.
 def Sim.Hurt.start() -> V.Vec:
-  V.Vec.of_list([H.Thing.play(), H.Thing.Row.tics(H.Thing.row(H.Thing.play())), 0, H.Thing.you()], 4)
+  V.Vec.of_list([H.Thing.play(), H.Thing.Row.tics(H.Thing.row(H.Thing.play())), 0, H.Thing.you(), 0], 5)
 
 def Sim.Hurt.state(+h: V.Vec) -> U32:
   V.Vec.get(h, Sim.hurt.state())
@@ -129,6 +135,9 @@ def Sim.Hurt.tics(+h: V.Vec) -> U32:
 
 def Sim.Hurt.attacker(+h: V.Vec) -> U32:
   V.Vec.get(h, Sim.hurt.attacker())
+
+def Sim.Hurt.refire(+h: V.Vec) -> U32:
+  V.Vec.get(h, Sim.hurt.refire())
 
 # The damage count fades by one a tic, in P_PlayerThink's counters and
 # in P_DeathThink.
@@ -207,6 +216,19 @@ def Player.hurting(p: Player, hurt: V.Vec) -> Player:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, was} = p
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}
 
+# The player showing some sprites.
+def Player.showing(p: Player, shown: Psprites) -> Player:
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, shown, hurt}
+
+# Doom's player->refire: how many shots the held attack has taken.
+def Player.refire(+p: Player) -> U32:
+  Sim.Hurt.refire(Player.hurt(p))
+
+# The player with another count of shots taken.
+def Player.firing(+p: Player, shots: U32) -> Player:
+  Player.hurting(p, V.Vec.set(Player.hurt(p), Sim.hurt.refire(), shots))
+
 # The player holding an inventory.
 def Player.holding(p: Player, held: I.Inventory) -> Player:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
@@ -217,8 +239,8 @@ def Player.onground(+p: Player) -> Bool:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   F.Fixed.le(z, floorz)
 
-# The weapon
-# ----------
+# The weapon's rows
+# -----------------
 
 # Doom's WEAPONBOTTOM, WEAPONTOP, RAISESPEED and LOWERSPEED: the screen
 # row a weapon starts to rise from, the row it rests at, and its rise and
@@ -239,108 +261,42 @@ def Sim.lowerspeed() -> U32:
 def Sim.bob(+momx: U32, +momy: U32) -> U32:
   F.Fixed.min(Sim.maxbob(), ((F.Fixed.mul(momx, momx) + F.Fixed.mul(momy, momy) : U32) >> 2n : U32))
 
-# A sprite and the state it is to enter, if any.
-type Sim.Entering is Data:
-  Entering{state: Maybe<&2, U32>, psp: Psprite}
+# Doom's P_SetupPsprites' first half: no sprite shows.
+def Psprites.none() -> Psprites:
+  Psprites{Psprite{None{}, 0, 0, 0}, Psprite{None{}, 0, 0, 0}}
 
-# Doom's A_Raise: the sprite rises, and at the top the weapon's ready
-# state is set.
-def Sim.raise(psp: Psprite, weapon: H.Thing.Weapon) -> Sim.Entering:
-  Psprite{state, tics, sx, sy} = psp
-  H.Weapon{up, ready, down, ammo} = weapon
-  +risen = (sy - Sim.raisespeed() : U32)
-  Entering{Bool.pick(Maybe<&2, U32>, F.Fixed.gt(risen, Sim.weapontop()), None{}, Some{ready}),
-    Psprite{state, tics, sx, F.Fixed.max(risen, Sim.weapontop())}}
-
-# Doom's A_WeaponReady's bob: the sprite swings on the level's clock, a
-# turn every 64 tics, as far as the bob to either side of column 1 and
-# below the top.
-def Sim.ready(psp: Psprite, +sine: V.Vec, clock: U32, +bob: U32) -> Sim.Entering:
-  Psprite{state, tics, sx, sy} = psp
-  +angle = ((128 * clock : U32) .&. 8191 : U32)
-  Entering{None{}, Psprite{state, tics, (65536 + F.Fixed.mul(bob, A.Angle.cos(sine, angle)) : U32),
-    (Sim.weapontop() + F.Fixed.mul(bob, A.Angle.sin(sine, (angle .&. 4095 : U32))) : U32)}}
-
-# Doom's A_Lower for a dead player: the sprite sinks 6 a tic and stays
-# at the bottom of the screen. Death is the only thing that lowers a
-# weapon here, so the branch that brings the next one up has no caller.
-def Sim.lower(psp: Psprite) -> Sim.Entering:
-  Psprite{state, tics, sx, +sy} = psp
-  Entering{None{}, Psprite{state, tics, sx, F.Fixed.min((sy + Sim.lowerspeed() : U32), Sim.weaponbottom())}}
-
-def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, sine: V.Vec, clock: U32, bob: U32,
-  weapon: H.Thing.Weapon) -> Sim.Entering:
-  match action:
-    case H.Raise{}:
-      Sim.raise(psp, weapon)
-    case H.WeaponReady{}:
-      Sim.ready(psp, sine, clock, bob)
-    case H.Lower{}:
-      Sim.lower(psp)
-    case other:
-      Entering{None{}, psp}
-
-# Doom's P_SetPsprite: the sprite enters the state for its tics and the
-# state's action runs, and again for a state the action sets. No chain of
-# vanilla's is longer than three.
-def Sim.psprite.set(fuel: Nat, st: Sim.Entering, +sine: V.Vec, +clock: U32, +bob: U32, +weapon: H.Thing.Weapon) ->
-  Psprite:
-  match fuel st:
-    case 1n+f Entering{Some{+state}, Psprite{was, tics, sx, sy}}:
-      Sim.psprite.set(f, Sim.psprite.act(H.Thing.Row.action(H.Thing.row(state)),
-        Psprite{Some{state}, H.Thing.Row.tics(H.Thing.row(state)), sx, sy}, sine, clock, bob, weapon),
-        sine, clock, bob, weapon)
-    case _ Entering{state, psp}:
-      psp
-
-# Doom's P_MovePsprites for one sprite: one that shows counts its tics
-# down, and the tic they run out enters its next state. No weapon state
-# lasts.
-def Sim.psprite.tic(psp: Psprite, sine: V.Vec, clock: U32, bob: U32, weapon: H.Thing.Weapon) -> Psprite:
+# Doom's player->extralight, the light a muzzle flash lends the whole
+# view: the flash sprite's row says it. Vanilla sets it from A_Light0,
+# A_Light1 and A_Light2, which sit on flash states alone and run as
+# those states are entered, so what it holds between tics is exactly the
+# resident flash row's light, and no field keeps it.
+def Psprite.light(psp: Psprite) -> U32:
   match psp:
     case Psprite{None{}, tics, sx, sy}:
-      Psprite{None{}, tics, sx, sy}
-    case Psprite{Some{+state}, +tics, sx, sy}:
-      Sim.psprite.set(4n, Entering{Bool.pick(Maybe<&2, U32>, U32.is_eq(tics, 1),
-        Some{H.Thing.Row.next(H.Thing.row(state))}, None{}), Psprite{Some{state}, (tics - 1 : U32), sx, sy}},
-        sine, clock, bob, weapon)
+      0
+    case Psprite{Some{+state}, tics, sx, sy}:
+      H.Thing.Row.light(H.Thing.row(state))
 
-# The flash is drawn where the weapon is.
-def Sim.psprites.follow(weapon: Psprite, flash: Psprite) -> Psprites:
-  Psprite{state, tics, +sx, +sy} = weapon
-  Psprite{fstate, ftics, fx, fy} = flash
-  Psprites{Psprite{state, tics, sx, sy}, Psprite{fstate, ftics, sx, sy}}
+def Psprites.light(ps: Psprites) -> U32:
+  Psprites{weapon, flash} = ps
+  Psprite.light(flash)
 
-# Doom's P_MovePsprites, with the bob P_CalcHeight works out from the
-# momentum the move left.
-def Sim.psprites(+level: L.Level, +clock: U32, p: Player) -> Player:
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    Psprites{weapon, flash}, hurt} = p
-  +sine = L.Level.sine(level)
-  +bob = Sim.bob(momx, momy)
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    Sim.psprites.follow(Sim.psprite.tic(weapon, sine, clock, bob, H.Thing.pistol()),
-      Sim.psprite.tic(flash, sine, clock, bob, H.Thing.pistol())), hurt}
+# Doom's player->extralight.
+def Player.extralight(+p: Player) -> U32:
+  Psprites.light(Player.psprites(p))
 
-# Doom's P_SetupPsprites and P_BringUpWeapon: no sprite shows, then the
-# weapon enters its raise state at the bottom.
-def Psprites.start(+sine: V.Vec, +weapon: H.Thing.Weapon) -> Psprites:
-  H.Weapon{up, ready, down, ammo} = weapon
-  Psprites{Sim.psprite.set(4n, Entering{Some{up}, Psprite{None{}, 0, 0, Sim.weaponbottom()}}, sine, 0, 0, weapon),
-    Psprite{None{}, 0, 0, 0}}
-
-def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32, psprites: Psprites) -> Player:
+def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32) -> Player:
   Player{x, y, floor, angle, 0, 0, 0, floor, ceil, Sim.viewheight(), 0,
-    (floor + Sim.viewheight() : U32), [], I.Inventory.start(), psprites, Sim.Hurt.start()}
+    (floor + Sim.viewheight() : U32), [], I.Inventory.start(), Psprites.none(), Sim.Hurt.start()}
 
 def Player.at(+level: L.Level, s: L.Level.Start) -> Player:
   L.Start{+x, +y, angle} = s
   +sector = L.Level.sector_at(level, x, y)
-  Player.at.fin(x, y, angle, L.Level.floor(level, sector), L.Level.ceil(level, sector),
-    Psprites.start(L.Level.sine(level), H.Thing.pistol()))
+  Player.at.fin(x, y, angle, L.Level.floor(level, sector), L.Level.ceil(level, sector))
 
 # The player at the level's start, on its floor, its eye at rest, with
-# the inventory Doom's G_PlayerReborn gives and the pistol coming up.
+# the inventory Doom's G_PlayerReborn gives and no weapon showing yet:
+# the state brings the pistol up, as P_SetupPsprites does.
 def Player.start(+level: L.Level) -> Player:
   Player.at(level, L.Level.start_of(level))
 
@@ -408,6 +364,19 @@ def Sim.open_bottom(+level: L.Level, +line: L.Level.Line) -> U32:
 def Sim.open_top(+level: L.Level, +line: L.Level.Line) -> U32:
   L.Line{x1, y1, x2, y2, flags, front, back} = line
   F.Fixed.min(L.Level.ceil(level, front), L.Level.ceil(level, back))
+
+# Doom's ML_TWOSIDED: the flag that says a line has an opening at all.
+def Sim.twosided(+line: L.Level.Line) -> Bool:
+  L.Line{x1, y1, x2, y2, +flags, front, back} = line
+  Bool.not(U32.is_zero((flags .&. 4 : U32)))
+
+# Doom's P_LineOpening leaves no opening in a line with one side. A line
+# flagged two-sided with no back sector is one, and neither E1M1 has
+# one, so vanilla's stale opening after such a line is never read.
+def Sim.shut(+level: L.Level, +line: L.Level.Line) -> Bool:
+  L.Line{x1, y1, x2, y2, flags, front, +back} = line
+  Bool.or(U32.is_eq(back, L.Level.none()),
+    F.Fixed.le((Sim.open_top(level, line) - Sim.open_bottom(level, line) : U32), 0))
 
 def Sim.fit.narrow(hit: Bool, +level: L.Level, +line: L.Level.Line, fit: Sim.Fit) ->
   Sim.Fit:
@@ -517,7 +486,7 @@ def Sim.body.def(d: H.Thing.Def, id: U32, x: U32, y: U32, z: U32) -> Sim.Body:
   Body{id, x, y, z, F.Fixed.of_map(radius), F.Fixed.of_map(height), flags}
 
 def Sim.body.of(th: H.Thing) -> Sim.Body:
-  H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = th
+  H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} = th
   Sim.body.def(H.Thing.info(kind), id, x, y, z)
 
 # The mobj with its centre at another place.
@@ -667,7 +636,7 @@ def Sim.touch.offer(reached: Bool, +kind: U32, counted: Bool, +inv: I.Inventory,
 def Sim.touch.def(d: H.Thing.Def, +th: H.Thing, +x: U32, +y: U32, +z: U32, inv: I.Inventory, bm: L.Level.Blockmap,
   things: H.Things) -> I.Inventory & H.Things:
   H.Def{+kind, state, radius, height, +flags} = d
-  H.Thing{id, k, +tx, +ty, tz, floorz, ceilz, angle, sector, st, tics} = th
+  H.Thing{id, k, +tx, +ty, tz, floorz, ceilz, angle, sector, st, tics, momz} = th
   +dz = (tz - z : U32)
   Sim.touch.offer(Bool.and(Bool.not(U32.is_zero((flags .&. 1 : U32))),
       Bool.and(Sim.overlap(F.Fixed.of_map(radius), tx, ty, x, y, Sim.radius()),
@@ -680,8 +649,8 @@ def Sim.touch.thing(m: Maybe<&2, H.Thing>, +x: U32, +y: U32, +z: U32, inv: I.Inv
   match m:
     case None{}:
       (inv, things)
-    case Some{H.Thing{id, +kind, tx, ty, tz, floorz, ceilz, angle, sector, state, tics}}:
-      Sim.touch.def(H.Thing.info(kind), H.Thing{id, kind, tx, ty, tz, floorz, ceilz, angle, sector, state, tics}, x, y,
+    case Some{H.Thing{id, +kind, tx, ty, tz, floorz, ceilz, angle, sector, state, tics, momz}}:
+      Sim.touch.def(H.Thing.info(kind), H.Thing{id, kind, tx, ty, tz, floorz, ceilz, angle, sector, state, tics, momz}, x, y,
         z, inv, bm, things)
 
 def Sim.touch.one(+id: U32, +x: U32, +y: U32, +z: U32, +bm: L.Level.Blockmap, got: I.Inventory & H.Things) ->
@@ -756,8 +725,8 @@ def Sim.crossings(+level: L.Level, ox: U32, oy: U32, +x: U32, +y: U32) -> List<&
 # The player's mobj unlinked from one place and linked at another, as
 # Doom's P_TryMove does about a move.
 def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, +y: U32) -> H.Things:
-  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), H.Things.you(things), ox, oy,
-    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), H.Things.you(things), x, y,
+  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), False{}, H.Things.you(things), ox, oy,
+    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), False{}, H.Things.you(things), x, y,
     L.Level.sector_at(level, x, y))
 
 def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x: U32, +y: U32, floor: U32,
@@ -949,6 +918,18 @@ def Sim.meets.things(ids: List<&2, U32>, +ts: H.Things, +p: Player, +tx: U32, +t
 def Sim.nudge(+v: U32, +org: U32) -> U32:
   Bool.pick(U32, U32.is_zero(((v - org : U32) .&. 8388607 : U32)), (v + F.Fixed.unit() : U32), v)
 
+# Doom's trace: the ray P_PathTraverse walks, from its origin nudged off
+# a cell's edge along its whole length. A visitor that must place
+# something on the ray reads it, as PTR_ShootTraverse does.
+type Sim.Trace is Data:
+  Trace{x: U32, y: U32, dx: U32, dy: U32}
+
+def Sim.trace.of(+bm: L.Level.Blockmap, +x1: U32, +y1: U32, +x2: U32, +y2: U32) -> Sim.Trace:
+  L.Blockmap{words, +ox, +oy, cols, rows} = bm
+  +tx = Sim.nudge(x1, ox)
+  +ty = Sim.nudge(y1, oy)
+  Trace{tx, ty, (x2 - tx : U32), (y2 - ty : U32)}
+
 # P_PathTraverse's setup along one axis: the step from cell to cell, how
 # much of the first cell is left to cross, and how far the other axis
 # gains a cell.
@@ -1063,20 +1044,20 @@ def Sim.meets.sort(meets: List<&2, Sim.Meet>, +sorted: List<&2, Sim.Meet>) -> Li
       Sim.meets.sort(rest, Sim.meets.insert(sorted, Sim.meets.before(m, sorted), m))
 
 def Sim.meets.at(+bm: L.Level.Blockmap, +level: L.Level, ts: H.Things, p: Player, lines: Bool, things: Bool,
-  +x1: U32, +y1: U32, +x2: U32, +y2: U32) -> List<&2, Sim.Meet>:
+  tr: Sim.Trace, +x2: U32, +y2: U32) -> List<&2, Sim.Meet>:
   L.Blockmap{words, +ox, +oy, cols, rows} = bm
-  +tx = Sim.nudge(x1, ox)
-  +ty = Sim.nudge(y1, oy)
+  Trace{+tx, +ty, tdx, tdy} = tr
   Sim.meets.sort(Sim.meets.go(Sim.ray(ox, oy, tx, ty, x2, y2), [], lines, things, level, ts, p, tx, ty,
-    (x2 - tx : U32), (y2 - ty : U32)), [])
+    tdx, tdy), [])
 
 # Doom's P_PathTraverse intercepts: what the trace meets in the cells it
 # crosses, gathered in the walk's order and sorted by distance. The
 # mobjs come from the population, where a move, a spawn and a removal
 # write their links.
-def Sim.meets(+level: L.Level, ts: H.Things, p: Player, lines: Bool, things: Bool, x1: U32, y1: U32, x2: U32,
-  y2: U32) -> List<&2, Sim.Meet>:
-  Sim.meets.at(L.Level.blockmap_of(level), level, ts, p, lines, things, x1, y1, x2, y2)
+def Sim.meets(+level: L.Level, ts: H.Things, p: Player, lines: Bool, things: Bool, x1: U32, y1: U32, +x2: U32,
+  +y2: U32) -> List<&2, Sim.Meet>:
+  Sim.meets.at(L.Level.blockmap_of(level), level, ts, p, lines, things,
+    Sim.trace.of(L.Level.blockmap_of(level), x1, y1, x2, y2), x2, y2)
 
 # What a visitor answers: whether the walk stops here, and what it goes
 # on carrying. Doom's traverser returns the flag and writes the rest to
@@ -1681,7 +1662,7 @@ def Sim.sound.spot(xy: U32 & U32) -> Sn.Sound.Source:
 # gone has no place.
 def Sim.sound.thing(own: Bool, m: Maybe<&2, H.Thing>) -> Sn.Sound.Source:
   match own m:
-    case False{} Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+    case False{} Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
       Sn.Spot{x, y}
     case _ _:
       Sn.Nobody{}
@@ -1725,6 +1706,698 @@ def Sim.sound.told(sfx: U32, +source: Sn.Sound.Source, +s: State) -> State:
 # number either.
 def Sim.sound(sfx: U32, source: Sn.Sound.Source, s: State) -> State:
   Sim.sound.told(sfx, source, State.told(s))
+
+# Spawning and removing
+# ---------------------
+
+# A thing entered into a state: in the population, linked where it is,
+# its thinker started.
+def State.entered(th: H.Thing, s: State) -> State:
+  H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} = th
+  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State.thinking(State{player, level, H.Things.entered(things, L.Level.blockmap_of(level),
+    H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}), sidetex, thinkers, rnd, clock, ended,
+    usedown, sounds, mrnd, reborn}, Mobj{id})
+
+# Doom's P_SpawnMobj in play: a thing of a type at (x, y) and z, or on
+# the floor or under the ceiling for H.Thing.onfloor and
+# H.Thing.onceiling. It takes the next id past every one given, draws
+# one random number, is linked where it is, and its thinker is started:
+# last, so it first thinks the same tic if the thinkers' run is not over,
+# as one added to the tail of Doom's list does.
+def Sim.spawn(d: H.Thing.Def, x: U32, y: U32, z: U32, s: State) -> State:
+  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State.entered(H.Thing.mobj(d, level, H.Things.count(things), x, y, z), State{player, level,
+    H.Things.fresh(things), sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown, sounds, mrnd, reborn})
+
+def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+      State{player, level, H.Things.removed(things, L.Level.blockmap_of(level), th), sidetex, thinkers, rnd, clock,
+        ended, usedown, sounds, mrnd, reborn}
+
+# Doom's P_RemoveMobj: the thing unlinked and gone, its id never given
+# again, its sound stopped; its thinker ends when its turn comes.
+def Sim.remove(id: U32, +s: State) -> State:
+  Sim.remove.thing(H.Things.get(State.things(s), id), s)
+
+# Firing
+# ------
+
+# Doom's MISSILERANGE, how far a bullet reaches.
+def Sim.missilerange() -> U32:
+  134217728
+
+# The slopes P_AimLineAttack opens with, the view's half height over its
+# half width up and down: what the player can aim at without looking up.
+def Sim.aimtop() -> U32:
+  40960
+
+def Sim.aimbottom() -> U32:
+  4294926336
+
+# Doom's shootz: a hitscan leaves the middle of the shooter's mobj,
+# eight units higher.
+def Sim.shootz(+z: U32, +height: U32) -> U32:
+  (z + (height >> 1n) + 524288 : U32)
+
+# C's division by two, which truncates toward zero where a shift floors.
+def Sim.halve(+v: U32) -> U32:
+  Bool.pick(U32, F.Fixed.is_neg(v), F.Fixed.neg((F.Fixed.neg(v) >> 1n : U32)), (v >> 1n : U32))
+
+# What Doom's PTR_AimTraverse keeps in globals: the population and the
+# player, to read a mobj the ray met; the shooter, which may not be
+# aimed at; the height it shoots from and how far; the slopes still open
+# above and below; and the slope at what has been aimed at, with its name.
+type Sim.Aim is Data:
+  Aim{things: H.Things, player: Player, shooter: U32, shootz: U32, range: U32, top: U32, bottom: U32,
+    slope: U32, target: Maybe<&2, U32>}
+
+def Sim.Aim.found(a: Sim.Aim) -> Bool:
+  Aim{things, player, shooter, shootz, range, top, bottom, slope, target} = a
+  Bool.not(Maybe.is_none(&2, U32, target))
+
+def Sim.Aim.target(a: Sim.Aim) -> Maybe<&2, U32>:
+  Aim{things, player, shooter, shootz, range, top, bottom, slope, target} = a
+  target
+
+# What P_AimLineAttack answers: the slope at what it aimed at, and level
+# where it found nothing.
+def Sim.Aim.slope(a: Sim.Aim) -> U32:
+  Aim{things, player, shooter, shootz, range, top, bottom, +slope, target} = a
+  Bool.pick(U32, Maybe.is_none(&2, U32, target), 0, slope)
+
+# PTR_AimTraverse over a two-sided line: the opening narrows the slopes
+# the shot may still take, each side only where the planes differ, and a
+# pair of slopes that has closed ends the walk.
+def Sim.aim.opening(+level: L.Level, +line: L.Level.Line, +frac: U32, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  L.Line{x1, y1, x2, y2, flags, +front, +back} = line
+  Aim{things, player, shooter, +shootz, +range, +top, +bottom, slope, target} = a
+  +dist = F.Fixed.mul(range, frac)
+  +low = Bool.pick(U32, U32.is_eq(L.Level.floor(level, front), L.Level.floor(level, back)), bottom,
+    F.Fixed.max(bottom, F.Fixed.div((Sim.open_bottom(level, line) - shootz : U32), dist)))
+  +high = Bool.pick(U32, U32.is_eq(L.Level.ceil(level, front), L.Level.ceil(level, back)), top,
+    F.Fixed.min(top, F.Fixed.div((Sim.open_top(level, line) - shootz : U32), dist)))
+  Answer{F.Fixed.le(high, low), Aim{things, player, shooter, shootz, range, high, low, slope, target}}
+
+# A line with no opening stops the aim where it stands.
+def Sim.aim.open(open: Bool, +level: L.Level, +line: L.Level.Line, +frac: U32, a: Sim.Aim) ->
+  Sim.Answer<&2, Sim.Aim>:
+  match open:
+    case False{}:
+      Answer{True{}, a}
+    case True{}:
+      Sim.aim.opening(level, line, frac, a)
+
+def Sim.aim.line(+level: L.Level, +i: U32, +frac: U32, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  +line = L.Level.line(level, i)
+  Sim.aim.open(Bool.and(Sim.twosided(line), Bool.not(Sim.shut(level, line))), level, line, frac, a)
+
+# The mobj is aimed at: the slope is the middle of what shows of it
+# between the open slopes, and the walk ends there.
+def Sim.aim.hit(missed: Bool, +id: U32, +slope: U32, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  match missed:
+    case True{}:
+      Answer{False{}, a}
+    case False{}:
+      Aim{things, player, shooter, shootz, range, top, bottom, was, target} = a
+      Answer{True{}, Aim{things, player, shooter, shootz, range, top, bottom, slope, Some{id}}}
+
+# PTR_AimTraverse over a mobj: one whose whole box lies over or under
+# the open slopes is shot past.
+def Sim.aim.shootable(shootable: Bool, +id: U32, +z: U32, +height: U32, +frac: U32, a: Sim.Aim) ->
+  Sim.Answer<&2, Sim.Aim>:
+  match shootable:
+    case False{}:
+      Answer{False{}, a}
+    case True{}:
+      Aim{things, player, shooter, +shootz, +range, +top, +bottom, slope, target} = a
+      +dist = F.Fixed.mul(range, frac)
+      +high = F.Fixed.div((z + height - shootz : U32), dist)
+      +low = F.Fixed.div((z - shootz : U32), dist)
+      Sim.aim.hit(Bool.or(F.Fixed.lt(high, bottom), F.Fixed.gt(low, top)), id,
+        Sim.halve((F.Fixed.min(high, top) + F.Fixed.max(low, bottom) : U32)),
+        Aim{things, player, shooter, shootz, range, top, bottom, slope, target})
+
+# The shooter may not aim at itself, and a mobj the population no longer
+# has is nowhere.
+def Sim.aim.self(own: Bool, m: Maybe<&2, Sim.Body>, +id: U32, +frac: U32, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  match own m:
+    case True{} _:
+      Answer{False{}, a}
+    case False{} None{}:
+      Answer{False{}, a}
+    case False{} Some{Body{bid, bx, by, z, radius, height, +flags}}:
+      Sim.aim.shootable(Bool.not(U32.is_zero((flags .&. 4 : U32))), id, z, height, frac, a)
+
+def Sim.aim.thing(+id: U32, +frac: U32, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  Aim{+things, +player, +shooter, shootz, range, top, bottom, slope, target} = a
+  Sim.aim.self(U32.is_eq(id, shooter), Sim.body(things, player, id), id, frac,
+    Aim{things, player, shooter, shootz, range, top, bottom, slope, target})
+
+def Sim.aim.met(isline: Bool, +level: L.Level, +what: U32, +frac: U32, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  match isline:
+    case True{}:
+      Sim.aim.line(level, what, frac, a)
+    case False{}:
+      Sim.aim.thing(what, frac, a)
+
+# Doom's PTR_AimTraverse.
+def Sim.aim.visit(+level: L.Level, m: Sim.Meet, a: Sim.Aim) -> Sim.Answer<&2, Sim.Aim>:
+  Meet{frac, isline, what} = m
+  Sim.aim.met(isline, level, what, frac, a)
+
+# Doom's P_AimLineAttack: the ray of some range along an angle, and the
+# slope at the first shootable mobj it can reach.
+def Sim.aim(+level: L.Level, +ts: H.Things, +p: Player, +x: U32, +y: U32, +shootz: U32, +shooter: U32,
+  +angle: U32, +range: U32) -> Sim.Aim:
+  +sine = L.Level.sine(level)
+  +f = A.Angle.fine(angle)
+  Sim.path(~Sim.Aim, ~Sim.aim.visit, level, ts, p, True{}, True{}, x, y,
+    (x + (range >> 16n) * A.Angle.cos(sine, f) : U32), (y + (range >> 16n) * A.Angle.sin(sine, f) : U32),
+    Aim{ts, p, shooter, shootz, range, Sim.aimtop(), Sim.aimbottom(), 0, None{}})
+
+# P_BulletSlope's last try, a turn to the left of the facing.
+def Sim.slope.left(found: Bool, +level: L.Level, +ts: H.Things, +p: Player, +x: U32, +y: U32, +shootz: U32,
+  +shooter: U32, +angle: U32, a: Sim.Aim) -> Sim.Aim:
+  match found:
+    case True{}:
+      a
+    case False{}:
+      Sim.aim(level, ts, p, x, y, shootz, shooter, (angle - 67108864 : U32), Sim.missilerange())
+
+# P_BulletSlope's second try, a turn to the right.
+def Sim.slope.right(found: Bool, +level: L.Level, +ts: H.Things, +p: Player, +x: U32, +y: U32, +shootz: U32,
+  +shooter: U32, +angle: U32, a: Sim.Aim) -> Sim.Aim:
+  match found:
+    case True{}:
+      a
+    case False{}:
+      +right = Sim.aim(level, ts, p, x, y, shootz, shooter, (angle + 67108864 : U32), Sim.missilerange())
+      Sim.slope.left(Sim.Aim.found(right), level, ts, p, x, y, shootz, shooter, angle, right)
+
+# Doom's P_BulletSlope: the aim straight ahead, and where that finds
+# nothing a turn of 1<<26 to either side, the right first. The slope of
+# the last try stands, so three misses aim level.
+def Sim.bulletslope(+level: L.Level, +ts: H.Things, +p: Player, +x: U32, +y: U32, +shootz: U32, +shooter: U32,
+  +angle: U32) -> U32:
+  +ahead = Sim.aim(level, ts, p, x, y, shootz, shooter, angle, Sim.missilerange())
+  Sim.Aim.slope(Sim.slope.right(Sim.Aim.found(ahead), level, ts, p, x, y, shootz, shooter, angle, ahead))
+
+# Where a bullet stopped: at a wall's face, at a mobj, or nowhere, which
+# is a shot into a sky as well as one that reached its range.
+type Sim.Hit is Data:
+  Struck{frac: U32}
+  Pierced{id: U32, frac: U32}
+  Vanished{}
+
+# What Doom's PTR_ShootTraverse keeps in globals, with what the bullet
+# met: the population and the player to read a mobj with, the shooter,
+# the height and range of the shot, the slope it flies at, and the
+# damage it deals whatever it hits.
+type Sim.Shot is Data:
+  Shot{things: H.Things, player: Player, shooter: U32, shootz: U32, range: U32, slope: U32, damage: U32,
+    hit: Sim.Hit}
+
+# The wall was reached: the bullet leaves nothing where it flew over a
+# sky ceiling, or where the sector behind the line shows the sky too,
+# which is vanilla's sky hack.
+def Sim.shot.sky(sky: Bool, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  match sky:
+    case True{}:
+      Shot{things, player, shooter, shootz, range, slope, damage, was} = sh
+      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage, Vanished{}}}
+    case False{}:
+      Shot{things, player, shooter, shootz, range, slope, damage, was} = sh
+      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage, Struck{frac}}}
+
+def Sim.shot.behind(exists: Bool, +level: L.Level, +back: U32) -> Bool:
+  match exists:
+    case False{}:
+      False{}
+    case True{}:
+      L.Level.sky(level, back)
+
+# PTR_ShootTraverse's hit on a line: the puff stands four units back
+# along the ray, which is where the sky is tested too.
+def Sim.shot.wall(+level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  L.Line{x1, y1, x2, y2, flags, +front, +back} = line
+  Shot{things, player, shooter, +shootz, +range, +slope, damage, hit} = sh
+  +back4 = (frac - F.Fixed.div(262144, range) : U32)
+  +z = (shootz + F.Fixed.mul(slope, F.Fixed.mul(back4, range)) : U32)
+  Sim.shot.sky(Bool.and(L.Level.sky(level, front), Bool.or(F.Fixed.gt(z, L.Level.ceil(level, front)),
+      Sim.shot.behind(Bool.not(U32.is_eq(back, L.Level.none())), level, back))), back4,
+    Shot{things, player, shooter, shootz, range, slope, damage, hit})
+
+def Sim.shot.open(blocked: Bool, +level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) ->
+  Sim.Answer<&2, Sim.Shot>:
+  match blocked:
+    case True{}:
+      Sim.shot.wall(level, line, frac, sh)
+    case False{}:
+      Answer{False{}, sh}
+
+# PTR_ShootTraverse over a two-sided line: the bullet flies on while its
+# slope stays inside the opening, and hits the line where a plane that
+# differs from the one behind it is in the way.
+def Sim.shot.crosses(+level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  L.Line{x1, y1, x2, y2, flags, +front, +back} = line
+  Shot{things, player, shooter, +shootz, +range, +slope, damage, hit} = sh
+  +dist = F.Fixed.mul(range, frac)
+  Sim.shot.open(Bool.or(
+      Bool.and(Bool.not(U32.is_eq(L.Level.floor(level, front), L.Level.floor(level, back))),
+        F.Fixed.gt(F.Fixed.div((Sim.open_bottom(level, line) - shootz : U32), dist), slope)),
+      Bool.and(Bool.not(U32.is_eq(L.Level.ceil(level, front), L.Level.ceil(level, back))),
+        F.Fixed.lt(F.Fixed.div((Sim.open_top(level, line) - shootz : U32), dist), slope))),
+    level, line, frac, Shot{things, player, shooter, shootz, range, slope, damage, hit})
+
+def Sim.shot.solid(open: Bool, +level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) ->
+  Sim.Answer<&2, Sim.Shot>:
+  match open:
+    case False{}:
+      Sim.shot.wall(level, line, frac, sh)
+    case True{}:
+      Sim.shot.crosses(level, line, frac, sh)
+
+def Sim.shot.line(+level: L.Level, +i: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  +line = L.Level.line(level, i)
+  Sim.shot.solid(Bool.and(Sim.twosided(line), Bool.not(Sim.shut(level, line))), level, line, frac, sh)
+
+# The mobj is hit: what it is given stands ten units back along the ray.
+def Sim.shot.body(missed: Bool, +id: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  match missed:
+    case True{}:
+      Answer{False{}, sh}
+    case False{}:
+      Shot{things, player, shooter, shootz, +range, slope, damage, was} = sh
+      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage,
+        Pierced{id, (frac - F.Fixed.div(655360, range) : U32)}}}
+
+# PTR_ShootTraverse over a mobj: one whose box the slope passes over or
+# under is shot past.
+def Sim.shot.shootable(shootable: Bool, +id: U32, +z: U32, +height: U32, +frac: U32, sh: Sim.Shot) ->
+  Sim.Answer<&2, Sim.Shot>:
+  match shootable:
+    case False{}:
+      Answer{False{}, sh}
+    case True{}:
+      Shot{things, player, shooter, +shootz, +range, +slope, damage, hit} = sh
+      +dist = F.Fixed.mul(range, frac)
+      Sim.shot.body(Bool.or(F.Fixed.lt(F.Fixed.div((z + height - shootz : U32), dist), slope),
+          F.Fixed.gt(F.Fixed.div((z - shootz : U32), dist), slope)), id, frac,
+        Shot{things, player, shooter, shootz, range, slope, damage, hit})
+
+def Sim.shot.self(own: Bool, m: Maybe<&2, Sim.Body>, +id: U32, +frac: U32, sh: Sim.Shot) ->
+  Sim.Answer<&2, Sim.Shot>:
+  match own m:
+    case True{} _:
+      Answer{False{}, sh}
+    case False{} None{}:
+      Answer{False{}, sh}
+    case False{} Some{Body{bid, bx, by, z, radius, height, +flags}}:
+      Sim.shot.shootable(Bool.not(U32.is_zero((flags .&. 4 : U32))), id, z, height, frac, sh)
+
+def Sim.shot.thing(+id: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  Shot{+things, +player, +shooter, shootz, range, slope, damage, hit} = sh
+  Sim.shot.self(U32.is_eq(id, shooter), Sim.body(things, player, id), id, frac,
+    Shot{things, player, shooter, shootz, range, slope, damage, hit})
+
+def Sim.shot.met(isline: Bool, +level: L.Level, +what: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  match isline:
+    case True{}:
+      Sim.shot.line(level, what, frac, sh)
+    case False{}:
+      Sim.shot.thing(what, frac, sh)
+
+# Doom's PTR_ShootTraverse. P_ShootSpecialLine is left out: no line in
+# either E1M1 fires on a gunshot.
+def Sim.shot.visit(+level: L.Level, m: Sim.Meet, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
+  Meet{frac, isline, what} = m
+  Sim.shot.met(isline, level, what, frac, sh)
+
+# The puff once it stands where P_SpawnPuff put it: it rises a unit a
+# tic, and its first state is shortened by the draw, never under a tic.
+def Sim.puff.tics(m: Maybe<&2, H.Thing>, +id: U32, +drawn: U32, s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz}}:
+      State{player, level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+      State{player, level, H.Things.put(things, id, Some{H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector,
+        state, F.Fixed.max(1, (tics - (drawn .&. 3 : U32) : U32)), F.Fixed.unit()}}), sidetex, thinkers, rnd, clock,
+        ended, usedown, sounds, mrnd, reborn}
+
+def Sim.puff.drawn(+id: U32, s: State) -> State:
+  State{player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  +drew = M.Random.next(rnd)
+  Sim.puff.tics(H.Things.get(things, id), id, M.Random.at(drew), State{player, level, things, sidetex, thinkers,
+    drew, clock, ended, usedown, sounds, mrnd, reborn})
+
+def Sim.puff.at(+x: U32, +y: U32, +z: U32, +s: State) -> State:
+  Sim.puff.drawn(H.Things.count(State.things(s)), Sim.spawn(H.Thing.info(H.Thing.puff()), x, y, z, s))
+
+# Doom's P_SpawnPuff: the z is nudged by up to four units either way,
+# the mobj spawns and draws as any does, and a last draw shortens its
+# first state. The spark state is for a punch alone, whose attack range
+# no shot has.
+def Sim.puff(+x: U32, +y: U32, +z: U32, s: State) -> State:
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  +a = M.Random.next(rnd)
+  +b = M.Random.next(a)
+  Sim.puff.at(x, y, (z + ((M.Random.at(a) - M.Random.at(b) : U32) << 10n) : U32),
+    State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn})
+
+# A mobj the bullet hit takes a puff where it does not bleed, as vanilla
+# gives an MF_NOBLOOD thing. P_SpawnBlood for one that bleeds, and
+# P_DamageMobj for either, belong in this match.
+def Sim.shot.hurt(bleeds: Bool, +x: U32, +y: U32, +z: U32, s: State) -> State:
+  match bleeds:
+    case False{}:
+      Sim.puff(x, y, z, s)
+    case True{}:
+      s
+
+def Sim.shot.bled(m: Maybe<&2, Sim.Body>, +x: U32, +y: U32, +z: U32, s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{Body{id, bx, by, bz, radius, height, +flags}}:
+      Sim.shot.hurt(U32.is_zero((flags .&. 524288 : U32)), x, y, z, s)
+
+# What the bullet left where it stopped, which vanilla spawns inside the
+# traversal: the walk ends at the first thing it hits, and no visitor of
+# this walk draws, so spawning here makes the same draws in the same
+# order.
+def Sim.shot.left(hit: Sim.Hit, tr: Sim.Trace, sh: Sim.Shot, s: State) -> State:
+  match hit:
+    case Vanished{}:
+      s
+    case Struck{+frac}:
+      Trace{tx, ty, tdx, tdy} = tr
+      Shot{things, player, shooter, shootz, +range, slope, damage, was} = sh
+      Sim.puff((tx + F.Fixed.mul(tdx, frac) : U32), (ty + F.Fixed.mul(tdy, frac) : U32),
+        (shootz + F.Fixed.mul(slope, F.Fixed.mul(frac, range)) : U32), s)
+    case Pierced{id, +frac}:
+      Trace{tx, ty, tdx, tdy} = tr
+      Shot{+things, +player, shooter, shootz, +range, slope, damage, was} = sh
+      Sim.shot.bled(Sim.body(things, player, id), (tx + F.Fixed.mul(tdx, frac) : U32),
+        (ty + F.Fixed.mul(tdy, frac) : U32), (shootz + F.Fixed.mul(slope, F.Fixed.mul(frac, range)) : U32), s)
+
+def Sim.shot.done(tr: Sim.Trace, sh: Sim.Shot, s: State) -> State:
+  Shot{things, player, shooter, shootz, range, slope, damage, +hit} = sh
+  Sim.shot.left(hit, tr, Shot{things, player, shooter, shootz, range, slope, damage, hit}, s)
+
+# Doom's P_LineAttack: the bullet's ray, and what it leaves where it
+# stops.
+def Sim.attack(+level: L.Level, +ts: H.Things, +p: Player, +x: U32, +y: U32, +shootz: U32, +shooter: U32,
+  +angle: U32, +range: U32, +slope: U32, +damage: U32, s: State) -> State:
+  +sine = L.Level.sine(level)
+  +f = A.Angle.fine(angle)
+  +x2 = (x + (range >> 16n) * A.Angle.cos(sine, f) : U32)
+  +y2 = (y + (range >> 16n) * A.Angle.sin(sine, f) : U32)
+  Sim.shot.done(Sim.trace.of(L.Level.blockmap_of(level), x, y, x2, y2),
+    Sim.path(~Sim.Shot, ~Sim.shot.visit, level, ts, p, True{}, True{}, x, y, x2, y2,
+      Shot{ts, p, shooter, shootz, range, slope, damage, Vanished{}}), s)
+
+def Sim.gunshot.fired(+angle: U32, +damage: U32, +slope: U32, +s: State) -> State:
+  +p = State.player(s)
+  +ts = State.things(s)
+  Sim.attack(State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
+    H.Things.you(ts), angle, Sim.missilerange(), slope, damage, s)
+
+# A held shot is spread by a draw to either side, where the first of a
+# press goes straight where the weapon points.
+def Sim.gunshot.spread(accurate: Bool, +angle: U32, +damage: U32, +slope: U32, s: State) -> State:
+  match accurate:
+    case True{}:
+      Sim.gunshot.fired(angle, damage, slope, s)
+    case False{}:
+      State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+      +a = M.Random.next(rnd)
+      +b = M.Random.next(a)
+      Sim.gunshot.fired((angle + ((M.Random.at(a) - M.Random.at(b) : U32) << 18n) : U32), damage, slope,
+        State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn})
+
+# Doom's P_GunShot: the damage is drawn first, whoever takes it.
+def Sim.gunshot(accurate: Bool, +slope: U32, s: State) -> State:
+  State{+player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  +drew = M.Random.next(rnd)
+  Sim.gunshot.spread(accurate, Player.angle(player), (5 * ((M.Random.at(drew) % 3 : U32) + 1 : U32) : U32), slope,
+    State{player, level, things, sidetex, thinkers, drew, clock, ended, usedown, sounds, mrnd, reborn})
+
+# The player sprites
+# ------------------
+
+# A player sprite mid-step: the state it is to enter, if any, the state
+# its action set on the muzzle flash, the sprite itself, and the world
+# the action changed.
+type Sim.Entering is Data:
+  Entering{next: Maybe<&2, U32>, sets: Maybe<&2, U32>, psp: Psprite, s: State}
+
+# Doom's A_Raise: the sprite rises, and at the top the weapon's ready
+# state is set.
+def Sim.raise(psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+  Psprite{state, tics, sx, sy} = psp
+  H.Weapon{up, ready, down, ammo, atk, flash} = weapon
+  +risen = (sy - Sim.raisespeed() : U32)
+  Entering{Bool.pick(Maybe<&2, U32>, F.Fixed.gt(risen, Sim.weapontop()), None{}, Some{ready}), None{},
+    Psprite{state, tics, sx, F.Fixed.max(risen, Sim.weapontop())}, s}
+
+# A_WeaponReady's bob: the sprite swings on the level's clock, a turn
+# every 64 tics, as far as the bob to either side of column 1 and below
+# the top.
+def Sim.ready.bob(psp: Psprite, +sine: V.Vec, +clock: U32, +bob: U32, s: State) -> Sim.Entering:
+  Psprite{state, tics, sx, sy} = psp
+  +angle = ((128 * clock : U32) .&. 8191 : U32)
+  Entering{None{}, None{}, Psprite{state, tics, (65536 + F.Fixed.mul(bob, A.Angle.cos(sine, angle)) : U32),
+    (Sim.weapontop() + F.Fixed.mul(bob, A.Angle.sin(sine, (angle .&. 4095 : U32))) : U32)}, s}
+
+# The state with another count of shots the held attack has taken.
+def State.firing(+refire: U32, s: State) -> State:
+  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State{Player.firing(player, refire), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+
+# One bullet spent, Doom's DecreaseAmmo for the pistol.
+def Sim.spent(s: State) -> State:
+  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State{Player.holding(player, I.Inventory.spend(I.Inventory.am_clip(), 1, Player.inv(player))), level, things,
+    sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+
+def Sim.fire.shot(+s: State) -> State:
+  +p = State.player(s)
+  +ts = State.things(s)
+  Sim.gunshot(U32.is_zero(Player.refire(p)), Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p),
+    Sim.shootz(Player.z(p), Sim.height()), H.Things.you(ts), Player.angle(p)), s)
+
+# Doom's A_FirePistol: the shot is heard, a bullet is spent, the muzzle
+# flash is set, and the bullet flies where the autoaim points, straight
+# on the first shot of a press and spread on the rest. P_SetMobjState on
+# the player's own mobj has no reader, since single player never draws
+# it, and P_NoiseAlert has nothing to wake yet.
+def Sim.fire.pistol(psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+  H.Weapon{up, ready, down, ammo, atk, flash} = weapon
+  Entering{None{}, Some{flash}, psp,
+    Sim.fire.shot(Sim.spent(Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)))}
+
+# Whether the ready weapon has a shot left. Doom's P_CheckAmmo also
+# picks another weapon where it has none, which is the switching
+# ticket's, so a dry pistol stays up instead of being lowered.
+def Sim.ammo.enough(+s: State) -> Bool:
+  U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_clip(), Player.inv(State.player(s))))
+
+# Doom's P_FireWeapon: with a shot left the weapon enters its attack
+# state.
+def Sim.fire.weapon(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+  match enough:
+    case False{}:
+      Entering{None{}, None{}, psp, s}
+    case True{}:
+      H.Weapon{up, ready, down, ammo, atk, flash} = weapon
+      Entering{Some{atk}, None{}, psp, s}
+
+def Sim.fire(psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+  Sim.fire.weapon(Sim.ammo.enough(s), psp, weapon, s)
+
+# Doom's A_WeaponReady's fire check: the attack held fires and leaves
+# the sprite where it is, and a released attack lets the weapon bob.
+# Vanilla also writes attackdown here, which only the launcher and the
+# BFG read. The pending weapon and the dead player's lowering are the
+# switching ticket's.
+def Sim.ready.fire(attack: Bool, psp: Psprite, weapon: H.Thing.Weapon, +sine: V.Vec, +clock: U32, +bob: U32,
+  s: State) -> Sim.Entering:
+  match attack:
+    case True{}:
+      Sim.fire(psp, weapon, s)
+    case False{}:
+      Sim.ready.bob(psp, sine, clock, bob, s)
+
+# Doom's A_ReFire: the attack still held and the player alive takes
+# another shot and counts it; anything else puts the count back, where
+# vanilla also runs P_CheckAmmo.
+def Sim.refire.again(again: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+  match again:
+    case True{}:
+      Sim.fire(psp, weapon, State.firing((Player.refire(State.player(s)) + 1 : U32), s))
+    case False{}:
+      Entering{None{}, None{}, psp, State.firing(0, s)}
+
+def Sim.refire(psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+  Sim.refire.again(Bool.and(K.Cmd.attack(cmd),
+    Bool.not(U32.is_zero(I.Inventory.health(Player.inv(State.player(s)))))), psp, weapon, s)
+
+# Doom's A_Lower for a dead player: the sprite sinks 6 a tic and stays
+# at the bottom of the screen. Death is the only thing that lowers a
+# weapon here, so the branch that brings the next one up has no caller.
+def Sim.lower(psp: Psprite, s: State) -> Sim.Entering:
+  Psprite{state, tics, sx, +sy} = psp
+  Entering{None{}, None{}, Psprite{state, tics, sx, F.Fixed.min((sy + Sim.lowerspeed() : U32),
+    Sim.weaponbottom())}, s}
+
+def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) ->
+  Sim.Entering:
+  match action:
+    case H.Null{}:
+      Entering{None{}, None{}, psp, s}
+    case H.Raise{}:
+      Sim.raise(psp, weapon, s)
+    case H.WeaponReady{}:
+      Sim.ready.fire(K.Cmd.attack(cmd), psp, weapon, L.Level.sine(State.level(s)), State.clock(s),
+        Sim.bob(Player.momx(State.player(s)), Player.momy(State.player(s))), s)
+    case H.FirePistol{}:
+      Sim.fire.pistol(psp, weapon, s)
+    case H.ReFire{}:
+      Sim.refire(psp, cmd, weapon, s)
+    case H.Lower{}:
+      Sim.lower(psp, s)
+    case other:
+      Entering{None{}, None{}, psp, s}
+
+# The state a step goes on to: the one the action set, else the next row
+# where the state it entered lasts no tics, as P_SetPsprite's loop does.
+def Sim.psprite.on(set: Maybe<&2, U32>, out: Bool, +next: U32) -> Maybe<&2, U32>:
+  match set out:
+    case Some{state} _:
+      Some{state}
+    case None{} True{}:
+      Some{next}
+    case None{} False{}:
+      None{}
+
+# The flash state an action set, over whatever an earlier step set.
+def Sim.psprite.or(set: Maybe<&2, U32>, had: Maybe<&2, U32>) -> Maybe<&2, U32>:
+  match set:
+    case None{}:
+      had
+    case Some{state}:
+      Some{state}
+
+def Sim.psprite.entered(e: Sim.Entering, +row: H.Thing.Row, had: Maybe<&2, U32>) -> Sim.Entering:
+  Entering{next, set, psp, s} = e
+  Entering{Sim.psprite.on(next, U32.is_zero(H.Thing.Row.tics(row)), H.Thing.Row.next(row)),
+    Sim.psprite.or(set, had), psp, s}
+
+# One turn of P_SetPsprite: the sprite takes the state's row and tics,
+# and the row's action runs.
+def Sim.psprite.enter(+state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd, +weapon: H.Thing.Weapon,
+  s: State) -> Sim.Entering:
+  Psprite{was, tics, sx, sy} = psp
+  +row = H.Thing.row(state)
+  Sim.psprite.entered(Sim.psprite.act(H.Thing.Row.action(row),
+    Psprite{Some{state}, H.Thing.Row.tics(row), sx, sy}, cmd, weapon, s), row, had)
+
+# Entering S_NULL stops the sprite showing, as a state number of 0 does
+# in vanilla.
+def Sim.psprite.gone(null: Bool, state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd,
+  +weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+  match null psp:
+    case True{} Psprite{was, tics, sx, sy}:
+      Entering{None{}, had, Psprite{None{}, tics, sx, sy}, s}
+    case False{} kept:
+      Sim.psprite.enter(state, had, kept, cmd, weapon, s)
+
+# Doom's P_SetPsprite: states are entered in turn while an action sets
+# one or the state entered lasts no tics. No chain of vanilla's is
+# longer than three.
+def Sim.psprite.set(fuel: Nat, st: Sim.Entering, +cmd: K.Cmd, +weapon: H.Thing.Weapon) -> Sim.Entering:
+  match fuel st:
+    case 1n+f Entering{Some{+state}, sets, psp, s}:
+      Sim.psprite.set(f, Sim.psprite.gone(U32.is_eq(state, H.Thing.null()), state, sets, psp, cmd, weapon, s),
+        cmd, weapon)
+    case _ Entering{next, sets, psp, s}:
+      Entering{next, sets, psp, s}
+
+# Doom's P_MovePsprites for one sprite: one that shows counts its tics
+# down, and the tic they run out enters its next state. No weapon state
+# lasts.
+def Sim.psprite.tic(psp: Psprite, sets: Maybe<&2, U32>, cmd: K.Cmd, weapon: H.Thing.Weapon, s: State) ->
+  Sim.Entering:
+  match psp:
+    case Psprite{None{}, tics, sx, sy}:
+      Entering{None{}, sets, Psprite{None{}, tics, sx, sy}, s}
+    case Psprite{Some{+state}, +tics, sx, sy}:
+      Sim.psprite.set(8n, Entering{Bool.pick(Maybe<&2, U32>, U32.is_eq(tics, 1),
+        Some{H.Thing.Row.next(H.Thing.row(state))}, None{}), sets, Psprite{Some{state}, (tics - 1 : U32), sx, sy},
+        s}, cmd, weapon)
+
+# The flash is drawn where the weapon is.
+def Sim.psprites.follow(weapon: Psprite, flash: Psprite) -> Psprites:
+  Psprite{state, tics, +sx, +sy} = weapon
+  Psprite{fstate, ftics, fx, fy} = flash
+  Psprites{Psprite{state, tics, sx, sy}, Psprite{fstate, ftics, sx, sy}}
+
+# The state holding the sprites a tic left.
+def State.showing(ps: Psprites, s: State) -> State:
+  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State{Player.showing(player, ps), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+
+def Sim.psprites.done(weapon: Psprite, e: Sim.Entering) -> State:
+  Entering{next, sets, psp, s} = e
+  State.showing(Sim.psprites.follow(weapon, psp), s)
+
+def Sim.psprites.after(weapon: Psprite, e: Sim.Entering, +cmd: K.Cmd, +winfo: H.Thing.Weapon) -> State:
+  Entering{next, sets, psp, s} = e
+  Sim.psprites.done(weapon, Sim.psprite.tic(psp, None{}, cmd, winfo, s))
+
+# The flash after the weapon's step: a state the weapon's action set is
+# entered first, and only then does P_MovePsprites count the flash's
+# tics down, since it reaches the flash after the weapon.
+def Sim.psprites.flash(flash: Psprite, e: Sim.Entering, +cmd: K.Cmd, +winfo: H.Thing.Weapon) -> State:
+  Entering{next, sets, psp, s} = e
+  Sim.psprites.after(psp, Sim.psprite.set(8n, Entering{sets, None{}, flash, s}, cmd, winfo), cmd, winfo)
+
+def Sim.psprites.both(ps: Psprites, +cmd: K.Cmd, +winfo: H.Thing.Weapon, s: State) -> State:
+  Psprites{+weapon, flash} = ps
+  Sim.psprites.flash(flash, Sim.psprite.tic(weapon, None{}, cmd, winfo, s), cmd, winfo)
+
+# Doom's P_MovePsprites: the weapon's sprite steps first, and its action
+# may set the flash's state; then the flash's steps, on the state the
+# weapon left it in.
+def Sim.psprites(+cmd: K.Cmd, +s: State) -> State:
+  Sim.psprites.both(Player.psprites(State.player(s)), cmd, H.Thing.pistol(), s)
+
+# The weapon put away, the flash as it was.
+def Sim.psprites.lowered(flash: Psprite, e: Sim.Entering) -> State:
+  Entering{next, sets, psp, s} = e
+  State.showing(Psprites{psp, flash}, s)
+
+def Sim.psprites.raised(e: Sim.Entering) -> State:
+  Entering{next, sets, psp, s} = e
+  State.showing(Psprites{psp, Psprite{None{}, 0, 0, 0}}, s)
+
+# Doom's P_SetupPsprites and P_BringUpWeapon: the weapon enters its
+# raise state at the bottom of the view, where A_Raise takes it up at
+# once. The pistol starts no sound and draws nothing, so where in the
+# level's start this runs cannot be seen.
+def Sim.psprites.up(+weapon: H.Thing.Weapon, s: State) -> State:
+  H.Weapon{+up, ready, down, ammo, atk, flash} = weapon
+  Sim.psprites.raised(Sim.psprite.set(8n, Entering{Some{up}, None{}, Psprite{None{}, 0, 0, Sim.weaponbottom()}, s},
+    K.Cmd.idle(), weapon))
+
+def Sim.psprites.start(s: State) -> State:
+  Sim.psprites.up(H.Thing.pistol(), s)
 
 # Lights
 # ------
@@ -1797,11 +2470,11 @@ def Sim.reclip(+level: L.Level, +things: H.Things, +p: Player) -> Sim.Try:
 # dropped, and no E1M1 mover crushes, so nothing is gibbed, removed or
 # hurt.
 def Sim.reclip.fin(th: H.Thing, m: Sim.Body, f: Sim.Fit) -> Bool & H.Thing:
-  H.Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics} = th
+  H.Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, momz} = th
   Body{i, mx, my, mz, radius, +height, flags} = m
   Fit{ok, +floor, +ceil} = f
   (Bool.or(Sim.fits(floor, ceil, height), U32.is_zero((flags .&. 4 : U32))),
-    H.Thing{id, kind, x, y, Sim.clip(z, floorz, floor, ceil, height), floor, ceil, angle, sector, state, tics})
+    H.Thing{id, kind, x, y, Sim.clip(z, floorz, floor, ceil, height), floor, ceil, angle, sector, state, tics, momz})
 
 def Sim.reclip.thing(+level: L.Level, things: H.Things, p: Player, +th: H.Thing) -> Bool & H.Thing:
   Sim.reclip.fin(th, Sim.body.of(th), Sim.check(level, things, p, Sim.body.of(th), 3))
@@ -1932,17 +2605,29 @@ def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: Sta
     case False{}:
       State.kept(s, Button{side, slot, texture, (tics - 1 : U32)})
 
-# Doom's P_MobjThinker for a thing: its tic through its states. One
-# removed has no thing, and its thinker ends here, as Doom's does when
-# the run reaches it.
+# The thing after its tic: one that entered S_NULL removed itself, as
+# P_SetMobjState does, and its thinker ends at its next turn.
+def Sim.thing.left(gone: Bool, th: H.Thing, +id: U32, s: State) -> State:
+  match gone:
+    case True{}:
+      State.kept(Sim.remove(id, s), Mobj{id})
+    case False{}:
+      State{player, level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+      State.kept(State{player, level, H.Things.put(things, id, Some{th}), sidetex, thinkers, rnd, clock,
+        ended, usedown, sounds, mrnd, reborn}, Mobj{id})
+
+def Sim.thing.stepped(+th: H.Thing, +id: U32, s: State) -> State:
+  Sim.thing.left(H.Thing.gone(th), th, id, s)
+
+# Doom's P_MobjThinker for a thing: its vertical move, then its tic
+# through its states. One already removed has no thing, and its thinker
+# ends here, as Doom's does when the run reaches it.
 def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
   match m:
     case None{}:
       s
     case Some{th}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-      State.kept(State{player, level, H.Things.put(things, id, Some{H.Thing.tic(th)}), sidetex, thinkers, rnd, clock,
-        ended, usedown, sounds, mrnd, reborn}, Mobj{id})
+      Sim.thing.stepped(H.Thing.tic(th), id, s)
 
 def Sim.thing(+id: U32, +s: State) -> State:
   Sim.thing.tic(H.Things.get(State.things(s), id), id, s)
@@ -2070,15 +2755,6 @@ def Sim.lights(n: Nat, +sector: U32, +s: State) -> State:
       Sim.lights(m, (sector + 1 : U32),
         Sim.light.spawn(L.Level.sector.special(State.level(s), sector), sector, s))
 
-# A thing entered into a state: in the population, linked where it is,
-# its thinker started.
-def State.entered(th: H.Thing, s: State) -> State:
-  H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = th
-  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  State.thinking(State{player, level, H.Things.entered(things, L.Level.blockmap_of(level),
-    H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}), sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd, reborn}, Mobj{id})
-
 def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
   match things:
     case []:
@@ -2090,7 +2766,7 @@ def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
 # started.
 def State.entered.you(s: State) -> State:
   State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), H.Things.you(things),
+  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), False{}, H.Things.you(things),
     Player.x(player), Player.y(player), L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex,
     thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}, Mobj{H.Things.you(things)})
 
@@ -2100,7 +2776,7 @@ def State.you.first(things: List<&2, H.Thing>, you: U32) -> Bool:
   match things:
     case []:
       True{}
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
       U32.is_lt(you, id)
 
 def State.populated.go(things: List<&2, H.Thing>, first: Bool, +you: U32, s: State) -> State:
@@ -2127,31 +2803,6 @@ def State.populated(+things: List<&2, H.Thing>, count: U32, s: State) -> State:
     State{player, level, Sim.nothing(L.Level.blockmap_of(level), count, H.Things.you(old), L.Level.nsectors(level)),
       sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn})
 
-# Doom's P_SpawnMobj in play: a thing of a type at (x, y) and z, or on
-# the floor or under the ceiling for H.Thing.onfloor and
-# H.Thing.onceiling. It takes the next id past every one given, draws
-# one random number, is linked where it is, and its thinker is started:
-# last, so it first thinks the same tic if the thinkers' run is not over,
-# as one added to the tail of Doom's list does.
-def Sim.spawn(d: H.Thing.Def, x: U32, y: U32, z: U32, s: State) -> State:
-  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  State.entered(H.Thing.mobj(d, level, H.Things.count(things), x, y, z), State{player, level,
-    H.Things.fresh(things), sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown, sounds, mrnd, reborn})
-
-def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
-  match m:
-    case None{}:
-      s
-    case Some{th}:
-      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-      State{player, level, H.Things.removed(things, L.Level.blockmap_of(level), th), sidetex, thinkers, rnd, clock,
-        ended, usedown, sounds, mrnd, reborn}
-
-# Doom's P_RemoveMobj: the thing unlinked and gone, its id never given
-# again, its sound stopped; its thinker ends when its turn comes.
-def Sim.remove(id: U32, +s: State) -> State:
-  Sim.remove.thing(H.Things.get(State.things(s), id), s)
-
 # The state a level starts in, from the map as loaded, with the player
 # at rest at a place, the things spawned with the random numbers they
 # draw, and then the lights in sector order. Use counts as down, as
@@ -2160,9 +2811,10 @@ def Sim.remove(id: U32, +s: State) -> State:
 # the melt that wipes the level in draws once a screen column, 320.
 def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn) -> State:
   H.Spawn{things, rnd, you} = spawn
-  Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0, State.populated(things, L.Level.nthings(level),
-    State{Player.at(level, place), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), Thinkers{[], []},
-      rnd, 0, False{}, True{}, [], 64, False{}}))
+  Sim.psprites.start(Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
+    State.populated(things, L.Level.nthings(level),
+      State{Player.at(level, place), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), Thinkers{[], []},
+        rnd, 0, False{}, True{}, [], 64, False{}})))
 
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
   State.at.spawned(level, place, H.Thing.spawn(level))
@@ -2452,12 +3104,6 @@ def Sim.use.hit(hit: Sim.Reach, +p: Player, +s: State) -> State:
       Sim.use.line(Sim.point_side(Player.x(p), Player.y(p), L.Level.line(State.level(s), i)),
         State.level(s), i, Player.inv(p), s)
 
-# Doom's P_LineOpening leaves no opening in a line with one side.
-def Sim.use.shut(+level: L.Level, +line: L.Level.Line) -> Bool:
-  L.Line{x1, y1, x2, y2, flags, front, back} = line
-  Bool.or(U32.is_eq(back, L.Level.none()),
-    F.Fixed.le((Sim.open_top(level, line) - Sim.open_bottom(level, line) : U32), 0))
-
 def Sim.use.at(special: Bool, shut: Bool, i: U32) -> Sim.Answer<&2, Sim.Reach>:
   match special shut:
     case True{} _:
@@ -2472,7 +3118,7 @@ def Sim.use.at(special: Bool, shut: Bool, i: U32) -> Sim.Answer<&2, Sim.Reach>:
 # its opening is more than nothing.
 def Sim.use.visit(+level: L.Level, m: Sim.Meet, reach: Sim.Reach) -> Sim.Answer<&2, Sim.Reach>:
   Meet{frac, isline, +i} = m
-  Sim.use.at(Bool.not(U32.is_zero(L.Level.special(level, i))), Sim.use.shut(level, L.Level.line(level, i)), i)
+  Sim.use.at(Bool.not(U32.is_zero(L.Level.special(level, i))), Sim.shut(level, L.Level.line(level, i)), i)
 
 # Doom's P_UseLines, on the press: a trace of 64 units along the facing.
 def Sim.use(press: Bool, +s: State) -> State:
@@ -2558,15 +3204,13 @@ def Sim.mobj.tics(+s: State) -> State:
 
 # Doom's P_DropWeapon: the ready weapon enters its down state, whose
 # A_Lower runs as it does.
-def Player.dropped(+sine: V.Vec, +clock: U32, p: Player) -> Player:
-  Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    Psprites{weapon, flash}, hurt} = p
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    Psprites{Sim.psprite.set(4n, Entering{Some{H.Thing.Weapon.down(H.Thing.pistol())}, weapon}, sine, clock,
-      Sim.bob(momx, momy), H.Thing.pistol()), flash}, hurt}
+def Sim.drop.weapon(ps: Psprites, +weapon: H.Thing.Weapon, s: State) -> State:
+  Psprites{shown, flash} = ps
+  Sim.psprites.lowered(flash, Sim.psprite.set(8n, Entering{Some{H.Thing.Weapon.down(weapon)}, None{}, shown, s},
+    K.Cmd.idle(), weapon))
 
 def Sim.drop(+s: State) -> State:
-  State.player.put(s, Player.dropped(L.Level.sine(State.level(s)), State.clock(s), State.player(s)))
+  Sim.drop.weapon(Player.psprites(State.player(s)), H.Thing.pistol(), s)
 
 # The death state's tics, less the random 0 to 3 P_KillMobj takes off.
 # Its 10 never reach vanilla's floor of 1.
@@ -2668,7 +3312,7 @@ def Sim.damage.hit(m: Maybe<&2, H.Thing>, +damage: U32, +source: U32, +s: State)
   match m:
     case None{}:
       Sim.damage.player(damage, source, s)
-    case Some{H.Thing{id, kind, +x, +y, +z, floorz, ceilz, angle, sector, state, tics}}:
+    case Some{H.Thing{id, kind, +x, +y, +z, floorz, ceilz, angle, sector, state, tics, momz}}:
       Sim.damage.player(damage, source, Sim.blow(x, y, z, damage, s))
 
 def Sim.damage.if(dead: Bool, +damage: U32, +inflictor: U32, +source: U32, +s: State) ->
@@ -2745,7 +3389,7 @@ def Sim.death.faced(m: Maybe<&2, H.Thing>, +level: L.Level, +p: Player) -> Playe
   match m:
     case None{}:
       Player.turned(True{}, Player.angle(p), 0, p)
-    case Some{H.Thing{id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics}}:
+    case Some{H.Thing{id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
       +to = A.Angle.of(L.Level.tanto(level), (x - Player.x(p) : U32), (y - Player.y(p) : U32))
       +delta = (to - Player.angle(p) : U32)
       Player.turned(Bool.or(U32.is_lt(delta, Sim.ang5()), U32.is_gt(delta, F.Fixed.neg(Sim.ang5()))), to, delta, p)
@@ -2762,8 +3406,8 @@ def Sim.death.asked(use: Bool, s: State) -> State:
 # attacker. Nothing else of P_PlayerThink runs: no move, no sector
 # special, no use of a line and no counters, so the damage count fades
 # here alone.
-def Sim.death(+level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, p: Player) -> Player:
-  Sim.death.faced(m, level, Sim.eye(level, clock, Player.sinking(Sim.psprites(level, clock, p))))
+def Sim.death(+level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, s: State) -> Player:
+  Sim.death.faced(m, level, Sim.eye(level, clock, Player.sinking(State.player(Sim.psprites(K.Cmd.idle(), s)))))
 
 # The tic
 # -------
@@ -2877,8 +3521,8 @@ def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: State) -> Stat
     State.things(after), State.sidetex(after), State.thinkers.of(after), State.rnd(after), (clock + 1 : U32),
     State.ended(after), use, State.sounds(after), State.mrnd(after), State.reborn(after)}
 
-# One tic in Doom's order: the player thinks (the move, the eye, the
-# player sprites, the counters, use on the press), the thinkers run in
+# One tic in Doom's order: the player thinks (the move, the eye, use on
+# the press, the player sprites, the counters), the thinkers run in
 # the order they were started (the mobjs of the map's records, the
 # player's among them, whose own turn moves the player and fires the
 # lines that move crossed, then the lights, then what play started), the
@@ -2889,10 +3533,14 @@ def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: State) -> Stat
 # Doom's P_PlayerThink for a living player, in its order: the move, the
 # eye, what the sector's special deals, then the player sprites and the
 # counters.
+# P_PlayerThink's counters, once the sprites have moved.
+def Sim.player.counted(+s: State) -> State:
+  State.player.put(s, Sim.counters(State.player(s)))
+
 def Sim.player.live(+cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State) -> State:
   +hurt = Sim.sector(level, clock,
     State.player.put(s, Sim.eye(level, clock, Sim.move(level, cmd, State.player(s)))))
-  State.player.put(hurt, Sim.counters(Sim.psprites(level, clock, State.player(hurt))))
+  Sim.player.counted(Sim.psprites(cmd, hurt))
 
 # Doom's P_DeathThink: the sprites move, the view sinks and turns to the
 # attacker, and use asks for the level again.
@@ -2900,8 +3548,7 @@ def Sim.player.dead(+level: L.Level, +clock: U32, use: Bool, +s: State) -> State
   +asked = Sim.death.asked(use, s)
   State.player.put(asked, Sim.death(level, clock,
     Sim.named(U32.is_eq(Sim.Hurt.attacker(Player.hurt(State.player(asked))), H.Thing.you()),
-      State.things(asked), Sim.Hurt.attacker(Player.hurt(State.player(asked)))),
-    State.player(asked)))
+      State.things(asked), Sim.Hurt.attacker(Player.hurt(State.player(asked)))), asked))
 
 # Doom's P_PlayerThink: a dead player thinks of dying alone. Neither
 # think moves the player, which the mobj's own turn does, so the tic

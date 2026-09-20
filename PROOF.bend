@@ -355,9 +355,8 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +
 # place.
 def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
   S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
-    S.State.player.put(S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y)),
-      S.Sim.counters(S.Sim.psprites(L.Level{geo, sectors, specials}, 0,
-        S.State.player(S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y)))))))
+    S.Sim.player.counted(S.Sim.psprites(K.Cmd.idle(),
+      S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y)))))
 
 def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, rest_before(geo, sectors, specials, x, y),
@@ -413,6 +412,9 @@ def Laws.pistol_rises():
   {==}
 
 def Laws.pistol_bobs():
+  {==}
+
+def Laws.pistol_spends():
   {==}
 
 def Laws.armour_absorbs():
@@ -981,14 +983,7 @@ def z_free(+level: L.Level, p: S.Player, hp: Free(level, p)) ->
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-# The player sprites, the counters and the vertical move keep the place
-# too.
-def psprites_free(+level: L.Level, clock: U32, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.psprites(level, clock, p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, S.Psprites{+weapon, +flash}, +hurt}:
-      hp
-
+# The counters and the vertical move keep the place too.
 def counters_free(+level: L.Level, p: S.Player, hp: Free(level, p)) -> Free(level, S.Sim.counters(p)):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
@@ -1328,7 +1323,7 @@ def Laws.spawn_phase():
 def Laws.bonus_cycle():
   {==}
 
-def Laws.lasting_stays(id, kind, x, y, z, floorz, ceilz, angle, sector, state):
+def Laws.lasting_stays(id, kind, x, y, ceilz, angle, sector, state):
   {==}
 
 # The solid columns stay sorted

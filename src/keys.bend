@@ -24,6 +24,11 @@ def Cmd.use(cmd: Cmd) -> Bool:
   Cmd{forward, side, turn, buttons} = cmd
   U32.is_eq((buttons .&. 2 : U32), 2)
 
+# BT_ATTACK, the bit Ctrl sets.
+def Cmd.attack(cmd: Cmd) -> Bool:
+  Cmd{forward, side, turn, buttons} = cmd
+  U32.is_eq((buttons .&. 1 : U32), 1)
+
 # A command in a demo file's units: the moves and the buttons as they
 # are, the turn in steps of 256, the byte a demo keeps of it.
 def Cmd.demo(forward: U32, side: U32, turn: U32, buttons: U32) -> Cmd:

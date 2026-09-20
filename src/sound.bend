@@ -9,6 +9,9 @@ import ./angle.bend as A
 
 # A sound is named by its sfxenum_t number; 0 is vanilla's sfx_None, the
 # sound that starts nothing.
+def Sound.pistol() -> U32:
+  1
+
 def Sound.pstart() -> U32:
   18
 
@@ -60,10 +63,10 @@ type Sound.Sfx is Data:
   Sfx{id: U32, lump: String, priority: U32}
 
 def Sound.table() -> List<&2, Sound.Sfx>:
-  [Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100}, Sfx{21, "DSDORCLS", 100},
-    Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{25, "DSPLPAIN", 96}, Sfx{32, "DSITEMUP", 78},
-    Sfx{33, "DSWPNUP", 78}, Sfx{34, "DSOOF", 96}, Sfx{57, "DSPLDETH", 32}, Sfx{81, "DSNOWAY", 78},
-    Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100}, Sfx{93, "DSGETPOW", 60}]
+  [Sfx{1, "DSPISTOL", 64}, Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100},
+    Sfx{21, "DSDORCLS", 100}, Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{25, "DSPLPAIN", 96},
+    Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78}, Sfx{34, "DSOOF", 96}, Sfx{57, "DSPLDETH", 32},
+    Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100}, Sfx{93, "DSGETPOW", 60}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel
