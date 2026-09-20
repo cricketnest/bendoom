@@ -505,7 +505,7 @@ def Closed.east() -> S.State:
 # visitor that passes over it.
 def Closed.barrel() -> S.State:
   Closed.at(Closed.player(13107200, 4194304, 0, 8388608), Closed.doors(), [],
-    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295, 0}])
+    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295, 0, 0}])
 
 # What a ray of the use key's 64 units, east from (32, 64), meets, and
 # what the use key's visitor makes of the same ray.
@@ -931,13 +931,13 @@ def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2
 # lasting: the laws below are about its touch and its heights, not its
 # tics. Its floor is the room's, at 0.
 def Closed.thing(id: U32, kind: U32, x: U32, y: U32, z: U32) -> H.Thing:
-  H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295, 0}
+  H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295, 0, 0}
 
 # The same on a floor of its own height, so that P_ZMovement leaves it
 # where it is: a thing under the room's floor would otherwise be lifted
 # onto it before anything reached it, as vanilla lifts one.
 def Closed.floored(id: U32, kind: U32, x: U32, y: U32, +z: U32) -> H.Thing:
-  H.Thing{id, kind, x, y, z, z, 8388608, 0, 0, 0, 4294967295, 0}
+  H.Thing{id, kind, x, y, z, z, 8388608, 0, 0, 0, 4294967295, 0, 0}
 
 # The pickup laws' expected values are p_inter.c's P_TouchSpecialThing,
 # P_GiveCard, P_GiveBody, P_GiveArmor, P_GivePower, P_GiveAmmo and
@@ -1006,7 +1006,7 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook} <> rest:
       id <> Closed.ids(rest)
 
 def Closed.kept(+s: S.State) -> Closed.Got:
@@ -1535,7 +1535,7 @@ def Closed.tics(m: Maybe<&2, H.Thing>) -> Maybe<&2, U32>:
   match m:
     case None{}:
       None{}
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook}}:
       Some{tics}
 
 # LAW: a mobj spawned while the thinkers run joins the tail of the list
@@ -1589,10 +1589,10 @@ def Closed.lowering(n: Nat) -> List<&2, H.Thing>:
 # under the ceiling at 128 stays at 60, over its floor at -4 (sanity).
 law floor_carries_things:
   {(Closed.lowering(1n), Closed.lowering(2n))
-    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295, 0},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295, 0}],
-      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295, 0},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295, 0}])
+    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, 0},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, 0}],
+      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, 0},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, 0}])
     : List<&2, H.Thing> & List<&2, H.Thing>}
 
 # The door open at 68 and closing, 2 a tic, over a thing, the west room's
@@ -1618,7 +1618,7 @@ law barrel_stops_door:
     == (2752512, 2752512,
       [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
         [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], S.Sim.noise.door()}],
-      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295, 0}], 2883584)
+      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295, 0, 0}], 2883584)
     : U32 & U32 & List<&2, S.Thinker> & List<&2, H.Thing> & U32}
 
 # LAW: a lamp is solid but not shootable, and vanilla's PIT_ChangeSector
@@ -1629,7 +1629,7 @@ law lamp_under_door:
   {(Closed.ceil(Closed.idled(34n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0))), 1),
     Closed.running(Closed.idled(35n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0)))),
     Closed.things(Closed.idled(35n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0)))))
-    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295, 0}])
+    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295, 0, 0}])
     : U32 & List<&2, S.Thinker> & List<&2, H.Thing>}
 
 def Closed.over_barrel() -> S.State:
@@ -1643,7 +1643,7 @@ def Closed.over_barrel() -> S.State:
 # (sanity).
 law door_opens_over_barrel:
   {(Closed.ceil(Closed.used(0n, Closed.over_barrel()), 1), Closed.things(Closed.used(1n, Closed.over_barrel())))
-    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295, 0}]) : U32 & List<&2, H.Thing>}
+    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295, 0, 0}]) : U32 & List<&2, H.Thing>}
 
 # Things
 # ------
@@ -1661,16 +1661,18 @@ def Closed.stocked() -> S.State:
 
 # The bonus and the armour as they spawned, in a state for some tics.
 def Closed.bonus(state: U32, tics: U32) -> H.Thing:
-  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0}
+  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, 1}
 
 def Closed.armour(state: U32, tics: U32) -> H.Thing:
-  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0}
+  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, 2}
 
 # LAW: the spawn's phase, vanilla's P_SpawnMapThing. The player draws
 # the random table's entry 1. The bonus draws entry 2 for P_SpawnMobj,
 # then entry 3, 220, for its first state's tics: 1 + 220 mod 6 = 5. The
 # armour draws entry 4, then entry 5, 241: 1 + 241 mod 6 = 2. The index
-# is 5 (sanity).
+# is 5. P_SpawnMobj's own draw is each one's lastlook, the entry modulo
+# MAXPLAYERS: 109 mod 4 = 1 for the bonus and 222 mod 4 = 2 for the
+# armour (sanity).
 law spawn_phase:
   {(Closed.things(Closed.stocked()), S.State.rnd(Closed.stocked()))
     == ([Closed.bonus(12, 5), Closed.armour(6, 2)], 5)
@@ -1698,21 +1700,78 @@ law bonus_cycle:
     : List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing> & List<&2, H.Thing>
       & List<&2, H.Thing> & List<&2, H.Thing> & U32 & U32}
 
-# LAW: a thing in a lasting state, of -1 tics, standing on its floor
-# with no vertical momentum, is the same thing after its tic, for every
-# thing. The heights are 0 because P_MobjThinker asks whether the mobj
-# is off its floor, and a word operation on a symbolic word is stuck.
+# LAW: a thing in a lasting state, of -1 tics, leaves the state where
+# its tic found it, for every thing, every name and every state: Doom's
+# P_MobjThinker counts no state of -1 tics down and enters no other.
 law lasting_stays:
-  for id: U32
-  for kind: U32
-  for x: U32
-  for y: U32
-  for ceilz: U32
-  for angle: U32
-  for sector: U32
-  for state: U32
-  {H.Thing.tic(H.Thing{id, kind, x, y, 0, 0, ceilz, angle, sector, state, 4294967295, 0})
-    == H.Thing{id, kind, x, y, 0, 0, ceilz, angle, sector, state, 4294967295, 0} : H.Thing}
+  for +id: U32
+  for +kind: U32
+  for +x: U32
+  for +y: U32
+  for +z: U32
+  for s: S.State
+  {S.Sim.thing.step(H.Thing.lasting(Closed.thing(id, kind, x, y, z)),
+    H.Thing.over(Closed.thing(id, kind, x, y, z)), Closed.thing(id, kind, x, y, z), id, s) == s : S.State}
+
+# Sight
+# -----
+
+# LAW: P_DivlineSide's three answers. A line up the y axis through
+# x 64 has a point at x 64 on it, one west of it behind it and one east
+# of it in front. A line east along y 64 from x 0 answers on for the
+# point (64, 32), because vanilla compares the point's x with the line's
+# y where it means its y; (0, 32) is south of it and in front, and
+# (0, 96) north of it and behind. A line out along (1, 1) from the
+# origin has (1, 0) in front, (0, 1) behind and (1, 1) on it, from the
+# whole-unit products 1 against 0, 0 against 1 and 1 against 1.
+law divline_sides:
+  {[S.Sim.sight.side(4194304, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(2097152, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(6291456, 2097152, 4194304, 0, 0, 65536),
+    S.Sim.sight.side(4194304, 2097152, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(0, 2097152, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(0, 6291456, 0, 4194304, 65536, 0),
+    S.Sim.sight.side(65536, 0, 0, 0, 65536, 65536),
+    S.Sim.sight.side(0, 65536, 0, 0, 65536, 65536),
+    S.Sim.sight.side(65536, 65536, 0, 0, 65536, 65536)]
+    == [2, 1, 0, 2, 0, 1, 0, 1, 2] : List<&2, U32>}
+
+# LAW: a pair of sectors REJECT rules out never sees, for any two mobjs
+# in any level: P_CheckSight answers the lump before it walks the BSP,
+# and nothing the walk could find brings the sight back.
+law rejected_never_sees:
+  for level: L.Level
+  for m: S.Sim.Body
+  for t: S.Sim.Body
+  {S.Sim.sight.between(True{}, level, m, t) == False{} : Bool}
+
+def Closed.looking(a: H.Thing.Action) -> Bool:
+  match a:
+    case H.Look{}:
+      True{}
+    case _:
+      False{}
+
+def Closed.chasing(a: H.Thing.Action) -> Bool:
+  match a:
+    case H.Chase{}:
+      True{}
+    case _:
+      False{}
+
+def Closed.wakes(d: H.Thing.Def) -> Bool:
+  H.Def{+kind, +state, radius, height, flags} = d
+  Bool.or(U32.is_zero(H.Thing.seesound(kind)),
+    Bool.and(Closed.looking(H.Thing.Row.action(H.Thing.row(state))),
+      Bool.and(Closed.row(H.Thing.see(kind)),
+        Closed.chasing(H.Thing.Row.action(H.Thing.row(H.Thing.see(kind)))))))
+
+# LAW: every type that calls out on sight stands in a row that runs
+# A_Look and chases in a row of the table that runs A_Chase, so no
+# monster can wake without a state to wake into and none can watch for
+# the player without A_Look to do it (sanity).
+law monsters_wake:
+  {List.all(~&2, ~H.Thing.Def, ~Closed.wakes, H.Thing.defs()) == True{} : Bool}
 
 # The renderer
 # ------------
@@ -1863,7 +1922,7 @@ def Sprite.gfx() -> G.Gfx:
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(+id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
   Z.Sprites.project(Sprite.view(), Closed.doors(), Sprite.gfx(), 1, id,
-    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295, 0}, [])
+    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295, 0, 0}, [])
 
 # LAW: R_ProjectSprite holds a sprite's columns to the screen, and
 # R_DrawVisSprite steps down a column by the scale's reciprocal. Facing

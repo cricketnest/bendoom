@@ -17,8 +17,10 @@
 # screenshot. The report counts that box separately, as `face`, which is
 # 0 only where the face holds still under the pause, as the dead one
 # does. The default script idles 20 tics, past the pistol's rise.
-# Vanilla's monsters wake when they see the player and Bendoom's do not
-# yet, so a place compares the two only while none sees the player.
+# Both games wake a monster that sees the player on the same tic, but
+# vanilla's chases from that tic and Bendoom's stands until milestone
+# 6's ticket 16, so a place compares the two only while no monster has
+# seen the player.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each

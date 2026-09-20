@@ -72,9 +72,11 @@
 # from the WAD with tools/oracle.nu's patch-pixels.
 # tools/oracle.nu finds no pixel off vanilla's in the frames it can
 # compare, over all 200 rows. It cannot compare a frame whose script
-# lets a monster see the player, since vanilla's wakes and Bendoom's
-# cannot yet (milestone 6's ticket 15 gives them A_Look): the two run
-# east past the pit, the two of the blue key in its dim and bright
+# lets a monster see the player: both games now wake it on the same
+# tic, but vanilla's A_Chase runs the moment it does, turning the
+# monster, stepping it and drawing a random number, and Bendoom's chase
+# waits for milestone 6's ticket 16. So the two runs east past the pit,
+# the blinking wall, the two of the blue key in its dim and bright
 # states, the two of the key strafed past, the two of the green armour
 # and the chainsaw taken, and the dead view in the nukage, which stands
 # 650 tics in the yard's sight, are regression pins until then, and so
@@ -313,9 +315,9 @@ def main() -> IO(Unit):
 #|sky -640 256 90 hash 4130793025 pixels 239 14 239 105 96 72 covered True
 #|pit 488 320 0 hash 1510042988 pixels 79 110 150 6 96 72 covered True
 #|sergeant 1144 259 315 hash 4195031459 pixels 111 108 0 1 96 72 covered True
-#|once 256 1088 0 hash 3239844465 pixels 110 79 105 7 96 72 covered True
+#|once 256 1088 0 hash 2442400286 pixels 110 79 105 7 96 64 covered True
 #|overlap 2752 960 0 hash 17648109 pixels 79 125 10 78 96 72 covered True
-#|walls 704 256 0 hash 1209152603 pixels 7 111 15 2 96 72 covered True
+#|walls 704 256 0 hash 2399935752 pixels 7 111 15 2 96 64 covered True
 #|ledge 256 128 90 hash 1443497237 pixels 7 5 15 110 96 72 covered True
 #|yard -640 256 0 hash 1684750053 pixels 1 100 78 8 96 72 covered True
 #|bars 1024 200 0 hash 439285215 pixels 109 79 5 5 96 72 covered True
@@ -324,32 +326,32 @@ def main() -> IO(Unit):
 #|shotgun guy from the side 987 1947 225 hash 3040449328 pixels 5 6 109 108 96 72 covered True
 #|demon mirrored 2448 2112 0 hash 2350286645 pixels 39 2 6 79 96 72 covered True
 #|stride U!:34 hash 250131952 pixels 2 5 164 6 96 72 covered True
-#|air U!:56 hash 2835961823 pixels 5 110 15 6 96 64 covered True
-#|landed U!:66 hash 154974120 pixels 6 110 14 79 96 64 covered True
+#|air U!:56 hash 3788238705 pixels 5 110 15 6 96 64 covered True
+#|landed U!:66 hash 1149665840 pixels 6 110 14 79 96 64 covered True
 #|door half open hash 1169190636 pixels 7 14 110 79 96 64 covered True
 #|switch pressed hash 644900545 pixels 3 110 107 7 96 64 covered True
 #|exit pressed hash 786890588 pixels 102 95 102 3 96 72 covered True
-#|blink dark hash 1008666635 pixels 94 73 73 101 96 59 covered True
-#|key 2380 600 180 22 hash 3573067751 pixels 5 1 6 110 96 72 covered True
-#|key bright 23 hash 3573067751 pixels 5 1 6 110 96 72 covered True
-#|key before hash 128313135 pixels 6 10 5 89 96 72 covered True
-#|key after hash 1444487152 pixels 105 10 2 89 96 72 covered True
+#|blink dark hash 1109576201 pixels 94 73 73 101 96 72 covered True
+#|key 2380 600 180 22 hash 491721407 pixels 5 1 6 110 96 72 covered True
+#|key bright 23 hash 491721407 pixels 5 1 6 110 96 72 covered True
+#|key before hash 398974500 pixels 6 10 5 89 96 72 covered True
+#|key after hash 1310564919 pixels 105 10 2 89 96 72 covered True
 #|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True
 #|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True
-#|green armour before hash 2918851378 pixels 110 110 6 1 96 72 covered True
-#|green armour after hash 4062327047 pixels 8 110 103 2 96 72 covered True
+#|green armour before hash 3593952694 pixels 110 110 6 1 96 59 covered True
+#|green armour after hash 1489547737 pixels 8 110 103 2 96 59 covered True
 #|stimpack and medikit before hash 1702492025 pixels 111 109 7 111 96 72 covered True
 #|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True
 #|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True
 #|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True
 #|rocket refused hash 3744069241 pixels 106 109 105 77 160 72 covered True
-#|chainsaw after hash 4197700361 pixels 5 5 137 141 96 79 covered True
-#|chainsaw refused hash 1145454209 pixels 5 5 137 141 160 72 covered True
+#|chainsaw after hash 958764125 pixels 5 5 137 141 96 79 covered True
+#|chainsaw refused hash 957078586 pixels 5 5 137 141 160 64 covered True
 #|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True
 #|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True
 #|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True
-#|dead 1600 1000 90 hash 3655066404 pixels 6 111 110 5 96 8 covered True
+#|dead 1600 1000 90 hash 4043722533 pixels 6 111 110 5 96 8 covered True
 #|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True
 #|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True
-#|puff on the ledge 25 hash 2232285233 pixels 7 110 15 2 96 72 covered True
+#|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True
 #|end

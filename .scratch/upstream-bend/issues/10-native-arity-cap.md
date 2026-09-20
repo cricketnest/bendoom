@@ -36,4 +36,8 @@ A big `+` let inside a function with a `do` block is inlined at its use, so bind
 
 ## What we do about it
 
-`docs/bend.md` records the budget. Counts that will not fit go in a `V.Vec`, a helper takes what it reads and not the record it reads it from, and a value that can be derived is not stored. The cure on our side is to stop `Sim.turn` holding three states: the hold needs the geometry and the player's place from the old one, which brings the peak from about 258 words to about 160. That refactor is under way on the branch `m6-width`.
+`docs/bend.md` records the budget and the rule: hold pieces, not whole records. Branch `m6-width` stopped `Sim.turn` holding three states. `State.held` takes the two words of the place it puts back instead of the state they came from, and every caller reads the place out first.
+
+Reading it out was half of it. Sibling arguments of one call compile to one fork, and every step of a fork holds every value any of its arms reads, so `f(x(s), y(s), heavy(s))` keeps `s` live across the heavy call whatever `x` and `y` take. A `+` let above the call ends the state at the let that last reads it, and that is what brought the peak down.
+
+Measured with the patched `comp.ts` and with dummy `U32` fields on the player: the widest segment fell from 255 to 170, `Game.tick` from 230 to 156, and the player's headroom from 0 words to 42. Ticket 05's message word fits again, and the vector packings above can be undone a field at a time.

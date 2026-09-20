@@ -9,7 +9,7 @@
 - [x] Every priority of `ST_updateFaceWidget` that the two maps can reach, with its count, including vanilla's ouch-face bug as it stands
 - [x] The second random index starts at 64 and counts as milestone 7's ticket 01 left it; that ticket found that under `-playdemo` one or two tics run before the melt's draws, so check from the source which table entries `ST_Ticker`'s first draws read
 - [x] The face's state is in the sim's state and advances once a tic, so that replay composition holds
-- [ ] The sim test prints the face index per tic on cases of damage from each side, a weapon pickup, held fire, and idling, against a nushell replay of `st_stuff.c` over the second random index
+- [x] The sim test prints the face index per tic on cases of damage from each side, a weapon pickup, held fire, and idling, against a nushell replay of `st_stuff.c` over the second random index
 - [x] Chocolate Doom's face keeps changing under the oracle's pause, so the oracle keeps its mask over the face's box except for the dead face, which holds and compares at zero
 - [x] Render cases compare the face's pixels with its patches read from the WAD in nushell
 - [x] A closed law pins the pain offset at each health level's edge
@@ -33,10 +33,10 @@
 - The priorities, their counts and the face lump order: `st_stuff.c` read by hand. `ST_FACESTRIDE` is 8, so `ST_TURNOFFSET` 3, `ST_OUCHOFFSET` 5, `ST_EVILGRINOFFSET` 6, `ST_RAMPAGEOFFSET` 7, `ST_GODFACE` 40 and `ST_DEADFACE` 41. `ST_EVILGRINCOUNT` 70, `ST_TURNCOUNT` and `ST_OUCHCOUNT` 35, `ST_RAMPAGEDELAY` 70, `ST_STRAIGHTFACECOUNT` 17, `ST_MUCHPAIN` 20.
 - `ST_initData`: `st_faceindex` 0, `st_oldhealth` -1, `oldweaponsowned` the player's. `st_facecount`, `priority` and `lastattackdown` are statics it does not touch, so at a fresh game they are 0, 0 and -1, which is what `Sim.Face.start` holds.
 - The pain offsets: `8 * ((100 - health) * 5 / 101)` worked in nushell at every edge, 0 at 100 down to 80, 8 at 79 down to 60, then 16, 24 and 32, which is law `pain_offset` and the sim test's 7, 15, 23, 31 and 39.
-- The glances: `rndtable` read from `m_random.c` in nushell. At index 65 it is 197, at 82 it is 249 and at 99 it is 92, whose remainders by 3 are 2, 0 and 2, which are the indexes the idling case prints on tics 1, 18 and 35; at 116 it is 239, remainder 2, so tic 52 changes nothing. The nukage's glances draw at 102 and 119, 138 and 164, remainders 0 and 2.
+- The glances: `rndtable` read from `m_random.c` in nushell. Each face line carries the M_Random index the tic's draw left, so each is `ST_calcPainOffset(health) + rndtable[index] % 3` checked in nushell: 197 at 65 and 92 at 99 give 2, 249 at 82 and 171 at 124 give 0, 145 at 101 and 61 at 137 give 1, and all eight glances the test prints agree. Printing the draw is what turns them from pins into computed values; before the sight ticket merged they were 64 plus the tic plus the sounds, and the sights now count too.
 - The sides: `R_PointToAngle2` by hand for a player at the origin facing east. A barrel due south is at `ANG270`, which is above the facing, so the difference is `ANG270` itself, past `ANG180`, and the face turns right, offset 3. Due north is `ANG90 - 1 - tantoangle[0]`, above the facing too, and the difference is under `ANG180`, so the face turns left, offset 4. Due east the difference is 0, inside `ANG45`, so the face is the rampage one, offset 7.
 - `ST_RAMPAGEDELAY` on the 71st tic of held fire: the first tic finds `lastattackdown` at -1 and sets it to 70, and each tic after it takes one off before the test, so it reaches 0 on the 71st.
-- `M_Random`'s index in every case: 64 at the level's start, one for each tic, which is `ST_Ticker`'s draw, and one for each audible sound start but the item pickup's. The idling case ends at 124 after 60 tics, the blows at 68 after 4, held fire at 144 after 75 tics and 5 pistol shots, and the nukage until it kills at 232 after 660 tics, 19 pain sounds and the death scream.
+- `M_Random`'s index in every case: 64 at the level's start, one for each tic, which is `ST_Ticker`'s draw, and one for each audible sound start but the item pickup's. The idling case ends at 124 after 60 tics with nothing heard, the blows at 68 after 4 in the closed room, and held fire at 144 after 75 tics and 5 pistol shots. Cases in the yard also count the monsters' sights, which milestone 6's ticket 15 added.
 - The face pixel the render test samples, row 180 column 155: `tools/oracle.nu`'s `patch-pixels` over Freedoom says 72 in `STFST00`, 64 in `STFST01`, 59 in `STFST02`, 79 in `STFEVL0` and 8 in `STFDEAD0`.
 
 ### The first two tics under -playdemo, settled
@@ -51,17 +51,16 @@ It does not change a face. The only tics whose draw is read are the ones a glanc
 
 | case | place | script | differing | face |
 | --- | --- | --- | --- | --- |
-| the dead face | 1600 1000 90 | `650,0,0,0,0` | 48988 | 0 |
+| the dead face | 1600 1000 90 | `650,0,0,0,0` | 48983 | 0 |
 | start, at rest | -416 256 0 | `20,0,0,0,0` | 0 | 66 |
 | switch pressed | 2064 -260 90 | `20,0,0,0,0 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0` | 0 | 28 |
 
-The dead case is the one this ticket asks for. Its view cannot be compared: ticket 09 found that with monsters on, vanilla's imps in the yard wake at a player who stands 650 tics there and Bendoom's cannot move yet, which is the 48988. Its face box is at zero, which is the whole of what this ticket claims there, and it is the one face that holds still under the pause. The other two rows are the living face changing under the pause, which is why the box stays masked, beside 0 differing everywhere else.
+The dead case is the one this ticket asks for. Its view cannot be compared: ticket 09 found that with monsters on, vanilla's imps in the yard wake at a player who stands 650 tics there and chase, and Bendoom's stand until ticket 16, which is the 48983. Its face box is at zero, which is the whole of what this ticket claims there, and it is the one face that holds still under the pause. The other two rows are the living face changing under the pause, which is why the box stays masked, beside 0 differing everywhere else.
 
 The face's pixels were then compared with the patches themselves, `tools/oracle.nu`'s `patch-pixels` over Freedoom against our own frame dump: all 578 pixels of `STFST00` in the rested start's frame and all 591 of `STFDEAD0` in the dead one, none differing. Against the wrong lump, `STFST01`, the start's frame differs in 64 pixels, so the check has teeth.
 
 ### Deferred to the later pass
 
-- The nushell replay of `ST_updateFaceWidget` over the second random index. The sim test's face cases are each worked from `st_stuff.c` by hand instead, with `rndtable` and `ST_calcPainOffset` read in nushell, which is where the box above stays unticked.
 - The shareware re-run. Every value here is Freedoom's.
 - Weapon switching and the monsters' attacks, which the ticket lists as blockers: the grin is shown on the chainsaw, which changes the weapons owned though the pistol stays in hand, and the wince on a literal-state blow, as ticket 09's own cases do, since nothing on the map attacks yet.
 - Vanilla's `attackdown` is `A_WeaponReady`'s, not the command's bit, and ticket 11 keeps no field for it; this reads the bit. The two differ only for a release inside a firing sequence, which resets the rampage count here and would not in vanilla, and only where fire has been held near 70 tics.
@@ -80,6 +79,14 @@ The face's pixels were then compared with the patches themselves, `tools/oracle.
 - Once the nukage has taken enough health, the face never glances again: the pain face's count is 35 tics and a blow lands every 32, so each blow resets it before it can time out.
 - The chainsaw's grin shows in the render test without a case of its own. `P_TouchSpecialThing` sets the pickup flash before `ST_Ticker` looks, so the frame named `chainsaw after` draws `STFEVL0`, which the sampled pixel reads as 79.
 
+### After the merge
+
+`milestone-6-7` at 5feab80, the sight ticket and the width refactor, merged in. Five conflicts, all resolved by reading both sides: the oracle's and the two tests' headers, which gained a paragraph from each side; `tests/game.bend`'s and both tests' expected blocks, regenerated; and `Sim.tic.live`, where the refactor's `+x` and `+y` lets now sit above `Sim.st.ticker`'s call with `+attack` beside them, which is the rule that keeps the native headroom. `Sim.face.hit.at` gained the thing record's new `lastlook` field.
+
+The merge moved every face that a monster's sight sound draws before: the nukage's two glances swapped and the render frames' faces changed. That is why each face line now prints the M_Random index its draw left, which is what makes the glance a computed value rather than a pin.
+
+The whole of the evidence above was rerun on the merged tree: the proof, every test on both lanes, the three oracle cases, and the two comparisons against the WAD's patches.
+
 ### Checks
 
-`bend PROOF.bend` prints "All terms check."; every test in `tests/` passes native and on bun; `doom.bend`, `tests/sim.bend` and `tools/frame.bend` all build natively; the three oracle cases above.
+`bend PROOF.bend` prints "All terms check."; every test in `tests/` passes native and on bun; `doom.bend`, `tests/sim.bend`, `tests/render.bend` and `tools/frame.bend` all build natively; the three oracle cases above; `git diff --check`. The flake check is the orchestrator's.
