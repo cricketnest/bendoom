@@ -2140,13 +2140,11 @@ def Sim.use(press: Bool, +s: State) -> State:
 # Damage
 # ------
 
-# Doom's P_Random: the state with its index stepped, and the number
-# drawn there.
-def Sim.drawn(s: State) -> State & U32:
+# Doom's P_Random: the state with its index stepped. What it drew is the
+# table at the index it leaves, M.Random.at(State.rnd(s)).
+def Sim.drawn(s: State) -> State:
   State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  +i = M.Random.next(rnd)
-  (State{player, level, things, sidetex, thinkers, i, clock, ended, usedown, sounds, mrnd, reborn},
-    M.Random.at(i))
+  State{player, level, things, sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown, sounds, mrnd, reborn}
 
 # A thing named by a blow: none for nobody, for the player, whose name
 # no thing in the population carries, or for a thing since gone.
@@ -2232,9 +2230,8 @@ def Sim.drop(+s: State) -> State:
 
 # The death state's tics, less the random 0 to 3 P_KillMobj takes off.
 # Its 10 never reach vanilla's floor of 1.
-def Sim.kill.tics(got: State & U32) -> State:
-  (+s, drawn) = got
-  State.player.put(s, Player.counted((drawn .&. 3 : U32), State.player(s)))
+def Sim.kill.tics(+s: State) -> State:
+  State.player.put(s, Player.counted((M.Random.at(State.rnd(s)) .&. 3 : U32), State.player(s)))
 
 # Doom's P_KillMobj for the player: the weapon drops away and the mobj
 # enters its death state, whose tics lose a random 0 to 3. The flags
@@ -2257,9 +2254,8 @@ def Sim.damage.flinch(flinches: Bool, +s: State) -> State:
 # The pain roll: a draw under the player's pain chance of 255, which
 # only a draw of 255 fails, sends the mobj into its pain state, where
 # the next state's A_Pain is heard three tics on.
-def Sim.damage.pain(got: State & U32) -> State:
-  (s, +drawn) = got
-  Sim.damage.flinch(U32.is_lt(drawn, 255), s)
+def Sim.damage.pain(+s: State) -> State:
+  Sim.damage.flinch(U32.is_lt(M.Random.at(State.rnd(s)), 255), s)
 
 def Sim.damage.done(dead: Bool, +s: State) -> State:
   match dead:
