@@ -1323,7 +1323,16 @@ def Laws.spawn_phase():
 def Laws.bonus_cycle():
   {==}
 
-def Laws.lasting_stays(id, kind, x, y, ceilz, angle, sector, state):
+def Laws.lasting_stays(id, kind, x, y, z, s):
+  {==}
+
+def Laws.divline_sides():
+  {==}
+
+def Laws.rejected_never_sees(level, m, t):
+  {==}
+
+def Laws.monsters_wake():
   {==}
 
 # The solid columns stay sorted
