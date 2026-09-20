@@ -132,6 +132,12 @@ def Player.psprites(+p: Player) -> Psprites:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   psprites
 
+# Doom's weaponinfo[player->readyweapon]: the weapon in the player's
+# hands, which the status bar counts ammo for. The pistol until a weapon
+# can be chosen.
+def Player.ready(+p: Player) -> H.Thing.Weapon:
+  H.Thing.pistol()
+
 # The player holding an inventory.
 def Player.holding(p: Player, held: I.Inventory) -> Player:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
@@ -168,7 +174,7 @@ type Sim.Entering is Data:
 # state is set.
 def Sim.raise(psp: Psprite, weapon: H.Thing.Weapon) -> Sim.Entering:
   Psprite{state, tics, sx, sy} = psp
-  H.Weapon{up, ready} = weapon
+  H.Weapon{up, ready, ammo} = weapon
   +risen = (sy - Sim.raisespeed() : U32)
   Entering{Bool.pick(Maybe<&2, U32>, F.Fixed.gt(risen, Sim.weapontop()), None{}, Some{ready}),
     Psprite{state, tics, sx, F.Fixed.max(risen, Sim.weapontop())}}
@@ -237,7 +243,7 @@ def Sim.psprites(+level: L.Level, +clock: U32, p: Player) -> Player:
 # Doom's P_SetupPsprites and P_BringUpWeapon: no sprite shows, then the
 # weapon enters its raise state at the bottom.
 def Psprites.start(+sine: V.Vec, +weapon: H.Thing.Weapon) -> Psprites:
-  H.Weapon{up, ready} = weapon
+  H.Weapon{up, ready, ammo} = weapon
   Psprites{Sim.psprite.set(4n, Entering{Some{up}, Psprite{None{}, 0, 0, Sim.weaponbottom()}}, sine, 0, 0, weapon),
     Psprite{None{}, 0, 0, 0}}
 

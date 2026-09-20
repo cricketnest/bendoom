@@ -94,13 +94,20 @@ def Thing.Row.action(r: Thing.Row) -> Thing.Action:
   Row{sprite, frame, bright, tics, next, action} = r
   action
 
-# A weapon's rows in Doom's weaponinfo: the state it rises in and the
-# state it is ready in.
+# A weapon's row in Doom's weaponinfo: the state it rises in, the state
+# it is ready in, and the ammotype_t it spends, which the status bar
+# counts.
 type Thing.Weapon is Data:
-  Weapon{up: U32, ready: U32}
+  Weapon{up: U32, ready: U32, ammo: U32}
 
+# d_items.c's weaponinfo for the pistol: it rises in row 60, rests in
+# row 59 and spends am_clip, ammotype_t 0.
 def Thing.pistol() -> Thing.Weapon:
-  Weapon{60, 59}
+  Weapon{60, 59, 0}
+
+def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, ammo} = w
+  ammo
 
 # Doom's P_MobjThinker for a thing that does not move: a lasting state
 # stays as it is; another counts its tics down, and the tic they run out

@@ -1,9 +1,12 @@
 # Frames of E1M1 from the WAD named by BENDOOM_IWAD, rendered through
 # the function the game draws with: for each, a 32-bit FNV-1a hash of the
-# view's 320 by 168 palette indices and the indices at four pixels (the
-# view's centre, near its top left, near its bottom right, and high on
-# its centre column). The start, then hand-chosen places with the eye at
-# rest on the floor and the angle a multiple of 45 degrees, each after
+# whole 320 by 200 frame, the view over the status bar, and the indices
+# at five pixels (the view's centre, near its top left, near its bottom
+# right, high on its centre column, and column 1 row 2 of the arms
+# panel's second number, which is grey 96 while the shotgun is not owned
+# and yellow 160 in the two frames with a full inventory). The start,
+# then hand-chosen places with the eye at rest on the floor and the
+# angle a multiple of 45 degrees, each after
 # the oracle's 20 idle tics: a bright metal wall, the dim bench room
 # north of the start, the hazard-striped step under the computer panels,
 # the lowered opening west of the start with a masked grate across it
@@ -44,6 +47,9 @@
 # from the start at the bob's lowest, tic 48, and at its farthest right,
 # tic 64; the stride has it far left. Every frame holds the things E1M1
 # spawns on Hurt Me Plenty, each in its state on that tic.
+# Every frame carries the status bar the inventory of its state fills,
+# so the bar at the start, after the rocket is taken, after the green
+# armour and after the blue key are the frames named for those pickups.
 # tools/oracle.nu finds no pixel off vanilla's in any frame but the exit,
 # which is not compared: vanilla never stands in it (milestone 4's
 # ticket 09 compares it another way), and the two refused frames, whose
@@ -56,8 +62,9 @@
 # a medikit taken at 100 health 2744 of theirs; a refused frame differs
 # from its taken twin only in the pickup's sprite, 762 pixels of the
 # rocket and 5092 of the chainsaw.
-# Each frame is drawn twice, over a view blanked to 0 and to 255: equal
-# hashes mean every pixel of the view was written. Pinned to Freedoom.
+# Each frame is drawn twice, over a frame blanked to 0 and to 255: equal
+# hashes mean every pixel of the 200 rows was written. Pinned to
+# Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -99,7 +106,7 @@ def line(+over0: U32, st: Hash) -> Array<U32> & String:
   Hash{mem, +h} = st
   pixels(U32.is_eq(h, over0), h, B.Bytes.each(~U32, ~B.Bytes.at, [(G.Gfx.frame() + 84 * 320 + 160 : U32),
     (G.Gfx.frame() + 10 * 320 + 10 : U32), (G.Gfx.frame() + 150 * 320 + 300 : U32),
-    (G.Gfx.frame() + 20 * 320 + 160 : U32)], mem))
+    (G.Gfx.frame() + 20 * 320 + 160 : U32), (G.Gfx.frame() + 174 * 320 + 124 : U32)], mem))
 
 def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
   (mem, text) = p
@@ -107,10 +114,10 @@ def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
     IO.print(tag ++ " " ++ text)
     return mem
 
-# A frame's hash, drawn over a view blanked to an index.
+# A frame's hash, drawn over a frame blanked to an index.
 def hashed(+tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, blank: U32, mem: Array<U32>) -> Hash:
-  D.Draw.each(~Hash, ~hash.px, U32.to_nat(53760), 0n, Hash{R.Render.frame(tables, gfx, s,
-    D.Draw.set(U32.to_nat(53760), mem, G.Gfx.frame(), blank)), H.Fnv.basis()})
+  D.Draw.each(~Hash, ~hash.px, U32.to_nat(64000), 0n, Hash{R.Render.frame(tables, gfx, s,
+    D.Draw.set(U32.to_nat(64000), mem, G.Gfx.frame(), blank)), H.Fnv.basis()})
 
 def again(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, st: Hash) -> Array<U32> & String:
   Hash{mem, h} = st
@@ -248,44 +255,44 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start hash 1557165389 pixels 1 1 7 5 covered True
-#|lit 736 464 135 hash 2164616461 pixels 106 8 95 105 covered True
-#|dark -416 256 90 hash 1520781991 pixels 110 107 0 238 covered True
-#|step 137 256 45 hash 3710908348 pixels 8 0 79 6 covered True
-#|grate -416 256 180 hash 1590491081 pixels 3 111 106 93 covered True
-#|water 3 256 0 hash 1501146406 pixels 2 6 77 6 covered True
-#|sky -640 256 90 hash 3346711206 pixels 239 14 239 105 covered True
-#|pit 488 256 0 hash 1669067075 pixels 8 6 111 1 covered True
-#|sergeant 1144 259 315 hash 823643776 pixels 111 108 0 1 covered True
-#|once 256 1088 0 hash 4087151414 pixels 110 79 105 7 covered True
-#|overlap 2752 960 0 hash 990508562 pixels 79 125 10 78 covered True
-#|walls 704 256 0 hash 3605968952 pixels 7 111 15 2 covered True
-#|ledge 256 128 90 hash 912580506 pixels 7 5 15 110 covered True
-#|yard -640 256 0 hash 680709450 pixels 1 100 78 8 covered True
-#|bars 1024 200 0 hash 155268204 pixels 109 79 5 5 covered True
-#|stride U!:34 hash 3359230631 pixels 2 5 164 6 covered True
-#|air U!:56 hash 2313637613 pixels 5 110 15 6 covered True
-#|landed U!:66 hash 1862205628 pixels 6 110 14 79 covered True
-#|door half open hash 1710433460 pixels 107 6 74 111 covered True
-#|switch pressed hash 1212247325 pixels 3 110 107 7 covered True
-#|exit pressed hash 4293877891 pixels 102 95 102 3 covered True
-#|blink dark hash 3434806638 pixels 94 73 73 101 covered True
-#|key 2380 600 180 22 hash 4042644713 pixels 5 1 6 110 covered True
-#|key bright 23 hash 477784286 pixels 5 1 6 110 covered True
-#|key before hash 2824692631 pixels 6 10 5 89 covered True
-#|key after hash 2517711650 pixels 105 10 2 89 covered True
-#|bonus before hash 1827634615 pixels 11 79 78 6 covered True
-#|bonus after hash 3218245263 pixels 10 78 2 11 covered True
-#|green armour before hash 2386652429 pixels 110 110 6 1 covered True
-#|green armour after hash 2324452548 pixels 8 110 103 2 covered True
-#|stimpack and medikit before hash 316771838 pixels 111 109 7 111 covered True
-#|stimpack and medikit refused hash 1803262692 pixels 110 108 2 107 covered True
-#|rocket before hash 1689782028 pixels 105 109 105 77 covered True
-#|rocket after hash 3174246019 pixels 106 109 105 77 covered True
-#|rocket refused hash 502319553 pixels 106 109 105 77 covered True
-#|chainsaw after hash 737262589 pixels 5 5 137 141 covered True
-#|chainsaw refused hash 2527520924 pixels 5 5 137 141 covered True
-#|pistol rising 8 hash 1980230935 pixels 1 1 7 5 covered True
-#|pistol bob low 48 hash 480894361 pixels 1 79 1 245 covered True
-#|pistol bob right 64 hash 4086953120 pixels 2 5 111 6 covered True
+#|start hash 2700636673 pixels 1 1 7 5 96 covered True
+#|lit 736 464 135 hash 2106469313 pixels 106 8 95 105 96 covered True
+#|dark -416 256 90 hash 310200639 pixels 110 107 0 238 96 covered True
+#|step 137 256 45 hash 1641445220 pixels 8 0 79 6 96 covered True
+#|grate -416 256 180 hash 1328291109 pixels 3 111 106 93 96 covered True
+#|water 3 256 0 hash 1619173338 pixels 2 6 77 6 96 covered True
+#|sky -640 256 90 hash 463986778 pixels 239 14 239 105 96 covered True
+#|pit 488 256 0 hash 2518513587 pixels 8 6 111 1 96 covered True
+#|sergeant 1144 259 315 hash 495192816 pixels 111 108 0 1 96 covered True
+#|once 256 1088 0 hash 116995530 pixels 110 79 105 7 96 covered True
+#|overlap 2752 960 0 hash 549813406 pixels 79 125 10 78 96 covered True
+#|walls 704 256 0 hash 1853415832 pixels 7 111 15 2 96 covered True
+#|ledge 256 128 90 hash 2908682710 pixels 7 5 15 110 96 covered True
+#|yard -640 256 0 hash 2573863974 pixels 1 100 78 8 96 covered True
+#|bars 1024 200 0 hash 549757620 pixels 109 79 5 5 96 covered True
+#|stride U!:34 hash 3490826559 pixels 2 5 164 6 96 covered True
+#|air U!:56 hash 4098663969 pixels 5 110 15 6 96 covered True
+#|landed U!:66 hash 1275252128 pixels 6 110 14 79 96 covered True
+#|door half open hash 4239436392 pixels 107 6 74 111 96 covered True
+#|switch pressed hash 724704945 pixels 3 110 107 7 96 covered True
+#|exit pressed hash 982269427 pixels 102 95 102 3 96 covered True
+#|blink dark hash 2296296530 pixels 94 73 73 101 96 covered True
+#|key 2380 600 180 22 hash 1785122885 pixels 5 1 6 110 96 covered True
+#|key bright 23 hash 2206557986 pixels 5 1 6 110 96 covered True
+#|key before hash 3742916879 pixels 6 10 5 89 96 covered True
+#|key after hash 1680916088 pixels 105 10 2 89 96 covered True
+#|bonus before hash 214362927 pixels 11 79 78 6 96 covered True
+#|bonus after hash 264819507 pixels 10 78 2 11 96 covered True
+#|green armour before hash 181021633 pixels 110 110 6 1 96 covered True
+#|green armour after hash 672230510 pixels 8 110 103 2 96 covered True
+#|stimpack and medikit before hash 2244377026 pixels 111 109 7 111 96 covered True
+#|stimpack and medikit refused hash 484170876 pixels 110 108 2 107 96 covered True
+#|rocket before hash 1272649172 pixels 105 109 105 77 96 covered True
+#|rocket after hash 1410101461 pixels 106 109 105 77 96 covered True
+#|rocket refused hash 3698027594 pixels 106 109 105 77 160 covered True
+#|chainsaw after hash 1350594065 pixels 5 5 137 141 96 covered True
+#|chainsaw refused hash 1976571187 pixels 5 5 137 141 160 covered True
+#|pistol rising 8 hash 767338383 pixels 1 1 7 5 96 covered True
+#|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
+#|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
 #|end
