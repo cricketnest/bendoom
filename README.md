@@ -21,7 +21,11 @@ If flakes aren't enabled on your system, put this after `nix`:
     --extra-experimental-features 'nix-command flakes'
 
 It runs on x86_64 Linux. aarch64 Linux and macOS are untested, and on
-macOS the game plays without music.
+macOS the game plays without music or sounds.
+
+The up and down arrows or W and S walk, the left and right arrows turn,
+A and D strafe, Shift runs, Space opens doors and presses switches, Ctrl
+fires, Esc quits. After dying, Space starts the level again.
 
 To record a game and make a video of it, first play with `RECORD` naming
 the demo to write, and quit with Esc or by closing the window; the demo
@@ -57,8 +61,8 @@ for bug.
 3. Walls, floors, ceilings and the sky: vanilla's renderer, its frames Chocolate Doom's pixel for pixel. Done.
 4. Doors, the lift, switches, the exit, blinking and glowing lights, animated flats and textures, scrolling walls: E1M1 completable, no enemies, its frames Chocolate Doom's tic for tic. Done.
 5. Decorations, items, pickups and sprites: every thing of both E1M1s but the monsters, spawned as on Hurt Me Plenty and drawn as vanilla's sprites behind walls, ledges and grates, animated on its tics; health, armour, ammo, weapons and the blue key taken as vanilla takes them; solid things in the way. Its frames Chocolate Doom's tic for tic. Done.
-6. Monsters, weapons, damage, the status bar.
-7. Sound effects.
+6. Monsters, weapons, damage, the status bar. In part: the monsters of both E1M1s stand where the map puts them, wake when they see the player and chase; zombiemen and shotgun guys shoot; the pistol fires with vanilla's autoaim, bullets hurt and kill, barrels explode, the nukage burns and the player dies; the status bar with its face, pickup messages and the red and gold flashes are drawn. Not yet: the imps' and demons' attacks (they chase and do not strike), every weapon but the pistol, monsters woken by gunfire, infighting, drops, the intermission. A monster in its pain frames is not drawn, and a shot that hits a thing lands a few pixels from vanilla's. Much of what is there is checked against Chocolate Doom only in part; each ticket under `.scratch/milestone-6-combat/` lists what it still owes.
+7. Sound effects. In part: doors, the lift, switches, pickups, the pistol, the monsters and the player sound from the WAD's own lumps, expanded as Chocolate Doom expands them, sample for sample, and mixed over the music on vanilla's eight channels. Not yet: a moving source does not pan as it moves, the mix is not yet compared with a recording of Chocolate Doom's, and the film carries the music alone.
 8. E1M1's music: the song and the instruments of the package's WAD played in Bend as Chocolate Doom's OPL music plays them, sample for sample, rendered while the flake builds and streamed by the game on repeat, so each package plays the song of the WAD it was built with. Done.
 9. Hellbent: the game as one λ-expression.
 
