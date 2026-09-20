@@ -17,11 +17,12 @@
 # sector under it (tools/wad.nu's sector-at), its z, its facing (its
 # record's angle), its state row, its tics, its definition and whether
 # P_SpawnMapThing left it in ambush, which is bit 8 of its record's
-# options. The blockmap's links against that population: 209 links for
-# 209 things, 108 of them solid (the solid types' counts in ticket 02's
-# nushell inventory and the 29 monsters), none at another place, type or
-# cell than its thing's, and no thing missing from the cell of its
-# centre. The player's inventory, G_PlayerReborn's.
+# options. The blockmap's links against that population, the player's
+# mobj's left out: 209 links for 209 things, 108 of them solid (the
+# solid types' counts in ticket 02's nushell inventory and the 29
+# monsters), none of a thing gone or in another cell than its centre's,
+# and no thing missing from the cell of its centre. The player's
+# inventory, G_PlayerReborn's.
 # Then the pistol from the start: the weapon sprite's state row, tics and
 # place on the screen, and the flash's, after chosen tics. It rises 6 a
 # tic from 122 for 15 tics, rests at column 1, row 32, bobs on a walk
@@ -73,7 +74,7 @@
 # barrel, an armour bonus, a health bonus and the twitching impaled
 # body: a nushell replay of P_MobjThinker over info.c's states from the
 # spawn's tics, the rows numbered in info.c's order.
-# Last, on a copy of the map with three of its monster records
+# Then, on a copy of the map with three of its monster records
 # rewritten, solid things stop the player and movers, and carried things
 # ride them, as solids says; and the blue key door refuses a use, a blue card is taken
 # and the door then opens, in one replay, as locked says.
@@ -110,6 +111,29 @@
 # (51, 224) and behind (51, 128); 200 ahead (64, 129) and 201 (63); 1184
 # ahead, the last audible unit (1), 1185, which rounds to silence and
 # draws nothing, and 1201, past the clipping distance.
+# Last, the links and the thinkers of things that move, spawn and leave
+# in play, as relinks says, each line with the mobjs of two blockmap
+# cells, the last linked first, the things two sectors show in their
+# lists' order, the next id, the random index and a thing, then the
+# thinkers' order. Every list is worked from vanilla's source over the
+# WAD read in nushell: the blockmap's origin is -712, -1072, so the
+# cells of (-400, 400) and (-400, 300) are 2,11 and 2,10, and the sectors
+# under them (tools/wad.nu's sector-at) 160 and 140. P_SpawnMapThing
+# spawns the records in order and P_SetThingPosition puts each first in
+# its lists, so cell 2,11 lists record 58, cell 2,10 the player's mobj,
+# record 157, sector 160 record 58 and sector 140 records 238 and 157,
+# of which the player's is no thing to show. P_UnsetThingPosition and
+# P_SetThingPosition about the move take 58 out of the first lists and
+# put it first in the second. P_SpawnMobj gives the bonus the next id
+# past the 292 records, draws one random number, leaves it S_BON1's 6
+# tics (row 12) on the floor at 0, links it first, and adds its thinker
+# at the list's tail: 181 mobjs in record order, the player's between
+# records 154 and 166, then the 9 lights (the sectors of special 1, 8 or
+# 12), then the bonus, which thinks that same tic, 5 tics left.
+# P_RemoveMobj unlinks it, its thinker ends at its next turn, and the
+# next spawned is 293, not 292 again. P_TryMove relinks the player's
+# mobj first in its cell on its first move. The random index after a
+# tic is the lights' draws, a regression pin.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -188,11 +212,22 @@ def heights(sectors: List<&2, U32>, +level: L.Level) -> String:
       " sector " ++ U32.show(sector) ++ " " ++ F.Fixed.show(L.Level.floor(level, sector)) ++ " "
         ++ F.Fixed.show(L.Level.ceil(level, sector)) ++ heights(rest, level)
 
+# How many thinkers are not mobjs': the lights, movers and buttons.
+def specials(ts: List<&2, S.Thinker>) -> U32:
+  match ts:
+    case []:
+      0
+    case S.Mobj{id} <> rest:
+      specials(rest)
+    case _ <> rest:
+      (1 + specials(rest) : U32)
+
 # A run of one command in a demo's units, then the clock, the player,
-# the thinkers running, and some sectors' floors and ceilings.
+# the thinkers running that are no mobj's, and some sectors' floors and
+# ceilings.
 def watch(tag: String, sectors: List<&2, U32>, +s: S.State) -> String:
   line(tag ++ " tic " ++ U32.show(S.State.clock(s)), s) ++ " thinkers "
-    ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
+    ++ U32.show(specials(S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
 
 def run(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, s: S.State) -> IO(S.State):
   +r = ran(n, cmd, s)
@@ -410,11 +445,16 @@ def opens(+open: S.State) -> IO(Unit):
     IO.print("-")
 
 # A state with a fresh player at rest some way south of the first
-# door's sound origin, 832, 528, facing an angle.
+# door's sound origin, 832, 528, facing an angle, its mobj relinked
+# where it now stands, as P_UnsetThingPosition and P_SetThingPosition
+# relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  S.State{S.Player.at(level, L.Start{F.Fixed.of_map(832), F.Fixed.of_map((528 - d : U32)), A.Angle.of_thing(degrees)}),
-    level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  +x = F.Fixed.of_map(832)
+  +y = F.Fixed.of_map((528 - d : U32))
+  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
+    S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
+    sounds, mrnd}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -663,47 +703,59 @@ def solid.def(d: H.Thing.Def) -> Bool:
 def solid(+kind: U32) -> Bool:
   solid.def(H.Thing.info(kind))
 
-# Whether a link agrees with the population: its thing alive, at the
-# link's x and y, of its type, with its centre in cell c.
-def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, link: L.Level.Link) -> Bool:
+def same(a: L.Level.Cell, b: L.Level.Cell) -> Bool:
+  L.Cell{ax, ay} = a
+  L.Cell{bx, by} = b
+  Bool.and(U32.is_eq(ax, bx), U32.is_eq(ay, by))
+
+# Whether a cell's link agrees with the population: its thing alive,
+# with its centre in cell c.
+def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, c: L.Level.Cell) -> Bool:
   match m:
     case None{}:
       False{}
-    case Some{H.Thing{id, +kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics}}:
-      L.Link{next, +lx, +ly, +lkind} = link
-      Bool.and(L.Level.cell.is(L.Level.cell_of(bm, x, y), c),
-        Bool.and(U32.is_eq(x, lx), Bool.and(U32.is_eq(y, ly), U32.is_eq(kind, lkind))))
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      same(L.Level.cell_of(bm, x, y), c)
 
-def links.count(+link: L.Level.Link, m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, t: Links) ->
-  Links:
-  L.Link{next, x, y, +kind} = link
-  Links{n, s, w} = t
-  Links{(n + 1 : U32), (s + Bool.to_u32(solid(kind)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c, link))) : U32)}
+def solid.some(m: Maybe<&2, H.Thing>) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      solid(kind)
 
-def links.cell(ids: List<&2, U32>, +level: L.Level, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
+# A cell's link counted, the player's mobj's left out.
+def links.count(you: Bool, +m: Maybe<&2, H.Thing>, bm: L.Level.Blockmap, c: L.Level.Cell, t: Links) -> Links:
+  match you:
+    case True{}:
+      t
+    case False{}:
+      Links{n, s, w} = t
+      Links{(n + 1 : U32), (s + Bool.to_u32(solid.some(m)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c))) : U32)}
+
+def links.cell(ids: List<&2, U32>, +bm: L.Level.Blockmap, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
   match ids:
     case []:
       t
     case +id <> rest:
-      links.cell(rest, level, ts, c, links.count(L.Level.linked.in(L.Level.things_of(level), id), H.Things.get(ts, id),
-        L.Level.blockmap_of(level), c, t))
+      links.cell(rest, bm, ts, c, links.count(U32.is_eq(id, H.Things.you(ts)), H.Things.get(ts, id), bm, c, t))
 
-def links.cells(cells: List<&2, L.Level.Cell>, +level: L.Level, +ts: H.Things, t: Links) -> Links:
+def links.cells(cells: List<&2, L.Level.Cell>, +bm: L.Level.Blockmap, +ts: H.Things, t: Links) -> Links:
   match cells:
     case []:
       t
     case +c <> rest:
-      links.cells(rest, level, ts, links.cell(L.Level.cell.things(L.Level.geo(level), c), level, ts, c, t))
+      links.cells(rest, bm, ts, links.cell(H.Things.linked(ts, bm, [c]), bm, ts, c, t))
 
 # How many of the things are not in the list of the cell their centre
 # is in.
-def unlinked(things: List<&2, H.Thing>, +level: L.Level) -> U32:
+def unlinked(things: List<&2, H.Thing>, +bm: L.Level.Blockmap, +ts: H.Things) -> U32:
   match things:
     case []:
       0
-    case H.Thing{+id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      (Bool.to_u32(Bool.not(S.Sim.member(L.Level.cell.things(L.Level.geo(level),
-        L.Level.cell_of(L.Level.blockmap_of(level), x, y)), id))) + unlinked(rest, level) : U32)
+    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+      (Bool.to_u32(Bool.not(S.Sim.member(H.Things.linked(ts, bm, [L.Level.cell_of(bm, x, y)]), id)))
+        + unlinked(rest, bm, ts) : U32)
 
 def solids.count(things: List<&2, H.Thing>) -> U32:
   match things:
@@ -712,22 +764,21 @@ def solids.count(things: List<&2, H.Thing>) -> U32:
     case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       (Bool.to_u32(solid(kind)) + solids.count(rest) : U32)
 
-def links.show(t: Links, +things: List<&2, H.Thing>, +level: L.Level) -> String:
+def links.show(t: Links, +things: List<&2, H.Thing>, bm: L.Level.Blockmap, ts: H.Things) -> String:
   Links{n, s, w} = t
   "links " ++ U32.show(n) ++ " of " ++ Nat.show(List.length(&2, H.Thing, things)) ++ " things, solid "
     ++ U32.show(s) ++ " of " ++ U32.show(solids.count(things)) ++ ", wrong " ++ U32.show(w) ++ ", unlinked "
-    ++ U32.show(unlinked(things, level))
+    ++ U32.show(unlinked(things, bm, ts))
 
-# The blockmap links of a state's level against its population, cell by
-# cell over the whole blockmap: as many links as things, as many of them
-# solid as solid things, none that disagrees with its thing, and no
-# thing missing from its centre's cell mean each thing is linked once,
-# in the cell of its centre, with its x, y and type.
-def links.in(bm: L.Level.Blockmap, +s: S.State) -> String:
+# The blockmap links of a state's population, cell by cell over the
+# whole blockmap: as many links as things, as many of them solid as
+# solid things, none that disagrees with its thing, and no thing missing
+# from its centre's cell mean each thing is linked once, in the cell of
+# its centre.
+def links.in(+bm: L.Level.Blockmap, +s: S.State) -> String:
   L.Blockmap{words, ox, oy, +cols, +rows} = bm
-  +level = S.State.level(s)
-  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), level, S.State.things(s),
-    Links{0, 0, 0}), H.Things.list(S.State.things(s)), level)
+  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), bm, S.State.things(s),
+    Links{0, 0, 0}), H.Things.list(S.State.things(s)), bm, S.State.things(s))
 
 def links(+s: S.State) -> String:
   links.in(L.Level.blockmap_of(S.State.level(s)), s)
@@ -842,6 +893,106 @@ def pickups(+level: L.Level) -> IO(Unit):
       holding(stocked(100, 100, 1, [50, 0, 0, 0], I.Inventory.start()), at(level, 1664, 1008, 90)))
     IO.print("-")
 
+def names(ids: List<&2, U32>) -> String:
+  match ids:
+    case []:
+      ""
+    case id <> rest:
+      " " ++ U32.show(id) ++ names(rest)
+
+# The mobjs that think before any special does, and those after one.
+def lead(ts: List<&2, S.Thinker>) -> List<&2, U32>:
+  match ts:
+    case S.Mobj{id} <> rest:
+      id <> lead(rest)
+    case _:
+      []
+
+def late(ts: List<&2, S.Thinker>, special: Bool) -> List<&2, U32>:
+  match ts special:
+    case [] _:
+      []
+    case S.Mobj{id} <> rest True{}:
+      id <> late(rest, True{})
+    case S.Mobj{id} <> rest False{}:
+      late(rest, False{})
+    case _ <> rest _:
+      late(rest, True{})
+
+# The thinkers' order: how many mobjs think before the specials, the
+# five about the player's among them, how many specials, and the mobjs
+# after a special.
+def order(tag: String, +ts: List<&2, S.Thinker>) -> String:
+  tag ++ " thinkers: " ++ Nat.show(List.length(&2, U32, lead(ts))) ++ " mobjs, about the player's"
+    ++ names(List.take(&2, U32, List.drop(&2, U32, lead(ts), 103n), 5n)) ++ ", " ++ U32.show(specials(ts))
+    ++ " specials, then mobjs" ++ names(late(ts, False{}))
+
+def of.sector(things: List<&2, H.Thing>, +sector: U32) -> List<&2, U32>:
+  match things:
+    case []:
+      []
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +at, state, tics} <> rest:
+      V.Vec.keep(~U32, U32.is_eq(at, sector), id, of.sector(rest, sector))
+
+# The mobjs the blockmap cell of a place in map units lists.
+def cell(+bm: L.Level.Blockmap, ts: H.Things, x: U32, y: U32) -> String:
+  names(H.Things.linked(ts, bm, [L.Level.cell_of(bm, F.Fixed.of_map(x), F.Fixed.of_map(y))]))
+
+# The mobjs of the blockmap cells at (-400, 400) and (-400, 300), the
+# last linked first, the things sectors 160 and 140 show, in their lists'
+# order, the next id, the random index, and a thing.
+def linked(tag: String, +id: U32, +s: S.State) -> String:
+  +bm = L.Level.blockmap_of(S.State.level(s))
+  +ts = S.State.things(s)
+  tag ++ " cell 2,11" ++ cell(bm, ts, 65136, 400) ++ " cell 2,10" ++ cell(bm, ts, 65136, 300) ++ " sector 160"
+    ++ names(of.sector(H.Things.shown(ts), 160)) ++ " sector 140" ++ names(of.sector(H.Things.shown(ts), 140))
+    ++ " next " ++ U32.show(H.Things.count(ts)) ++ " random " ++ U32.show(S.State.rnd(s)) ++ " "
+    ++ thing(H.Things.get(ts, id))
+
+def moved.some(m: Maybe<&2, H.Thing>, x: U32, y: U32, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      S.State.moved(S.Try{True{}, S.State.player(s), H.Things.moved(S.State.things(s),
+        L.Level.blockmap_of(S.State.level(s)), th, H.Thing.at(th, S.State.level(s), F.Fixed.of_map(x),
+          F.Fixed.of_map(y)))}, S.State.level(s), s)
+
+# A state with a thing at another place, unlinked and linked again.
+def moved(+id: U32, x: U32, y: U32, +s: S.State) -> S.State:
+  moved.some(H.Things.get(S.State.things(s), id), x, y, s)
+
+def spawned(d: Maybe<&2, H.Thing.Def>, x: U32, y: U32, s: S.State) -> S.State:
+  match d:
+    case None{}:
+      s
+    case Some{info}:
+      S.Sim.spawn(info, F.Fixed.of_map(x), F.Fixed.of_map(y), H.Thing.onfloor(), s)
+
+# A state's links and a thing, then its thinkers' order.
+def seen(tag: String, id: U32, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    IO.print(linked(tag, id, s))
+    IO.print(order(" ", S.State.thinkers(s)))
+    return s
+
+# Things that move, spawn and leave in play, from the start. The dead
+# former human, record 58, moved from (-400, 400) to (-400, 300), over a
+# cell border and a sector border, as P_UnsetThingPosition and
+# P_SetThingPosition relink it; a health bonus spawned at (-340, 288) as
+# P_SpawnMobj spawns it, an idle tic, its removal as P_RemoveMobj removes
+# it, a tic, and another spawned; then the player's first move.
+def relinks(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    s0 : S.State <- seen("start", 58, S.State.start(level))
+    s1 : S.State <- seen("moved", 58, moved(58, 65136, 300, s0))
+    s2 : S.State <- seen("spawned", 292, spawned(H.Thing.def(2014), 65196, 288, s1))
+    s3 : S.State <- seen("a tic", 292, S.Sim.tic(idle(), s2))
+    s4 : S.State <- seen("removed, a tic", 292, S.Sim.tic(idle(), S.Sim.remove(292, s3)))
+    s5 : S.State <- seen("spawned", 293, spawned(H.Thing.def(2014), 65196, 288, s4))
+    s6 : S.State <- seen("walked", 293, S.Sim.tic(forward(), s5))
+    IO.print(links(s6))
+
 def psprite(psp: S.Psprite) -> String:
   S.Psprite{state, tics, sx, sy} = psp
   Maybe.show(~&2, ~U32, ~U32.show, state) ++ " tics " ++ U32.show(tics) ++ " at " ++ F.Fixed.show(sx) ++ " "
@@ -904,6 +1055,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     pickups(level)
     door(level)
     patched.cases(level, patched(W.Wad.dir(a)))
+    relinks(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -1385,3 +1537,18 @@ def main() -> IO(Unit):
 #|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0
 #|sounds drew to 66
 #|-
+#|start cell 2,11 58 cell 2,10 157 sector 160 58 sector 140 238 next 292 random 59 thing 58 type 18 at -400.000000 400.000000 z 16.000000 angle 270.000 sector 160 state 2 tics 4294967295 radius 20 height 16 flags 0
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
+#|moved cell 2,11 cell 2,10 58 157 sector 160 sector 140 58 238 next 292 random 59 thing 58 type 18 at -400.000000 300.000000 z 16.000000 angle 270.000 sector 140 state 2 tics 4294967295 radius 20 height 16 flags 0
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
+#|spawned cell 2,11 cell 2,10 292 58 157 sector 160 sector 140 292 58 238 next 293 random 60 thing 292 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 6 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 292
+#|a tic cell 2,11 cell 2,10 292 58 157 sector 160 sector 140 292 58 238 next 293 random 62 thing 292 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 5 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 292
+#|removed, a tic cell 2,11 cell 2,10 58 157 sector 160 sector 140 58 238 next 293 random 62 
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
+#|spawned cell 2,11 cell 2,10 293 58 157 sector 160 sector 140 293 58 238 next 294 random 63 thing 293 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 6 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 293
+#|walked cell 2,11 cell 2,10 157 293 58 sector 160 sector 140 293 58 238 next 294 random 63 thing 293 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 5 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 293
+#|links 210 of 210 things, solid 108 of 108, wrong 0, unlinked 0

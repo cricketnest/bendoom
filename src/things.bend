@@ -1,10 +1,11 @@
-# Doom's info.c, P_SpawnMapThing and the state half of P_MobjThinker for
-# the things Bendoom spawns: the definitions of the DoomEd types either
-# E1M1 places, less the starts and the spectre, which Hurt Me Plenty
-# never spawns, the state rows their spawn states lead to and the
-# pistol's with its entry in d_items.c's weaponinfo, the map's THINGS
-# records made the level's first things, a thing's tic through its
-# states, and P_RemoveMobj.
+# Doom's info.c, P_SpawnMobj, P_SpawnMapThing, P_SetThingPosition,
+# P_RemoveMobj and the state half of P_MobjThinker for the things
+# Bendoom spawns: the definitions of the DoomEd types either E1M1
+# places, less the starts and the spectre, which Hurt Me Plenty never
+# spawns, the state rows their spawn states lead to and the pistol's
+# with its entry in d_items.c's weaponinfo, the map's THINGS records
+# made the level's first things, a thing's tic through its states, and
+# the population with its blockmap and sector links.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
@@ -13,16 +14,16 @@ import ./random.bend as M
 import ./vec.bend as V
 import ./sound.bend as Sn
 
-# A thing, Doom's mobj: its THINGS record's index, which names it for
-# good, its DoomEd type, its position with z on the floor or under the
+# A thing, Doom's mobj: its id, which names it for good (its THINGS
+# record's index, or the next id past every one given for a thing spawned
+# in play), its DoomEd type, its position with z on the floor or under the
 # ceiling, the floor and ceiling it is held between, its facing, the
 # sector under it, its state row, and the tics left in it.
 type Thing is Data:
   Thing{id: U32, kind: U32, x: U32, y: U32, z: U32, floorz: U32, ceilz: U32, angle: U32, sector: U32, state: U32,
     tics: U32}
 
-# The player among the mobjs: a name no record has, above every record's,
-# so the player's link ranked by it heads its cell.
+# The player's id on a map with no start for it: one no record has.
 def Thing.you() -> U32:
   4294967295
 
@@ -180,31 +181,57 @@ def Thing.def(kind: U32) -> Maybe<&2, Thing.Def>:
 def Thing.info(+kind: U32) -> Thing.Def:
   Maybe.default(&2, Thing.Def, Thing.def(kind), Def{kind, 0, 0, 0, 0})
 
+# Doom's ONFLOORZ and ONCEILINGZ: a z that asks P_SpawnMobj for the
+# floor, or for the thing's height under the ceiling.
+def Thing.onfloor() -> U32:
+  2147483648
+
+def Thing.onceiling() -> U32:
+  2147483647
+
+# Doom's P_SpawnMobj, less its random draw, which its caller makes: a
+# thing of a type named id at (x, y) and z, in its first state for that
+# state's tics, facing east, held between the floor and ceiling of the
+# sector under it.
+def Thing.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, +z: U32) -> Thing:
+  Def{kind, +state, radius, height, flags} = d
+  +sector = L.Level.sector_at(level, x, y)
+  +floor = L.Level.floor(level, sector)
+  +ceil = L.Level.ceil(level, sector)
+  Thing{id, kind, x, y, Bool.pick(U32, U32.is_eq(z, Thing.onfloor()), floor,
+      Bool.pick(U32, U32.is_eq(z, Thing.onceiling()), (ceil - F.Fixed.of_map(height) : U32), z)), floor, ceil, 0,
+    sector, state, Thing.Row.tics(Thing.row(state))}
+
+# The thing with its centre at another place, in the sector under it.
+def Thing.at(th: Thing, level: L.Level, +x: U32, +y: U32) -> Thing:
+  Thing{id, kind, ox, oy, z, floorz, ceilz, angle, was, state, tics} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, L.Level.sector_at(level, x, y), state, tics}
+
 # The things spawned, the last first while they spawn, the random
 # index, and player 1's start record, the player's own name before one
 # spawns.
 type Thing.Spawn is Data:
   Spawn{things: List<&2, Thing>, rnd: U32, you: U32}
 
-# Doom's P_SpawnMobj and the rest of P_SpawnMapThing: one random number
-# drawn for the thing, and one more for a state that runs out, which
-# lasts that number modulo its tics, plus one. It stands on the floor of
-# the sector under it, or hangs its height under the ceiling, is held
-# between that sector's floor and ceiling, and faces the record's angle.
-def Thing.spawn.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, angle: U32, s: Thing.Spawn) ->
+def Thing.spawn.facing(th: Thing, angle: U32, tics: U32) -> Thing:
+  Thing{id, kind, x, y, z, floorz, ceilz, east, sector, state, first} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of_thing(angle), sector, state, tics}
+
+# The rest of Doom's P_SpawnMapThing: one random number drawn for the
+# mobj, and one more for a state that runs out, which lasts that number
+# modulo its tics, plus one. It stands on the floor or hangs from the
+# ceiling, and faces the record's angle.
+def Thing.spawn.mobj(+d: Thing.Def, +level: L.Level, id: U32, x: U32, y: U32, angle: U32, s: Thing.Spawn) ->
   Thing.Spawn:
-  Def{kind, +state, radius, height, flags} = d
+  Def{kind, state, radius, height, flags} = d
   Spawn{things, rnd, you} = s
   +tics = Thing.Row.tics(Thing.row(state))
   +drawn = M.Random.next(rnd)
   +runs = F.Fixed.gt(tics, 0)
   +after = Bool.pick(U32, runs, M.Random.next(drawn), drawn)
-  +sector = L.Level.sector_at(level, x, y)
-  +floor = L.Level.floor(level, sector)
-  +ceil = L.Level.ceil(level, sector)
-  Spawn{Thing{id, kind, x, y, Bool.pick(U32, U32.is_zero((flags .&. 256 : U32)), floor,
-      (ceil - F.Fixed.of_map(height) : U32)), floor, ceil, A.Angle.of_thing(angle), sector, state,
-      Bool.pick(U32, runs, (M.Random.at(after) % tics + 1 : U32), tics)} <> things, after, you}
+  Spawn{Thing.spawn.facing(Thing.mobj(d, level, id, x, y,
+      Bool.pick(U32, U32.is_zero((flags .&. 256 : U32)), Thing.onfloor(), Thing.onceiling())), angle,
+    Bool.pick(U32, runs, (M.Random.at(after) % tics + 1 : U32), tics)) <> things, after, you}
 
 def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level: L.Level, +id: U32, +x: U32,
   +y: U32, angle: U32, s: Thing.Spawn) -> Thing.Spawn:
@@ -218,8 +245,8 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
       s
 
 # Doom's P_SpawnMapThing on Hurt Me Plenty with one player: player 1's
-# start spawns the player, who draws a random number too and ranks among
-# the things of its cell by the first such record, the start
+# start spawns the player, who draws a random number too and takes the
+# first such record's index for its name, the start
 # Level.start_of places it at; another record spawns when its options
 # set that skill's bit, 2, and not the multiplayer bit, 16, and its type
 # has a definition.
@@ -258,92 +285,151 @@ def Thing.ambush(+level: L.Level, +id: U32) -> Bool:
 # The population
 # --------------
 
-# The things by id, a complete binary tree like a V.Vec: a slot holds
-# its thing, or none for an id that never spawned or is gone.
-type Thing.Tree is Data:
-  Slot{thing: Maybe<&2, Thing>}
-  Fork{l: Thing.Tree, r: Thing.Tree}
-
-# The things alive, among ids from 0 to count, and where the player's
-# link stands among the things of its cell. Doom links a thing first in
-# its cell when it spawns or moves, so the things are linked the last
-# spawned first, and the player after those spawned after its start
-# record, you, until its first move puts it before them all, at the
-# player's own name. Last, what the things did that is heard and the
-# state has not reported yet: a position check has no state to tell.
+# The things alive by id, among ids from 0 to count, the player's id,
+# and Doom's links: the ids in each blockmap cell and in each sector,
+# the last linked first, the player's among them. A thing spawned in
+# play takes the count for its id, so no id ever names two things. Last,
+# what the things did that is heard and the state has not reported yet:
+# a position check has no state to tell.
 type Things is Data:
-  Things{tree: Thing.Tree, count: U32, you: U32, heard: List<&2, Sn.Sound.Event>}
+  Things{tree: V.Tree<Thing>, count: U32, you: U32, cells: V.Tree<List<&2, U32>>,
+    sectors: V.Tree<List<&2, U32>>, heard: List<&2, Sn.Sound.Event>}
 
-def Thing.Tree.empty(d: Nat) -> Thing.Tree:
-  match d:
-    case 0n:
-      Slot{None{}}
-    case 1n++p:
-      Fork{Thing.Tree.empty(p), Thing.Tree.empty(p)}
-
-def Thing.Tree.get(t: Thing.Tree, odd: Bool, +i: U32) -> Maybe<&2, Thing>:
-  match t odd:
-    case Slot{m} _:
-      m
-    case Fork{l, r} False{}:
-      Thing.Tree.get(l, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32))
-    case Fork{l, r} True{}:
-      Thing.Tree.get(r, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32))
-
-def Thing.Tree.set(t: Thing.Tree, odd: Bool, +i: U32, m: Maybe<&2, Thing>) -> Thing.Tree:
-  match t odd:
-    case Slot{old} _:
-      Slot{m}
-    case Fork{l, r} False{}:
-      Fork{Thing.Tree.set(l, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32), m), r}
-    case Fork{l, r} True{}:
-      Fork{l, Thing.Tree.set(r, V.Vec.odd((i >> 1n : U32)), (i >> 1n : U32), m)}
-
-def Thing.Tree.tics(t: Thing.Tree) -> Thing.Tree:
-  match t:
-    case Slot{m}:
-      Slot{Maybe.map(&2, Thing, Thing, Thing.tic, m)}
-    case Fork{l, r}:
-      Fork{Thing.Tree.tics(l), Thing.Tree.tics(r)}
+# No things, the ids under count kept for the map's records, with a
+# list for each of so many blockmap cells and sectors.
+def Things.none(+count: U32, you: U32, ncells: U32, nsectors: U32) -> Things:
+  Things{V.Tree.empty(Thing, V.Vec.depth(count)), count, you, V.Tree.empty(List<&2, U32>, V.Vec.depth(ncells)),
+    V.Tree.empty(List<&2, U32>, V.Vec.depth(nsectors)), []}
 
 def Things.get(ts: Things, +id: U32) -> Maybe<&2, Thing>:
-  Things{tree, count, you, heard} = ts
-  Thing.Tree.get(tree, V.Vec.odd(id), id)
+  Things{tree, count, you, cells, sectors, heard} = ts
+  V.Tree.get(Thing, tree, id)
 
 def Things.put(ts: Things, +id: U32, m: Maybe<&2, Thing>) -> Things:
-  Things{tree, count, you, heard} = ts
-  Things{Thing.Tree.set(tree, V.Vec.odd(id), id, m), count, you, heard}
+  Things{tree, count, you, cells, sectors, heard} = ts
+  Things{V.Tree.set(Thing, tree, id, m), count, you, cells, sectors, heard}
 
 # The things after one of them was heard.
 def Things.sounded(ts: Things, e: Sn.Sound.Event) -> Things:
-  Things{tree, count, you, heard} = ts
-  Things{tree, count, you, List.append(&2, Sn.Sound.Event, heard, [e])}
-
-# Doom's P_RemoveMobj: the thing is gone, and its sound stops.
-def Things.removed(ts: Things, +id: U32) -> Things:
-  Things.sounded(Things.put(ts, id, None{}), Sn.Stop{Sn.Thing{id}})
+  Things{tree, count, you, cells, sectors, heard} = ts
+  Things{tree, count, you, cells, sectors, List.append(&2, Sn.Sound.Event, heard, [e])}
 
 def Things.you(ts: Things) -> U32:
-  Things{tree, count, you, heard} = ts
+  Things{tree, count, you, cells, sectors, heard} = ts
   you
 
-# The things after the player's first move.
-def Things.moved(ts: Things) -> Things:
-  Things{tree, count, you, heard} = ts
-  Things{tree, count, Thing.you(), heard}
+def Things.count(ts: Things) -> U32:
+  Things{tree, count, you, cells, sectors, heard} = ts
+  count
 
-def Things.of.go(things: List<&2, Thing>, ts: Things) -> Things:
-  match things:
+def Things.fresh.if(full: Bool, tree: V.Tree<Thing>) -> V.Tree<Thing>:
+  match full:
+    case False{}:
+      tree
+    case True{}:
+      V.Tree.grown(Thing, tree)
+
+# The population with one id more, its old count, and room for it: the
+# tree is full when the count is a power of two.
+def Things.fresh(ts: Things) -> Things:
+  Things{tree, +count, you, cells, sectors, heard} = ts
+  Things{Things.fresh.if(U32.is_zero((count .&. (count - 1) : U32)), tree), (count + 1 : U32), you, cells, sectors,
+    heard}
+
+# Links
+# -----
+
+def Things.first(ids: List<&2, U32>, +id: U32) -> List<&2, U32>:
+  id <> ids
+
+def Things.without(ids: List<&2, U32>, +id: U32) -> List<&2, U32>:
+  match ids:
     case []:
-      ts
-    case Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      Things.of.go(rest,
-        Things.put(ts, id, Some{Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}))
+      []
+    case +h <> rest:
+      V.Vec.keep(~U32, Bool.not(U32.is_eq(h, id)), h, Things.without(rest, id))
 
-# A population of things whose ids are under count, the player's link
-# at you.
-def Things.of(things: List<&2, Thing>, +count: U32, you: U32) -> Things:
-  Things.of.go(things, Things{Thing.Tree.empty(V.Vec.depth(count)), count, you, []})
+# List i of some lists with an id put first in it, or taken out of it.
+def Things.edit(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, +lists: V.Tree<List<&2, U32>>, +i: U32,
+  id: U32) -> V.Tree<List<&2, U32>>:
+  V.Tree.set(List<&2, U32>, lists, i,
+    Some{edit(Maybe.default(&2, List<&2, U32>, V.Tree.get(List<&2, U32>, lists, i), []), id)})
+
+def Things.edit.cell(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, inside: Bool,
+  cells: V.Tree<List<&2, U32>>, i: U32, id: U32) -> V.Tree<List<&2, U32>>:
+  match inside:
+    case False{}:
+      cells
+    case True{}:
+      Things.edit(~edit, cells, i, id)
+
+# A mobj at (x, y) in a sector, in the list of the blockmap cell its
+# centre is in and in its sector's; off the map it is in no cell.
+def Things.placed(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, ts: Things, +bm: L.Level.Blockmap,
+  +id: U32, x: U32, y: U32, sector: U32) -> Things:
+  Things{tree, count, you, cells, sectors, heard} = ts
+  L.Blockmap{words, ox, oy, +cols, +rows} = bm
+  +c = L.Level.cell_of(bm, x, y)
+  Things{tree, count, you, Things.edit.cell(~edit, L.Level.cell.inside(cols, rows, c), cells,
+    L.Level.cell.number(cols, c), id), Things.edit(~edit, sectors, sector, id), heard}
+
+# Doom's P_SetThingPosition: the mobj goes first in its cell's list and
+# first in its sector's.
+def Things.link(ts: Things, bm: L.Level.Blockmap, id: U32, x: U32, y: U32, sector: U32) -> Things:
+  Things.placed(~Things.first, ts, bm, id, x, y, sector)
+
+# Doom's P_UnsetThingPosition: the mobj leaves both lists.
+def Things.unlink(ts: Things, bm: L.Level.Blockmap, id: U32, x: U32, y: U32, sector: U32) -> Things:
+  Things.placed(~Things.without, ts, bm, id, x, y, sector)
+
+# The population with a thing in it, linked where it is: one that
+# spawned, or one that moved, once unlinked from where it was.
+def Things.entered(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
+  Thing{+id, kind, +x, +y, z, floorz, ceilz, angle, +sector, state, tics} = th
+  Things.link(Things.put(ts, id, Some{Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}), bm, id, x,
+    y, sector)
+
+def Things.unlinked(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = th
+  Things.unlink(ts, bm, id, x, y, sector)
+
+# A thing at another place, once unlinked from where it was: Doom's
+# P_UnsetThingPosition and P_SetThingPosition about a move.
+def Things.moved(ts: Things, +bm: L.Level.Blockmap, was: Thing, now: Thing) -> Things:
+  Things.entered(Things.unlinked(ts, bm, was), bm, now)
+
+# Doom's P_RemoveMobj: the thing unlinked and gone, its id never used
+# again, and its sound stopped.
+def Things.removed(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
+  Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} = th
+  Things.sounded(Things.put(Things.unlinked(ts, bm,
+    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}), id, None{}), Sn.Stop{Sn.Thing{id}})
+
+def Things.linked.at(inside: Bool, cells: V.Tree<List<&2, U32>>, i: U32) -> List<&2, U32>:
+  match inside:
+    case False{}:
+      []
+    case True{}:
+      Maybe.default(&2, List<&2, U32>, V.Tree.get(List<&2, U32>, cells, i), [])
+
+def Things.linked.go(cs: List<&2, L.Level.Cell>, +cols: U32, +rows: U32, +cells: V.Tree<List<&2, U32>>) ->
+  List<&2, U32>:
+  match cs:
+    case []:
+      []
+    case +c <> rest:
+      List.append(&2, U32, Things.linked.at(L.Level.cell.inside(cols, rows, c), cells, L.Level.cell.number(cols, c)),
+        Things.linked.go(rest, cols, rows, cells))
+
+# The mobjs linked in each of some blockmap cells in turn, a cell's
+# last linked first: the order Doom's P_BlockThingsIterator meets them.
+def Things.linked(ts: Things, bm: L.Level.Blockmap, cs: List<&2, L.Level.Cell>) -> List<&2, U32>:
+  Things{tree, count, you, cells, sectors, heard} = ts
+  L.Blockmap{words, ox, oy, cols, rows} = bm
+  Things.linked.go(cs, cols, rows, cells)
+
+# Lists
+# -----
 
 def Things.cons(m: Maybe<&2, Thing>, rest: List<&2, Thing>) -> List<&2, Thing>:
   match m:
@@ -352,17 +438,38 @@ def Things.cons(m: Maybe<&2, Thing>, rest: List<&2, Thing>) -> List<&2, Thing>:
     case Some{th}:
       th <> rest
 
-def Things.list.go(n: Nat, +t: Thing.Tree, +i: U32) -> List<&2, Thing>:
+def Things.list.go(n: Nat, +t: V.Tree<Thing>, +i: U32) -> List<&2, Thing>:
   match n:
     case 0n:
       []
     case 1n+m:
-      Things.cons(Thing.Tree.get(t, V.Vec.odd(i), i), Things.list.go(m, t, (i + 1 : U32)))
+      Things.cons(V.Tree.get(Thing, t, i), Things.list.go(m, t, (i + 1 : U32)))
 
 # The things alive, in the order of their ids.
 def Things.list(ts: Things) -> List<&2, Thing>:
-  Things{+tree, +count, you, heard} = ts
+  Things{+tree, +count, you, cells, sectors, heard} = ts
   Things.list.go(U32.to_nat(count), tree, 0)
+
+def Things.ids(lists: V.Tree<List<&2, U32>>) -> List<&2, U32>:
+  match lists:
+    case V.Slot{m}:
+      Maybe.default(&2, List<&2, U32>, m, [])
+    case V.Fork{l, r}:
+      List.append(&2, U32, Things.ids(l), Things.ids(r))
+
+def Things.those(ids: List<&2, U32>, +tree: V.Tree<Thing>) -> List<&2, Thing>:
+  match ids:
+    case []:
+      []
+    case id <> rest:
+      Things.cons(V.Tree.get(Thing, tree, id), Things.those(rest, tree))
+
+# The things alive, sector by sector, a sector's in the order of its
+# list: the order Doom's R_AddSprites meets the things of a sector in.
+# The player's mobj is no thing, so it is not among them.
+def Things.shown(ts: Things) -> List<&2, Thing>:
+  Things{tree, count, you, cells, sectors, heard} = ts
+  Things.those(Things.ids(sectors), tree)
 
 # The name of a thing the population lacks, before rest; rest alone for
 # one it has.
@@ -385,21 +492,3 @@ def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
 # population, as text.
 def Things.tally(first: List<&2, Thing>, +things: Things) -> String:
   " things " ++ Nat.show(List.length(&2, Thing, Things.list(things))) ++ " taken" ++ Things.gone(first, things)
-
-# Every thing alive through its tic. A tic reads no other thing, so the
-# order vanilla's thinkers run them in cannot show.
-def Things.tics(ts: Things) -> Things:
-  Things{tree, count, you, heard} = ts
-  Things{Thing.Tree.tics(tree), count, you, heard}
-
-def Thing.link.go(things: List<&2, Thing>, +level: L.Level) -> L.Level:
-  match things:
-    case []:
-      level
-    case Thing{+id, +kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      Thing.link.go(rest, L.Level.link(level, id, x, y, kind))
-
-# The level with things linked into its blockmap in turn, as Doom links
-# them when they spawn, and no other.
-def Thing.linked(+level: L.Level, things: List<&2, Thing>, count: U32) -> L.Level:
-  Thing.link.go(things, L.Level.unlinked(level, count))
