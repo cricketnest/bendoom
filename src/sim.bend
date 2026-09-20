@@ -580,7 +580,7 @@ def Sim.touch(+level: L.Level, +x: U32, +y: U32, +z: U32, got: I.Inventory & H.T
 # Moving
 # ------
 
-def Sim.keep(keep: Bool, x: U32, rest: List<&2, U32>) -> List<&2, U32>:
+def Sim.keep(~T: Data, keep: Bool, x: T, rest: List<&2, T>) -> List<&2, T>:
   match keep:
     case False{}:
       rest
@@ -613,7 +613,7 @@ def Sim.crossings.go(lines: List<&2, U32>, +level: L.Level, +ox: U32, +oy: U32, 
     case []:
       found
     case +i <> rest:
-      Sim.crossings.go(rest, level, ox, oy, x, y, Sim.keep(Bool.and(Sim.crosses(level, ox, oy, x, y, i),
+      Sim.crossings.go(rest, level, ox, oy, x, y, Sim.keep(~U32, Bool.and(Sim.crosses(level, ox, oy, x, y, i),
         Bool.not(Sim.member(found, i))), i, found))
 
 def Sim.crossings(+level: L.Level, ox: U32, oy: U32, +x: U32, +y: U32) -> List<&2, U32>:
@@ -663,14 +663,14 @@ def Sim.Try.or(b: Bool, t: Sim.Try) -> Sim.Try:
   Try{ok, p, things} = t
   Try{Bool.or(b, ok), p, things}
 
-# Sliding
-# -------
+# The path traversal
+# ------------------
 
-# Doom's P_PointOnDivlineSide against the trace, for far ends.
+# Doom's P_PointOnDivlineSide: the cross product with the sign-bit
+# shortcut, one factor shifted by eight as the original shifts it.
 def Sim.div_side.slow(+x: U32, +y: U32, +dx: U32, +dy: U32) -> Bool:
   Bool.pick(Bool, U32.is_zero(((dy .^. dx .^. x .^. y) .&. 2147483648 : U32)),
-    Bool.not(F.Fixed.lt(F.Fixed.mul(F.Fixed.sarn(y, 8n), F.Fixed.sarn(dx, 8n)),
-      F.Fixed.mul(F.Fixed.sarn(dy, 8n), F.Fixed.sarn(x, 8n)))),
+    Bool.not(F.Fixed.lt(F.Fixed.mul(y, F.Fixed.sarn(dx, 8n)), F.Fixed.mul(F.Fixed.sarn(dy, 8n), x))),
     Bool.not(U32.is_zero(((dy .^. x) .&. 2147483648 : U32))))
 
 def Sim.div_side(+x: U32, +y: U32, +tx: U32, +ty: U32, +dx: U32, +dy: U32) -> Bool:
@@ -687,18 +687,20 @@ def Sim.crossed(+tx: U32, +ty: U32, +tdx: U32, +tdy: U32, +line: L.Level.Line) -
     Bool.xor(Sim.div_side(x1, y1, tx, ty, tdx, tdy), Sim.div_side(x2, y2, tx, ty, tdx, tdy)),
     Bool.xor(Sim.point_side(tx, ty, line), Sim.point_side((tx + tdx : U32), (ty + tdy : U32), line)))
 
-# Doom's P_InterceptVector: how far along the trace the line is.
+# Doom's P_InterceptVector: how far along the trace it meets the line
+# from (x, y) along (dx, dy).
 def Sim.intercept.div(+num: U32, +den: U32) -> U32:
   Bool.pick(U32, U32.is_zero(den), 0, F.Fixed.div(num, den))
 
+def Sim.intercept.at(+tx: U32, +ty: U32, +tdx: U32, +tdy: U32, +x: U32, +y: U32, +dx: U32, +dy: U32) -> U32:
+  Sim.intercept.div(
+    (F.Fixed.mul(F.Fixed.sarn((x - tx : U32), 8n), dy)
+      + F.Fixed.mul(F.Fixed.sarn((ty - y : U32), 8n), dx) : U32),
+    (F.Fixed.mul(F.Fixed.sarn(dy, 8n), tdx) - F.Fixed.mul(F.Fixed.sarn(dx, 8n), tdy) : U32))
+
 def Sim.intercept.frac(+tx: U32, +ty: U32, +tdx: U32, +tdy: U32, +line: L.Level.Line) -> U32:
   L.Line{+x1, +y1, +x2, +y2, flags, front, back} = line
-  +dx = (x2 - x1 : U32)
-  +dy = (y2 - y1 : U32)
-  Sim.intercept.div(
-    (F.Fixed.mul(F.Fixed.sarn((x1 - tx : U32), 8n), dy)
-      + F.Fixed.mul(F.Fixed.sarn((ty - y1 : U32), 8n), dx) : U32),
-    (F.Fixed.mul(F.Fixed.sarn(dy, 8n), tdx) - F.Fixed.mul(F.Fixed.sarn(dx, 8n), tdy) : U32))
+  Sim.intercept.at(tx, ty, tdx, tdy, x1, y1, (x2 - x1 : U32), (y2 - y1 : U32))
 
 # The fraction where the trace meets the line, or past one when it
 # does not (Doom's INT_MAX for an intercept out of range).
@@ -706,91 +708,304 @@ def Sim.intercept(+tx: U32, +ty: U32, +tdx: U32, +tdy: U32, +line: L.Level.Line)
   Bool.pick(U32, Sim.crossed(tx, ty, tdx, tdy, line),
     Sim.intercept.frac(tx, ty, tdx, tdy, line), 2147483647)
 
-# Doom's PTR_SlideTraverse: whether the line stops the slide. A line
-# flagged two-sided with no back sector has no opening and blocks.
-def Sim.blocks.open(+level: L.Level, +p: Player, +line: L.Level.Line) -> Bool:
-  L.Line{x1, y1, x2, y2, flags, front, +back} = line
-  +top = Sim.open_top(level, line)
-  +bottom = Sim.open_bottom(level, line)
-  +z = Player.z(p)
-  Bool.or(U32.is_eq(back, L.Level.none()),
-    Bool.or(F.Fixed.lt((top - bottom : U32), Sim.height()),
-      Bool.or(F.Fixed.lt((top - z : U32), Sim.height()),
-        F.Fixed.gt((bottom - z : U32), Sim.step_up()))))
+# The fraction where the trace meets the segment from (x, y) along
+# (dx, dy), which is a thing's crossing diagonal, or past one when the
+# segment's ends lie on one side of the trace.
+def Sim.intercept.cross(+tx: U32, +ty: U32, +tdx: U32, +tdy: U32, +x: U32, +y: U32, +dx: U32, +dy: U32) -> U32:
+  Bool.pick(U32, Bool.xor(Sim.div_side(x, y, tx, ty, tdx, tdy),
+      Sim.div_side((x + dx : U32), (y + dy : U32), tx, ty, tdx, tdy)),
+    Sim.intercept.at(tx, ty, tdx, tdy, x, y, dx, dy), 2147483647)
 
-def Sim.blocks(+level: L.Level, +p: Player, +line: L.Level.Line) -> Bool:
-  L.Line{x1, y1, x2, y2, +flags, front, back} = line
-  Bool.pick(Bool, U32.is_zero((flags .&. 4 : U32)),
-    Bool.not(Sim.point_side(Player.x(p), Player.y(p), line)),
-    Sim.blocks.open(level, p, line))
-
-# The best hit so far: the least fraction and its line; none is one
-# past a whole move.
-def Sim.hit.better(closer: Bool, frac: U32, i: U32, best: U32 & U32) -> U32 & U32:
-  match closer:
-    case False{}:
-      best
+# The diagonal of the thing's box that a trace of this slope can cross:
+# the one from the top left corner down when the trace rises, the one
+# from the bottom left corner up otherwise.
+def Sim.intercept.box(rising: Bool, +tx: U32, +ty: U32, +tdx: U32, +tdy: U32, +x: U32, +y: U32, +r: U32) -> U32:
+  match rising:
     case True{}:
-      (frac, i)
-
-def Sim.hit.blocked(blocked: Bool, +frac: U32, i: U32, best: U32 & U32) -> U32 & U32:
-  match blocked:
+      Sim.intercept.cross(tx, ty, tdx, tdy, (x - r : U32), (y + r : U32), (r + r : U32), (0 - r - r : U32))
     case False{}:
-      best
-    case True{}:
-      (+bf, bi) = best
-      Sim.hit.better(U32.is_lt(frac, bf), frac, i, (bf, bi))
+      Sim.intercept.cross(tx, ty, tdx, tdy, (x - r : U32), (y - r : U32), (r + r : U32), (r + r : U32))
 
-# A line a trace meets, and how far along the trace, as a fraction.
+# Doom's PIT_AddThingIntercepts: a thing is met where the trace crosses
+# its corner to corner diagonal.
+def Sim.intercept.thing(link: L.Level.Link, +tx: U32, +ty: U32, +tdx: U32, +tdy: U32) -> U32:
+  L.Link{next, +x, +y, +kind} = link
+  Sim.intercept.box(F.Fixed.gt((tdx .^. tdy : U32), 0), tx, ty, tdx, tdy, x, y,
+    H.Thing.Def.radius(H.Thing.info(kind)))
+
+# Doom's intercept_t: how far along the trace the meeting is, whether a
+# line was met, and the name of the line or of the thing.
 type Sim.Meet is Data:
-  Meet{frac: U32, line: U32}
+  Meet{frac: U32, isline: Bool, what: U32}
 
-def Sim.meets.add(near: Bool, frac: U32, i: U32, rest: List<&2, Sim.Meet>) -> List<&2, Sim.Meet>:
-  match near:
+def Sim.Meet.frac(m: Sim.Meet) -> U32:
+  Meet{frac, isline, what} = m
+  frac
+
+# Doom's validcount over the lines of a cell: a line an earlier cell
+# listed, or this cell listed already, is passed over.
+def Sim.meets.fresh(ids: List<&2, U32>, +seen: List<&2, U32>) -> List<&2, U32>:
+  match ids:
+    case []:
+      []
+    case +i <> rest:
+      Sim.keep(~U32, Bool.not(Sim.member(seen, i)), i, Sim.meets.fresh(rest, i <> seen))
+
+# What a cell holds for a walk that asks for it: Doom's PT_ADDLINES and
+# PT_ADDTHINGS.
+def Sim.meets.ids(~at: @+geo: L.Level.Geo -> @+c: L.Level.Cell -> List<&2, U32>, add: Bool, geo: L.Level.Geo,
+  c: L.Level.Cell) -> List<&2, U32>:
+  match add:
     case False{}:
-      rest
+      []
     case True{}:
-      Meet{frac, i} <> rest
+      at(geo, c)
 
-def Sim.meets.go(lines: List<&2, U32>, +level: L.Level, +tx: U32, +ty: U32, +tdx: U32, +tdy: U32) ->
+# Doom's PIT_AddLineIntercepts: a line the trace crosses within its
+# length is met, at the fraction P_InterceptVector gives; one behind the
+# source or past the end is left out, as the traversal would pass over
+# it.
+def Sim.meets.lines(ids: List<&2, U32>, +level: L.Level, +tx: U32, +ty: U32, +tdx: U32, +tdy: U32) ->
   List<&2, Sim.Meet>:
-  match lines:
+  match ids:
     case []:
       []
     case +i <> rest:
       +frac = Sim.intercept(tx, ty, tdx, tdy, L.Level.line(level, i))
-      Sim.meets.add(U32.is_le(frac, F.Fixed.unit()), frac, i, Sim.meets.go(rest, level, tx, ty, tdx, tdy))
+      Sim.keep(~Sim.Meet, U32.is_le(frac, F.Fixed.unit()), Meet{frac, True{}, i},
+        Sim.meets.lines(rest, level, tx, ty, tdx, tdy))
+
+def Sim.meets.things(ids: List<&2, U32>, +level: L.Level, +tx: U32, +ty: U32, +tdx: U32, +tdy: U32) ->
+  List<&2, Sim.Meet>:
+  match ids:
+    case []:
+      []
+    case +id <> rest:
+      +frac = Sim.intercept.thing(L.Level.linked.in(L.Level.things_of(level), id), tx, ty, tdx, tdy)
+      Sim.keep(~Sim.Meet, U32.is_le(frac, F.Fixed.unit()), Meet{frac, False{}, id},
+        Sim.meets.things(rest, level, tx, ty, tdx, tdy))
 
 # A trace that starts on a cell's edge is nudged off it, as Doom's.
 def Sim.nudge(+v: U32, +org: U32) -> U32:
   Bool.pick(U32, U32.is_zero(((v - org : U32) .&. 8388607 : U32)), (v + F.Fixed.unit() : U32), v)
 
-def Sim.meets.at(+bm: L.Level.Blockmap, +level: L.Level, +x1: U32, +y1: U32, +x2: U32, +y2: U32) ->
-  List<&2, Sim.Meet>:
+# P_PathTraverse's setup along one axis: the step from cell to cell, how
+# much of the first cell is left to cross, and how far the other axis
+# gains a cell.
+type Sim.Axis is Data:
+  Axis{step: U32, partial: U32, gain: U32}
+
+def Sim.ray.axis(ahead: Bool, back: Bool, v: U32, dv: U32, dw: U32) -> Sim.Axis:
+  match ahead back:
+    case True{} _:
+      Axis{1, (F.Fixed.unit() - (F.Fixed.sarn(v, 7n) .&. 65535 : U32) : U32), F.Fixed.div(dw, F.Fixed.abs(dv))}
+    case False{} True{}:
+      Axis{4294967295, (F.Fixed.sarn(v, 7n) .&. 65535 : U32), F.Fixed.div(dw, F.Fixed.abs(dv))}
+    case False{} False{}:
+      Axis{0, F.Fixed.unit(), 16777216}
+
+# The walk's place: the cell it stands in, the two intercepts it steps
+# by, and whether the cell is the last.
+type Sim.Ray is Data:
+  Ray{done: Bool, mapx: U32, mapy: U32, xi: U32, yi: U32}
+
+def Sim.ray.of(xt2: U32, yt2: U32, +mapx: U32, +mapy: U32, xi: U32, yi: U32) -> Sim.Ray:
+  Ray{Bool.and(U32.is_eq(mapx, xt2), U32.is_eq(mapy, yt2)), mapx, mapy, xi, yi}
+
+# The next cell: the axis whose intercept still falls in this cell
+# advances, y before x; when neither does the walk stands still, as
+# Doom's does, until its count runs out.
+def Sim.ray.step(ymet: Bool, xmet: Bool, xt2: U32, yt2: U32, xstep: U32, ystep: U32, mapxstep: U32,
+  mapystep: U32, mapx: U32, mapy: U32, xi: U32, yi: U32) -> Sim.Ray:
+  match ymet xmet:
+    case True{} _:
+      Sim.ray.of(xt2, yt2, (mapx + mapxstep : U32), mapy, xi, (yi + ystep : U32))
+    case False{} True{}:
+      Sim.ray.of(xt2, yt2, mapx, (mapy + mapystep : U32), (xi + xstep : U32), yi)
+    case False{} False{}:
+      Sim.ray.of(xt2, yt2, mapx, mapy, xi, yi)
+
+def Sim.ray.go(fuel: Nat, r: Sim.Ray, +xt2: U32, +yt2: U32, +xstep: U32, +ystep: U32, +mapxstep: U32,
+  +mapystep: U32) -> List<&2, L.Level.Cell>:
+  match fuel r:
+    case 0n _:
+      []
+    case 1n+k Ray{True{}, mapx, mapy, xi, yi}:
+      [L.Cell{mapx, mapy}]
+    case 1n+k Ray{False{}, +mapx, +mapy, +xi, +yi}:
+      L.Cell{mapx, mapy} <> Sim.ray.go(k, Sim.ray.step(U32.is_eq(F.Fixed.sarn(yi, 16n), mapy),
+        U32.is_eq(F.Fixed.sarn(xi, 16n), mapx), xt2, yt2, xstep, ystep, mapxstep, mapystep, mapx, mapy, xi, yi),
+        xt2, yt2, xstep, ystep, mapxstep, mapystep)
+
+def Sim.ray.walk(ax: Sim.Axis, ay: Sim.Axis, rx: U32, ry: U32, xt1: U32, yt1: U32, +xt2: U32, +yt2: U32) ->
+  List<&2, L.Level.Cell>:
+  Axis{mapxstep, partialx, +ystep} = ax
+  Axis{mapystep, partialy, +xstep} = ay
+  Sim.ray.go(64n, Sim.ray.of(xt2, yt2, xt1, yt1, (F.Fixed.sarn(rx, 7n) + F.Fixed.mul(partialy, xstep) : U32),
+    (F.Fixed.sarn(ry, 7n) + F.Fixed.mul(partialx, ystep) : U32)), xt2, yt2, xstep, ystep, mapxstep, mapystep)
+
+# P_PathTraverse's walk: the cells the trace crosses, the one it starts
+# in first, at most 64, ending with the one it ends in. Doom's count
+# stops a trace whose stepping never reaches that cell.
+def Sim.ray(+ox: U32, +oy: U32, +tx: U32, +ty: U32, +x2: U32, +y2: U32) -> List<&2, L.Level.Cell>:
+  +rx = (tx - ox : U32)
+  +ry = (ty - oy : U32)
+  +dx = (x2 - tx : U32)
+  +dy = (y2 - ty : U32)
+  +xt1 = F.Fixed.sarn(rx, 23n)
+  +yt1 = F.Fixed.sarn(ry, 23n)
+  +xt2 = F.Fixed.sarn((x2 - ox : U32), 23n)
+  +yt2 = F.Fixed.sarn((y2 - oy : U32), 23n)
+  Sim.ray.walk(Sim.ray.axis(F.Fixed.gt(xt2, xt1), F.Fixed.lt(xt2, xt1), rx, dx, dy),
+    Sim.ray.axis(F.Fixed.gt(yt2, yt1), F.Fixed.lt(yt2, yt1), ry, dy, dx), rx, ry, xt1, yt1, xt2, yt2)
+
+# The meetings of one walk, cell by cell: the lines of a cell, then the
+# things linked in it, as Doom's iterators run.
+def Sim.meets.go(cells: List<&2, L.Level.Cell>, +seen: List<&2, U32>, +lines: Bool, +things: Bool,
+  +level: L.Level, +tx: U32, +ty: U32, +tdx: U32, +tdy: U32) -> List<&2, Sim.Meet>:
+  match cells:
+    case []:
+      []
+    case +c <> rest:
+      +ids = Sim.meets.ids(~L.Level.cell.lines, lines, L.Level.geo(level), c)
+      List.append(&2, Sim.Meet, List.append(&2, Sim.Meet,
+        Sim.meets.lines(Sim.meets.fresh(ids, seen), level, tx, ty, tdx, tdy),
+        Sim.meets.things(Sim.meets.ids(~L.Level.cell.things, things, L.Level.geo(level), c), level, tx, ty, tdx,
+          tdy)),
+        Sim.meets.go(rest, List.append(&2, U32, ids, seen), lines, things, level, tx, ty, tdx, tdy))
+
+# Whether a meeting goes before a sorted list's head: nearer than it, or
+# the list empty.
+def Sim.meets.before(+m: Sim.Meet, sorted: List<&2, Sim.Meet>) -> Bool:
+  match sorted:
+    case []:
+      True{}
+    case h <> rest:
+      U32.is_lt(Sim.Meet.frac(m), Sim.Meet.frac(h))
+
+# A meeting into a list sorted by fraction, after its equals, so the
+# first gathered of equals stays first, as Doom's repeated minimum picks
+# them.
+def Sim.meets.insert(sorted: List<&2, Sim.Meet>, before: Bool, +m: Sim.Meet) -> List<&2, Sim.Meet>:
+  match sorted before:
+    case _ True{}:
+      m <> sorted
+    case [] False{}:
+      [m]
+    case h <> +rest False{}:
+      h <> Sim.meets.insert(rest, Sim.meets.before(m, rest), m)
+
+def Sim.meets.sort(meets: List<&2, Sim.Meet>, +sorted: List<&2, Sim.Meet>) -> List<&2, Sim.Meet>:
+  match meets:
+    case []:
+      sorted
+    case +m <> rest:
+      Sim.meets.sort(rest, Sim.meets.insert(sorted, Sim.meets.before(m, sorted), m))
+
+def Sim.meets.at(+bm: L.Level.Blockmap, +level: L.Level, lines: Bool, things: Bool, +x1: U32, +y1: U32,
+  +x2: U32, +y2: U32) -> List<&2, Sim.Meet>:
   L.Blockmap{words, +ox, +oy, cols, rows} = bm
   +tx = Sim.nudge(x1, ox)
   +ty = Sim.nudge(y1, oy)
-  Sim.meets.go(Sim.lines(level, F.Fixed.min(tx, x2), F.Fixed.min(ty, y2), F.Fixed.max(tx, x2),
-    F.Fixed.max(ty, y2)), level, tx, ty, (x2 - tx : U32), (y2 - ty : U32))
+  Sim.meets.sort(Sim.meets.go(Sim.ray(ox, oy, tx, ty, x2, y2), [], lines, things, level, tx, ty,
+    (x2 - tx : U32), (y2 - ty : U32)), [])
 
-# Doom's P_PathTraverse intercepts: the lines a trace meets within its
-# length, gathered from the cells the trace's box touches rather than
-# walked cell by cell, in the order gathered.
-def Sim.meets(+level: L.Level, x1: U32, y1: U32, x2: U32, y2: U32) -> List<&2, Sim.Meet>:
-  Sim.meets.at(L.Level.blockmap_of(level), level, x1, y1, x2, y2)
+# Doom's P_PathTraverse intercepts: what the trace meets in the cells it
+# crosses, gathered in the walk's order and sorted by distance.
+def Sim.meets(+level: L.Level, lines: Bool, things: Bool, x1: U32, y1: U32, x2: U32, y2: U32) ->
+  List<&2, Sim.Meet>:
+  Sim.meets.at(L.Level.blockmap_of(level), level, lines, things, x1, y1, x2, y2)
 
-def Sim.trace.go(meets: List<&2, Sim.Meet>, +level: L.Level, +p: Player, best: U32 & U32) -> U32 & U32:
-  match meets:
-    case []:
-      best
-    case Meet{frac, +i} <> rest:
-      Sim.trace.go(rest, level, p, Sim.hit.blocked(Sim.blocks(level, p, L.Level.line(level, i)), frac, i, best))
+# What a visitor answers: whether the walk stops here, and what it goes
+# on carrying. Doom's traverser returns the flag and writes the rest to
+# its globals.
+type Sim.Answer<a, -A: Kind(a)> is Kind(a):
+  Answer{stop: Bool, carry: A}
 
-# Doom's PTR_SlideTraverse over a trace: the closest line it meets that
-# blocks.
-def Sim.trace(+level: L.Level, +p: Player, x1: U32, y1: U32, x2: U32, y2: U32, best: U32 & U32) ->
+# Doom's P_TraverseIntercepts: each meeting in turn, the nearest first,
+# until the visitor refuses.
+def Sim.walk(~A: Data, ~visit: @+level: L.Level -> @m: Sim.Meet -> @c: A -> Sim.Answer<&2, A>,
+  ms: List<&2, Sim.Meet>, +level: L.Level, st: Sim.Answer<&2, A>) -> A:
+  match ms st:
+    case [] Answer{stop, carry}:
+      carry
+    case _ Answer{True{}, carry}:
+      carry
+    case m <> rest Answer{False{}, carry}:
+      Sim.walk(~A, ~visit, rest, level, visit(level, m, carry))
+
+# Doom's P_PathTraverse: the visitor sees what the ray from (x1, y1) to
+# (x2, y2) meets, the nearest first, and ends the walk when it refuses.
+def Sim.path(~A: Data, ~visit: @+level: L.Level -> @m: Sim.Meet -> @c: A -> Sim.Answer<&2, A>,
+  +level: L.Level, lines: Bool, things: Bool, x1: U32, y1: U32, x2: U32, y2: U32, start: A) -> A:
+  Sim.walk(~A, ~visit, Sim.meets(level, lines, things, x1, y1, x2, y2), level, Answer{False{}, start})
+
+# Sliding
+# -------
+
+# Doom's PTR_SlideTraverse: whether the line stops the slide. A line
+# flagged two-sided with no back sector has no opening and blocks.
+def Sim.blocks.open(+level: L.Level, +z: U32, +line: L.Level.Line) -> Bool:
+  L.Line{x1, y1, x2, y2, flags, front, +back} = line
+  +top = Sim.open_top(level, line)
+  +bottom = Sim.open_bottom(level, line)
+  Bool.or(U32.is_eq(back, L.Level.none()),
+    Bool.or(F.Fixed.lt((top - bottom : U32), Sim.height()),
+      Bool.or(F.Fixed.lt((top - z : U32), Sim.height()),
+        F.Fixed.gt((bottom - z : U32), Sim.step_up()))))
+
+def Sim.blocks(+level: L.Level, x: U32, y: U32, z: U32, +line: L.Level.Line) -> Bool:
+  L.Line{x1, y1, x2, y2, +flags, front, back} = line
+  Bool.pick(Bool, U32.is_zero((flags .&. 4 : U32)),
+    Bool.not(Sim.point_side(x, y, line)),
+    Sim.blocks.open(level, z, line))
+
+# What PTR_SlideTraverse works from: the sliding player's place, and the
+# closest blocking line met so far with its fraction; none is one past a
+# whole move.
+type Sim.Slide is Data:
+  Slide{x: U32, y: U32, z: U32, frac: U32, line: U32}
+
+def Sim.hit.better(closer: Bool, frac: U32, i: U32, s: Sim.Slide) -> Sim.Slide:
+  match closer:
+    case False{}:
+      s
+    case True{}:
+      Slide{x, y, z, bf, bi} = s
+      Slide{x, y, z, frac, i}
+
+def Sim.hit.blocked(blocked: Bool, +frac: U32, i: U32, s: Sim.Slide) -> Sim.Slide:
+  match blocked:
+    case False{}:
+      s
+    case True{}:
+      Slide{x, y, z, +bf, bi} = s
+      Sim.hit.better(U32.is_lt(frac, bf), frac, i, Slide{x, y, z, bf, bi})
+
+def Sim.slide.stop(+blocked: Bool, +frac: U32, i: U32, s: Sim.Slide) -> Sim.Answer<&2, Sim.Slide>:
+  Answer{blocked, Sim.hit.blocked(blocked, frac, i, s)}
+
+# The slide's visitor: a line that blocks ends the walk, and is the
+# slide's when it is closer than any line an earlier corner's trace met.
+def Sim.slide.visit(+level: L.Level, m: Sim.Meet, s: Sim.Slide) -> Sim.Answer<&2, Sim.Slide>:
+  Meet{+frac, isline, +i} = m
+  Slide{+x, +y, +z, bf, bl} = s
+  Sim.slide.stop(Sim.blocks(level, x, y, z, L.Level.line(level, i)), frac, i, Slide{x, y, z, bf, bl})
+
+def Sim.slide.from(+p: Player, best: U32 & U32) -> Sim.Slide:
+  (frac, line) = best
+  Slide{Player.x(p), Player.y(p), Player.z(p), frac, line}
+
+def Sim.slide.best(s: Sim.Slide) -> U32 & U32:
+  Slide{x, y, z, frac, line} = s
+  (frac, line)
+
+# Doom's P_PathTraverse with PTR_SlideTraverse over one corner's trace:
+# the closest line it meets that blocks, against the best so far.
+def Sim.trace(+level: L.Level, p: Player, x1: U32, y1: U32, x2: U32, y2: U32, best: U32 & U32) ->
   U32 & U32:
-  Sim.trace.go(Sim.meets(level, x1, y1, x2, y2), level, p, best)
+  Sim.slide.best(Sim.path(~Sim.Slide, ~Sim.slide.visit, level, True{}, False{}, x1, y1, x2, y2,
+    Sim.slide.from(p, best)))
 
 # Doom's P_HitSlideLine: the move projected onto the line.
 def Sim.along.angle(+level: L.Level, +p: Player, +line: L.Level.Line, +mx: U32, +my: U32) ->
@@ -972,7 +1187,7 @@ def Sim.crawling(+mom: U32) -> Bool:
   Bool.and(F.Fixed.gt(mom, F.Fixed.neg(Sim.stopspeed())), F.Fixed.lt(mom, Sim.stopspeed()))
 
 def Sim.friction.ground(+cmd: K.Cmd, +p: Player) -> Player:
-  K.Cmd{forward, side, turn, use} = cmd
+  K.Cmd{forward, side, turn, buttons} = cmd
   Player{x, y, z, angle, +momx, +momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   Sim.slow(Bool.and(Sim.crawling(momx), Bool.and(Sim.crawling(momy),
     Bool.and(U32.is_zero(forward), U32.is_zero(side)))), p)
@@ -1025,7 +1240,7 @@ def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
 
 # Doom's P_MovePlayer: turn, then thrust forward and sideways.
 def Sim.move(+level: L.Level, +cmd: K.Cmd, p: Player) -> Player:
-  K.Cmd{forward, side, turn, use} = cmd
+  K.Cmd{forward, side, turn, buttons} = cmd
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} = p
   +a = (angle + (turn << 16n) : U32)
   Sim.push(level, Sim.push(level, Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight,
@@ -1592,7 +1807,7 @@ def Sim.thinkers(s: State) -> State:
 # sector, else the front.
 def Sim.around.of(+sector: U32, line: L.Level.Line, rest: List<&2, U32>) -> List<&2, U32>:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
-  Sim.keep(Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
+  Sim.keep(~U32, Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
     Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
       Bool.or(U32.is_eq(front, sector), U32.is_eq(back, sector)))),
     Bool.pick(U32, U32.is_eq(front, sector), back, front), rest)
@@ -1779,7 +1994,7 @@ def Sim.tagged.go(n: Nat, +level: L.Level, +thinkers: List<&2, Thinker>, +tag: U
     case 0n:
       []
     case 1n+m:
-      Sim.keep(Bool.and(U32.is_eq(L.Level.sector.tag(level, s), tag), Bool.not(Sim.moving(thinkers, s))), s,
+      Sim.keep(~U32, Bool.and(U32.is_eq(L.Level.sector.tag(level, s), tag), Bool.not(Sim.moving(thinkers, s))), s,
         Sim.tagged.go(m, level, thinkers, tag, (s + 1 : U32)))
 
 def Sim.tagged(+s: State, line: U32) -> List<&2, U32>:
@@ -2000,56 +2215,21 @@ def Sim.use.shut(+level: L.Level, +line: L.Level.Line) -> Bool:
   Bool.or(U32.is_eq(back, L.Level.none()),
     F.Fixed.le((Sim.open_top(level, line) - Sim.open_bottom(level, line) : U32), 0))
 
-def Sim.use.first.pick(special: Bool, shut: Bool, i: U32, later: Sim.Reach) -> Sim.Reach:
+def Sim.use.at(special: Bool, shut: Bool, i: U32) -> Sim.Answer<&2, Sim.Reach>:
   match special shut:
     case True{} _:
-      Special{i}
+      Answer{True{}, Special{i}}
     case False{} True{}:
-      Wall{}
+      Answer{True{}, Wall{}}
     case False{} False{}:
-      later
+      Answer{False{}, Nothing{}}
 
-# Doom's PTR_UseTraverse along the sorted meets: the first special line
-# ends the trace whatever its special; a line without one lets it go on
-# when its opening is more than nothing.
-def Sim.use.first(sorted: List<&2, Sim.Meet>, +level: L.Level) -> Sim.Reach:
-  match sorted:
-    case []:
-      Nothing{}
-    case Meet{frac, +i} <> rest:
-      Sim.use.first.pick(Bool.not(U32.is_zero(L.Level.special(level, i))),
-        Sim.use.shut(level, L.Level.line(level, i)), i, Sim.use.first(rest, level))
-
-def Sim.Meet.frac(m: Sim.Meet) -> U32:
-  Meet{frac, line} = m
-  frac
-
-# Whether a meet goes before a sorted list's head: nearer than it, or
-# the list empty.
-def Sim.use.before(+m: Sim.Meet, sorted: List<&2, Sim.Meet>) -> Bool:
-  match sorted:
-    case []:
-      True{}
-    case h <> rest:
-      U32.is_lt(Sim.Meet.frac(m), Sim.Meet.frac(h))
-
-# A meet into a list sorted by fraction, after its equals, so the first
-# gathered of equals stays first, as Doom picks them.
-def Sim.use.insert(sorted: List<&2, Sim.Meet>, before: Bool, +m: Sim.Meet) -> List<&2, Sim.Meet>:
-  match sorted before:
-    case _ True{}:
-      m <> sorted
-    case [] False{}:
-      [m]
-    case h <> +rest False{}:
-      h <> Sim.use.insert(rest, Sim.use.before(m, rest), m)
-
-def Sim.use.sort(meets: List<&2, Sim.Meet>, +sorted: List<&2, Sim.Meet>) -> List<&2, Sim.Meet>:
-  match meets:
-    case []:
-      sorted
-    case +m <> rest:
-      Sim.use.sort(rest, Sim.use.insert(sorted, Sim.use.before(m, sorted), m))
+# Doom's PTR_UseTraverse: the first special line ends the walk whatever
+# its special; a line without one ends it at a wall, and is passed when
+# its opening is more than nothing.
+def Sim.use.visit(+level: L.Level, m: Sim.Meet, reach: Sim.Reach) -> Sim.Answer<&2, Sim.Reach>:
+  Meet{frac, isline, +i} = m
+  Sim.use.at(Bool.not(U32.is_zero(L.Level.special(level, i))), Sim.use.shut(level, L.Level.line(level, i)), i)
 
 # Doom's P_UseLines, on the press: a trace of 64 units along the facing.
 def Sim.use(press: Bool, +s: State) -> State:
@@ -2061,16 +2241,16 @@ def Sim.use(press: Bool, +s: State) -> State:
       +level = State.level(s)
       +sine = L.Level.sine(level)
       +f = A.Angle.fine(Player.angle(p))
-      Sim.use.hit(Sim.use.first(Sim.use.sort(Sim.meets(level, Player.x(p), Player.y(p),
-        (Player.x(p) + 64 * A.Angle.cos(sine, f) : U32), (Player.y(p) + 64 * A.Angle.sin(sine, f) : U32)), []),
-        level), p, s)
+      Sim.use.hit(Sim.path(~Sim.Reach, ~Sim.use.visit, level, True{}, False{}, Player.x(p), Player.y(p),
+        (Player.x(p) + 64 * A.Angle.cos(sine, f) : U32), (Player.y(p) + 64 * A.Angle.sin(sine, f) : U32),
+        Nothing{}), p, s)
 
 # The tic
 # -------
 
 # Use acts on the tic it goes down, not while it is held.
 def Sim.pressed(cmd: K.Cmd, usedown: Bool) -> Bool:
-  Bool.and(K.Cmd.use(cmd), Bool.not(usedown))
+  Bool.and(Bool.not(usedown), K.Cmd.use(cmd))
 
 # The player as moved, at the height, floor and ceiling a mover left,
 # holding what its re-clip picked up, the lines it crossed fired and

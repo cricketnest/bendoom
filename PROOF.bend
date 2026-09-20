@@ -169,7 +169,7 @@ def Laws.index_head(name, pos, size, rest):
     : {W.Wad.index.pick(_, W.Wad.index(name, rest)) == Some{0n} : Maybe<Nat>}
   {==}
 
-# Keys: a key's flag set twice keeps the second setting; the eight
+# Keys: a key's flag set twice keeps the second setting; the twelve
 # flags are rewritten one by one, abstracted from the key code.
 
 def set_twice(b: Bool, +d1: Bool, +d2: Bool, +old: Bool) ->
@@ -180,88 +180,157 @@ def set_twice(b: Bool, +d1: Bool, +d2: Bool, +old: Bool) ->
     case False{}:
       {==}
 
-def press8(b1: Bool, b2: Bool, b3: Bool, b4: Bool, b5: Bool, b6: Bool, b7: Bool, b8: Bool, +d1: Bool, +d2:
-  Bool, +up: Bool, +dn: Bool, +left: Bool, +right: Bool, +sleft: Bool, +sright: Bool, +run: Bool, +use:
-  Bool) ->
+def press12(b1: Bool, b2: Bool, b3: Bool, b4: Bool, b5: Bool, b6: Bool, b7: Bool, b8: Bool, b9: Bool,
+  b10: Bool, b11: Bool, b12: Bool, +d1: Bool, +d2: Bool, +up: Bool, +dn: Bool, +left: Bool, +right: Bool,
+  +sleft: Bool, +sright: Bool, +run: Bool, +use: Bool, +fire: Bool, +one: Bool, +two: Bool, +three: Bool) ->
   {K.Keys{K.Keys.set(b1, d2, K.Keys.set(b1, d1, up)), K.Keys.set(b2, d2, K.Keys.set(b2, d1, dn)),
     K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)), K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)),
     K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
-    K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-    == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-      K.Keys.set(b8, d2, use)} : K.Keys}:
+    K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)),
+    K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)), K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+    K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+    == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+      K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}:
   %set_twice(b1, d1, d2, up)
     : {K.Keys{_, K.Keys.set(b2, d2, K.Keys.set(b2, d1, dn)), K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)),
       K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)),
       K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
-      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b2, d1, d2, dn)
-    : {K.Keys{K.Keys.set(b1, d2, up), _, K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)), K.Keys.set(b4, d2,
-      K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2,
-      K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2,
-      K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), _, K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)),
+      K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)),
+      K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b3, d1, d2, left)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), _, K.Keys.set(b4, d2, K.Keys.set(b4, d1,
-      right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1,
-      sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), _,
+      K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)),
+      K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b4, d1, d2, right)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), _, K.Keys.set(b5,
-      d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2,
-      K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), _,
+      K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
+      K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)),
+      K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)), K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b5, d1, d2, sleft)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), _, K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1,
-      run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), _, K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
+      K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)),
+      K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)), K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b6, d1, d2, sright)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), _, K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2,
-      K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), _, K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b7, d1, d2, run)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), _, K.Keys.set(b8, d2, K.Keys.set(b8,
-      d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), _,
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b8, d1, d2, use)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run), _}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), _, K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b9, d1, d2, fire)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), _, K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b10, d1, d2, one)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), _,
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b11, d1, d2, two)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one), _,
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b12, d1, d2, three)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+      K.Keys.set(b11, d2, two), _}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   {==}
 
 def Laws.last_press(code, d1, d2, keys):
   match keys:
-    case K.Keys{up, dn, left, right, sleft, sright, run, use}:
-      press8(U32.is_eq(code, 63232) || U32.is_eq(code, 119),
+    case K.Keys{up, dn, left, right, sleft, sright, run, use, fire, one, two, three}:
+      press12(U32.is_eq(code, 63232) || U32.is_eq(code, 119),
         U32.is_eq(code, 63233) || U32.is_eq(code, 115), U32.is_eq(code, 63234),
         U32.is_eq(code, 63235), U32.is_eq(code, 97), U32.is_eq(code, 100),
-        U32.is_eq(code, 65592) || U32.is_eq(code, 65596), U32.is_eq(code, 32), d1, d2, up, dn, left,
-        right, sleft, sright, run, use)
+        U32.is_eq(code, 65592) || U32.is_eq(code, 65596), U32.is_eq(code, 32),
+        U32.is_eq(code, 65595) || U32.is_eq(code, 65598), U32.is_eq(code, 49), U32.is_eq(code, 50),
+        U32.is_eq(code, 51), d1, d2, up, dn, left, right, sleft, sright, run, use, fire, one, two, three)
 
 def Laws.arrows_wasd(down, keys):
   match keys:
-    case K.Keys{up, dn, left, right, sleft, sright, run, use}:
+    case K.Keys{up, dn, left, right, sleft, sright, run, use, fire, one, two, three}:
       {==}
+
+def Laws.lowest_number_wins(two, three):
+  {==}
 
 def Laws.tic_rest(level, x, y):
   match level:
@@ -297,6 +366,9 @@ def Laws.pistol_rises():
 def Laws.pistol_bobs():
   {==}
 
+def Laws.ray_meets():
+  {==}
+
 def Laws.door_timeline():
   {==}
 
@@ -321,12 +393,11 @@ def Laws.floor_lowered():
 def Laws.lift_crushed():
   {==}
 
-def Laws.use_fires_once(forward, side, turn, next, player, level, things, sidetex, thinkers, rnd, clock, usedown, sounds,
-  mrnd):
-  match next level:
-    case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
-      {==}
-    case K.Cmd{f, s, t, False{}} L.Level{geo, sectors, specials}:
+def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
+  sounds, mrnd, held):
+  match level:
+    case L.Level{geo, sectors, specials}:
+      %held : {S.Sim.pressed(next, _) == False{} : Bool}
       {==}
 
 # A tree read where it was just written answers what was written: both
@@ -731,7 +802,7 @@ def slow_free(stop: Bool, +level: L.Level, p: S.Player, hp: Free(level, p)) ->
 def ground_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.friction.ground(cmd, p)):
   match cmd p:
-    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+    case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       slow_free(Bool.and(S.Sim.crawling(momx), Bool.and(S.Sim.crawling(momy),
         Bool.and(U32.is_zero(forward), U32.is_zero(side)))), level,
         S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, hp)
@@ -796,7 +867,7 @@ def push_free(+level: L.Level, +p: S.Player, +angle: U32, +move: U32, hp: Free(l
 def move_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.move(level, cmd, p)):
   match cmd p:
-    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+    case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       push_free(level, S.Sim.push(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
         (angle + (turn << 16n) : U32), forward),
         ((angle + (turn << 16n) : U32) - A.Angle.ang90() : U32), side,

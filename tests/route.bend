@@ -36,23 +36,23 @@ import ../src/inventory.bend as I
 import ../src/project.bend as P
 import ../src/game.bend as M
 
-def held(n: Nat, forward: U32, side: U32, turn: U32, use: Bool) -> List<&2, K.Cmd>:
-  List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, use))
+def held(n: Nat, forward: U32, side: U32, turn: U32, buttons: U32) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, buttons))
 
 def idle(n: Nat) -> List<&2, K.Cmd>:
-  held(n, 0, 0, 0, False{})
+  held(n, 0, 0, 0, 0)
 
 def run(n: Nat) -> List<&2, K.Cmd>:
-  held(n, 50, 0, 0, False{})
+  held(n, 50, 0, 0, 0)
 
 def turn(by: U32) -> List<&2, K.Cmd>:
-  held(1n, 0, 0, by, False{})
+  held(1n, 0, 0, by, 0)
 
 def use() -> List<&2, K.Cmd>:
-  held(1n, 0, 0, 0, True{})
+  held(1n, 0, 0, 0, 2)
 
 def run_use() -> List<&2, K.Cmd>:
-  held(1n, 50, 0, 0, True{})
+  held(1n, 50, 0, 0, 2)
 
 # The clock, the player, whether the level has ended, the blue doors'
 # ceilings, the inventory, the things left and the names of those gone
@@ -117,14 +117,14 @@ def route(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     r1 : S.State <- leg("south door", south_door(), start, start)
     r2 : S.State <- leg("shells", [use(), run(34n), idle(12n), turn(64), run(20n), idle(5n), turn(4294967232),
       run(16n), idle(12n), turn(64)], start, r1)
-    r3 : S.State <- leg("up the lift", [use(), idle(28n), held(8n, 25, 0, 0, False{}), idle(100n), run(54n),
+    r3 : S.State <- leg("up the lift", [use(), idle(28n), held(8n, 25, 0, 0, 0), idle(100n), run(54n),
       idle(14n), turn(64)], start, r2)
     r4 : S.State <- leg("switch", [run(28n), use()], start, r3)
-    r5 : S.State <- leg("key door", [held(10n, 4294967246, 0, 0, False{}), idle(10n), turn(4294967232), run(12n),
+    r5 : S.State <- leg("key door", [held(10n, 4294967246, 0, 0, 0), idle(10n), turn(4294967232), run(12n),
       idle(20n), turn(64), run(83n)], start, r4)
-    r6 : S.State <- leg("key in view", [held(1n, 50, 0, 1, True{}), run(58n), idle(10n), turn(47),
-      held(13n, 0, 4294967272, 0, False{})], start, r5)
-    r7 : S.State <- leg("key taken", [held(1n, 0, 4294967272, 0, False{})], start, r6)
+    r6 : S.State <- leg("key in view", [held(1n, 50, 0, 1, 2), run(58n), idle(10n), turn(47),
+      held(13n, 0, 4294967272, 0, 0)], start, r5)
+    r7 : S.State <- leg("key taken", [held(1n, 0, 4294967272, 0, 0)], start, r6)
     r8 : S.State <- leg("back to the south door", [turn(80), run(60n), turn(4294967232), run(71n), idle(30n),
       turn(4294967232), run(34n)], start, r7)
     r9 : S.State <- leg("down the start's lift", [run_use(), run(44n), turn(64), run(51n), idle(20n),
@@ -138,7 +138,7 @@ def route(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       r13)
     r15 : S.State <- leg("second blue door opening", [run_use(), run(20n)], start, r14)
     r16 : S.State <- leg("held by the column", [run(24n)], start, r15)
-    r17 : S.State <- leg("past the column", [held(9n, 0, 24, 0, False{}), idle(15n), run(21n)], start, r16)
+    r17 : S.State <- leg("past the column", [held(9n, 0, 24, 0, 0), idle(15n), run(21n)], start, r16)
     r18 : S.State <- leg("exit room", [use(), idle(36n), run(8n), idle(22n)], start, r17)
     r19 : S.State <- leg("exit switch", [turn(4294967232), run(9n), idle(20n)], start, r18)
     +r20 : S.State <- leg("exit", [use()], start, r19)

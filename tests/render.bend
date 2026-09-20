@@ -142,7 +142,7 @@ def west(units: U32) -> U32:
 
 # The state after running east from the start for some tics.
 def ran(+level: L.Level, tics: Nat) -> S.State:
-  S.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, False{})),
+  S.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, 0)),
     S.State.start(level))
 
 # The state after runs of commands in a demo's units from a place: the
@@ -151,7 +151,7 @@ def after(runs: List<&2, List<&2, K.Cmd>>, s: S.State) -> S.State:
   S.Sim.replay(List.concat(&2, K.Cmd, runs), s)
 
 def strafe(n: Nat) -> List<&2, K.Cmd>:
-  List.replicate(K.Cmd, n, K.Cmd.demo(0, 4294967272, 0, False{}))
+  List.replicate(K.Cmd, n, K.Cmd.demo(0, 4294967272, 0, 0))
 
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
@@ -161,14 +161,14 @@ def rested(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
   S.Sim.replay(idle(20n), at(level, x, y, degrees))
 
 def walk(n: Nat) -> List<&2, K.Cmd>:
-  List.replicate(K.Cmd, n, K.Cmd.demo(25, 0, 0, False{}))
+  List.replicate(K.Cmd, n, K.Cmd.demo(25, 0, 0, 0))
 
 def back(n: Nat) -> List<&2, K.Cmd>:
-  List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, False{}))
+  List.replicate(K.Cmd, n, K.Cmd.demo(4294967271, 0, 0, 0))
 
 # A pickup strafed past: the idle tics, a turn, then strafing left.
 def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
-  after([idle(20n), [K.Cmd.demo(0, 0, turn, False{})], strafe(n)], s)
+  after([idle(20n), [K.Cmd.demo(0, 0, turn, 0)], strafe(n)], s)
 
 # Every weapon and every ammo type at its cap, so that no ammo or weapon
 # pickup can be taken.
@@ -204,12 +204,12 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
     m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
     m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n), walk(20n),
-      [K.Cmd.demo(0, 0, 0, True{})], idle(20n)],
+      [K.Cmd.demo(0, 0, 0, 2)], idle(20n)],
       at(level, east(832), east(384), 90)), m12)
     m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n), walk(10n),
-      [K.Cmd.demo(0, 0, 0, True{})], idle(27n)],
+      [K.Cmd.demo(0, 0, 0, 2)], idle(27n)],
       at(level, east(2064), west(260), 90)), m13)
-    m15 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, True{})],
+    m15 : Array<U32> <- frame("exit pressed", tables, gfx, after([idle(20n), [K.Cmd.demo(0, 0, 0, 2)],
       idle(10n)], at(level, west(352), east(1296), 180)), m14)
     m16 : Array<U32> <- frame("blink dark", tables, gfx, after([idle(66n)], at(level, east(640), east(712), 180)),
       m15)

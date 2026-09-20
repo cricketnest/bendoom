@@ -151,6 +151,11 @@ def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
   kind
 
+# A type's radius in fixed point.
+def Thing.Def.radius(d: Thing.Def) -> U32:
+  Def{kind, state, radius, height, flags} = d
+  F.Fixed.of_map(radius)
+
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:
     case True{}:

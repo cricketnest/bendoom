@@ -1,7 +1,9 @@
 # A place and a command script as text, for the tools: a place is
 # "x y degrees" (map units, the angle in steps of 45 as a thing's is);
-# a script is runs a space apart, each "count,forward,side,turn,use" in
-# a demo file's units, the use 0 or 1.
+# a script is runs a space apart, each "count,forward,side,turn,buttons"
+# in a demo file's units, but for the buttons: use 1, attack 2, a change
+# of weapon 4 and eight times the weapon's number from 0 (tools/demo.nu
+# says why).
 import Base
 import ../src/angle.bend as A
 import ../src/level.bend as L
@@ -22,11 +24,15 @@ def Script.place(words: List<&2, String>) -> L.Level.Start:
     case _:
       L.Start{0, 0, 0}
 
+# The demo's buttons byte: the script's, its two low bits trading places.
+def Script.buttons(+b: U32) -> U32:
+  ((b .&. 252) + ((b .&. 1) << 1n) + ((b >> 1n) .&. 1) : U32)
+
 def Script.run(fields: List<&2, String>) -> List<&2, K.Cmd>:
   match fields:
-    case [n, forward, side, turn, use]:
+    case [n, forward, side, turn, buttons]:
       List.replicate(K.Cmd, U32.to_nat(Script.int(n)),
-        K.Cmd.demo(Script.int(forward), Script.int(side), Script.int(turn), U32.is_eq(Script.int(use), 1)))
+        K.Cmd.demo(Script.int(forward), Script.int(side), Script.int(turn), Script.buttons(Script.int(buttons))))
     case _:
       []
 
