@@ -16,6 +16,7 @@ import ./bsp.bend as B
 import ./planes.bend as N
 import ./sprites.bend as T
 import ./bar.bend as Y
+import ./inventory.bend as I
 
 def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
   P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p),
@@ -52,13 +53,26 @@ def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.
   Render.psprites(S.Player.psprites(p), gfx, Render.light(level, p, P.View.extralight(view)),
     Render.rest(view, level, gfx, things, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem))))
 
+# ST_doPaletteStuff's pick for the player: the damage count, the berserk
+# power's counter and the pickup flash name one of PLAYPAL's fourteen.
+def Render.palette(+p: S.Player) -> U32:
+  Y.Bar.palette(S.Sim.Hurt.damage(S.Player.hurt(p)), I.Inventory.strength(S.Player.inv(p)),
+    I.Inventory.bonus(S.Player.inv(p)))
+
+def Render.paletted(+palette: U32, mem: Array<U32>) -> Array<U32> & U32:
+  (mem, palette)
+
 # The sectors' heights and light come from the state's level, the
 # sides' textures from the state, and the animations' frames and the
 # walls' scroll from its clock. The view fills the frame's first 168
-# rows and the status bar the 32 under it.
-def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> Array<U32>:
-  Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)),
+# rows and the status bar the 32 under it. The frame stays palette
+# indices; the palette they are read through travels beside it, to the
+# window's fold, the film and the frame dump.
+def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) ->
+  Array<U32> & U32:
+  +palette = Render.palette(S.State.player(s))
+  Render.paletted(palette, Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)),
     S.Sim.Face.index(S.State.face(s)), gfx,
     Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
       G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.shown(S.State.things(s)),
-      S.State.player(s), mem))
+      S.State.player(s), mem)))

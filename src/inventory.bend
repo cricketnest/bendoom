@@ -116,6 +116,11 @@ def Inventory.chainsaw() -> U32:
 def Inventory.pw_strength() -> U32:
   1
 
+# The berserk power's counter, which counts up from 1 while it is on.
+def Inventory.strength(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  V.Vec.get(powers, Inventory.pw_strength())
+
 # Whether the blue card or the blue skull is owned.
 def Inventory.blue(inv: Inventory) -> Bool:
   Bool.not(U32.is_zero((Inventory.cards(inv) .&. (Inventory.bluecard() .|. Inventory.blueskull() : U32) : U32)))

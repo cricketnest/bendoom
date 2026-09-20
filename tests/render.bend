@@ -91,8 +91,18 @@
 # from its taken twin only in the pickup's sprite, 762 pixels of the
 # rocket and 5092 of the chainsaw.
 # Each frame is drawn twice, over a frame blanked to 0 and to 255: equal
-# hashes mean every pixel of the 200 rows was written. Pinned to
-# Freedoom.
+# hashes mean every pixel of the 200 rows was written.
+# Every line names the palette ST_doPaletteStuff chose for its frame,
+# which the renderer answers beside the indices. The plain palette 0 is
+# every frame's but the pickups' and the nukage's. A pickup adds 6 to
+# the flash and the same tic's counters take one off, so 5 picks the
+# first gold, 10: the health bonus, the green armour, the rocket and the
+# chainsaw frames show it, and so does the run east at tic 66, which has
+# just crossed the health bonus record 268 at 512 256. The blue key sets
+# the flash to 6 and then adds 6, leaving 11, which picks the second
+# gold, 11. A tic stood in the nukage of sector 173 leaves a damage
+# count of 4, which picks the first red, 2; by the dead frame's tic 650
+# it has long faded. Pinned to Freedoom.
 import Base
 import ../src/bytes.bend as B
 import ../src/fixed.bend as F
@@ -108,15 +118,15 @@ import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 
 type Hash is Type:
-  Hash{mem: Array<U32>, h: U32}
+  Hash{mem: Array<U32>, h: U32, pal: U32}
 
-def hash.mix(h: U32, p: Array<U32> & U32) -> Hash:
+def hash.mix(h: U32, pal: U32, p: Array<U32> & U32) -> Hash:
   (mem, v) = p
-  Hash{mem, H.Fnv.mix(h, v)}
+  Hash{mem, H.Fnv.mix(h, v), pal}
 
 def hash.px(i: Nat, st: Hash) -> Hash:
-  Hash{mem, h} = st
-  hash.mix(h, B.Bytes.at(mem, (G.Gfx.frame() + U32.from_nat(i) : U32)))
+  Hash{mem, h, pal} = st
+  hash.mix(h, pal, B.Bytes.at(mem, (G.Gfx.frame() + U32.from_nat(i) : U32)))
 
 def shows(xs: List<&2, U32>) -> List<&2, String>:
   match xs:
@@ -125,14 +135,14 @@ def shows(xs: List<&2, U32>) -> List<&2, String>:
     case x <> rest:
       U32.show(x) <> shows(rest)
 
-def pixels(covered: Bool, h: U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
+def pixels(covered: Bool, h: U32, pal: U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
   (mem, xs) = p
   (mem, "hash " ++ U32.show(h) ++ " pixels " ++ String.join(shows(xs), " ") ++ " covered "
-    ++ Bool.show(covered))
+    ++ Bool.show(covered) ++ " palette " ++ U32.show(pal))
 
 def line(+over0: U32, st: Hash) -> Array<U32> & String:
-  Hash{mem, +h} = st
-  pixels(U32.is_eq(h, over0), h, B.Bytes.each(~U32, ~B.Bytes.at, [(G.Gfx.frame() + 84 * 320 + 160 : U32),
+  Hash{mem, +h, pal} = st
+  pixels(U32.is_eq(h, over0), h, pal, B.Bytes.each(~U32, ~B.Bytes.at, [(G.Gfx.frame() + 84 * 320 + 160 : U32),
     (G.Gfx.frame() + 10 * 320 + 10 : U32), (G.Gfx.frame() + 150 * 320 + 300 : U32),
     (G.Gfx.frame() + 20 * 320 + 160 : U32), (G.Gfx.frame() + 174 * 320 + 124 : U32),
     (G.Gfx.frame() + 180 * 320 + 155 : U32)], mem))
@@ -143,13 +153,17 @@ def print(tag: String, p: Array<U32> & String) -> IO(Array<U32>):
     IO.print(tag ++ " " ++ text)
     return mem
 
-# A frame's hash, drawn over a frame blanked to an index.
+def hashed.of(p: Array<U32> & U32) -> Hash:
+  (mem, pal) = p
+  D.Draw.each(~Hash, ~hash.px, U32.to_nat(64000), 0n, Hash{mem, H.Fnv.basis(), pal})
+
+# A frame's hash and the palette the renderer named for it, drawn over a
+# frame blanked to an index.
 def hashed(+tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, blank: U32, mem: Array<U32>) -> Hash:
-  D.Draw.each(~Hash, ~hash.px, U32.to_nat(64000), 0n, Hash{R.Render.frame(tables, gfx, s,
-    D.Draw.set(U32.to_nat(64000), mem, G.Gfx.frame(), blank)), H.Fnv.basis()})
+  hashed.of(R.Render.frame(tables, gfx, s, D.Draw.set(U32.to_nat(64000), mem, G.Gfx.frame(), blank)))
 
 def again(tables: P.Project.Tables, gfx: G.Gfx, s: S.State, st: Hash) -> Array<U32> & String:
-  Hash{mem, h} = st
+  Hash{mem, h, pal} = st
   line(h, hashed(tables, gfx, s, 255, mem))
 
 # A frame of the state, its line printed, and the array back.
@@ -289,8 +303,10 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       w2)
     d1 : Array<U32> <- frame("dead 1600 1000 90", tables, gfx, after([idle(650n)],
       at(level, east(1600), east(1000), 90)), w3)
+    r1 : Array<U32> <- frame("nukage 1600 1000 90", tables, gfx, after([idle(1n)],
+      at(level, east(1600), east(1000), 90)), d1)
     w4 : Array<U32> <- frame("pistol firing 25", tables, gfx, after([idle(20n), fired(4n)], S.State.start(level)),
-      d1)
+      r1)
     w5 : Array<U32> <- frame("pistol flash over 32", tables, gfx, after([idle(20n), fired(11n)],
       S.State.start(level)), w4)
     w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
@@ -306,52 +322,53 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
-#|start hash 3501647150 pixels 1 1 7 5 96 72 covered True
-#|lit 736 464 135 hash 1888788078 pixels 106 8 95 105 96 72 covered True
-#|dark -416 256 90 hash 1364473328 pixels 110 107 0 238 96 72 covered True
-#|step 137 256 45 hash 2880593419 pixels 8 0 79 6 96 72 covered True
-#|grate -416 256 180 hash 442390666 pixels 3 111 106 93 96 72 covered True
-#|water 3 256 0 hash 1102040513 pixels 2 6 77 6 96 72 covered True
-#|sky -640 256 90 hash 4130793025 pixels 239 14 239 105 96 72 covered True
-#|pit 488 320 0 hash 1510042988 pixels 79 110 150 6 96 72 covered True
-#|sergeant 1144 259 315 hash 4195031459 pixels 111 108 0 1 96 72 covered True
-#|once 256 1088 0 hash 2442400286 pixels 110 79 105 7 96 64 covered True
-#|overlap 2752 960 0 hash 17648109 pixels 79 125 10 78 96 72 covered True
-#|walls 704 256 0 hash 2399935752 pixels 7 111 15 2 96 64 covered True
-#|ledge 256 128 90 hash 1443497237 pixels 7 5 15 110 96 72 covered True
-#|yard -640 256 0 hash 1684750053 pixels 1 100 78 8 96 72 covered True
-#|bars 1024 200 0 hash 439285215 pixels 109 79 5 5 96 72 covered True
-#|demon head on 48 1616 180 hash 3057454219 pixels 2 7 111 243 96 59 covered True
-#|shotgun guy from behind 896 2048 270 hash 3729950378 pixels 5 109 0 5 96 72 covered True
-#|shotgun guy from the side 987 1947 225 hash 3040449328 pixels 5 6 109 108 96 72 covered True
-#|demon mirrored 2448 2112 0 hash 2350286645 pixels 39 2 6 79 96 72 covered True
-#|stride U!:34 hash 250131952 pixels 2 5 164 6 96 72 covered True
-#|air U!:56 hash 3788238705 pixels 5 110 15 6 96 64 covered True
-#|landed U!:66 hash 1149665840 pixels 6 110 14 79 96 64 covered True
-#|door half open hash 1169190636 pixels 7 14 110 79 96 64 covered True
-#|switch pressed hash 644900545 pixels 3 110 107 7 96 64 covered True
-#|exit pressed hash 786890588 pixels 102 95 102 3 96 72 covered True
-#|blink dark hash 1109576201 pixels 94 73 73 101 96 72 covered True
-#|key 2380 600 180 22 hash 491721407 pixels 5 1 6 110 96 72 covered True
-#|key bright 23 hash 491721407 pixels 5 1 6 110 96 72 covered True
-#|key before hash 398974500 pixels 6 10 5 89 96 72 covered True
-#|key after hash 1310564919 pixels 105 10 2 89 96 72 covered True
-#|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True
-#|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True
-#|green armour before hash 3593952694 pixels 110 110 6 1 96 59 covered True
-#|green armour after hash 1489547737 pixels 8 110 103 2 96 59 covered True
-#|stimpack and medikit before hash 1702492025 pixels 111 109 7 111 96 72 covered True
-#|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True
-#|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True
-#|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True
-#|rocket refused hash 3744069241 pixels 106 109 105 77 160 72 covered True
-#|chainsaw after hash 958764125 pixels 5 5 137 141 96 79 covered True
-#|chainsaw refused hash 957078586 pixels 5 5 137 141 160 64 covered True
-#|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True
-#|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True
-#|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True
-#|dead 1600 1000 90 hash 4043722533 pixels 6 111 110 5 96 8 covered True
-#|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True
-#|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True
-#|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True
+#|start hash 3501647150 pixels 1 1 7 5 96 72 covered True palette 0
+#|lit 736 464 135 hash 1888788078 pixels 106 8 95 105 96 72 covered True palette 0
+#|dark -416 256 90 hash 1364473328 pixels 110 107 0 238 96 72 covered True palette 0
+#|step 137 256 45 hash 2880593419 pixels 8 0 79 6 96 72 covered True palette 0
+#|grate -416 256 180 hash 442390666 pixels 3 111 106 93 96 72 covered True palette 0
+#|water 3 256 0 hash 1102040513 pixels 2 6 77 6 96 72 covered True palette 0
+#|sky -640 256 90 hash 4130793025 pixels 239 14 239 105 96 72 covered True palette 0
+#|pit 488 320 0 hash 1510042988 pixels 79 110 150 6 96 72 covered True palette 0
+#|sergeant 1144 259 315 hash 4195031459 pixels 111 108 0 1 96 72 covered True palette 0
+#|once 256 1088 0 hash 2442400286 pixels 110 79 105 7 96 64 covered True palette 0
+#|overlap 2752 960 0 hash 17648109 pixels 79 125 10 78 96 72 covered True palette 0
+#|walls 704 256 0 hash 2399935752 pixels 7 111 15 2 96 64 covered True palette 0
+#|ledge 256 128 90 hash 1443497237 pixels 7 5 15 110 96 72 covered True palette 0
+#|yard -640 256 0 hash 1684750053 pixels 1 100 78 8 96 72 covered True palette 0
+#|bars 1024 200 0 hash 439285215 pixels 109 79 5 5 96 72 covered True palette 0
+#|demon head on 48 1616 180 hash 3057454219 pixels 2 7 111 243 96 59 covered True palette 0
+#|shotgun guy from behind 896 2048 270 hash 3729950378 pixels 5 109 0 5 96 72 covered True palette 0
+#|shotgun guy from the side 987 1947 225 hash 3040449328 pixels 5 6 109 108 96 72 covered True palette 0
+#|demon mirrored 2448 2112 0 hash 2350286645 pixels 39 2 6 79 96 72 covered True palette 0
+#|stride U!:34 hash 250131952 pixels 2 5 164 6 96 72 covered True palette 0
+#|air U!:56 hash 3788238705 pixels 5 110 15 6 96 64 covered True palette 0
+#|landed U!:66 hash 1149665840 pixels 6 110 14 79 96 64 covered True palette 10
+#|door half open hash 1169190636 pixels 7 14 110 79 96 64 covered True palette 0
+#|switch pressed hash 644900545 pixels 3 110 107 7 96 64 covered True palette 0
+#|exit pressed hash 786890588 pixels 102 95 102 3 96 72 covered True palette 0
+#|blink dark hash 1109576201 pixels 94 73 73 101 96 72 covered True palette 0
+#|key 2380 600 180 22 hash 491721407 pixels 5 1 6 110 96 72 covered True palette 0
+#|key bright 23 hash 491721407 pixels 5 1 6 110 96 72 covered True palette 0
+#|key before hash 398974500 pixels 6 10 5 89 96 72 covered True palette 0
+#|key after hash 1310564919 pixels 105 10 2 89 96 72 covered True palette 11
+#|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True palette 0
+#|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True palette 10
+#|green armour before hash 3593952694 pixels 110 110 6 1 96 59 covered True palette 0
+#|green armour after hash 1489547737 pixels 8 110 103 2 96 59 covered True palette 10
+#|stimpack and medikit before hash 1702492025 pixels 111 109 7 111 96 72 covered True palette 0
+#|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True palette 0
+#|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True palette 0
+#|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True palette 10
+#|rocket refused hash 3744069241 pixels 106 109 105 77 160 72 covered True palette 0
+#|chainsaw after hash 958764125 pixels 5 5 137 141 96 79 covered True palette 10
+#|chainsaw refused hash 957078586 pixels 5 5 137 141 160 64 covered True palette 0
+#|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True palette 0
+#|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True palette 0
+#|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True palette 0
+#|dead 1600 1000 90 hash 4043722533 pixels 6 111 110 5 96 8 covered True palette 0
+#|nukage 1600 1000 90 hash 3477668975 pixels 11 2 107 1 96 77 covered True palette 2
+#|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True palette 0
+#|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True palette 0
+#|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True palette 0
 #|end

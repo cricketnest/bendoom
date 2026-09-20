@@ -2,7 +2,7 @@
 # draw threads, since a texel read through a copyable tree costs three
 # hundred times one through an array (bench/lookup.bend). The array
 # holds the frame and the draw's per-column scratch first, then the
-# palette as RGB words, the colormaps, and the lumps: the flats the
+# fourteen palettes as RGB words, the colormaps, and the lumps: the flats the
 # sectors name, then the patches of the textures the sides name, then
 # the composed columns, then the sprite lumps of the frames the map's
 # things spawn in or reach and of the weapon's, every rotation, then the
@@ -68,18 +68,21 @@ def Gfx.cliptop() -> U32:
 def Gfx.clipbot() -> U32:
   65152
 
+# PLAYPAL's fourteen palettes as RGB words, 256 a palette: the plain
+# one, the eight reds, the four golds and the radiation suit's green.
+# ST_doPaletteStuff picks which one a frame is shown in.
 def Gfx.palette() -> U32:
   65536
 
 def Gfx.colormap() -> U32:
-  65792
+  69120
 
 # 128 zeros: the texels of a column no patch covers.
 def Gfx.void() -> U32:
-  74496
+  77824
 
 def Gfx.lumps() -> U32:
-  74624
+  77952
 
 def Gfx.none() -> U32:
   4294967295
@@ -1040,7 +1043,7 @@ def Gfx.plan(lumps: List<&2, W.Wad.Lump>, +fields: List<&2, U32>) -> List<&2, U3
     case l <> rest:
       B.Bytes.fields.one(fields, Gfx.lump.pos(l), Gfx.plan(rest, fields))
 
-# The array sized for everything; the first palette, the colormaps, the
+# The array sized for everything; the palettes, the colormaps, the
 # flats, the patches, the sprites and the bar's patches copied in; the
 # composed columns pasted. heads: each sprite lump's width, left and top
 # offsets.
@@ -1055,7 +1058,7 @@ def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: Li
       Job{Gfx.lump.pos(cmap), Gfx.colormap(), 8704} <> List.concat(&2, Gfx.Job,
         [Gfx.jobs(Gfx.flat.lumps(flats), Gfx.lumps()), Gfx.jobs(plumps, Gfx.last(fbases)),
           Gfx.jobs(slumps, Gfx.Asm.comp(asm)), Gfx.jobs(bar, Gfx.last(sbases))]),
-      Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, 256n, 3, Gfx.lump.pos(pal), Gfx.palette(),
+      Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, U32.to_nat(3584), 3, Gfx.lump.pos(pal), Gfx.palette(),
         Copy{a, Array.new(U32, V.Vec.depth((Gfx.last(bbases) + 128 : U32)), 0)})))),
     Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
       Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"),

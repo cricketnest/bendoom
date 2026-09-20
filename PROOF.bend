@@ -426,6 +426,9 @@ def Laws.damage_count():
 def Laws.pain_offset():
   {==}
 
+def Laws.damage_palette():
+  {==}
+
 def Laws.ray_meets():
   {==}
 
