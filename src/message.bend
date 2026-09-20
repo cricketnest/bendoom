@@ -107,14 +107,9 @@ def Message.text(n: U32) -> String:
     case _:
       ""
 
-# HU_MSGTIMEOUT: four seconds of tics on the line. A message is given
-# one tic more, since the tic that gives it counts it down before it is
-# ever drawn.
+# HU_MSGTIMEOUT: four seconds of tics on the line.
 def Message.timeout() -> U32:
   140
-
-def Message.given() -> U32:
-  141
 
 # HU_MSGX and HU_MSGY: the line's left column and top row, the screen's
 # corner.

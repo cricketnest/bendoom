@@ -39,8 +39,8 @@
 
 ### Trade-offs
 
-- The line is in the `Inventory`, not in `State`. `State` is where it belongs by kind, and it was there until the native lane refused it (see Surprises). The `Inventory` is the player's own record, it already carries `bonus`, which is as much a heads-up counter as a possession, and it is what the position check has in hand where a pickup writes.
-- Folding HU_Ticker's install into the write costs one tic of counter (141, not 140) and saves the pending slot vanilla keeps, which would have been a third field. The schedule is vanilla's tic for tic.
+- The line is in the `Inventory`, not in `State`, and its two numbers are one word. `State` is where it belongs by kind, and it was there until the native lane refused it (see Surprises). The `Inventory` is the player's own record, it already carries `bonus`, which is as much a heads-up counter as a possession, and it is what the position check has in hand where a pickup writes.
+- HU_Ticker is split where it costs nothing: its install rides on the write, so a message takes the line at once for `HU_MSGTIMEOUT` tics, and its counter rides on `P_PlayerThink`'s counters, which have already run when a pickup or a use happens. The schedule is vanilla's tic for tic, and neither the tic nor the state grew a step.
 - The oracle's `patch-pixels` moved to `tools/wad.nu` rather than being copied, as the ticket asks.
 
 ### Surprises
@@ -51,4 +51,5 @@
 
 ### Deferred to the later pass
 
-- The oracle was not run on this tree. What stands in for it: every hash in `tests/render.bend` is the integration branch's, regenerated there after its own zero, and they all still hold with the message line built, which is what it means for a frame drawn with messages off to be untouched. A pass that runs `tools/oracle.nu` over the render test's places on this tree would close it.
+- **This branch does not build on the native lane and must not be merged as it stands.** `bend PROOF.bend` checks, every test passes on the interpreter and on bun, and the game runs there; but `bend doom.bend -o doom`, `bend tests/sim.bend -o sim` and `bend tools/frame.bend -o frame` all end in `an arity over 255`, so `nix flake check` would fail. The integration branch at c98ff58 builds all three, and one more U32 field in `Inventory` is the whole difference: the monsters and the damage work have taken the last of the native lane's room. The line is already packed into a single word for this reason. What would close it: room made elsewhere (a record the sim reads everywhere losing a field, or the backend's limit lifted), after which nothing in this ticket need change.
+- The oracle was not run on this tree; the frame dump does not build here, so it could not be. What stands in for it: every hash in `tests/render.bend` is the integration branch's, regenerated there after its own zero, and they all still hold with the message line built, which is what it means for a frame drawn with messages off to be untouched.

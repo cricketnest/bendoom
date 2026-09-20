@@ -1648,18 +1648,10 @@ def State.message(s: State) -> U32:
 def State.msgtics(s: State) -> U32:
   I.Inventory.msgtics(Player.inv(State.player(s)))
 
-# The state with another line, the player's inventory keeping it.
-def State.lined(f: @+inv: I.Inventory -> I.Inventory, +s: State) -> State:
-  State.player.put(s, Player.holding(State.player(s), f(Player.inv(State.player(s)))))
-
 # The player given a message, where p_inter.c and p_doors.c set
 # player->message: it takes the heads-up line at once.
-def State.says(msg: U32, s: State) -> State:
-  State.lined(inv => I.Inventory.saying(msg, inv), s)
-
-# Doom's HU_Ticker, which G_Ticker runs once the playsim's tic is over.
-def State.hud(s: State) -> State:
-  State.lined(inv => I.Inventory.hud(inv), s)
+def State.says(msg: U32, +s: State) -> State:
+  State.player.put(s, Player.holding(State.player(s), I.Inventory.saying(msg, Player.inv(State.player(s)))))
 
 # The state with a thinker started, last to run.
 def State.thinking(s: State, t: Thinker) -> State:
@@ -2942,14 +2934,11 @@ def Sim.player(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State)
 # were started (the mobjs of the map's records, the player's among them,
 # whose own turn moves the player and fires the lines that move
 # crossed), the clock counts. The tic's sounds start from none, and what
-# the things were heard doing is reported when its last thinker has run,
-# and the heads-up line takes its own tic last, as G_Ticker runs
-# HU_Ticker after P_Ticker.
+# the things were heard doing is reported when its last thinker has run.
 # An ended level stands still: no tic runs, so its sounds stay the last
 # live tic's, and whoever gathers sounds tic by tic passes over it.
 def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, before: State, after: State) -> State:
-  State.hud(Sim.tic.kept(geo, clock, K.Cmd.use(cmd),
-    State.told(Sim.thinkers(cmd, geo, State.held(geo, before, after)))))
+  Sim.tic.kept(geo, clock, K.Cmd.use(cmd), State.told(Sim.thinkers(cmd, geo, State.held(geo, before, after))))
 
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: State) -> State:

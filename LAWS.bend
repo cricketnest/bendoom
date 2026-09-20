@@ -364,8 +364,8 @@ law pistol_bobs:
 # The damage laws are p_inter.c's P_DamageMobj by hand.
 
 def Closed.armoured.of(inv: I.Inventory, kind: U32, points: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics} = inv
-  I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
 
 # The starting inventory wearing armour of a type, 0 for none, with some
 # points.
@@ -905,38 +905,39 @@ type Closed.Edit is Data:
 def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
   match inv e:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Health{n}:
-      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
+      bonus, line} Health{n}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Armour{points, kind}:
-      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
+      bonus, line} Armour{points, kind}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Cards{bits}:
-      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
+      bonus, line} Cards{bits}:
+      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Ammo{rounds}:
+      bonus, line} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
-        bonus, message, msgtics}
+        bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Backpack{}:
+      bonus, line} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
-        powers, items, bonus, message, msgtics}
+        powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Weapons{bits}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, message, msgtics}
+      bonus, line} Weapons{bits}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Strength{n}:
+      bonus, line} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, message, msgtics}
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Items{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, message, msgtics}
+      bonus, line} Items{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Flash{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, message, msgtics}
+      bonus, line} Flash{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message, msgtics} Said{n, tics}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, n, tics}
+      bonus, line} Said{n, tics}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
+        ((n << 8n) .|. tics : U32)}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -957,9 +958,8 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
 # The inventory with the heads-up line taken off it: the laws below are
 # about the grants, and pickup_messages about the line.
 def Closed.hushed(inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message,
-    msgtics} = inv
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, 0, 0}
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, 0}
 
 def Closed.kept(+s: S.State) -> Closed.Got:
   Got{Closed.ids(H.Things.list(S.State.things(s))), Closed.hushed(S.Player.inv(S.State.player(s)))}

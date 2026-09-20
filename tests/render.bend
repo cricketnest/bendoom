@@ -232,8 +232,8 @@ def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
 # Every weapon and every ammo type at its cap, so that no ammo or weapon
 # pickup can be taken.
 def maxed(inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus, message, msgtics} = inv
-  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus, message, msgtics}
+  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus, line}
 
 def full(s: S.State) -> S.State:
   S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s

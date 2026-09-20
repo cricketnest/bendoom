@@ -1128,13 +1128,6 @@ def held_y(before: S.Player, after: S.Player) ->
     case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} S.Player{ax, ay, az, aangle, amomx, amomy, amomz, afloorz, aceilz, aviewheight, adeltaview, aviewz, acrossed, ainv, apsprites, ahurt}:
       {==}
 
-# HU_Ticker writes the line and takes the message off the player, which
-# leaves the place its turn left it.
-def hud_free(s: S.State, h: Laws.Free(s)) -> Laws.Free(S.State.hud(s)):
-  match s:
-    case S.State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      holding_free(level, player, I.Inventory.hud(S.Player.inv(player)), h)
-
 # What a turn holds is free where the state before it was: the level it
 # packs has the geometry, and the player it packs the place.
 def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
@@ -1251,12 +1244,10 @@ def Laws.tic_keeps_geometry(cmd, s):
 # parameter, since a symbolic level leaves it stuck.
 def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State, +after: S.State,
   h: Held(geo, before)) -> Laws.Free(S.Sim.tic.done(cmd, geo, clock, before, after)):
-  hud_free(S.Sim.tic.kept(geo, clock, K.Cmd.use(cmd),
-      S.State.told(S.Sim.thinkers(cmd, geo, S.State.held(geo, before, after)))),
-    told_held(geo, S.Sim.thinkers(cmd, geo, S.State.held(geo, before, after)),
-      rested_held(geo, S.Sim.thinkers.all(8n, cmd, geo, S.State.held(geo, before, after)),
-        all_held(8n, cmd, geo, S.State.held(geo, before, after),
-          held_free(geo, before, after, h)))))
+  told_held(geo, S.Sim.thinkers(cmd, geo, S.State.held(geo, before, after)),
+    rested_held(geo, S.Sim.thinkers.all(8n, cmd, geo, S.State.held(geo, before, after)),
+      all_held(8n, cmd, geo, S.State.held(geo, before, after),
+        held_free(geo, before, after, h))))
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
