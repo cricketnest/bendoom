@@ -19,6 +19,7 @@ import ./random.bend as M
 import ./things.bend as H
 import ./inventory.bend as I
 import ./sound.bend as Sn
+import ./message.bend as Msg
 
 # Doom's pspdef_t, a player sprite: its state row, none while it does
 # not show, the tics left in it, and its place on a 320 by 200 screen.
@@ -2101,6 +2102,21 @@ def State.player.put(s: State, p: Player) -> State:
   State{was, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
 
+# Messages
+# --------
+
+# What the heads-up line shows, and the tics it has left there.
+def State.message(s: State) -> U32:
+  I.Inventory.message(Player.inv(State.player(s)))
+
+def State.msgtics(s: State) -> U32:
+  I.Inventory.msgtics(Player.inv(State.player(s)))
+
+# The player given a message, where p_inter.c and p_doors.c set
+# player->message: it takes the heads-up line at once.
+def State.says(msg: U32, +s: State) -> State:
+  State.player.put(s, Player.holding(State.player(s), I.Inventory.saying(msg, Player.inv(State.player(s)))))
+
 # The state with a thinker started, last to run.
 def State.thinking(s: State, t: Thinker) -> State:
   State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
@@ -3495,7 +3511,7 @@ def Sim.door.locked(opens: Bool, line: L.Level.Line, s: State) -> State:
     case True{}:
       Sim.door(line, 131072, Sim.noise.door(), s)
     case False{}:
-      Sim.sound(Sn.Sound.oof(), Sn.Nobody{}, s)
+      Sim.sound(Sn.Sound.oof(), Sn.Nobody{}, State.says(Msg.Message.pd_bluek(), s))
 
 # Switches and tagged movers
 # --------------------------

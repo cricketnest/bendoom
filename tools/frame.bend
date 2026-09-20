@@ -5,7 +5,9 @@
 # renderer: a line naming which of PLAYPAL's fourteen palettes it is
 # shown in, then 200 lines of 320 palette indices, two hex digits each.
 # tools/oracle.nu diffs it against Chocolate Doom's frame after the same
-# commands from the same place.
+# commands from the same place. It draws no heads-up message, as the
+# Chocolate Doom it is compared with runs with show_messages 0; message
+# pixels are checked in tests/render.bend instead.
 #
 #   bend tools/frame.bend -o frame
 #   FRAME="-416 256 0" SCRIPT="20,0,0,0,0 34,50,0,0,0" ./frame
@@ -48,7 +50,7 @@ def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, g
   (+gfx, +level) = gl
   do IO<Unit>:
     rest : Array<U32> <- Frame.print(Frame.palette(R.Render.frame(P.Project.tables(level), gfx,
-      S.Sim.replay(script, S.State.at(level, place)), mem)))
+      S.Sim.replay(script, S.State.at(level, place)), False{}, mem)))
     Frame.rows(200n, 0, rest)
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):

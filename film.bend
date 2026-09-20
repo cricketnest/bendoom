@@ -33,7 +33,8 @@ def Film.go(cmds: List<&2, K.Cmd>, +tables: P.Project.Tables, +gfx: G.Gfx, state
       IO.pure(Unit, Unit{})
     case cmd <> rest:
       +next = S.Sim.tic(cmd, state)
-      Film.shot(V.Show.rgb(R.Render.frame(tables, gfx, next, mem)), m => Film.go(rest, tables, gfx, next, m))
+      Film.shot(V.Show.rgb(R.Render.frame(tables, gfx, next, True{}, mem)),
+        m => Film.go(rest, tables, gfx, next, m))
 
 def Film.play(demo: List<&2, U32>, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl

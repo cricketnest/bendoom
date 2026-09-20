@@ -13,6 +13,7 @@ import ./src/random.bend as M
 import ./src/things.bend as H
 import ./src/inventory.bend as I
 import ./src/sound.bend as Sn
+import ./src/message.bend as Msg
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
@@ -363,9 +364,9 @@ law pistol_bobs:
 
 # An inventory with so many bullets in the clip.
 def Closed.clip.of(inv: I.Inventory, +rounds: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.set(ammo, I.Inventory.am_clip(), rounds), caps, backpack,
-    weapons, powers, items, bonus}
+    weapons, powers, items, bonus, line}
 
 # The pistol at rest, the state A_Raise leaves it in.
 def Closed.ready() -> S.Psprites:
@@ -405,8 +406,8 @@ law pistol_spends:
 # The damage laws are p_inter.c's P_DamageMobj by hand.
 
 def Closed.armoured.of(inv: I.Inventory, kind: U32, points: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
-  I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
 
 # The starting inventory wearing armour of a type, 0 for none, with some
 # points.
@@ -938,9 +939,9 @@ def Closed.locked(inv: I.Inventory) -> S.State:
 # up after that tic (sanity).
 law blue_door_locked:
   {(Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.start())), 1),
-    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(2, I.Inventory.start()))), 1),
-    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(1, I.Inventory.start()))), 1),
-    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, I.Inventory.start()))), 1))
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(2, Msg.Message.none(), I.Inventory.start()))), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start()))), 1),
+    Closed.ceil(Closed.used(0n, Closed.locked(I.Inventory.card(8, Msg.Message.none(), I.Inventory.start()))), 1))
     == (0, 0, 131072, 131072) : U32 & U32 & U32 & U32}
 
 # The west room's player holding an inventory at (x, 64), on the floor
@@ -982,39 +983,44 @@ type Closed.Edit is Data:
   Strength{n: U32}
   Items{n: U32}
   Flash{n: U32}
+  Said{n: U32, tics: U32}
 
 def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
   match inv e:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Health{n}:
-      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, line} Health{n}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Armour{points, kind}:
-      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, line} Armour{points, kind}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Cards{bits}:
-      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, line} Cards{bits}:
+      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Ammo{rounds}:
+      bonus, line} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
-        bonus}
+        bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Backpack{}:
+      bonus, line} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
-        powers, items, bonus}
+        powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Weapons{bits}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus}
+      bonus, line} Weapons{bits}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Strength{n}:
+      bonus, line} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus}
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Items{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus}
+      bonus, line} Items{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, line}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Flash{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n}
+      bonus, line} Flash{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, line}
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus, line} Said{n, tics}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
+        ((n << 8n) .|. tics : U32)}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -1032,8 +1038,31 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
     case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook} <> rest:
       id <> Closed.ids(rest)
 
+# The inventory with the heads-up line taken off it: the laws below are
+# about the grants, and pickup_messages about the line.
+def Closed.hushed(inv: I.Inventory) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, 0}
+
 def Closed.kept(+s: S.State) -> Closed.Got:
-  Got{Closed.ids(H.Things.list(S.State.things(s))), S.Player.inv(S.State.player(s))}
+  Got{Closed.ids(H.Things.list(S.State.things(s))), Closed.hushed(S.Player.inv(S.State.player(s)))}
+
+# What the heads-up line shows and how long it has left there.
+type Closed.Line is Data:
+  Shown{message: U32, tics: U32}
+
+def Closed.line(+s: S.State) -> Closed.Line:
+  Shown{I.Inventory.message(S.Player.inv(S.State.player(s))),
+    I.Inventory.msgtics(S.Player.inv(S.State.player(s)))}
+
+# The line after the tic that brings the player 8 from a thing of a
+# type, in its reach.
+def Closed.said(inv: I.Inventory, kind: U32) -> Closed.Line:
+  Closed.line(Closed.idled(1n, Closed.among(inv, 2097152, 0, 524288, [Closed.thing(1, kind, 2097152, 5242880, 0)])))
+
+# The line after n tics of a player with nothing to pick up.
+def Closed.ticked(n: Nat, inv: I.Inventory) -> Closed.Line:
+  Closed.line(Closed.idled(n, Closed.among(inv, 2097152, 0, 0, [])))
 
 # What is left after n tics of the west room's player, holding an
 # inventory, walking north by a momentum a tic toward a thing of a type
@@ -1289,6 +1318,28 @@ law weapon_taken:
       Got{[], Closed.inv([Weapons{131}, Flash{6}])},
       Got{[1], Closed.inv([Weapons{131}])}]
     : List<&2, Closed.Got>}
+
+# LAW: the heads-up line. d_englsh.h's string for each pickup type the
+# two E1M1s hold, PD_BLUEK for the blue door that refuses, and
+# hu_stuff.c's four seconds. A pickup takes the line on its own tic with
+# HU_MSGTIMEOUT tics left; a pickup the grant refuses says nothing and
+# leaves the line as it was; the counter falls by one a tic and the line
+# goes out at zero.
+law pickup_messages:
+  {[Closed.said(I.Inventory.start(), 2014), Closed.said(Closed.inv([Health{99}]), 2011),
+    Closed.said(Closed.inv([Health{99}]), 2012), Closed.said(I.Inventory.start(), 2018),
+    Closed.said(I.Inventory.start(), 2019), Closed.said(I.Inventory.start(), 5),
+    Closed.said(I.Inventory.start(), 2005), Closed.said(I.Inventory.start(), 2023),
+    Closed.said(I.Inventory.start(), 2011), Closed.said(Closed.inv([Armour{150, 2}]), 2018),
+    Closed.said(Closed.inv([Said{3, 90}]), 2011),
+    Closed.ticked(1n, Closed.inv([Said{3, 2}])), Closed.ticked(2n, Closed.inv([Said{3, 2}])),
+    Closed.ticked(3n, Closed.inv([Said{3, 2}])),
+    Closed.line(Closed.used(0n, Closed.locked(I.Inventory.start()))),
+    Closed.line(Closed.used(0n, Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start()))))]
+    == [Shown{3, 140}, Shown{5, 140}, Shown{6, 140}, Shown{1, 140}, Shown{2, 140}, Shown{7, 140}, Shown{15, 140},
+      Shown{8, 140}, Shown{0, 0}, Shown{0, 0}, Shown{3, 89}, Shown{3, 1}, Shown{3, 0}, Shown{3, 0}, Shown{17, 140},
+      Shown{0, 0}]
+    : List<&2, Closed.Line>}
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
@@ -1940,7 +1991,7 @@ def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
 def Sprite.gfx() -> G.Gfx:
   G.Gfx{V.Leaf{0}, V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0,
     V.Vec.of_list(List.append(&2, U32, Sprite.slots(8n, 1000, 0), Sprite.slots(8n, 2000, 1)), 96),
-    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}, V.Leaf{0}}
+    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}, V.Leaf{0}, V.Leaf{0}}
 
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(+id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
