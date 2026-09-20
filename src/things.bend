@@ -3,14 +3,15 @@
 # E1M1 places, less the starts and the spectre, which Hurt Me Plenty
 # never spawns, the state rows their spawn states lead to and the
 # pistol's with its entry in d_items.c's weaponinfo, the map's THINGS
-# records made the level's first things, and a thing's tic through its
-# states.
+# records made the level's first things, a thing's tic through its
+# states, and P_RemoveMobj.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
 import ./level.bend as L
 import ./random.bend as M
 import ./vec.bend as V
+import ./sound.bend as Sn
 
 # A thing, Doom's mobj: its THINGS record's index, which names it for
 # good, its DoomEd type, its position with z on the floor or under the
@@ -151,6 +152,11 @@ def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
   kind
 
+# A type's radius in fixed point.
+def Thing.Def.radius(d: Thing.Def) -> U32:
+  Def{kind, state, radius, height, flags} = d
+  F.Fixed.of_map(radius)
+
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:
     case True{}:
@@ -263,9 +269,10 @@ type Thing.Tree is Data:
 # its cell when it spawns or moves, so the things are linked the last
 # spawned first, and the player after those spawned after its start
 # record, you, until its first move puts it before them all, at the
-# player's own name.
+# player's own name. Last, what the things did that is heard and the
+# state has not reported yet: a position check has no state to tell.
 type Things is Data:
-  Things{tree: Thing.Tree, count: U32, you: U32}
+  Things{tree: Thing.Tree, count: U32, you: U32, heard: List<&2, Sn.Sound.Event>}
 
 def Thing.Tree.empty(d: Nat) -> Thing.Tree:
   match d:
@@ -300,21 +307,30 @@ def Thing.Tree.tics(t: Thing.Tree) -> Thing.Tree:
       Fork{Thing.Tree.tics(l), Thing.Tree.tics(r)}
 
 def Things.get(ts: Things, +id: U32) -> Maybe<&2, Thing>:
-  Things{tree, count, you} = ts
+  Things{tree, count, you, heard} = ts
   Thing.Tree.get(tree, V.Vec.odd(id), id)
 
 def Things.put(ts: Things, +id: U32, m: Maybe<&2, Thing>) -> Things:
-  Things{tree, count, you} = ts
-  Things{Thing.Tree.set(tree, V.Vec.odd(id), id, m), count, you}
+  Things{tree, count, you, heard} = ts
+  Things{Thing.Tree.set(tree, V.Vec.odd(id), id, m), count, you, heard}
+
+# The things after one of them was heard.
+def Things.sounded(ts: Things, e: Sn.Sound.Event) -> Things:
+  Things{tree, count, you, heard} = ts
+  Things{tree, count, you, List.append(&2, Sn.Sound.Event, heard, [e])}
+
+# Doom's P_RemoveMobj: the thing is gone, and its sound stops.
+def Things.removed(ts: Things, +id: U32) -> Things:
+  Things.sounded(Things.put(ts, id, None{}), Sn.Stop{Sn.Thing{id}})
 
 def Things.you(ts: Things) -> U32:
-  Things{tree, count, you} = ts
+  Things{tree, count, you, heard} = ts
   you
 
 # The things after the player's first move.
 def Things.moved(ts: Things) -> Things:
-  Things{tree, count, you} = ts
-  Things{tree, count, Thing.you()}
+  Things{tree, count, you, heard} = ts
+  Things{tree, count, Thing.you(), heard}
 
 def Things.of.go(things: List<&2, Thing>, ts: Things) -> Things:
   match things:
@@ -327,7 +343,7 @@ def Things.of.go(things: List<&2, Thing>, ts: Things) -> Things:
 # A population of things whose ids are under count, the player's link
 # at you.
 def Things.of(things: List<&2, Thing>, +count: U32, you: U32) -> Things:
-  Things.of.go(things, Things{Thing.Tree.empty(V.Vec.depth(count)), count, you})
+  Things.of.go(things, Things{Thing.Tree.empty(V.Vec.depth(count)), count, you, []})
 
 def Things.cons(m: Maybe<&2, Thing>, rest: List<&2, Thing>) -> List<&2, Thing>:
   match m:
@@ -345,7 +361,7 @@ def Things.list.go(n: Nat, +t: Thing.Tree, +i: U32) -> List<&2, Thing>:
 
 # The things alive, in the order of their ids.
 def Things.list(ts: Things) -> List<&2, Thing>:
-  Things{+tree, +count, you} = ts
+  Things{+tree, +count, you, heard} = ts
   Things.list.go(U32.to_nat(count), tree, 0)
 
 # The name of a thing the population lacks, before rest; rest alone for
@@ -373,8 +389,8 @@ def Things.tally(first: List<&2, Thing>, +things: Things) -> String:
 # Every thing alive through its tic. A tic reads no other thing, so the
 # order vanilla's thinkers run them in cannot show.
 def Things.tics(ts: Things) -> Things:
-  Things{tree, count, you} = ts
-  Things{Thing.Tree.tics(tree), count, you}
+  Things{tree, count, you, heard} = ts
+  Things{Thing.Tree.tics(tree), count, you, heard}
 
 def Thing.link.go(things: List<&2, Thing>, +level: L.Level) -> L.Level:
   match things:

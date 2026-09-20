@@ -7,6 +7,7 @@
 **Status:** ready-for-agent
 
 - [ ] Every priority of `ST_updateFaceWidget` that the two maps can reach, with its count, including vanilla's ouch-face bug as it stands
+- [ ] The second random index starts at 64 and counts as milestone 7's ticket 01 left it; that ticket found that under `-playdemo` one or two tics run before the melt's draws, so check from the source which table entries `ST_Ticker`'s first draws read
 - [ ] The face's state is in the sim's state and advances once a tic, so that replay composition holds
 - [ ] The sim test prints the face index per tic on cases of damage from each side, a weapon pickup, held fire, and idling, against a nushell replay of `st_stuff.c` over the second random index
 - [ ] Chocolate Doom's face keeps changing under the oracle's pause, so the oracle keeps its mask over the face's box except for the dead face, which holds and compares at zero

@@ -1,7 +1,8 @@
-# Every tests/*.bend, run against Freedoom and the render of its song on
-# both lanes, native and JS; its output must equal its trailing #| lines
-# on each. No test opens a sound device.
-{ lib, llvmPackages_19, bend, bun, alsa-lib, freedoom, music }:
+# Every tests/*.bend, run against Freedoom and the render of its song
+# and the expansion of its sounds on both lanes, native and JS; its
+# output must equal its trailing #| lines on each. No test opens a sound
+# device.
+{ lib, llvmPackages_19, bend, bun, alsa-lib, freedoom, music, sounds }:
 
 llvmPackages_19.stdenv.mkDerivation {
   pname = "bendoom-tests";
@@ -19,6 +20,7 @@ llvmPackages_19.stdenv.mkDerivation {
 
   BENDOOM_IWAD = "${freedoom}/share/games/doom/freedoom1.wad";
   BENDOOM_MUSIC = music;
+  BENDOOM_SOUNDS = sounds;
 
   buildPhase = ''
     runHook preBuild

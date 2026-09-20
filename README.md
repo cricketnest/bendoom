@@ -66,4 +66,6 @@ for bug.
 
 GPL-2.0-or-later, in `LICENSE`. `src/tables.bend` and
 `src/opl_tables.bend` are generated from Chocolate Doom's source, which
-is GPL-2.0-or-later too.
+is GPL-2.0-or-later too. `src/sfx_taps.bend` is the filter of SDL's
+resampler, computed by `tools/gen_sfx_taps.nu` as SDL's source computes
+it; SDL is under the zlib license.

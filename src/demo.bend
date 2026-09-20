@@ -16,11 +16,11 @@ type Demo.Rec is Type:
   Rec{file: File, carry: U32}
 
 # G_WriteDemoTiccmd's bytes of a tic: the moves, the turn's high byte,
-# the buttons, where use is bit 1.
-def Demo.tic(forward: U32, side: U32, turn: U32, use: Bool, p: List<&2, U32> & U32) -> List<&2, U32> & U32:
+# the buttons.
+def Demo.tic(forward: U32, side: U32, turn: U32, buttons: U32, p: List<&2, U32> & U32) -> List<&2, U32> & U32:
   (rest, carry) = p
   ((forward .&. 255 : U32) <> (side .&. 255 : U32) <> ((turn >> 8n) .&. 255 : U32)
-    <> Bool.pick(U32, use, 2, 0) <> rest, carry)
+    <> (buttons .&. 255 : U32) <> rest, carry)
 
 # The tics' bytes, and the turn left over after them. A demo keeps a
 # turn in steps of 256, so each is rounded to one and the error carried
@@ -30,10 +30,10 @@ def Demo.tics(cmds: List<&2, K.Cmd>, +carry: U32) -> List<&2, U32> & U32:
   match cmds:
     case []:
       ([], carry)
-    case K.Cmd{forward, side, turn, use} <> rest:
+    case K.Cmd{forward, side, turn, buttons} <> rest:
       +desired = (turn + carry : U32)
       +kept = ((desired + 128) .&. 4294967040 : U32)
-      Demo.tic(forward, side, kept, use, Demo.tics(rest, (desired - kept : U32)))
+      Demo.tic(forward, side, kept, buttons, Demo.tics(rest, (desired - kept : U32)))
 
 # A byte as the signed char the file holds.
 def Demo.signed(+b: U32) -> U32:
@@ -50,9 +50,9 @@ def Demo.until(end: Bool, cmd: K.Cmd, rest: List<&2, K.Cmd>) -> List<&2, K.Cmd>:
 # tic.
 def Demo.cmds(bytes: List<&2, U32>) -> List<&2, K.Cmd>:
   match bytes:
-    case +forward <> side <> turn <> +buttons <> rest:
+    case +forward <> side <> turn <> buttons <> rest:
       Demo.until(U32.is_eq(forward, 128), K.Cmd.demo(Demo.signed(forward), Demo.signed(side),
-        Demo.signed(turn), U32.is_eq((buttons .&. 2 : U32), 2)), Demo.cmds(rest))
+        Demo.signed(turn), buttons), Demo.cmds(rest))
     case _:
       []
 
