@@ -106,14 +106,14 @@ def main() -> IO(Unit):
 #|  inventory health 100 armour 3 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 12 things 206 taken 173 174 175
 #|shells tic 214 1247.599700 -444.203857 0.000 z 0.000000 ended False blue doors -128.000000 -128.000000
 #|  inventory health 100 armour 3 type 1 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 202 taken 173 174 175 207 208 275 276
-#|up the lift tic 420 2023.386642 -482.187698 90.000 z 128.000000 ended False blue doors -128.000000 -128.000000
-#|  inventory health 58 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 202 taken 173 174 175 207 208 275 276
-#|switch tic 449 2070.270736 -240.046356 90.000 z 136.000000 ended False blue doors -128.000000 -128.000000
-#|  inventory health 58 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 202 taken 173 174 175 207 208 275 276
-#|key door tic 633 2255.965057 162.870071 90.000 z 136.000000 ended False blue doors -128.000000 -128.000000
-#|  inventory health 58 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 202 taken 173 174 175 207 208 275 276
-#|key in view tic 716 2215.224349 547.121185 157.500 z 136.000000 ended False blue doors -128.000000 -128.000000
-#|  inventory health 58 armour 0 type 0 cards 1 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 6 things 203 taken 87 173 174 175 207 208 275 276
-#|key taken tic 717 2212.904556 541.592147 157.500 z 136.000000 ended False blue doors -128.000000 -128.000000
-#|  inventory health 58 armour 0 type 0 cards 1 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 5 things 203 taken 87 173 174 175 207 208 275 276
+#|up the lift tic 420 2037.208175 -461.687759 90.000 z 128.000000 ended False blue doors -128.000000 -128.000000
+#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 202 taken 173 174 175 207 208 275 276
+#|switch tic 449 2083.213745 -272.046646 90.000 z 136.000000 ended False blue doors -128.000000 -128.000000
+#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 205 taken 173 174 175 207 208 275 276
+#|key door tic 633 2222.810943 -48.032348 90.000 z 144.000000 ended False blue doors -128.000000 -128.000000
+#|  inventory health 41 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 199 taken 141 173 174 175 197 199 207 208 275 276
+#|key in view tic 716 2186.874084 -85.488708 157.500 z 136.000000 ended False blue doors -128.000000 -128.000000
+#|  inventory health 41 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 199 taken 141 173 174 175 197 199 207 208 275 276
+#|key taken tic 717 2184.757278 -90.502609 157.500 z 136.000000 ended False blue doors -128.000000 -128.000000
+#|  inventory health 41 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 199 taken 141 173 174 175 197 199 207 208 275 276
 #|Time 0:20

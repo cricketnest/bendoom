@@ -6,7 +6,8 @@
 # with its entry in d_items.c's weaponinfo and the bullet puff's, the
 # map's THINGS records made the level's first things, the state half of
 # a thing's tic, whose actions the sim runs, its rise by its vertical
-# momentum, and the population with its blockmap and sector links.
+# momentum under gravity, what a blow and a death leave on it, and the
+# population with its blockmap and sector links.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
@@ -20,10 +21,161 @@ import ./sound.bend as Sn
 # in play), its DoomEd type, its position with z on the floor or under the
 # ceiling, the floor and ceiling it is held between, its facing, the
 # sector under it, its state row, the tics left in it, its vertical
-# momentum and the counters its hunt keeps.
+# momentum, and the rest of its mobj_t.
 type Thing is Data:
   Thing{id: U32, kind: U32, x: U32, y: U32, z: U32, floorz: U32, ceilz: U32, angle: U32, sector: U32, state: U32,
-    tics: U32, momz: U32, ai: V.Vec}
+    tics: U32, momz: U32, hurt: V.Vec}
+
+# The rest of Doom's mobj_t, which the definition answers for until a
+# blow, a death or a look changes it, eleven counts in one vector as
+# the player's wound is: its health, the thing it is after (its own
+# name for none), its reaction time, the threshold that keeps it on that
+# target, the horizontal momentum a blow gave it, its flags, which
+# P_KillMobj and A_Fall clear bits of, its height, which a death
+# quarters, the player A_Look last looked at, the eight-way direction
+# A_Chase walks it, and the tics it keeps that direction.
+def Thing.hurt.health() -> U32:
+  0
+
+def Thing.hurt.target() -> U32:
+  1
+
+def Thing.hurt.reaction() -> U32:
+  2
+
+def Thing.hurt.threshold() -> U32:
+  3
+
+def Thing.hurt.momx() -> U32:
+  4
+
+def Thing.hurt.momy() -> U32:
+  5
+
+def Thing.hurt.flags() -> U32:
+  6
+
+def Thing.hurt.height() -> U32:
+  7
+
+def Thing.hurt.lastlook() -> U32:
+  8
+
+def Thing.hurt.movedir() -> U32:
+  9
+
+def Thing.hurt.movecount() -> U32:
+  10
+
+# Doom's DI_NODIR, the ninth direction, which is none of the eight.
+def Thing.nodir() -> U32:
+  8
+
+def Thing.hurt(th: Thing) -> V.Vec:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = th
+  hurt
+
+def Thing.hurting(th: Thing, hurt: V.Vec) -> Thing:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, was} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}
+
+# Doom's mobj->health, signed: a blow past it kills, and one past its
+# negation gibs.
+def Thing.health(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.health())
+
+# Doom's mobj->target: what the thing is after, its own name for
+# nothing, which is what an explosion credits its kills to.
+def Thing.target(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.target())
+
+def Thing.threshold(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.threshold())
+
+# Doom's mobj->movedir, one of the eight directions A_Chase walks, or
+# DI_NODIR where it can walk none.
+def Thing.movedir(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.movedir())
+
+# Doom's mobj->movecount, signed: the tics left before A_Chase picks
+# another direction.
+def Thing.movecount(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.movecount())
+
+# One of the counts written back.
+def Thing.counted(+th: Thing, +slot: U32, value: U32) -> Thing:
+  Thing.hurting(th, V.Vec.set(Thing.hurt(th), slot, value))
+
+def Thing.momx(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.momx())
+
+def Thing.momy(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.momy())
+
+# Doom's mobj->flags, the definition's until P_KillMobj and A_Fall clear
+# bits of them.
+def Thing.flags(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.flags())
+
+# Doom's mobj->height in fixed point, the definition's until a death
+# quarters it.
+def Thing.height(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.height())
+
+# Whether a flag of the mask is set on the thing.
+def Thing.flagged(th: Thing, +mask: U32) -> Bool:
+  Bool.not(U32.is_zero((Thing.flags(th) .&. mask : U32)))
+
+def Thing.id(th: Thing) -> U32:
+  Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
+  id
+
+def Thing.kind(th: Thing) -> U32:
+  Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
+  kind
+
+def Thing.x(th: Thing) -> U32:
+  Thing{id, kind, +x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
+  x
+
+def Thing.y(th: Thing) -> U32:
+  Thing{id, kind, x, +y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
+  y
+
+def Thing.z(th: Thing) -> U32:
+  Thing{id, kind, x, y, +z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
+  z
+
+def Thing.floorz(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, +floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
+  floorz
+
+def Thing.tics(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt} = th
+  tics
+
+def Thing.angle(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, floorz, ceilz, +angle, sector, state, tics, momz, hurt} = th
+  angle
+
+def Thing.sector(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics, momz, hurt} = th
+  sector
+
+# The thing with some vertical momentum, which P_SpawnBlood gives.
+def Thing.rising(th: Thing, momz: U32) -> Thing:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, was, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}
+
+# The thing with some tics left in the state it stands in.
+def Thing.ticking(th: Thing, tics: U32) -> Thing:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, was, momz, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}
+
+# The thing with the floor and ceiling a move left it between.
+def Thing.between(th: Thing, +floorz: U32, +ceilz: U32) -> Thing:
+  Thing{id, kind, x, y, z, was, old, angle, sector, state, tics, momz, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}
 
 # The player's id on a map with no start for it: one no record has.
 def Thing.you() -> U32:
@@ -36,7 +188,8 @@ def Thing.null() -> U32:
 
 # What a state row does as it is entered, Doom's action pointers: a
 # weapon's A_Raise, A_WeaponReady, A_Lower, A_FirePistol and A_ReFire, a
-# mobj's A_Pain, A_PlayerScream, A_Look, A_Chase, A_FaceTarget,
+# mobj's A_Pain, A_Scream (A_PlayerScream on the player's own rows),
+# A_XScream, A_Fall, A_Explode, A_Look, A_Chase, A_FaceTarget,
 # A_PosAttack and A_SPosAttack, or nothing. A row of one kind never
 # holds the other's.
 type Thing.Action is Data:
@@ -48,6 +201,9 @@ type Thing.Action is Data:
   Lower{}
   Pain{}
   Scream{}
+  XScream{}
+  Fall{}
+  Explode{}
   Look{}
   Chase{}
   Face{}
@@ -71,13 +227,13 @@ type Thing.Row is Data:
 # watches for the player, then the pistol's down state and the player
 # mobj's own, whose death ends in row 0, the corpse a dead marine record
 # spawns in, then the pistol's fire states, its muzzle flash's, the
-# state that puts the flash's light out, the bullet puff's, the
-# monsters' eight run states each, where A_Chase hunts the player, and
-# last the three attack states each of the zombieman and the shotgun
-# guy. Only S_LIGHTDONE, row 84,
-# has 0 tics, and it is a player sprite's; it carries A_Light0 in
-# vanilla and here only puts the light out by being the last row before
-# S_NULL.
+# state that puts the flash's light out, the bullet puff's, then the
+# monsters' eight run states each, where A_Chase hunts the player, their
+# pain, death and gib rows, the barrel's explosion, the blood, and last
+# the three attack rows each of the zombieman and the shotgun guy. A monster's second pain row leads back to its see state.
+# Only S_LIGHTDONE, row 84, has 0 tics, and it is a player sprite's; it
+# carries A_Light0 in vanilla and here only puts the light out by being
+# the last row before S_NULL.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}, 0}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}, 0},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}, 0}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}, 0},
@@ -139,9 +295,41 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"SARG", 1, False{}, 2, 116, Chase{}, 0}, Row{"SARG", 1, False{}, 2, 117, Chase{}, 0},
     Row{"SARG", 2, False{}, 2, 118, Chase{}, 0}, Row{"SARG", 2, False{}, 2, 119, Chase{}, 0},
     Row{"SARG", 3, False{}, 2, 120, Chase{}, 0}, Row{"SARG", 3, False{}, 2, 113, Chase{}, 0},
-    Row{"POSS", 4, False{}, 10, 122, Face{}, 0}, Row{"POSS", 5, False{}, 8, 123, PosAttack{}, 0},
+    Row{"POSS", 6, False{}, 3, 122, Null{}, 0}, Row{"POSS", 6, False{}, 3, 89, Pain{}, 0},
+    Row{"POSS", 7, False{}, 5, 124, Null{}, 0}, Row{"POSS", 8, False{}, 5, 125, Scream{}, 0},
+    Row{"POSS", 9, False{}, 5, 126, Fall{}, 0}, Row{"POSS", 10, False{}, 5, 127, Null{}, 0},
+    Row{"POSS", 11, False{}, 4294967295, 127, Null{}, 0}, Row{"POSS", 12, False{}, 5, 129, Null{}, 0},
+    Row{"POSS", 13, False{}, 5, 130, XScream{}, 0}, Row{"POSS", 14, False{}, 5, 131, Fall{}, 0},
+    Row{"POSS", 15, False{}, 5, 132, Null{}, 0}, Row{"POSS", 16, False{}, 5, 133, Null{}, 0},
+    Row{"POSS", 17, False{}, 5, 134, Null{}, 0}, Row{"POSS", 18, False{}, 5, 135, Null{}, 0},
+    Row{"POSS", 19, False{}, 5, 136, Null{}, 0}, Row{"POSS", 20, False{}, 4294967295, 136, Null{}, 0},
+    Row{"SPOS", 6, False{}, 3, 138, Null{}, 0}, Row{"SPOS", 6, False{}, 3, 97, Pain{}, 0},
+    Row{"SPOS", 7, False{}, 5, 140, Null{}, 0}, Row{"SPOS", 8, False{}, 5, 141, Scream{}, 0},
+    Row{"SPOS", 9, False{}, 5, 142, Fall{}, 0}, Row{"SPOS", 10, False{}, 5, 143, Null{}, 0},
+    Row{"SPOS", 11, False{}, 4294967295, 143, Null{}, 0}, Row{"SPOS", 12, False{}, 5, 145, Null{}, 0},
+    Row{"SPOS", 13, False{}, 5, 146, XScream{}, 0}, Row{"SPOS", 14, False{}, 5, 147, Fall{}, 0},
+    Row{"SPOS", 15, False{}, 5, 148, Null{}, 0}, Row{"SPOS", 16, False{}, 5, 149, Null{}, 0},
+    Row{"SPOS", 17, False{}, 5, 150, Null{}, 0}, Row{"SPOS", 18, False{}, 5, 151, Null{}, 0},
+    Row{"SPOS", 19, False{}, 5, 152, Null{}, 0}, Row{"SPOS", 20, False{}, 4294967295, 152, Null{}, 0},
+    Row{"TROO", 7, False{}, 2, 154, Null{}, 0}, Row{"TROO", 7, False{}, 2, 105, Pain{}, 0},
+    Row{"TROO", 8, False{}, 8, 156, Null{}, 0}, Row{"TROO", 9, False{}, 8, 157, Scream{}, 0},
+    Row{"TROO", 10, False{}, 6, 158, Null{}, 0}, Row{"TROO", 11, False{}, 6, 159, Fall{}, 0},
+    Row{"TROO", 12, False{}, 4294967295, 159, Null{}, 0}, Row{"TROO", 13, False{}, 5, 161, Null{}, 0},
+    Row{"TROO", 14, False{}, 5, 162, XScream{}, 0}, Row{"TROO", 15, False{}, 5, 163, Null{}, 0},
+    Row{"TROO", 16, False{}, 5, 164, Fall{}, 0}, Row{"TROO", 17, False{}, 5, 165, Null{}, 0},
+    Row{"TROO", 18, False{}, 5, 166, Null{}, 0}, Row{"TROO", 19, False{}, 5, 167, Null{}, 0},
+    Row{"TROO", 20, False{}, 4294967295, 167, Null{}, 0}, Row{"SARG", 7, False{}, 2, 169, Null{}, 0},
+    Row{"SARG", 7, False{}, 2, 113, Pain{}, 0}, Row{"SARG", 8, False{}, 8, 171, Null{}, 0},
+    Row{"SARG", 9, False{}, 8, 172, Scream{}, 0}, Row{"SARG", 10, False{}, 4, 173, Null{}, 0},
+    Row{"SARG", 11, False{}, 4, 174, Fall{}, 0}, Row{"SARG", 12, False{}, 4, 175, Null{}, 0},
+    Row{"SARG", 13, False{}, 4294967295, 175, Null{}, 0}, Row{"BEXP", 0, True{}, 5, 177, Null{}, 0},
+    Row{"BEXP", 1, True{}, 5, 178, Scream{}, 0}, Row{"BEXP", 2, True{}, 5, 179, Null{}, 0},
+    Row{"BEXP", 3, True{}, 10, 180, Explode{}, 0}, Row{"BEXP", 4, True{}, 10, 4294967295, Null{}, 0},
+    Row{"BLUD", 2, False{}, 8, 182, Null{}, 0}, Row{"BLUD", 1, False{}, 8, 183, Null{}, 0},
+    Row{"BLUD", 0, False{}, 8, 4294967295, Null{}, 0},
+    Row{"POSS", 4, False{}, 10, 185, Face{}, 0}, Row{"POSS", 5, False{}, 8, 186, PosAttack{}, 0},
     Row{"POSS", 4, False{}, 8, 89, Null{}, 0},
-    Row{"SPOS", 4, False{}, 10, 125, Face{}, 0}, Row{"SPOS", 5, True{}, 10, 126, SPosAttack{}, 0},
+    Row{"SPOS", 4, False{}, 10, 188, Face{}, 0}, Row{"SPOS", 5, True{}, 10, 189, SPosAttack{}, 0},
     Row{"SPOS", 4, False{}, 10, 97, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
@@ -202,110 +390,42 @@ def Thing.play.death() -> U32:
   73
 
 def Thing.state(th: Thing) -> U32:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   state
-
-def Thing.kind(th: Thing) -> U32:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
-  kind
-
-def Thing.x(th: Thing) -> U32:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
-  x
-
-def Thing.y(th: Thing) -> U32:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
-  y
-
-def Thing.angle(th: Thing) -> U32:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
-  angle
 
 # Whether the state lasts, Doom's tics of -1.
 def Thing.lasting(th: Thing) -> Bool:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, ai} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt} = th
   U32.is_eq(tics, 4294967295)
 
 # Whether the tic about to be spent is the state's last.
 def Thing.over(th: Thing) -> Bool:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, ai} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt} = th
   U32.is_eq(tics, 1)
 
 # One tic of the state spent.
 def Thing.spent(th: Thing) -> Thing:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, ai} = th
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, (tics - 1 : U32), momz, ai}
-
-# The counters Doom's mobj_t keeps for a thing that hunts, held in one
-# vector because a record's width is a budget the whole program shares:
-# the player A_Look last looked at, what the thing hunts, the eight-way
-# direction it walks, the tics before it picks another direction, the
-# tics before it may fire, the tics it stays on its target whatever
-# hurts it, and the flags its attacks set, MF_JUSTHIT 64 and
-# MF_JUSTATTACKED 128. A type's own flags never change, so they stay in
-# its definition.
-def Thing.ai.lastlook() -> U32:
-  0
-
-def Thing.ai.target() -> U32:
-  1
-
-def Thing.ai.movedir() -> U32:
-  2
-
-def Thing.ai.movecount() -> U32:
-  3
-
-def Thing.ai.reaction() -> U32:
-  4
-
-def Thing.ai.threshold() -> U32:
-  5
-
-def Thing.ai.flags() -> U32:
-  6
-
-# Doom's DI_NODIR, the ninth direction, which is none of the eight.
-def Thing.nodir() -> U32:
-  8
-
-# A target that is nobody, Doom's NULL: a name no record and no thing
-# spawned in play ever carries, and not the player's own.
-def Thing.nobody() -> U32:
-  4294967294
-
-def Thing.ai(th: Thing) -> V.Vec:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
-  ai
-
-def Thing.at.ai(th: Thing, ai: V.Vec) -> Thing:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, was} = th
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai}
-
-def Thing.counter(th: Thing, +slot: U32) -> U32:
-  V.Vec.get(Thing.ai(th), slot)
-
-def Thing.counted(+th: Thing, +slot: U32, value: U32) -> Thing:
-  Thing.at.ai(th, V.Vec.set(Thing.ai(th), slot, value))
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, (tics - 1 : U32), momz, hurt}
 
 # The thing having looked: Doom's P_LookForPlayers leaves lastlook at
 # the one player in the game whether it found it or not.
-def Thing.looked(th: Thing) -> Thing:
-  Thing.counted(th, Thing.ai.lastlook(), 0)
+def Thing.looked(+th: Thing) -> Thing:
+  Thing.hurting(th, V.Vec.set(Thing.hurt(th), Thing.hurt.lastlook(), 0))
 
 # Doom's P_LookForPlayers with one player in the game: the loop starts
 # at lastlook and stops at (lastlook - 1) & 3, so a monster that spawned
 # looking at player 2 reaches player 1 on the turn that stops it and
 # sees nothing at all. Every other start reaches player 1 first.
 def Thing.blind(th: Thing) -> Bool:
-  U32.is_eq(Thing.counter(th, Thing.ai.lastlook()), 1)
+  U32.is_eq(V.Vec.get(Thing.hurt(th), Thing.hurt.lastlook()), 1)
 
 # The state half of Doom's P_SetMobjState: the thing in a state, for
 # that state's tics. The action the state runs on entry is the sim's,
 # which has the rest of the game to run it against.
 def Thing.entering(th: Thing, +state: U32) -> Thing:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, was, tics, momz, ai} = th
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, Thing.Row.tics(Thing.row(state)), momz, ai}
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, was, tics, momz, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, Thing.Row.tics(Thing.row(state)), momz, hurt}
 
 # A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
 # radius and height in map units, vanilla's flags: 1 special, 2
@@ -327,19 +447,25 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{2018, 6, 20, 16, 1}, Def{2019, 8, 20, 16, 1}, Def{2023, 34, 20, 16, 8388609}, Def{2028, 49, 16, 16, 2},
     Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
     Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
-    Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}, Def{4294967295, 85, 20, 16, 528}]
+    Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}, Def{4294967295, 85, 20, 16, 528},
+    Def{4294967294, 181, 20, 16, 16}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
 def Thing.puff() -> U32:
   4294967295
 
+# MT_BLOOD's DoomEd type, -1 in vanilla too: the one type here that
+# needs a name of its own, since the puff has taken -1. Nothing but a
+# bullet in flesh spawns it.
+def Thing.blood() -> U32:
+  4294967294
+
 def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
   kind
 
-# A type's spawn state, the row A_Chase sends a thing back to when it
-# has no target left.
+# A type's spawn state, Doom's mobjinfo spawnstate.
 def Thing.Def.state(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
   state
@@ -381,12 +507,6 @@ def Thing.seesound(+kind: U32) -> U32:
 def Thing.speed(+kind: U32) -> U32:
   Bool.pick(U32, U32.is_eq(kind, 3002), 10, 8)
 
-# Doom's mobjinfo reactiontime, the tics a woken thing waits before it
-# may fire, which P_SpawnMobj gives it. Every type in info.c but the
-# player's mobj has 8, and the player is not one of these things.
-def Thing.reaction() -> U32:
-  8
-
 # Doom's mobjinfo activesound, the call a chasing thing makes on a draw
 # under 3.
 def Thing.activesound(+kind: U32) -> U32:
@@ -406,16 +526,56 @@ def Thing.melee(+kind: U32) -> U32:
   0
 
 def Thing.missile(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3004), 121, Bool.pick(U32, U32.is_eq(kind, 9), 124, 0))
+  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187, 0))
 
-# The counters P_SpawnMobj gives a thing: the player its draw left
-# A_Look looking at, no target, no move or threshold count, the
-# reaction time, and no flags. The direction is east and not none,
-# because P_SpawnMobj clears the whole mobj and DI_EAST is the zero of
-# dirtype_t; a thing's first A_Chase therefore snaps its facing to the
-# eight directions and turns it, where DI_NODIR would leave it alone.
-def Thing.ai.start(+lastlook: U32) -> V.Vec:
-  V.Vec.of_list([lastlook, Thing.nobody(), 0, 0, Thing.reaction(), 0, 0], 7)
+# The rest of Doom's mobjinfo for the types a blow reaches, read by kind
+# for the same reason: the spawn health, the pain chance, the rows of
+# the pain state, the death and the gib death, the mass the thrust
+# divides by, and the sounds A_Pain and A_Scream start, S_NULL for a row
+# the type has none of and 0 for silence. Every other type is scenery at
+# vanilla's default health of 1000 and mass of 100, which no blow
+# reaches, since nothing that is not shootable is ever damaged.
+def Thing.fight(+kind: U32) -> V.Vec:
+  V.Vec.of(Bool.pick(List<&2, U32>, U32.is_eq(kind, 3004), [20, 200, 121, 123, 128, 100, 27, 59],
+    Bool.pick(List<&2, U32>, U32.is_eq(kind, 9), [30, 170, 137, 139, 144, 100, 27, 60],
+      Bool.pick(List<&2, U32>, U32.is_eq(kind, 3001), [60, 200, 153, 155, 160, 100, 27, 62],
+        Bool.pick(List<&2, U32>, U32.is_eq(kind, 3002), [150, 180, 168, 170, 4294967295, 400, 26, 64],
+          Bool.pick(List<&2, U32>, U32.is_eq(kind, 2035), [20, 0, 4294967295, 176, 4294967295, 100, 0, 82],
+            [1000, 0, 4294967295, 4294967295, 4294967295, 100, 0, 0]))))))
+
+def Thing.spawnhealth(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 0)
+
+def Thing.painchance(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 1)
+
+def Thing.painstate(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 2)
+
+def Thing.deathstate(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 3)
+
+def Thing.xdeathstate(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 4)
+
+def Thing.mass(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 5)
+
+def Thing.painsound(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 6)
+
+def Thing.deathsound(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 7)
+
+# Doom's mobj_t as P_SpawnMobj leaves it: the type's spawn health, no
+# target, vanilla's reaction time of 8, no threshold, no momentum, the
+# type's flags and height, which only a death changes, the player the
+# spawn's draw left it looking at, and a direction of east with no tics
+# on it: P_SpawnMobj clears the whole mobj and DI_EAST is the zero of
+# dirtype_t, so a thing's first A_Chase snaps its facing to the eight
+# directions and turns it, where DI_NODIR would leave it alone.
+def Thing.Hurt.start(+kind: U32, flags: U32, height: U32, lastlook: U32) -> V.Vec:
+  V.Vec.of([Thing.spawnhealth(kind), Thing.you(), 8, 0, 0, 0, flags, height, lastlook, 0, 0])
 
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:
@@ -440,35 +600,52 @@ def Thing.def(kind: U32) -> Maybe<&2, Thing.Def>:
 def Thing.info(+kind: U32) -> Thing.Def:
   Maybe.default(&2, Thing.Def, Thing.def(kind), Def{kind, 0, 0, 0, 0})
 
+# What P_SpawnMobj leaves on a thing of a type that never looked, for a
+# caller that has the type and not its definition in hand.
+def Thing.Hurt.of(+kind: U32) -> V.Vec:
+  Thing.Hurt.start(kind, Thing.Def.flags(Thing.info(kind)),
+    F.Fixed.of_map(Thing.Def.height(Thing.info(kind))), 0)
+
 # Doom's P_ZMovement's clip, under the ceiling: a rising mobj that meets
 # it stops there.
-def Thing.z.ceiling(hit: Bool, +z: U32, +momz: U32, +ceilz: U32, +height: U32) -> U32 & U32:
+def Thing.zmove.ceiling(hit: Bool, +z: U32, +momz: U32, +ceilz: U32, +height: U32) -> U32 & U32:
   match hit:
     case True{}:
       ((ceilz - height : U32), Bool.pick(U32, F.Fixed.gt(momz, 0), 0, momz))
     case False{}:
       (z, momz)
 
+# Doom's GRAVITY, a unit a tic, doubled on the tic a mobj first falls.
+def Thing.zmove.pull(+momz: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(momz), F.Fixed.neg((F.Fixed.unit() * 2 : U32)), (momz - F.Fixed.unit() : U32))
+
 # Doom's P_ZMovement for the things Bendoom moves: the mobj rises by its
-# momentum and stops where the floor or the ceiling is. Gravity has no
-# caller, since every thing that leaves its floor is flagged without it.
-def Thing.z.floor(hit: Bool, +z: U32, +momz: U32, +floorz: U32, +ceilz: U32, +height: U32) -> U32 & U32:
-  match hit:
-    case True{}:
-      Thing.z.ceiling(F.Fixed.gt((floorz + height : U32), ceilz), floorz, 0, ceilz, height)
-    case False{}:
-      Thing.z.ceiling(F.Fixed.gt((z + height : U32), ceilz), z, momz, ceilz, height)
+# momentum and stops where the floor or the ceiling is, and off the
+# floor gravity pulls it down unless its flags say otherwise. A mobj
+# that lands keeps a rising momentum, as vanilla clears a falling one
+# alone.
+def Thing.zmove.floor(hit: Bool, gravity: Bool, +z: U32, +momz: U32, +floorz: U32, +ceilz: U32, +height: U32) ->
+  U32 & U32:
+  match hit gravity:
+    case True{} _:
+      Thing.zmove.ceiling(F.Fixed.gt((floorz + height : U32), ceilz), floorz,
+        Bool.pick(U32, F.Fixed.lt(momz, 0), 0, momz), ceilz, height)
+    case False{} False{}:
+      Thing.zmove.ceiling(F.Fixed.gt((z + height : U32), ceilz), z, momz, ceilz, height)
+    case False{} True{}:
+      Thing.zmove.ceiling(F.Fixed.gt((z + height : U32), ceilz), z, Thing.zmove.pull(momz), ceilz, height)
 
-def Thing.z.put(thing: Thing, zm: U32 & U32) -> Thing:
-  Thing{id, kind, x, y, was, floorz, ceilz, angle, sector, state, tics, old, ai} = thing
+def Thing.zmove.put(thing: Thing, zm: U32 & U32) -> Thing:
+  Thing{id, kind, x, y, was, floorz, ceilz, angle, sector, state, tics, old, hurt} = thing
   (z, momz) = zm
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai}
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}
 
-def Thing.z(thing: Thing) -> Thing:
-  Thing{id, +kind, x, y, +z, +floorz, +ceilz, angle, sector, state, tics, +momz, ai} = thing
-  +height = F.Fixed.of_map(Thing.Def.height(Thing.info(kind)))
-  Thing.z.put(Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai},
-    Thing.z.floor(F.Fixed.le((z + momz : U32), floorz), (z + momz : U32), momz, floorz, ceilz, height))
+def Thing.zmove(thing: Thing) -> Thing:
+  Thing{id, kind, x, y, +z, +floorz, +ceilz, angle, sector, state, tics, +momz, +hurt} = thing
+  +height = V.Vec.get(hurt, Thing.hurt.height())
+  +falls = U32.is_zero((V.Vec.get(hurt, Thing.hurt.flags()) .&. 512 : U32))
+  Thing.zmove.put(Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
+    Thing.zmove.floor(F.Fixed.le((z + momz : U32), floorz), falls, (z + momz : U32), momz, floorz, ceilz, height))
 
 # The vertical half of Doom's P_MobjThinker, run for a mobj off its
 # floor or with momentum, as vanilla runs P_ZMovement. A thing that
@@ -478,18 +655,18 @@ def Thing.tic.z(moves: Bool, thing: Thing) -> Thing:
     case False{}:
       thing
     case True{}:
-      Thing.z(thing)
+      Thing.zmove(thing)
 
 # The vertical half of a thing's tic, run before the state half, which
 # is the sim's because a state's action is.
 def Thing.risen(thing: Thing) -> Thing:
-  Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, +momz, ai} = thing
+  Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, +momz, hurt} = thing
   Thing.tic.z(Bool.or(Bool.not(U32.is_eq(z, floorz)), Bool.not(U32.is_zero(momz))),
-    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai})
+    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt})
 
 # Whether a thing has entered S_NULL and so removed itself.
 def Thing.gone(thing: Thing) -> Bool:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, ai} = thing
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, hurt} = thing
   U32.is_eq(state, Thing.null())
 
 # Doom's ONFLOORZ and ONCEILINGZ: a z that asks P_SpawnMobj for the
@@ -506,18 +683,19 @@ def Thing.onceiling() -> U32:
 # facing east, held between the floor and ceiling of the sector under
 # it.
 def Thing.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, +z: U32, lastlook: U32) -> Thing:
-  Def{+kind, +state, radius, height, flags} = d
+  Def{+kind, +state, radius, +height, +flags} = d
   +sector = L.Level.sector_at(level, x, y)
   +floor = L.Level.floor(level, sector)
   +ceil = L.Level.ceil(level, sector)
   Thing{id, kind, x, y, Bool.pick(U32, U32.is_eq(z, Thing.onfloor()), floor,
       Bool.pick(U32, U32.is_eq(z, Thing.onceiling()), (ceil - F.Fixed.of_map(height) : U32), z)), floor, ceil, 0,
-    sector, state, Thing.Row.tics(Thing.row(state)), 0, Thing.ai.start(lastlook)}
+    sector, state, Thing.Row.tics(Thing.row(state)), 0,
+    Thing.Hurt.start(kind, flags, F.Fixed.of_map(height), lastlook)}
 
 # The thing with its centre at another place, in the sector under it.
 def Thing.at(th: Thing, level: L.Level, +x: U32, +y: U32) -> Thing:
-  Thing{id, kind, ox, oy, z, floorz, ceilz, angle, was, state, tics, momz, ai} = th
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, L.Level.sector_at(level, x, y), state, tics, momz, ai}
+  Thing{id, kind, ox, oy, z, floorz, ceilz, angle, was, state, tics, momz, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, L.Level.sector_at(level, x, y), state, tics, momz, hurt}
 
 # The things spawned, the last first while they spawn, the random
 # index, and player 1's start record, the player's own name before one
@@ -526,8 +704,8 @@ type Thing.Spawn is Data:
   Spawn{things: List<&2, Thing>, rnd: U32, you: U32}
 
 def Thing.spawn.facing(th: Thing, angle: U32, tics: U32) -> Thing:
-  Thing{id, kind, x, y, z, floorz, ceilz, east, sector, state, first, momz, ai} = th
-  Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of_thing(angle), sector, state, tics, momz, ai}
+  Thing{id, kind, x, y, z, floorz, ceilz, east, sector, state, first, momz, hurt} = th
+  Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of_thing(angle), sector, state, tics, momz, hurt}
 
 # The rest of Doom's P_SpawnMapThing: one random number drawn for the
 # mobj, whose remainder by MAXPLAYERS is its lastlook, and one more for
@@ -701,12 +879,12 @@ def Things.unlink(ts: Things, bm: L.Level.Blockmap, unlisted: Bool, id: U32, x: 
 # The population with a thing in it, linked where it is: one that
 # spawned, or one that moved, once unlinked from where it was.
 def Things.entered(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
-  Thing{+id, +kind, +x, +y, z, floorz, ceilz, angle, +sector, state, tics, momz, ai} = th
+  Thing{+id, +kind, +x, +y, z, floorz, ceilz, angle, +sector, state, tics, momz, hurt} = th
   Things.link(Things.put(ts, id, Some{Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz,
-    ai}}), bm, Thing.Def.unlisted(Thing.info(kind)), id, x, y, sector)
+    hurt}}), bm, Thing.Def.unlisted(Thing.info(kind)), id, x, y, sector)
 
 def Things.unlinked(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
-  Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
+  Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   Things.unlink(ts, bm, Thing.Def.unlisted(Thing.info(kind)), id, x, y, sector)
 
 # A thing at another place, once unlinked from where it was: Doom's
@@ -717,9 +895,9 @@ def Things.moved(ts: Things, +bm: L.Level.Blockmap, was: Thing, now: Thing) -> T
 # Doom's P_RemoveMobj: the thing unlinked and gone, its id never used
 # again, and its sound stopped.
 def Things.removed(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
-  Thing{+id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} = th
+  Thing{+id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   Things.sounded(Things.put(Things.unlinked(ts, bm,
-    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai}), id, None{}),
+    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}), id, None{}),
     Sn.Stop{Sn.Thing{id}})
 
 def Things.linked.at(inside: Bool, cells: V.Tree<List<&2, U32>>, i: U32) -> List<&2, U32>:
@@ -802,7 +980,7 @@ def Things.gone(before: List<&2, Thing>, +after: Things) -> String:
   match before:
     case []:
       ""
-    case Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} <> rest:
+    case Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
       Things.gone.name(Things.get(after, id), id, Things.gone(rest, after))
 
 # How many things are left and the names of those gone since a first

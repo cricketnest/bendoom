@@ -14,7 +14,9 @@
 # after the same script, over all 200 rows but for the pause graphic and
 # the box the marine's face covers: the status bar's ticker runs on
 # while the playsim is paused, so the face keeps changing under the
-# screenshot. The default script idles 20 tics, past the pistol's rise.
+# screenshot. The report counts that box separately, as `face`, which is
+# 0 only where the face holds still under the pause, as the dead one
+# does. The default script idles 20 tics, past the pistol's rise.
 # Both games wake a monster that sees the player on the same tic, but
 # vanilla's chases from that tic and Bendoom's stands until milestone
 # 6's ticket 16, so a place compares the two only while no monster has
@@ -40,37 +42,6 @@ def pcx-indices []: binary -> list<string> {
   | str replace --all --regex '(..)' '$1 '
   | str replace --all --regex 'c1 (..)' '$1'
   | str trim | split row ' '
-}
-
-# The posts of the patch column whose first is at the offset piped in:
-# each one's first row in the patch, its length, and where its pixels
-# start, up to the column's 255.
-def posts [wad: binary]: int -> table<delta: int, length: int, pixels: int> {
-  let first = $in
-  generate {|at|
-    let delta = $wad | bytes at $at..$at | into int
-    if $delta != 255 {
-      let length = $wad | bytes at ($at + 1)..($at + 1) | into int
-      {out: {delta: $delta, length: $length, pixels: ($at + 3)}, next: ($at + $length + 4)}
-    }
-  } $first
-}
-
-# The pixels a patch covers when drawn at x, y, its offsets taken off as
-# V_DrawPatch takes them: each one's frame index and colour.
-def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<at: int, colour: string> {
-  let patch = $wad | lumps | where name == $name | last | get pos
-  let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
-  let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
-  let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
-  0..<$width | each {|c|
-    $patch + ($wad | bytes at ($patch + 8 + $c * 4)..($patch + 11 + $c * 4) | into int --endian little)
-    | posts $wad
-    | each {|post| 0..<$post.length | each {|k| {
-        at: (($top + $post.delta + $k) * 320 + $left + $c)
-        colour: ($wad | bytes at ($post.pixels + $k)..($post.pixels + $k) | encode hex | str lowercase)
-      } } }
-  } | flatten | flatten
 }
 
 # Every frame pixel the marine's face can cover: the box around the
@@ -167,13 +138,16 @@ def main [
   let shot = vanilla ($bytes | placed $x $y $angle $things) $name $paused $tics $pause $dir
   let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let masked = ($pause | get at) ++ (face-box $bytes)
-  let differing = 0..<(200 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
+  let box = face-box $bytes
+  let masked = ($pause | get at) ++ $box
+  let off = 0..<(200 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) }
+  let differing = $off | where $it not-in $masked
   if not $keep { rm --recursive $dir }
   {
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
+    face: ($off | where $it in $box | length)
     masked: ($masked | uniq | where $it < 200 * 320 | length)
     first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })

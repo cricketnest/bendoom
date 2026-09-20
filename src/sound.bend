@@ -36,6 +36,15 @@ def Sound.swtchn() -> U32:
 def Sound.plpain() -> U32:
   25
 
+def Sound.dmpain() -> U32:
+  26
+
+def Sound.popain() -> U32:
+  27
+
+def Sound.slop() -> U32:
+  31
+
 def Sound.itemup() -> U32:
   32
 
@@ -62,6 +71,20 @@ def Sound.oof() -> U32:
 def Sound.pldeth() -> U32:
   57
 
+# The three zombie death sounds and the two imp ones are groups A_Scream
+# draws one of; the demon's and the barrel's stand alone.
+def Sound.podth1() -> U32:
+  59
+
+def Sound.bgdth1() -> U32:
+  62
+
+def Sound.sgtdth() -> U32:
+  64
+
+def Sound.barexp() -> U32:
+  82
+
 def Sound.noway() -> U32:
   81
 
@@ -84,9 +107,11 @@ def Sound.table() -> List<&2, Sound.Sfx>:
     Sfx{21, "DSDORCLS", 100}, Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{25, "DSPLPAIN", 96},
     Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78}, Sfx{34, "DSOOF", 96}, Sfx{57, "DSPLDETH", 32},
     Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100}, Sfx{93, "DSGETPOW", 60},
-    Sfx{36, "DSPOSIT1", 98}, Sfx{37, "DSPOSIT2", 98}, Sfx{38, "DSPOSIT3", 98}, Sfx{39, "DSBGSIT1", 98},
-    Sfx{40, "DSBGSIT2", 98}, Sfx{41, "DSSGTSIT", 98}, Sfx{2, "DSSHOTGN", 64}, Sfx{75, "DSPOSACT", 120},
-    Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}]
+    Sfx{26, "DSDMPAIN", 96}, Sfx{27, "DSPOPAIN", 96}, Sfx{31, "DSSLOP", 78}, Sfx{36, "DSPOSIT1", 98},
+    Sfx{37, "DSPOSIT2", 98}, Sfx{38, "DSPOSIT3", 98}, Sfx{39, "DSBGSIT1", 98}, Sfx{40, "DSBGSIT2", 98},
+    Sfx{41, "DSSGTSIT", 98}, Sfx{59, "DSPODTH1", 70}, Sfx{60, "DSPODTH2", 70}, Sfx{61, "DSPODTH3", 70},
+    Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
+    Sfx{2, "DSSHOTGN", 64}, Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel

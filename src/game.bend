@@ -36,7 +36,7 @@ def Game.shown(level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, state: S.St
 def Game.view(g: Game) -> Game & Image:
   Game{level, +gfx, +tables, +state, input, again, last, owed, mem, demo, music} = g
   Game.shown(level, gfx, tables, state, input, again, last, owed, demo, music,
-    V.Show.image(R.Render.frame(tables, gfx, state, mem)))
+    V.Show.image(R.Render.frame(tables, gfx, state, True{}, mem)))
 
 def Game.key(+code: U32, +down: Bool, g: Game) -> Game:
   Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
@@ -132,7 +132,8 @@ def Game.advanced(+from: S.State, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, l
   tables: P.Project.Tables, input: K.Input, again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
   music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
-  Game.started(S.State.ended(from), demo, level, gfx, tables, input, again, last, owed, mem, music,
+  +was = S.State.ended(from)
+  Game.started(was, demo, level, gfx, tables, input, again, last, owed, mem, music,
     Game.tics(cmds, [], from))
 
 # The one path back to a fresh level, from the map as loaded: a press of
