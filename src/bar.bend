@@ -212,3 +212,33 @@ def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +face: U32, +gfx: G.Gfx, 
   Array<U32>:
   Bar.icons(inv, face, gfx,
     Bar.numbers(inv, H.Thing.Weapon.ammo(ready), gfx, Bar.patch(G.Gfx.bar(gfx, Bar.back()), 0, 168, mem)))
+
+# The palette
+# -----------
+
+# ST_doPaletteStuff's berserk fade, 12 - (strength >> 6), which stands
+# in for the damage count while it is the larger. It is nothing once the
+# power is off, and nothing again once it has counted past 768, where
+# vanilla's int goes negative and loses to a count that never is.
+def Bar.fade(+strength: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(strength), 0, (12 - U32.min(12, (strength >> 6n : U32)) : U32))
+
+# One of the eight red palettes from STARTREDPALS, a step every eight
+# counts, the eighth held past that.
+def Bar.red(+cnt: U32) -> U32:
+  (1 + U32.min(7, ((cnt + 7 : U32) >> 3n : U32)) : U32)
+
+# One of the four gold palettes from STARTBONUSPALS, the same steps.
+def Bar.gold(+bonus: U32) -> U32:
+  (9 + U32.min(3, ((bonus + 7 : U32) >> 3n : U32)) : U32)
+
+def Bar.palette.of(+cnt: U32, +bonus: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(cnt), Bool.pick(U32, U32.is_zero(bonus), 0, Bar.gold(bonus)), Bar.red(cnt))
+
+# ST_doPaletteStuff: which of PLAYPAL's fourteen palettes the frame is
+# shown in. Red by the damage count or the berserk fade, whichever is
+# larger; gold by the pickup flash where no red is due; the plain
+# palette otherwise. Neither map spawns a radiation suit on this skill,
+# so RADIATIONPAL is never picked.
+def Bar.palette(+damage: U32, +strength: U32, +bonus: U32) -> U32:
+  Bar.palette.of(U32.max(damage, Bar.fade(strength)), bonus)

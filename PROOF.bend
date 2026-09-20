@@ -427,6 +427,9 @@ def Laws.damage_count():
 def Laws.pain_offset():
   {==}
 
+def Laws.damage_palette():
+  {==}
+
 def Laws.ray_meets():
   {==}
 
@@ -1321,7 +1324,7 @@ def fit_taken(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Invent
 
 def thing_fin_taken(go: Bool, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32,
   +r: U32, +floor: U32, +ceil: U32, s: S.State,
-  taken: {True{} == S.Sim.Walk.ok(S.Sim.thing.move.fin(go, th, id, level, ox, oy, x, y, r, floor, ceil,
+  taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.fin(go, th, id, level, ox, oy, x, y, r, floor, ceil,
     s)) : Bool}) -> {True{} == go : Bool}:
   match go:
     case False{}:
@@ -1344,7 +1347,7 @@ def walks_taken(f: S.Sim.Fit, +z: U32, +height: U32, e: {True{} == S.Sim.walks(f
 
 def thing_fit_taken(+z: U32, +height: U32, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32,
   +x: U32, +y: U32, +r: U32, f: S.Sim.Fit, s: S.State,
-  taken: {True{} == S.Sim.Walk.ok(S.Sim.thing.move.fit(z, height, th, id, level, ox, oy, x, y, r, f,
+  taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.fit(z, height, th, id, level, ox, oy, x, y, r, f,
     s)) : Bool}) -> {True{} == S.Sim.Fit.ok(f) : Bool}:
   match f:
     case S.Fit{+ok, +floor, +ceil, +drop}:

@@ -465,6 +465,29 @@ law pain_offset:
     == (0, 0, 0, 8, 8, 16, 16, 24, 24, 32, 32)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
+# The palette a damage count, a berserk counter and a pickup flash pick.
+def Closed.palette(damage: U32, strength: U32, bonus: U32) -> U32:
+  Y.Bar.palette(damage, strength, bonus)
+
+# LAW: ST_doPaletteStuff's palette at each step's edge, st_stuff.c by
+# hand. A count steps the red palette every eight from STARTREDPALS 1,
+# by (cnt+7)>>3, and holds at the eighth, so counts 1 to 8 pick 2, 9
+# picks 3, and 64 and the capped 100 both pick the last red 8. The
+# berserk fade 12 - (strength>>6) stands in for the count while it is
+# larger: the tic the pack is taken picks 3, the counter at 256 picks 2,
+# at 768 the fade is gone and at 4096 vanilla's int is negative, both
+# leaving the count to speak. A pickup flash steps the gold palette the
+# same way from STARTBONUSPALS 9, so 1 to 8 pick 10, 9 picks 11, and 25
+# holds at the last gold 12; a flash under a count picks no gold.
+law damage_palette:
+  {(Closed.palette(0, 0, 0), Closed.palette(1, 0, 0), Closed.palette(8, 0, 0), Closed.palette(9, 0, 0),
+    Closed.palette(64, 0, 0), Closed.palette(100, 0, 0), Closed.palette(0, 0, 1), Closed.palette(0, 0, 6),
+    Closed.palette(0, 0, 8), Closed.palette(0, 0, 9), Closed.palette(0, 0, 25), Closed.palette(0, 1, 0),
+    Closed.palette(0, 256, 0), Closed.palette(0, 768, 0), Closed.palette(0, 4096, 0),
+    Closed.palette(100, 1, 0), Closed.palette(0, 768, 6))
+    == (0, 2, 2, 3, 8, 8, 10, 10, 10, 11, 12, 3, 2, 0, 0, 8, 10)
+    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
+
 # The movers' closed laws stand on a literal level: a west room (sector
 # 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
 # 2, ceiling 72), all floors at 0, 16 units of door from x 64 to x 80.
@@ -1438,7 +1461,7 @@ law thing_move_is_checked:
   for +ts: H.Things
   for +p: S.Player
   for s: S.State
-  for taken: {True{} == S.Sim.Walk.ok(S.Sim.thing.move.met(m, th, id, level, x, y, ts, p, s)) : Bool}
+  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y, ts, p, s)) : Bool}
   {True{} == S.Sim.Fit.ok(S.Sim.check(level, ts, p, S.Sim.Body.at(m, x, y), 3)) : Bool}
 
 # LAW: clear is pinned to the mobjs: when nothing stops a box, every
@@ -1956,7 +1979,7 @@ law wall_column:
       10485760, 4194304, 1073741824, 0),
     R.Segs.iscale(65536), R.Segs.iscale(4194304), R.Segs.iscale(256),
     R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
-    == (63, 4294967199, 65535, 1023, 16777215, 70912, 67072)
+    == (63, 4294967199, 65535, 1023, 16777215, 74240, 70400)
     : U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # LAW: a range's silhouette, with the eye 41 over a floor at 8 under a
@@ -2024,13 +2047,13 @@ law sprite_columns:
   {(Sprite.at(1, 10485760, 0, 0), Sprite.at(2, 10485760, 9830400, 0), Sprite.at(3, 10485760, 4285136896, 1),
     Sprite.at(4, 10485760, 26214400, 0), Sprite.at(5, 20971520, 0, 0), Sprite.at(6, 20971520, 20185088, 1),
     Z.Sprites.col.of(0, Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000,
-      65792, 1, 6}, Z.Sprites.unclipped(), Z.Sprites.unclipped()))
-    == ([Z.Vis{128, 191, 65536, 10485760, 0, 0, 3670016, 983040, 0, 65536, 1000, 65792, 1, 1}],
-      [Z.Vis{0, 41, 65536, 10485760, 9830400, 0, 3670016, 983040, 1441792, 65536, 1000, 65792, 1, 2}],
-      [Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760, 2000, 65792, 1, 3}],
-      [], [Z.Vis{144, 175, 32768, 20971520, 0, 0, 3670016, 983040, 0, 131072, 1000, 65792, 1, 5}],
-      [Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000, 65792, 1, 6}],
-      Q.Col{0, 5013504, 32768, 983040, 131072, 65792, 4294967295, 168})
+      69120, 1, 6}, Z.Sprites.unclipped(), Z.Sprites.unclipped()))
+    == ([Z.Vis{128, 191, 65536, 10485760, 0, 0, 3670016, 983040, 0, 65536, 1000, 69120, 1, 1}],
+      [Z.Vis{0, 41, 65536, 10485760, 9830400, 0, 3670016, 983040, 1441792, 65536, 1000, 69120, 1, 2}],
+      [Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760, 2000, 69120, 1, 3}],
+      [], [Z.Vis{144, 175, 32768, 20971520, 0, 0, 3670016, 983040, 0, 131072, 1000, 69120, 1, 5}],
+      [Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000, 69120, 1, 6}],
+      Q.Col{0, 5013504, 32768, 983040, 131072, 69120, 4294967295, 168})
     : List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis>
       & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & Q.Masked.Col}
 
@@ -2095,7 +2118,7 @@ law plane_span:
       V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{20971520}, V.Leaf{65537}, V.Leaf{0}, 0}, 0},
       0, 409, 2686976, 8, 0}, 84, 0),
     D.Draw.span.pack(98304, 147456), D.Draw.span.spot(100665600))
-    == (128, 384, 71424, 72960, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 72960}, 100665600, 129)
+    == (128, 384, 74752, 76288, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 76288}, 100665600, 129)
     : U32 & U32 & U32 & U32 & U32 & U32 & N.Planes.Step & U32 & U32}
 
 # A checker to ride the draw's loop: whether every index so far was the
