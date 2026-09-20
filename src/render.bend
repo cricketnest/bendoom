@@ -57,7 +57,8 @@ def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.
 # walls' scroll from its clock. The view fills the frame's first 168
 # rows and the status bar the 32 under it.
 def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> Array<U32>:
-  Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)), gfx,
+  Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)),
+    S.Sim.Face.index(S.State.face(s)), gfx,
     Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
       G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.shown(S.State.things(s)),
       S.State.player(s), mem))

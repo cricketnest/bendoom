@@ -423,6 +423,9 @@ def Laws.armour_absorbs():
 def Laws.damage_count():
   {==}
 
+def Laws.pain_offset():
+  {==}
+
 def Laws.ray_meets():
   {==}
 

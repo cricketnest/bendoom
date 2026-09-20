@@ -943,16 +943,30 @@ def Gfx.bar.numbered(n: Nat, +name: String, +first: U32) -> List<&2, String>:
     case 1n+m:
       (name ++ U32.show(first)) <> Gfx.bar.numbered(m, name, (first + 1 : U32))
 
+# ST_loadUnloadGraphics' face states, in the order it numbers them: for
+# each of the five pain levels the three straight faces, the turn right,
+# the turn left, the ouch, the evil grin and the rampage, then the god
+# and the dead face.
+def Gfx.bar.faces(n: Nat, +i: U32) -> List<&2, String>:
+  match n:
+    case 0n:
+      ["STFGOD0", "STFDEAD0"]
+    case 1n+m:
+      +d = U32.show(i)
+      List.append(&2, String, ["STFST" ++ d ++ "0", "STFST" ++ d ++ "1", "STFST" ++ d ++ "2",
+        "STFTR" ++ d ++ "0", "STFTL" ++ d ++ "0", "STFOUCH" ++ d, "STFEVL" ++ d, "STFKILL" ++ d],
+        Gfx.bar.faces(m, (i + 1 : U32)))
+
 # The patches ST_loadGraphics loads that a single player's bar draws, in
 # the order Gfx.bar numbers them: the ten tall digits, the ten short
 # ones, the percent sign, the six key icons, the six grey weapon
-# numbers, the arms panel, and the background. STMBARL and STMBARR
-# belong to Doom 1.0, which neither WAD is; the minus sign shows on a
-# negative count alone, the face background on a net game's bar, and the
-# faces are ticket 23's.
+# numbers, the arms panel, the background, and the 42 faces. STMBARL and
+# STMBARR belong to Doom 1.0, which neither WAD is; the minus sign shows
+# on a negative count alone and the face background on a net game's bar.
 def Gfx.bar.names() -> List<&2, String>:
   List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),
-    ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"]])
+    ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"],
+    Gfx.bar.faces(5n, 0)])
 
 # Loading
 # -------
@@ -1354,7 +1368,7 @@ def Gfx.sprite(+g: Gfx, state: U32, rot: U32, k: U32) -> U32:
 # The index in the array of status bar patch k: 0 to 9 the tall digits,
 # 10 to 19 the short ones, 20 the percent sign, 21 to 26 the key icons,
 # 27 to 32 the grey weapon numbers, 33 the arms panel, 34 the
-# background, as Gfx.bar.names() lists them.
+# background, 35 to 76 the faces, as Gfx.bar.names() lists them.
 def Gfx.bar(+g: Gfx, k: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, bar} = g
   V.Vec.get(bar, k)
