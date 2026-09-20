@@ -1,7 +1,9 @@
 # A measurement, not a test: the game's own loop in its window for 600
-# frames, the frames a second it made, and, with the music playing, on
-# how many of them the device's queue was empty before the write; the
-# first always is, since nothing has been written yet. WALK=1 holds the
+# frames, the frames a second it made, and, with the song and the tics'
+# sounds mixed, on how many of them the device's queue was empty before
+# the write; the first always is, since nothing has been written yet.
+# The script below is the one that keeps channels busy: its door sounds
+# open and close over the music. WALK=1 holds the
 # run, up and left keys, so the player runs in circles some 135 units
 # across through the start room and the hall beyond its gate, sliding
 # along what it meets; without it the player stands at the start. SCRIPT
