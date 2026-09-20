@@ -1,12 +1,12 @@
 # Doom's info.c, P_SpawnMobj, P_SpawnMapThing, P_SetThingPosition,
 # P_RemoveMobj, P_ZMovement and the state half of P_MobjThinker for the
 # things Bendoom spawns: the definitions of the DoomEd types either E1M1
-# places, less the monsters and the starts, the state rows their spawn
-# states lead to and the pistol's with its entry in d_items.c's
-# weaponinfo and the bullet puff's, the map's THINGS records made the
-# level's first things, a thing's tic through its states and up by its
-# vertical momentum, and the population with its blockmap and sector
-# links.
+# places, less the starts and the spectre, which Hurt Me Plenty never
+# spawns, the state rows their spawn states lead to and the pistol's
+# with its entry in d_items.c's weaponinfo and the bullet puff's, the
+# map's THINGS records made the level's first things, a thing's tic
+# through its states and up by its vertical momentum, and the population
+# with its blockmap and sector links.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
@@ -34,14 +34,19 @@ def Thing.you() -> U32:
 def Thing.null() -> U32:
   4294967295
 
-# What a state row does as it is entered, Doom's action pointers:
-# nothing, A_Raise, A_WeaponReady, A_FirePistol and A_ReFire.
+# What a state row does as it is entered, Doom's action pointers: a
+# weapon's A_Raise, A_WeaponReady, A_Lower, A_FirePistol and A_ReFire, a
+# mobj's A_Pain and A_PlayerScream, or nothing. A row of one kind never
+# holds the other's.
 type Thing.Action is Data:
   Null{}
   Raise{}
   WeaponReady{}
   FirePistol{}
   ReFire{}
+  Lower{}
+  Pain{}
+  Scream{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -55,20 +60,22 @@ type Thing.Row is Data:
   Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32, action: Thing.Action, light: U32}
 
 # The state rows by Bendoom's number: every state the spawn states of the
-# types below lead to, in vanilla's order, then the pistol's states, the
-# muzzle flash's, the state that puts the extra light out, and the
-# puff's. Only S_LIGHTDONE has 0 tics, and it is a player sprite's; it
-# carries A_Light0 in vanilla and here only puts the flash's light out
-# by being the last row before S_NULL.
+# types below lead to, in vanilla's order, then the pistol's ready and
+# raise states, then the monsters' two idle states each, whose A_Look is
+# not run yet, then the pistol's down state and the player mobj's own,
+# whose death ends in row 0, the corpse a dead marine record spawns in,
+# then the pistol's fire states, its muzzle flash's, the state that puts
+# the flash's light out and the bullet puff's. Only S_LIGHTDONE, row 84,
+# has 0 tics, and it is a player sprite's; it carries A_Light0 in
+# vanilla and here only puts the light out by being the last row before
+# S_NULL.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}, 0}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}, 0},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}, 0}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}, 0},
     Row{"TROO", 12, False{}, 4294967295, 4, Null{}, 0}, Row{"SARG", 13, False{}, 4294967295, 5, Null{}, 0},
-    Row{"ARM1", 0, False{}, 6, 7, Null{}, 0}, Row{"ARM1", 1, True{}, 7, 6, Null{}, 0},
-    Row{"ARM2", 0, False{}, 6, 9, Null{}, 0}, Row{"ARM2", 1, True{}, 6, 8, Null{}, 0},
-    Row{"BAR1", 0, False{}, 6, 11, Null{}, 0},
-    Row{"BAR1", 1, False{}, 6, 10, Null{}, 0},
-    Row{"BON1", 0, False{}, 6, 13, Null{}, 0},
+    Row{"ARM1", 0, False{}, 6, 7, Null{}, 0}, Row{"ARM1", 1, True{}, 7, 6, Null{}, 0}, Row{"ARM2", 0, False{}, 6, 9, Null{}, 0},
+    Row{"ARM2", 1, True{}, 6, 8, Null{}, 0}, Row{"BAR1", 0, False{}, 6, 11, Null{}, 0},
+    Row{"BAR1", 1, False{}, 6, 10, Null{}, 0}, Row{"BON1", 0, False{}, 6, 13, Null{}, 0},
     Row{"BON1", 1, False{}, 6, 14, Null{}, 0}, Row{"BON1", 2, False{}, 6, 15, Null{}, 0},
     Row{"BON1", 3, False{}, 6, 16, Null{}, 0}, Row{"BON1", 2, False{}, 6, 17, Null{}, 0},
     Row{"BON1", 1, False{}, 6, 12, Null{}, 0}, Row{"BON2", 0, False{}, 6, 19, Null{}, 0},
@@ -93,11 +100,20 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"CBRA", 0, True{}, 4294967295, 55, Null{}, 0}, Row{"TRE1", 0, False{}, 4294967295, 56, Null{}, 0},
     Row{"TRE2", 0, False{}, 4294967295, 57, Null{}, 0}, Row{"ELEC", 0, False{}, 4294967295, 58, Null{}, 0},
     Row{"PISG", 0, False{}, 1, 59, WeaponReady{}, 0}, Row{"PISG", 0, False{}, 1, 60, Raise{}, 0},
-    Row{"PISG", 0, False{}, 4, 62, Null{}, 0}, Row{"PISG", 1, False{}, 6, 63, FirePistol{}, 0},
-    Row{"PISG", 2, False{}, 4, 64, Null{}, 0}, Row{"PISG", 1, False{}, 5, 59, ReFire{}, 0},
-    Row{"PISF", 0, True{}, 7, 66, Null{}, 1}, Row{"SHTG", 4, False{}, 0, 4294967295, Null{}, 0},
-    Row{"PUFF", 0, True{}, 4, 68, Null{}, 0}, Row{"PUFF", 1, False{}, 4, 69, Null{}, 0},
-    Row{"PUFF", 2, False{}, 4, 70, Null{}, 0}, Row{"PUFF", 3, False{}, 4, 4294967295, Null{}, 0}]
+    Row{"POSS", 0, False{}, 10, 62, Null{}, 0}, Row{"POSS", 1, False{}, 10, 61, Null{}, 0},
+    Row{"SPOS", 0, False{}, 10, 64, Null{}, 0}, Row{"SPOS", 1, False{}, 10, 63, Null{}, 0},
+    Row{"TROO", 0, False{}, 10, 66, Null{}, 0}, Row{"TROO", 1, False{}, 10, 65, Null{}, 0},
+    Row{"SARG", 0, False{}, 10, 68, Null{}, 0}, Row{"SARG", 1, False{}, 10, 67, Null{}, 0},
+    Row{"PISG", 0, False{}, 1, 69, Lower{}, 0}, Row{"PLAY", 0, False{}, 4294967295, 70, Null{}, 0},
+    Row{"PLAY", 6, False{}, 4, 72, Null{}, 0}, Row{"PLAY", 6, False{}, 4, 70, Pain{}, 0},
+    Row{"PLAY", 7, False{}, 10, 74, Null{}, 0}, Row{"PLAY", 8, False{}, 10, 75, Scream{}, 0},
+    Row{"PLAY", 9, False{}, 10, 76, Null{}, 0}, Row{"PLAY", 10, False{}, 10, 77, Null{}, 0},
+    Row{"PLAY", 11, False{}, 10, 78, Null{}, 0}, Row{"PLAY", 12, False{}, 10, 0, Null{}, 0},
+    Row{"PISG", 0, False{}, 4, 80, Null{}, 0}, Row{"PISG", 1, False{}, 6, 81, FirePistol{}, 0},
+    Row{"PISG", 2, False{}, 4, 82, Null{}, 0}, Row{"PISG", 1, False{}, 5, 59, ReFire{}, 0},
+    Row{"PISF", 0, True{}, 7, 84, Null{}, 1}, Row{"SHTG", 4, False{}, 0, 4294967295, Null{}, 0},
+    Row{"PUFF", 0, True{}, 4, 86, Null{}, 0}, Row{"PUFF", 1, False{}, 4, 87, Null{}, 0},
+    Row{"PUFF", 2, False{}, 4, 88, Null{}, 0}, Row{"PUFF", 3, False{}, 4, 4294967295, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -124,19 +140,38 @@ def Thing.Row.light(r: Thing.Row) -> U32:
   Row{sprite, frame, bright, tics, next, action, light} = r
   light
 
-# A weapon's rows in Doom's weaponinfo: the state it rises in, the state
-# it is ready in, the state it fires in, and its muzzle flash's.
+# A weapon's row in Doom's weaponinfo: the states it rises, is ready,
+# sinks and fires in, its muzzle flash's, and the ammotype_t it spends,
+# which the status bar counts.
 type Thing.Weapon is Data:
-  Weapon{up: U32, ready: U32, atk: U32, flash: U32}
+  Weapon{up: U32, ready: U32, down: U32, ammo: U32, atk: U32, flash: U32}
 
+# d_items.c's weaponinfo for the pistol: it rises in row 60, rests in
+# row 59, sinks in row 69, spends am_clip, ammotype_t 0, fires from row
+# 79 and flashes in row 83.
 def Thing.pistol() -> Thing.Weapon:
-  Weapon{60, 59, 61, 65}
+  Weapon{60, 59, 69, 0, 79, 83}
 
-# A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
-# radius and height in map units, and vanilla's flags: 1 special, 2
-# solid, 4 shootable, 16 in no blockmap cell, 256 hung from the ceiling,
-# 512 no gravity, 524288 no blood, 8388608 an item the tally counts,
-# 33554432 not in deathmatch.
+def Thing.Weapon.down(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  down
+
+def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  ammo
+
+# The player mobj's rows in Doom's mobjinfo: the state it stands in,
+# the one it flinches in and the one its death begins with. Its spawn
+# health, 100, is the inventory's.
+def Thing.play() -> U32:
+  70
+
+def Thing.play.pain() -> U32:
+  71
+
+def Thing.play.death() -> U32:
+  73
+
 type Thing.Def is Data:
   Def{kind: U32, state: U32, radius: U32, height: U32, flags: U32}
 
@@ -151,7 +186,8 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{2013, 28, 20, 16, 8388609}, Def{2014, 12, 20, 16, 8388609}, Def{2015, 18, 20, 16, 8388609},
     Def{2018, 6, 20, 16, 1}, Def{2019, 8, 20, 16, 1}, Def{2023, 34, 20, 16, 8388609}, Def{2028, 49, 16, 16, 2},
     Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
-    Def{2049, 42, 20, 16, 1}, Def{4294967295, 67, 20, 16, 528}]
+    Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
+    Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}, Def{4294967295, 85, 20, 16, 528}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -332,9 +368,9 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
     case _ _ _:
       s
 
-# Doom's P_SpawnMapThing on Hurt Me Plenty with one player and no
-# monsters: player 1's start spawns the player, who draws a random number
-# too and takes the first such record's index for its name, the start
+# Doom's P_SpawnMapThing on Hurt Me Plenty with one player: player 1's
+# start spawns the player, who draws a random number too and takes the
+# first such record's index for its name, the start
 # Level.start_of places it at; another record spawns when its options
 # set that skill's bit, 2, and not the multiplayer bit, 16, and its type
 # has a definition.
@@ -358,6 +394,17 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
 # random index once they have spawned, from 0.
 def Thing.spawn(+level: L.Level) -> Thing.Spawn:
   Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
+
+def Thing.ambush.of(record: L.Level.Thing, mapped: Bool) -> Bool:
+  L.Thing{x, y, angle, kind, options} = record
+  Bool.and(mapped, Bool.not(U32.is_zero((options .&. 8 : U32))))
+
+# Doom's MF_AMBUSH, which P_SpawnMapThing sets from bit 8 of the record's
+# options: a map thing's id is its record's index, so the record keeps
+# the flag, and a thing spawned in play, its id past the records, has
+# none.
+def Thing.ambush(+level: L.Level, +id: U32) -> Bool:
+  Thing.ambush.of(L.Level.thing(level, id), U32.is_lt(id, L.Level.nthings(level)))
 
 # The population
 # --------------

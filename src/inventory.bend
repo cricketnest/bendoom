@@ -2,6 +2,7 @@
 # P_TouchSpecialThing's grants for the types Bendoom takes.
 import Base
 import ./vec.bend as V
+import ./fixed.bend as F
 import ./sound.bend as Sn
 
 # Health; armour points and type (0 none, 1 green, 2 blue); the cards,
@@ -33,6 +34,19 @@ def Inventory.health(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   health
 
+# Doom's PST_DEAD: the health P_DamageMobj holds at 0 has run out.
+# Health is compared as a signed quantity, as vanilla's is.
+def Inventory.dead(+inv: Inventory) -> Bool:
+  F.Fixed.le(Inventory.health(inv), 0)
+
+def Inventory.armour(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  armour
+
+def Inventory.armourtype(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  armourtype
+
 def Inventory.cards(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   cards
@@ -40,6 +54,20 @@ def Inventory.cards(inv: Inventory) -> U32:
 def Inventory.bonus(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   bonus
+
+def Inventory.weapons(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  weapons
+
+# The rounds of an ammo type and the cap on them, Doom's ammo[t] and
+# maxammo[t].
+def Inventory.rounds(+t: U32, inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  V.Vec.get(ammo, t)
+
+def Inventory.cap(+t: U32, inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  V.Vec.get(caps, t)
 
 # The armour types.
 def Inventory.green_armour() -> U32:
@@ -146,11 +174,6 @@ def Inventory.suit(+kind: U32, inv: Inventory) -> Maybe<&2, Inventory>:
 # Doom's clipammo: the rounds in a clip of each ammo type.
 def Inventory.clip(+t: U32) -> U32:
   V.Vec.get(V.Vec.of_list([10, 4, 20, 1], 4), t)
-
-# The rounds of an ammo type left.
-def Inventory.rounds(+t: U32, inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus} = inv
-  V.Vec.get(ammo, t)
 
 # Doom's DecreaseAmmo: a shot spends rounds of its weapon's type. No
 # weapon Bendoom carries has an ammo type past the four, so vanilla's
@@ -278,6 +301,32 @@ def Inventory.took(counted: Bool, inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers,
     (items + Bool.to_u32(counted) : U32), (bonus + 6 : U32)}
+
+# P_DamageMobj's saved: green armour absorbs a third of a blow and blue
+# a half, and neither more than the points worn. No armour absorbs
+# nothing.
+def Inventory.saved(worn: Bool, +armourtype: U32, +armour: U32, +damage: U32) -> U32:
+  match worn:
+    case False{}:
+      0
+    case True{}:
+      U32.min(armour, Bool.pick(U32, U32.is_eq(armourtype, Inventory.green_armour()), (damage / 3 : U32),
+        (damage / 2 : U32)))
+
+def Inventory.hurt.fin(+saved: U32, inv: Inventory, +damage: U32) -> Inventory & U32:
+  Inventory{+health, +armour, +armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  +left = (damage - saved : U32)
+  (Inventory{F.Fixed.max((health - left : U32), 0), (armour - saved : U32),
+    Bool.pick(U32, U32.is_eq(armour, saved), 0, armourtype), cards, ammo, caps, backpack, weapons, powers, items,
+    bonus}, left)
+
+# P_DamageMobj's blow on the inventory: the armour absorbs its share and
+# loses its type where the share used it up, and the health takes the
+# rest and stops at 0, as player->health does. The inventory after, and
+# the damage that reached the player, which the damage count takes.
+def Inventory.hurt(+inv: Inventory, +damage: U32) -> Inventory & U32:
+  Inventory.hurt.fin(Inventory.saved(Bool.not(U32.is_zero(Inventory.armourtype(inv))), Inventory.armourtype(inv),
+    Inventory.armour(inv), damage), inv, damage)
 
 # 1 for a counter that runs, 0 for one at rest.
 def Inventory.on(+n: U32) -> U32:

@@ -6,10 +6,10 @@ import Base
 import ./bytes.bend as B
 import ./keys.bend as K
 
-# Version 109, skill 2 (Hurt me plenty), E1M1, no deathmatch, respawn or
-# fast, no monsters, player 1 alone in the game.
+# Version 109, skill 2 (Hurt me plenty), E1M1, no deathmatch, respawn,
+# fast or -nomonsters, player 1 alone in the game.
 def Demo.header() -> List<&2, U32>:
-  [109, 2, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0]
+  [109, 2, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0]
 
 # A demo being recorded, and the turn the last tic's rounding left over.
 type Demo.Rec is Type:

@@ -12,7 +12,7 @@
 - [x] The extra light reaches the renderer, and flash frames draw full bright
 - [x] The pistol's sound starts where vanilla's does
 - [x] Sim cases: one shot, held fire, the last bullet, a shot at a wall and at a ledge above, with the random index after each
-- [ ] Render cases: the firing frames with the room lit and a puff on a wall, at zero differing pixels
+- [ ] Render cases: the firing frames with the room lit and a puff on a wall, at zero differing pixels (one of the three is at zero after the merge; see Deferred)
 - [x] A closed law pins one bullet a shot and no shot at zero
 
 ## Comments
@@ -37,7 +37,9 @@
 
 ### The oracle
 
-`nu tools/oracle.nu x y degrees script --frame`, the dump built from this tree, Freedoom, `masked` 665 in each, which is the pause graphic alone. Run before the merge of `milestone-6-7`, so with no monsters in the map.
+`nu tools/oracle.nu x y degrees script --frame`, the dump built from this tree, Freedoom.
+
+Before the merge of `milestone-6-7`, so with no monsters in the map, `masked` 665 in each, which was the pause graphic alone:
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
@@ -46,12 +48,21 @@
 | the puff on the ledge out of the pit | 704 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
 | rest, unchanged | -416 256 0 | `20,0,0,0,0` | 0 |
 
-The start room holds no monster on Hurt Me Plenty and the pit's ledge is out of any monster's sight, so these three are fidelity cases even once the oracle runs with monsters: vanilla's `P_NoiseAlert`, which ticket 21 adds, wakes nothing that can reach the frame in the tics compared.
+After the merge, with monsters in the map and all 200 rows compared, `masked` 1595:
+
+| case | place | script | differing |
+| --- | --- | --- | --- |
+| firing, the room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
+
+That case is a fidelity case with monsters on: the start room holds none on Hurt Me Plenty, and the five tics between the press and the frame are fewer than a monster woken by vanilla's `P_NoiseAlert`, which ticket 21 adds, needs to reach the view. The other two were rerun only before the merge; their hashes in the render test are regenerated from this tree and are regression pins until they are rerun.
 
 ### Deferred to the later pass
 
-- The remaining render and oracle cases the ticket asked for: a puff seen from other angles, the sky shot's frame, and rerunning every existing rest position with firing in the script. Three firing frames are at zero, which is what shows the draw path and the extra light are right.
-- The nushell replay of `T_LightFlash` that would turn P_Random's index at the start of each firing case from a pin into a computed value. The index is printed and is a regression pin.
+- The oracle rerun of the other two firing frames after the merge (the flash going out, and the puff on the ledge). Both were at zero before the merge; their render hashes are regression pins for now.
+- The remaining render and oracle cases the ticket asked for: a puff seen from other angles, the sky shot's frame, and rerunning every existing rest position with firing in the script.
+- The nushell replay of `T_LightFlash` that would turn P_Random's index at the start of each firing case from a pin into a computed value, and the table values for the puff's z and tics. Both are printed and are regression pins; the number of draws and the order they are made in are worked from the source and are not.
+- `nix flake check` was not run: the whole test suite on both lanes and the proof were run instead, before and after the merge.
+- Vanilla runs `P_MovePsprites` after `P_UseLines`; this branch runs it before, as it did before this ticket. It matters only for the order of two sounds in a tic where a use and a shot fall together.
 - `A_GunFlash` and `A_Light2` have no state row: the pistol's flash is set by `A_FirePistol` and lit by its row. They arrive with ticket 12's shotgun.
 - Doom's `attackdown` is written by `A_WeaponReady` and read by the launcher and the BFG alone, neither of which has a state row here, so it is not kept. Ticket 12 brings it back if it ever brings those weapons.
 
