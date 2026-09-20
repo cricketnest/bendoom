@@ -30,18 +30,21 @@
 
 **The oracle.** `nix develop -c nu tools/oracle.nu 1600 1000 90 <script> --frame <dump>`, frame dump built from this tree, Freedoom, `masked` 665 in every report, which is the pause graphic alone. The place is the middle of sector 173, one of Freedoom's three special 7 sectors (23, 38 and 173, all read from the WAD in nushell).
 
-| case | script | differing |
-| --- | --- | --- |
-| the pistol still sinking, view 35 | `615,0,0,0,0` | 0 |
-| the view still falling, 20 | `630,0,0,0,0` | 0 |
-| the dead view at rest, 6 | `650,0,0,0,0` | 0 |
+| case | script | rows | differing |
+| --- | --- | --- | --- |
+| the pistol still sinking, view 35 | `615,0,0,0,0` | 168 | 0 |
+| the view still falling, 20 | `630,0,0,0,0` | 168 | 0 |
+| the dead view at rest, 6 | `650,0,0,0,0` | 168 | 0 |
+| the dead view with the bar | `650,0,0,0,0` | 200 | 0 |
 
-The render test's new case is the last of these, and it was run again, with the frame dump built again, after each merge of the integration branch, the buttons byte and then the one traversal: still 0. Every other render case is unchanged; the whole file is at zero but for the three hashes that never had an oracle.
+The render test's new case is the last of these. It was run again, with the frame dump built again, after each merge of the integration branch: the buttons byte, the one traversal, and then the one position check with the status bar, where it is 0 over all 200 rows, the bar showing no health, with the pause graphic and the face box masked.
+
+Ticket 08 then turned the oracle's monsters on, and that place cannot be compared any more: vanilla's imps in the yard see a player who stands 650 tics there and wake, and Bendoom's cannot move yet, so the frames part company from about the twentieth tic (117 and 329 differing pixels at two places at 20 tics, 48988 at 650). The case stays as a regression pin, beside the ones ticket 08 pinned for the same reason, until the monsters think. Every other render case is unchanged.
 
 **What was built.**
 
 - `src/sim.bend`: a damage section and a dying section. `Sim.damage` is `P_DamageMobj`'s player branch and the one function everything that hurts the player calls: the damage, an inflictor and a source, both `Maybe` of a thing's name. `Sim.blow` is the thrust with its draw; `I.Inventory.hurt` is the armour and the health; `Player.took` keeps the attacker and raises the damage count to at most 100; `Sim.kill` is `P_KillMobj` for the player, with `Sim.drop` for `P_DropWeapon`. `Sim.sector` is `P_PlayerInSpecialSector`, whose switch is one test, since special 7 is the only special either map carries that hurts: the sector's special, the clock's low five bits and the player's feet on the floor decide the blow together. `Sim.death` is `P_DeathThink`. `Sim.mobj.enter` is `P_SetMobjState` for the player's mobj and `Sim.mobj.tics` its state cycle, which runs where `P_MobjThinker` runs it, after the lines the move crossed have fired. `P_PlayerThink` splits in two: `Sim.player` is the half that writes the state, the sector's special for a living player and the reborn for a dying one, and `Sim.thought` the half that is the player's alone, the sprites and the counters or the dying view. The sector's special runs where vanilla runs it, right after the eye; the use stays after the counters, where this sim already had it, since a dead player makes no press and nothing the sprites do is heard yet.
-- The player carries `Sim.Hurt{state, tics, damage, attacker}`, one field: the mobj state row that times the pain and death sounds, the damage count that milestone 6's palette and face read, and who hit last. The state carries `reborn`, vanilla's `PST_REBORN`, which the game loop answers.
+- The player carries the wound in one field, a vector of four counts as the powers are: the mobj state row that times the pain and death sounds, the tics left in it, the damage count that milestone 6's palette and face read, and who hit last, the player's own name for nobody. A record there would have been a sixteenth field the merged sim cannot afford: the native build fails with "an arity over 255" at a seventeenth, and a record field costs its width. The state carries `reborn`, vanilla's `PST_REBORN`, which the game loop answers.
 - `src/things.bend`: `Thing.Action` gains `Lower`, `Pain` and `Scream`; row 61 is `S_PISTOLDOWN` and rows 62 to 70 the player mobj's standing, pain and death states, which end in row 0, `S_PLAY_DIE7`. `Thing.Weapon` gains `down`, so `Gfx.sprite.weapon` loads the down state's sprite.
 - `src/inventory.bend`: `Inventory.dead`, the `PST_DEAD` test, which `P_TouchSpecialThing` and `P_PlayerThink` both ask; `Inventory.hurt` and `Inventory.saved`, `P_DamageMobj`'s armour and health; `Inventory.armour` and `Inventory.armourtype`.
 - `src/game.bend`: `Game.from` is still the one path to a fresh level; its caller now asks for it on the press after the exit or on the sim's own reborn.
@@ -81,5 +84,7 @@ The render test's new case is the last of these, and it was run again, with the 
 - `P_CalcHeight` still bobs a dead player. Only the view height's ramp is skipped, so a corpse sliding on its momentum bobs as it goes; the corpse slide case shows it.
 - A blow's thrust moved the corpse past its own attacker in the first draft of the literal-state case, which turned the view the other way round. The barrel was moved to 512 units away so the turn runs one way.
 - A big `+` let bound in the game test's `play` and handed to a frame failed the native build with "an arity over 255" and no location; the same expression as a def of its own passes. It is in `docs/bend.md`.
+- The same error, with no location again, is what a sixteenth field on the player costs once the merged sim is this wide: a U32 passes, a record or three more do not. The wound went into a vector, and the budget is in `docs/bend.md` too.
+- The hold ticket 03 built is what carries the freedom law over the blow. Nothing in the think moves the player, so putting the whole of `P_PlayerThink` inside `State.held` costs the proof no lemma at all, where threading the blow through it would have cost one a function.
 
-Checks: `bend PROOF.bend` prints "All terms check." on the merged tree; `nix flake check` passes, which is every test on both lanes; the three oracle cases at 0, the last rerun after each merge; `git diff --check`.
+Checks, after the last merge (milestone 6's tickets 02, 03, 04 and 08 and the buttons byte): `bend PROOF.bend` prints "All terms check."; every test in `tests/` passes native and on bun; the oracle cases above; `git diff --check`. The flake check is the integration branch's.
