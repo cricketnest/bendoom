@@ -387,53 +387,10 @@ def Inter.show(wi: Inter) -> String:
 # The draw
 # --------
 
-# A patch being drawn: the array, the patch's index in it, and the
-# screen place of its first column.
-type Inter.Col is Type:
-  Col{mem: Array<U32>, patch: U32, x: U32, y: U32}
-
-def Inter.Col.mem(st: Inter.Col) -> Array<U32>:
-  Col{mem, patch, x, y} = st
-  mem
-
-# V_DrawPatch for one post: its texels down the frame's column from the
-# patch's row plus the post's.
-def Inter.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +at: G.Gfx.Spot) -> Array<U32>:
-  D.Draw.post(U32.to_nat(len), mem,
-    (G.Gfx.frame() + (G.Gfx.Spot.y(at) + delta) * 320 + G.Gfx.Spot.x(at) : U32), (src + 3 : U32))
-
-def Inter.col.posts(+c: U32, +patch: U32, +x: U32, +y: U32, p: Array<U32> & U32) -> Inter.Col:
-  (mem, off) = p
-  Col{G.Gfx.posts(~G.Gfx.Spot, ~Inter.post, 256n, G.Post{False{}, mem, (patch + off : U32)},
-      G.Spot{(x + c : U32), y}), patch, x, y}
-
-def Inter.col(c: Nat, st: Inter.Col) -> Inter.Col:
-  Col{mem, +patch, +x, +y} = st
-  +col = U32.from_nat(c)
-  Inter.col.posts(col, patch, x, y, B.Bytes.u32(mem, (patch + 8 + col * 4 : U32)))
-
-def Inter.patch.go(+patch: U32, +w: U32, +x: U32, +y: U32, mem: Array<U32>) -> Array<U32>:
-  Inter.Col.mem(D.Draw.each(~Inter.Col, ~Inter.col, U32.to_nat(w), 0n, Col{mem, patch, x, y}))
-
-def Inter.patch.top(+patch: U32, +x: U32, +y: U32, w: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, top) = p
-  Inter.patch.go(patch, w, x, (y - G.Gfx.s16(top) : U32), mem)
-
-def Inter.patch.left(+patch: U32, +x: U32, +y: U32, w: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, left) = p
-  Inter.patch.top(patch, (x - G.Gfx.s16(left) : U32), y, w, B.Bytes.u16(mem, (patch + 6 : U32)))
-
-def Inter.patch.width(+patch: U32, +x: U32, +y: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, w) = p
-  Inter.patch.left(patch, x, y, w, B.Bytes.u16(mem, (patch + 4 : U32)))
-
-def Inter.patch.at(+patch: U32, x: U32, y: U32, mem: Array<U32>) -> Array<U32>:
-  Inter.patch.width(patch, x, y, B.Bytes.u16(mem, patch))
-
 # Doom's V_DrawPatch: the patch of a name at x, y, its offsets taken
 # off, over whatever the frame holds.
 def Inter.patch(+gfx: G.Gfx, name: String, x: U32, y: U32, mem: Array<U32>) -> Array<U32>:
-  Inter.patch.at(G.Gfx.patch(gfx, name), x, y, mem)
+  D.Draw.patch(G.Gfx.patch(gfx, name), x, y, mem)
 
 # A patch's width, height, left offset or top offset, as the array holds
 # its header.

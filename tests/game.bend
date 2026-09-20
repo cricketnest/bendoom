@@ -1,14 +1,14 @@
 # The game's frame, from the WAD named by BENDOOM_IWAD: a clock reading
 # and the frame's key events in, the play and what it prints out. No
 # window opens. A level's line is the clock, whether the level has
-# ended, the player, the thinkers running, the floor and ceiling of
-# sector 64 (the exit room's door), line 407's special (the exit switch,
-# 11 as loaded), whether its side shows the switch's partner, how many
-# things there are and the random index. The tally's line is its screen
-# and counts.
+# ended, the player, the thinkers running that are no mobj's, the floor
+# and ceiling of sector 64 (the exit room's door), line 407's special
+# (the exit switch, 11 as loaded), whether its side shows the switch's
+# partner, how many things there are and the random index. The tally's
+# line is its screen and counts.
 # First the state the game starts with. Then a game handed the state a
 # script leaves beside Freedoom's exit switch with the room's door open
-# behind the player, 50 tics in. Every frame 200 ms on runs 7 tics. The
+# behind the player, 41 tics in. Every frame 200 ms on runs 7 tics. The
 # first, with Space pressed, ends the level on its first tic and shows
 # the tally for the six after it; Space held through the exit does not
 # skip the tally's first pause, since WI_checkForAccelerate finds the
@@ -46,12 +46,22 @@ def pressed(+level: L.Level, sidetex: V.Vec) -> Bool:
   U32.is_eq(V.Vec.get(sidetex, (615 * 3 + 2 : U32)),
     L.Level.switch(level, V.Vec.get(L.Level.sidetex(level), (615 * 3 + 2 : U32))))
 
+# How many thinkers are not mobjs': the lights, movers and buttons.
+def specials(ts: List<&2, S.Thinker>) -> U32:
+  match ts:
+    case []:
+      0
+    case S.Mobj{id} <> rest:
+      specials(rest)
+    case _ <> rest:
+      (1 + specials(rest) : U32)
+
 def line(tag: String, +s: S.State) -> String:
   +p = S.State.player(s)
   +level = S.State.level(s)
   tag ++ " tic " ++ U32.show(S.State.clock(s)) ++ " ended " ++ Bool.show(S.State.ended(s)) ++ " at "
     ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " " ++ A.Angle.show(S.Player.angle(p))
-    ++ " thinkers " ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ " sector 64 "
+    ++ " thinkers " ++ U32.show(specials(S.State.thinkers(s))) ++ " sector 64 "
     ++ F.Fixed.show(L.Level.floor(level, 64)) ++ " " ++ F.Fixed.show(L.Level.ceil(level, 64)) ++ " special "
     ++ U32.show(L.Level.special(level, 407)) ++ " pressed " ++ Bool.show(pressed(level, S.State.sidetex(s)))
     ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(s)))) ++ " random "
@@ -103,12 +113,13 @@ def frame(tag: String, now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Ma
     case Some{g}:
       IO.bind(Bool & M.Game, Maybe<M.Game>, M.Game.frame(now, events, g), after => report(tag, after))
 
-# The exit room's door used from inside, then the walk to the switch.
+# The exit room's door used from inside, then the walk west to the
+# switch, which passes north of the shotgun guy of record 289 and turns
+# to 202.5 degrees, where the use reaches through the alcove past him.
 def route() -> List<&2, K.Cmd>:
-  List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 5n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, True{})],
-    [K.Cmd.demo(0, 0, 96, False{})], List.replicate(K.Cmd, 12n, K.Cmd.demo(25, 0, 0, False{})),
-    [K.Cmd.demo(0, 0, 224, False{})], List.replicate(K.Cmd, 20n, K.Cmd.demo(25, 0, 0, False{})),
-    List.replicate(K.Cmd, 10n, K.Cmd.idle())])
+  List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 5n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, 2)],
+    [K.Cmd.demo(0, 0, 64, 0)], List.replicate(K.Cmd, 25n, K.Cmd.demo(25, 0, 0, 0)),
+    List.replicate(K.Cmd, 8n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 16, 0)]])
 
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +level) = gl
@@ -117,7 +128,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   do IO<Unit>:
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
-    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, True{}), beside)))
+    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
       P.Project.tables(level), W.Playing{beside}, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{},
       None{}}})
@@ -141,17 +152,3 @@ def main() -> IO(Unit):
   do IO<Unit>:
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
-#|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 1
-#|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 180 random 5
-#|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 66
-#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 0 - - - 0 0 0 random 76
-#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 0 1 0 0 0 0 0 1 0 random 76
-#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 1 1 1 random 76
-#|enter tally count 10 cnt 15 bcnt 27 shown 0 0 0 1 30 anims 2 1 2 2 1 1 1 2 2 1 random 76
-#|held tally count 10 cnt 15 bcnt 34 shown 0 0 0 1 30 anims 2 2 0 2 2 2 2 2 0 2 random 76
-#|let go tally count 10 cnt 15 bcnt 41 shown 0 0 0 1 30 anims 0 0 0 0 2 0 0 0 0 0 random 76
-#|space again tally next cnt 134 bcnt 48 shown 0 0 0 1 30 anims - - 0 0 - - 0 - 0 0 random 86
-#|let go again tally next cnt 127 bcnt 55 shown 0 0 0 1 30 anims 0 0 0 1 0 0 1 0 1 0 random 86
-#|last press tally done cnt 4 bcnt 62 shown 0 0 0 1 30 anims 1 0 1 1 0 1 1 0 1 1 random 86
-#|the level again tic 3 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 3
-#|esc quit

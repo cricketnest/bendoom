@@ -20,6 +20,7 @@ import ./src/planes.bend as N
 import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
+import ./src/sound.bend as Sn
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -169,7 +170,7 @@ def Laws.index_head(name, pos, size, rest):
     : {W.Wad.index.pick(_, W.Wad.index(name, rest)) == Some{0n} : Maybe<Nat>}
   {==}
 
-# Keys: a key's flag set twice keeps the second setting; the eight
+# Keys: a key's flag set twice keeps the second setting; the twelve
 # flags are rewritten one by one, abstracted from the key code.
 
 def set_twice(b: Bool, +d1: Bool, +d2: Bool, +old: Bool) ->
@@ -180,88 +181,157 @@ def set_twice(b: Bool, +d1: Bool, +d2: Bool, +old: Bool) ->
     case False{}:
       {==}
 
-def press8(b1: Bool, b2: Bool, b3: Bool, b4: Bool, b5: Bool, b6: Bool, b7: Bool, b8: Bool, +d1: Bool, +d2:
-  Bool, +up: Bool, +dn: Bool, +left: Bool, +right: Bool, +sleft: Bool, +sright: Bool, +run: Bool, +use:
-  Bool) ->
+def press12(b1: Bool, b2: Bool, b3: Bool, b4: Bool, b5: Bool, b6: Bool, b7: Bool, b8: Bool, b9: Bool,
+  b10: Bool, b11: Bool, b12: Bool, +d1: Bool, +d2: Bool, +up: Bool, +dn: Bool, +left: Bool, +right: Bool,
+  +sleft: Bool, +sright: Bool, +run: Bool, +use: Bool, +fire: Bool, +one: Bool, +two: Bool, +three: Bool) ->
   {K.Keys{K.Keys.set(b1, d2, K.Keys.set(b1, d1, up)), K.Keys.set(b2, d2, K.Keys.set(b2, d1, dn)),
     K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)), K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)),
     K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
-    K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-    == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-      K.Keys.set(b8, d2, use)} : K.Keys}:
+    K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)),
+    K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)), K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+    K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+    == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+      K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}:
   %set_twice(b1, d1, d2, up)
     : {K.Keys{_, K.Keys.set(b2, d2, K.Keys.set(b2, d1, dn)), K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)),
       K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)),
       K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
-      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b2, d1, d2, dn)
-    : {K.Keys{K.Keys.set(b1, d2, up), _, K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)), K.Keys.set(b4, d2,
-      K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2,
-      K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2,
-      K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), _, K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)),
+      K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)),
+      K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b3, d1, d2, left)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), _, K.Keys.set(b4, d2, K.Keys.set(b4, d1,
-      right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1,
-      sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), _,
+      K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)), K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)),
+      K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b4, d1, d2, right)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), _, K.Keys.set(b5,
-      d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2,
-      K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), _,
+      K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
+      K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)),
+      K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)), K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b5, d1, d2, sleft)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), _, K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)), K.Keys.set(b7, d2, K.Keys.set(b7, d1,
-      run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), _, K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
+      K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)),
+      K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)), K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b6, d1, d2, sright)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), _, K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)), K.Keys.set(b8, d2,
-      K.Keys.set(b8, d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), _, K.Keys.set(b7, d2, K.Keys.set(b7, d1, run)),
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b7, d1, d2, run)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), _, K.Keys.set(b8, d2, K.Keys.set(b8,
-      d1, use))}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), _,
+      K.Keys.set(b8, d2, K.Keys.set(b8, d1, use)), K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   %set_twice(b8, d1, d2, use)
-    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4, d2,
-      right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run), _}
-      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left), K.Keys.set(b4,
-        d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright), K.Keys.set(b7, d2, run),
-        K.Keys.set(b8, d2, use)} : K.Keys}
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), _, K.Keys.set(b9, d2, K.Keys.set(b9, d1, fire)),
+      K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)), K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)),
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b9, d1, d2, fire)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), _, K.Keys.set(b10, d2, K.Keys.set(b10, d1, one)),
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b10, d1, d2, one)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), _,
+      K.Keys.set(b11, d2, K.Keys.set(b11, d1, two)), K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b11, d1, d2, two)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one), _,
+      K.Keys.set(b12, d2, K.Keys.set(b12, d1, three))}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
+  %set_twice(b12, d1, d2, three)
+    : {K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+      K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+      K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+      K.Keys.set(b11, d2, two), _}
+      == K.Keys{K.Keys.set(b1, d2, up), K.Keys.set(b2, d2, dn), K.Keys.set(b3, d2, left),
+        K.Keys.set(b4, d2, right), K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
+        K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use), K.Keys.set(b9, d2, fire), K.Keys.set(b10, d2, one),
+        K.Keys.set(b11, d2, two), K.Keys.set(b12, d2, three)} : K.Keys}
   {==}
 
 def Laws.last_press(code, d1, d2, keys):
   match keys:
-    case K.Keys{up, dn, left, right, sleft, sright, run, use}:
-      press8(U32.is_eq(code, 63232) || U32.is_eq(code, 119),
+    case K.Keys{up, dn, left, right, sleft, sright, run, use, fire, one, two, three}:
+      press12(U32.is_eq(code, 63232) || U32.is_eq(code, 119),
         U32.is_eq(code, 63233) || U32.is_eq(code, 115), U32.is_eq(code, 63234),
         U32.is_eq(code, 63235), U32.is_eq(code, 97), U32.is_eq(code, 100),
-        U32.is_eq(code, 65592) || U32.is_eq(code, 65596), U32.is_eq(code, 32), d1, d2, up, dn, left,
-        right, sleft, sright, run, use)
+        U32.is_eq(code, 65592) || U32.is_eq(code, 65596), U32.is_eq(code, 32),
+        U32.is_eq(code, 65595) || U32.is_eq(code, 65598), U32.is_eq(code, 49), U32.is_eq(code, 50),
+        U32.is_eq(code, 51), d1, d2, up, dn, left, right, sleft, sright, run, use, fire, one, two, three)
 
 def Laws.arrows_wasd(down, keys):
   match keys:
-    case K.Keys{up, dn, left, right, sleft, sright, run, use}:
+    case K.Keys{up, dn, left, right, sleft, sright, run, use, fire, one, two, three}:
       {==}
+
+def Laws.lowest_number_wins(two, three):
+  {==}
 
 def Laws.tic_rest(level, x, y):
   match level:
@@ -297,6 +367,9 @@ def Laws.pistol_rises():
 def Laws.pistol_bobs():
   {==}
 
+def Laws.ray_meets():
+  {==}
+
 def Laws.door_timeline():
   {==}
 
@@ -321,12 +394,11 @@ def Laws.floor_lowered():
 def Laws.lift_crushed():
   {==}
 
-def Laws.use_fires_once(forward, side, turn, next, player, level, things, sidetex, thinkers, rnd, clock, usedown, sounds,
-  mrnd, secrets):
-  match next level:
-    case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
-      {==}
-    case K.Cmd{f, s, t, False{}} L.Level{geo, sectors, specials}:
+def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
+  sounds, mrnd, secrets, held):
+  match level:
+    case L.Level{geo, sectors, specials}:
+      %held : {S.Sim.pressed(next, _) == False{} : Bool}
       {==}
 
 # A tree read where it was just written answers what was written: both
@@ -479,65 +551,60 @@ def go_pins(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +m
     case +h <> rest 1n+j:
       go_pins(rest, level, x, y, r, mask, S.Sim.fit.line(level, x, y, r, mask, h, f), j, i, listed, e)
 
-# A free position passed the thing check, and then every line.
-def at_pins(c: Bool, +level: L.Level, +x: U32, +y: U32, k: Nat, +i: U32,
-  listed: {Some{i} == List.get(&2, U32, S.Sim.lines(level, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), k) : Maybe<&2, U32>},
-  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}) ->
-  {True{} == S.Sim.line_ok(level, x, y, S.Sim.radius(), 1, i) : Bool}:
-  match c:
-    case False{}:
-      %e : BD(_, Unit, {True{} == S.Sim.line_ok(level, x, y, S.Sim.radius(), 1, i) : Bool})
-      Unit{}
-    case True{}:
-      go_pins(S.Sim.lines(level, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32),
-        (y + S.Sim.radius() : U32)), level, x, y, S.Sim.radius(), 1, S.Sim.fit.start(True{}, level, x, y), k, i, listed,
-        e)
-
 def Laws.free_pins_lines(level, x, y, k, i, listed, free):
-  at_pins(S.Sim.clear(level, x, y, S.Sim.radius(), H.Thing.you()), level, x, y, k, i, listed, free)
+  go_pins(S.Sim.lines(level, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32),
+    (y + S.Sim.radius() : U32)), level, x, y, S.Sim.radius(), 1, S.Sim.fit.start(True{}, level, x, y), k, i, listed,
+    free)
 
-# Clear pins the things
-# ---------------------
+# Clear pins the mobjs
+# --------------------
 
-def not_blocker(b: Bool, -c: Bool, e: {True{} == Bool.and(Bool.not(b), c) : Bool}) -> {False{} == b : Bool}:
-  match b:
+# A box that met no mobj that stops it is stopped by none of the list,
+# by its position: the first that stops it would be what it hit.
+def met_none(stops: Bool, id: U32, later: S.Sim.Met,
+  e: {None{} == S.Sim.Met.hit(S.Sim.met.if(stops, id, later)) : Maybe<&2, U32>}) -> {False{} == stops : Bool}:
+  match stops:
     case True{}:
-      %e : BD(_, Unit, {False{} == True{} : Bool})
+      %e : MD(_, {False{} == True{} : Bool}, Unit)
       Unit{}
     case False{}:
       {==}
 
-# A True verdict over the things near means no one of them stops the
-# box, by its position.
-def clear_pins(ids: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, k: Nat, +id: U32,
+def met_later(stops: Bool, id: U32, later: S.Sim.Met,
+  e: {None{} == S.Sim.Met.hit(S.Sim.met.if(stops, id, later)) : Maybe<&2, U32>}) ->
+  {None{} == S.Sim.Met.hit(later) : Maybe<&2, U32>}:
+  match stops later:
+    case True{} S.Met{before, hit}:
+      %e : MD(_, {None{} == hit : Maybe<&2, U32>}, Unit)
+      Unit{}
+    case False{} S.Met{before, hit}:
+      e
+
+def clear_pins(ids: List<&2, U32>, +things: H.Things, +p: S.Player, +m: S.Sim.Body, k: Nat, +id: U32,
   listed: {Some{id} == List.get(&2, U32, ids, k) : Maybe<&2, U32>},
-  e: {True{} == S.Sim.clear.go(ids, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()) : Bool}) ->
-  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool}:
+  e: {None{} == S.Sim.Met.hit(S.Sim.met.go(ids, things, p, m)) : Maybe<&2, U32>}) ->
+  {False{} == S.Sim.stops.at(things, p, m, id) : Bool}:
   match ids k:
     case [] _:
-      %listed : MD(_, Unit,
-        {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool})
+      %listed : MD(_, Unit, {False{} == S.Sim.stops.at(things, p, m, id) : Bool})
       Unit{}
-    case +h <> rest 0n:
-      %some_eq(id, h, listed)
-        : {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), _) : Bool}
-      not_blocker(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), h),
-        S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()), e)
-    case +h <> rest 1n+j:
-      clear_pins(rest, level, x, y, j, id, listed,
-        and_true_right(Bool.not(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), h)),
-          S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()), e))
+    case +h <> +rest 0n:
+      %some_eq(id, h, listed) : {False{} == S.Sim.stops.at(things, p, m, _) : Bool}
+      met_none(S.Sim.stops.at(things, p, m, h), h, S.Sim.met.go(rest, things, p, m), e)
+    case +h <> +rest 1n+j:
+      clear_pins(rest, things, p, m, j, id, listed,
+        met_later(S.Sim.stops.at(things, p, m, h), h, S.Sim.met.go(rest, things, p, m), e))
 
-def Laws.clear_pins_things(level, x, y, k, id, listed, clear):
-  clear_pins(S.Sim.near(level, x, y, S.Sim.radius()), level, x, y, k, id, listed, clear)
+def Laws.clear_pins_things(level, things, p, m, k, id, listed, clear):
+  clear_pins(S.Sim.nearby(level, things, m), things, p, m, k, id, listed, clear)
 
 # The wall law
 # ------------
 
-# Free: the player's position passes Sim.fit. Every move the sim takes
-# has passed it, so each function from the tic down keeps it: a lemma a
-# function, on the flag it decides by and the record it opens.
+# Free: no line stops the player's box. Every move the sim takes has
+# passed Sim.check, whose lines are those, so each function from the tic
+# down keeps it: a lemma a function, on the flag it decides by and the
+# record it opens.
 def Free(level: L.Level, +p: S.Player) -> Type:
   {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
 
@@ -552,33 +619,54 @@ def holding_free(+level: L.Level, p: S.Player, held: I.Inventory, hp: Free(level
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
+# A place that passed the check with its things' verdict passes the
+# lines alone.
+def at_clear(c: Bool, +level: L.Level, +x: U32, +y: U32,
+  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}) ->
+  {True{} == S.Sim.free(level, x, y) : Bool}:
+  match c:
+    case False{}:
+      %e : BD(_, Unit, {True{} == S.Sim.free(level, x, y) : Bool})
+      Unit{}
+    case True{}:
+      e
+
+def fit_ok(c: Bool, +level: L.Level, +x: U32, +y: U32, +ok: Bool, fl: U32, cl: U32, +h: Bool,
+  e: {True{} == Bool.and(ok, h) : Bool},
+  hf: {S.Fit{ok, fl, cl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}) ->
+  {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}:
+  %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
+  and_true_left(ok, h, e)
+
 def fin_free(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32,
-  ceil: U32, over: List<&2, U32>, +ok: Bool, fl: U32, cl: U32, +h: Bool, e: {go == Bool.and(ok, h) : Bool},
-  hf: {S.Fit{ok, fl, cl} == S.Sim.fit(level, x, y) : S.Sim.Fit}, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, p, things, x, y, floor, ceil, over))):
+  ceil: U32, over: List<&2, U32>, +c: Bool, +ok: Bool, fl: U32, cl: U32, +h: Bool,
+  e: {go == Bool.and(ok, h) : Bool},
+  hf: {S.Fit{ok, fl, cl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
+  Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over))):
   match go p:
     case False{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
     case True{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
-      %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
-      and_true_left(ok, h, e)
+      at_clear(c, level, x, y, fit_ok(c, level, x, y, ok, fl, cl, h, e, hf))
 
 def fit_free(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things,
-  f: S.Sim.Fit, over: List<&2, U32>, hf: {f == S.Sim.fit(level, x, y) : S.Sim.Fit}, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move.fit(p, x, y, touched, f, over))):
+  f: S.Sim.Fit, over: List<&2, U32>, +c: Bool,
+  hf: {f == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
+  Free(level, S.Sim.Try.player(S.Sim.try_move.fit(level, p, x, y, touched, f, over))):
   match touched f:
     case (+inv, +things) S.Fit{+ok, +floor, +ceil}:
-      fin_free(level, Bool.and(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
-        Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
-          F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up())))), S.Player.holding(p, inv), things, x, y,
-        floor, ceil, over, ok, floor, ceil, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
+      fin_free(level, S.Sim.passes(S.Fit{ok, floor, ceil}, S.Player.z(p), S.Sim.height()),
+        S.Player.holding(p, inv), things, x, y, floor, ceil, over, c, ok, floor, ceil,
+        Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
           Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
             F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))), {==}, hf, holding_free(level, p, inv, hp))
 
-def try_free(+level: L.Level, things: H.Things, +p: S.Player, +x: U32, +y: U32, hp: Free(level, p)) ->
+def try_free(+level: L.Level, +things: H.Things, +p: S.Player, +x: U32, +y: U32, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.try_move(level, things, p, x, y))):
-  fit_free(level, p, x, y, S.Sim.touch(level, x, y, S.Player.z(p), (S.Player.inv(p), things)), S.Sim.fit(level, x, y),
-    S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y), {==}, hp)
+  +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
+  fit_free(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
+    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y),
+    Maybe.is_none(&2, U32, S.Sim.blocked(level, things, p, m)), {==}, hp)
 
 def done_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.Sim.Try.player(S.Sim.Try.done(t))):
@@ -660,13 +748,13 @@ def once_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hit_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
-        S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
+        S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
           S.Sim.lead(x, momx), S.Sim.trail(y, momy), (S.Sim.lead(x, momx) + momx : U32),
           (S.Sim.trail(y, momy) + momy : U32),
-          S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
+          S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
             S.Sim.trail(x, momx), S.Sim.lead(y, momy), (S.Sim.trail(x, momx) + momx : U32),
             (S.Sim.lead(y, momy) + momy : U32),
-            S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
+            S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
               S.Sim.lead(x, momx), S.Sim.lead(y, momy), (S.Sim.lead(x, momx) + momx : U32),
               (S.Sim.lead(y, momy) + momy : U32), ((F.Fixed.unit() + 1 : U32), 0)))), hp)
 
@@ -731,7 +819,7 @@ def slow_free(stop: Bool, +level: L.Level, p: S.Player, hp: Free(level, p)) ->
 def ground_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.friction.ground(cmd, p)):
   match cmd p:
-    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+    case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       slow_free(Bool.and(S.Sim.crawling(momx), Bool.and(S.Sim.crawling(momy),
         Bool.and(U32.is_zero(forward), U32.is_zero(side)))), level,
         S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, hp)
@@ -796,7 +884,7 @@ def push_free(+level: L.Level, +p: S.Player, +angle: U32, +move: U32, hp: Free(l
 def move_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.move(level, cmd, p)):
   match cmd p:
-    case K.Cmd{+forward, +side, +turn, +use} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
+    case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       push_free(level, S.Sim.push(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites},
         (angle + (turn << 16n) : U32), forward),
         ((angle + (turn << 16n) : U32) - A.Angle.ang90() : U32), side,
@@ -833,8 +921,8 @@ def z_free(+level: L.Level, p: S.Player, hp: Free(level, p)) ->
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}, hp)
 
-# The player sprites, the counters, the vertical move and the state the
-# mobj leaves keep the place too.
+# The player sprites, the counters and the vertical move keep the place
+# too.
 def psprites_free(+level: L.Level, clock: U32, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.psprites(level, clock, p)):
   match p:
@@ -846,36 +934,11 @@ def counters_free(+level: L.Level, p: S.Player, hp: Free(level, p)) -> Free(leve
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
-# Counting a secret sector changes the inventory alone, so the player
-# stands where it stood.
-def secret_count_free(counts: Bool, +level: L.Level, +sector: U32, s: S.State,
-  hp: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.secret.count(counts, sector, s))):
-  match counts s:
-    case False{} _:
-      hp
-    case True{} S.State{S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}, lv, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
-      hp
-
-def secret_free(+level: L.Level, +s: S.State, hp: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.secret(s))):
-  secret_count_free(Bool.and(U32.is_eq(V.Vec.get(S.State.secrets(s),
-      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))), 1),
-    U32.is_eq(S.Player.z(S.State.player(s)), L.Level.floor(S.State.level(s),
-      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))))), level,
-    L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))), s, hp)
-
 def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.Sim.Try.player(S.Sim.mobj.z(t))):
   match t:
     case S.Try{ok, +p, things}:
       z_free(level, p, ht)
-
-def moved_free(+level: L.Level, t: S.Sim.Try, at: L.Level, s: S.State, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.State.player(S.State.moved(t, at, s))):
-  match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
-      ht
 
 # Free reads the geometry alone
 # -----------------------------
@@ -959,8 +1022,8 @@ def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb
         S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb),
         line_same(geo, sa, pa, sb, pb, x, y, r, mask, i, fa, fb, e))
 
-# The lines gathered for a box are the blockmap's, and the things near it
-# its links, which two levels of one geometry share.
+# The lines gathered for a box are the blockmap's, which two levels of
+# one geometry share.
 def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x0: U32, +y0: U32, +x1: U32,
   +y1: U32) ->
   {S.Sim.lines(L.Level{geo, sa, pa}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb}, x0, y0, x1, y1)
@@ -969,71 +1032,159 @@ def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
     case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
       {==}
 
-def clear_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
-  {S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you())
-    == S.Sim.clear(L.Level{geo, sb, pb}, x, y, S.Sim.radius(), H.Thing.you()) : Bool}:
-  match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
-      {==}
-
-def at_same(c: Bool, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
-  {S.Sim.Fit.ok(S.Sim.fit.at(c, L.Level{geo, sa, pa}, x, y, S.Sim.radius(), 1))
-    == S.Sim.Fit.ok(S.Sim.fit.at(c, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1)) : Bool}:
-  match c:
-    case False{}:
-      {==}
-    case True{}:
-      %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-        (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
-        : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32),
-          (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa},
-          x, y,
-          S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y)))
-          == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1,
-            S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y))) : Bool}
-      go_same(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-        (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, sb, pb, x, y, S.Sim.radius(), 1,
-        S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y), {==})
-
-# Free is the same in two levels of one geometry: the things near are
-# its links, the lines gathered its blockmap's, and each one's condition
-# is the geometry's.
+# Free is the same in two levels of one geometry: the lines gathered are
+# its blockmap's, and each one's condition is the geometry's.
 def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
   {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.free(L.Level{geo, sb, pb}, x, y) : Bool}:
-  %clear_same(geo, sa, pa, sb, pb, x, y)
-    : {S.Sim.Fit.ok(S.Sim.fit.at(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you()),
-      L.Level{geo, sa, pa}, x, y, S.Sim.radius(), 1))
-      == S.Sim.Fit.ok(S.Sim.fit.at(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1)) : Bool}
-  at_same(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you()), geo, sa, pa, sb, pb, x, y)
+  %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
+    : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32),
+      (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa},
+      x, y,
+      S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y)))
+      == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1,
+        S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y))) : Bool}
+  go_same(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, sb, pb, x, y, S.Sim.radius(), 1,
+    S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y), {==})
 
-# A mover's re-clip moves the player up and down alone.
-def stood_x(moved: S.Player, +q: S.Player) -> {S.Player.x(moved) == S.Player.x(S.Player.stood(moved, q)) : U32}:
-  match moved:
-    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}:
+# Held: free in a geometry, whatever the state's sectors and specials
+# have become. Each thinker's turn keeps it: the turn is held to the
+# geometry and the player's place, or is the player's own move.
+def Held(geo: L.Level.Geo, +s: S.State) -> Type:
+  {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s))},
+    S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))) : Bool}
+
+def held_x(before: S.Player, after: S.Player) ->
+  {S.Player.x(before) == S.Player.x(S.Player.held(before, after)) : U32}:
+  match before after:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} S.Player{ax, ay, az, aangle, amomx, amomy, amomz, afloorz, aceilz, aviewheight, adeltaview, aviewz, acrossed, ainv, apsprites}:
       {==}
 
-def stood_y(moved: S.Player, +q: S.Player) -> {S.Player.y(moved) == S.Player.y(S.Player.stood(moved, q)) : U32}:
-  match moved:
-    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites}:
+def held_y(before: S.Player, after: S.Player) ->
+  {S.Player.y(before) == S.Player.y(S.Player.held(before, after)) : U32}:
+  match before after:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites} S.Player{ax, ay, az, aangle, amomx, amomy, amomz, afloorz, aceilz, aviewheight, adeltaview, aviewz, acrossed, ainv, apsprites}:
       {==}
 
-# What the tic keeps is free where the player it moved was: the level
-# it packs has the geometry the move was checked against, and the
-# player it packs the place.
-def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Player, clock: U32, use: Bool,
-  +after: S.State, h: Free(L.Level{geo, sectors, specials}, moved)) ->
-  Laws.Free(S.Sim.tic.kept(geo, moved, clock, use, after)):
-  %stood_x(moved, S.State.player(after))
-    : {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(after)),
-      L.Level.specials(S.State.level(after))}, _,
-      S.Player.y(S.Player.stood(moved, S.State.player(after)))) : Bool}
-  %stood_y(moved, S.State.player(after))
-    : {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(after)),
-      L.Level.specials(S.State.level(after))}, S.Player.x(moved), _) : Bool}
-  %free_geo(geo, sectors, specials, L.Level.sectors(S.State.level(after)),
-    L.Level.specials(S.State.level(after)), S.Player.x(moved), S.Player.y(moved))
-    : {True{} == _ : Bool}
-  h
+# Counting a secret sector changes the inventory alone, so the player
+# stands where it stood: its state is held where the state it was
+# counted from was.
+def secret_count_held(counts: Bool, +geo: L.Level.Geo, +sector: U32, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.secret.count(counts, sector, s)):
+  match counts s:
+    case False{} _:
+      h
+    case True{} S.State{S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}, L.Level{g, +sectors, +specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+
+def secret_held(+geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) -> Held(geo, S.Sim.secret(s)):
+  secret_count_held(Bool.and(U32.is_eq(V.Vec.get(S.State.secrets(s),
+      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))), 1),
+    U32.is_eq(S.Player.z(S.State.player(s)), L.Level.floor(S.State.level(s),
+      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))))), geo,
+    L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))), s, h)
+
+# What a turn holds is free where the state before it was: the level it
+# packs has the geometry, and the player it packs the place.
+def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
+  Held(geo, S.State.held(geo, before, after)):
+  match before after:
+    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wsecrets} S.State{+player, L.Level{g, +sectors, +specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      %held_x(was, player)
+        : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, _, S.Player.y(S.Player.held(was, player))) : Bool}
+      %held_y(was, player)
+        : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, S.Player.x(was), _) : Bool}
+      %free_geo(geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), sectors, specials, S.Player.x(was),
+        S.Player.y(was))
+        : {True{} == _ : Bool}
+      h
+
+def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> Held(geo, S.State.kept(s, t)):
+  match s:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+
+def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, t: S.Sim.Try, s: S.State,
+  ht: Free(L.Level{geo, sa, pa}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa}, s)):
+  match t s:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      ht
+
+# The player's own turn: its move is checked against the geometry, and
+# the lines it fires are held.
+def mobj_held(+cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) -> Held(geo, S.Sim.mobj(cmd, geo, s)):
+  +level = {L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s))} : L.Level}
+  +went = S.State.moved(S.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), level, s)
+  kept_held(geo, S.State.held(geo, went, S.Sim.cross(S.Player.crossed(S.State.player(went)), went)),
+    S.Mobj{H.Things.you(S.State.things(s))},
+    held_free(geo, went, S.Sim.cross(S.Player.crossed(S.State.player(went)), went),
+      moved_held(geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)),
+        S.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), s,
+        mobj_z_free(level, S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s)),
+          xy_free(level, S.State.things(s), cmd, S.State.player(s), h)))))
+
+def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.turn(mine, t, cmd, geo, s)):
+  match mine:
+    case True{}:
+      mobj_held(cmd, geo, s, h)
+    case False{}:
+      held_free(geo, s, S.Sim.think(t, s), h)
+
+def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.thinkers.go(fuel, cmd, geo, s)):
+  match fuel s:
+    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +secrets}:
+      run_held(rest, cmd, geo, S.Sim.turn(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, secrets}),
+        turn_held(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, secrets}, h))
+
+def all_held(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.thinkers.all(fuel, cmd, geo, s)):
+  match fuel s:
+    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +secrets}:
+      all_held(f, cmd, geo, S.Sim.thinkers.go(t <> due, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, secrets}),
+        run_held(t <> due, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, secrets}, h))
+
+def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.rested(s)):
+  match s:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+
+# Reporting a sound keeps the place: it writes the sounds and the index
+# and nothing the place is read from.
+def heard_held(geo: L.Level.Geo, e: Sn.Sound.Event, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.State.heard(e, s)):
+  match s:
+    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      h
+
+def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.State.told.go(events, s)):
+  match events:
+    case []:
+      h
+    case +e <> rest:
+      told_go_held(geo, rest, S.State.heard(e, s), heard_held(geo, e, s, h))
+
+def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.told(s)):
+  match s:
+    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      told_go_held(geo, heard,
+        S.State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd, clock, ended,
+          usedown, sounds, mrnd, secrets}, h)
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
@@ -1046,24 +1197,22 @@ def Laws.tic_keeps_free(cmd, s, free):
   match s:
     case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, secrets}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +secrets}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, secrets}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = S.Sim.counters(S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))))
-      +felt = S.Sim.secret({S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [],
-        mrnd, secrets} : S.State})
-      +used = S.Sim.use(S.Sim.pressed(cmd, usedown), felt)
-      +went = S.Sim.mobj(cmd, level, S.State.player(felt), used)
-      kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
-        S.State.told(S.Sim.thinkers(S.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
-        moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, S.State.things(used), cmd, S.State.player(felt))),
-          S.State.level(used), used,
-          mobj_z_free(level, S.Sim.xy(level, S.State.things(used), cmd, S.State.player(felt)), xy_free(level,
-            S.State.things(used), cmd, S.State.player(felt),
-            secret_free(level, {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [],
-              mrnd, secrets} : S.State},
-            counters_free(level, S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
-              psprites_free(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
-                eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free)))))))))
+      +before = {S.Sim.secret(S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown,
+        [], mrnd, secrets}) : S.State}
+      told_held(geo,
+        S.Sim.thinkers(cmd, geo, S.State.held(geo, before, S.Sim.use(S.Sim.pressed(cmd, usedown), before))),
+        rested_held(geo, S.Sim.thinkers.all(8n, cmd, geo,
+            S.State.held(geo, before, S.Sim.use(S.Sim.pressed(cmd, usedown), before))),
+          all_held(8n, cmd, geo, S.State.held(geo, before, S.Sim.use(S.Sim.pressed(cmd, usedown), before)),
+            held_free(geo, before, S.Sim.use(S.Sim.pressed(cmd, usedown), before),
+              secret_held(geo, {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown,
+                [], mrnd, secrets} : S.State},
+              counters_free(level, S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
+                psprites_free(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
+                  eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free)))))))))
 
 def Laws.replay_keeps_free(script, s, free):
   match script:
@@ -1072,20 +1221,58 @@ def Laws.replay_keeps_free(script, s, free):
     case +cmd <> rest:
       Laws.replay_keeps_free(rest, S.Sim.tic(cmd, s), Laws.tic_keeps_free(cmd, s, free))
 
-# A free position is clear: the thing check's verdict starts the fit.
-def free_clear(c: Bool, +level: L.Level, +x: U32, +y: U32,
-  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}) -> {True{} == c : Bool}:
+# The freedom law
+# ---------------
+
+def at_true(c: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32,
+  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, r, mask)) : Bool}) -> {True{} == c : Bool}:
   match c:
     case False{}:
       e
     case True{}:
       {==}
 
-def Laws.replay_keeps_clear(script, s, free):
-  +after = S.Sim.replay(script, s)
-  free_clear(S.Sim.clear(S.State.level(after), S.Player.x(S.State.player(after)), S.Player.y(S.State.player(after)),
-    S.Sim.radius(), H.Thing.you()), S.State.level(after), S.Player.x(S.State.player(after)),
-    S.Player.y(S.State.player(after)), Laws.replay_keeps_free(script, s, free))
+def none_is(b: Maybe<&2, U32>, e: {True{} == Maybe.is_none(&2, U32, b) : Bool}) -> {None{} == b : Maybe<&2, U32>}:
+  match b:
+    case None{}:
+      {==}
+    case Some{v}:
+      %e : BD(_, Unit, {None{} == Some{v} : Maybe<&2, U32>})
+      Unit{}
+
+def Laws.check_is_clear(level, things, p, m, mask, passed):
+  match m:
+    case S.Body{+id, +x, +y, +z, +radius, +height, +flags}:
+      none_is(S.Sim.blocked(level, things, p, S.Body{id, x, y, z, radius, height, flags}),
+        at_true(Maybe.is_none(&2, U32, S.Sim.blocked(level, things, p, S.Body{id, x, y, z, radius, height, flags})),
+          level, x, y, radius, mask, passed))
+
+def fin_taken(go: Bool, +level: L.Level, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32, ceil: U32,
+  over: List<&2, U32>,
+  taken: {True{} == S.Sim.Try.ok(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over)) : Bool}) ->
+  {True{} == go : Bool}:
+  match go:
+    case False{}:
+      taken
+    case True{}:
+      {==}
+
+def fit_taken(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things, f: S.Sim.Fit,
+  over: List<&2, U32>,
+  taken: {True{} == S.Sim.Try.ok(S.Sim.try_move.fit(level, p, x, y, touched, f, over)) : Bool}) ->
+  {True{} == S.Sim.Fit.ok(f) : Bool}:
+  match touched f:
+    case (+inv, +things) S.Fit{+ok, +floor, +ceil}:
+      and_true_left(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
+          Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
+            F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))),
+        fin_taken(S.Sim.passes(S.Fit{ok, floor, ceil}, S.Player.z(p), S.Sim.height()), level,
+          S.Player.holding(p, inv), things, x, y, floor, ceil, over, taken))
+
+def Laws.move_is_checked(level, things, p, x, y, taken):
+  +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
+  fit_taken(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
+    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y), taken)
 
 # Things compute.
 
@@ -1405,10 +1592,19 @@ def Laws.radius_within():
 def Laws.solid_stays():
   {==}
 
+def Laws.monsters_block():
+  {==}
+
+def Laws.states_exist():
+  {==}
+
 def Laws.blocker_geometry():
   {==}
 
 def Laws.link_order():
+  {==}
+
+def Laws.spawn_thinks_this_tic():
   {==}
 
 def Laws.thing_blocks():
@@ -1468,6 +1664,12 @@ def Laws.sfx_refusals():
   {==}
 
 def Laws.sfx_rates_unserved(count, bytes):
+  {==}
+
+def Laws.key_boxes():
+  {==}
+
+def Laws.arms_numbers():
   {==}
 
 def Laws.tally_percents():

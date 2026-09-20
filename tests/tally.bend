@@ -3,12 +3,10 @@
 # secrets against the level's totals, and the time. Freedoom's E1M1
 # spawns 49 things flagged MF_COUNTITEM on Hurt Me Plenty (30 of type
 # 2014, 18 of 2015 and the berserk pack, read from its THINGS lump in
-# nushell) and holds 4 sectors of special 9 (52, 86, 128 and 132), and
-# no monster has a definition yet, so the kill total is 0 until
-# milestone 6's ticket 08 spawns them; it will count itself, since the
-# totals are counted by the flags of the things that spawn.
+# nushell), 29 monsters flagged MF_COUNTKILL, and 4 sectors of special
+# 9 (52, 86, 128 and 132).
 # Then the intermission tic by tic, from the state a short route beside
-# the exit switch leaves, which ends the level on tic 51. The tics are
+# the exit switch leaves, which ends the level on tic 42. The tics are
 # wi_stuff.c's: WI_initStats leaves sp_state 1 and cnt_pause TICRATE, so
 # the pause ends and the kills begin at bcnt 35; each percentage climbs
 # by 2 a tic from -1, which reaches a target of 0 in one tic; each of
@@ -41,7 +39,7 @@ import ../src/inventory.bend as I
 import ../src/inter.bend as W
 
 def held(n: Nat, forward: U32, side: U32, turn: U32, use: Bool) -> List<&2, K.Cmd>:
-  List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, use))
+  List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, Bool.pick(U32, use, 2, 0)))
 
 def idle(n: Nat) -> List<&2, K.Cmd>:
   held(n, 0, 0, 0, False{})
@@ -49,8 +47,8 @@ def idle(n: Nat) -> List<&2, K.Cmd>:
 # The exit room's door used from inside, the walk to the switch, and the
 # use that takes it, as tests/game.bend walks it.
 def route() -> List<&2, K.Cmd>:
-  List.concat(&2, K.Cmd, [idle(5n), held(1n, 0, 0, 0, True{}), held(1n, 0, 0, 96, False{}),
-    held(12n, 25, 0, 0, False{}), held(1n, 0, 0, 224, False{}), held(20n, 25, 0, 0, False{}), idle(10n),
+  List.concat(&2, K.Cmd, [idle(5n), held(1n, 0, 0, 0, True{}), held(1n, 0, 0, 64, False{}),
+    held(25n, 25, 0, 0, False{}), idle(8n), held(1n, 0, 0, 16, False{}),
     held(1n, 0, 0, 0, True{})])
 
 def beside() -> L.Level.Start:
@@ -147,8 +145,8 @@ def main() -> IO(Unit):
   do IO<Unit>:
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
-#|start kills 0/0 items 0/49 secrets 0/4 time 0
-#|exit kills 0/0 items 0/49 secrets 0/4 time 51 ended True random 66
+#|start kills 0/29 items 0/49 secrets 0/4 time 0
+#|exit kills 0/29 items 0/49 secrets 0/4 time 42 ended True random 66
 #|bcnt 0 count 1 cnt 35 bcnt 0 shown - - - - - anims - - - - - - - - - - random 76
 #|bcnt 1 count 1 cnt 34 bcnt 1 shown - - - - - anims - - 0 - - - - - 0 - random 76
 #|bcnt 34 count 1 cnt 1 bcnt 34 shown - - - - - anims 2 2 0 2 2 2 2 2 0 2 random 76
@@ -171,7 +169,7 @@ def main() -> IO(Unit):
 #|cut short done cnt 10 bcnt 66 shown 0 0 0 1 30 anims 1 1 1 1 1 1 1 1 1 1 random 86
 #|nine tics on done cnt 1 bcnt 75 shown 0 0 0 1 30 anims 2 1 2 2 1 2 2 1 2 2 random 86
 #|ten tics on done cnt 0 bcnt 76 shown 0 0 0 1 30 anims 2 1 2 2 1 2 2 1 2 2 random 86
-#|the level again level tic 1 kills 0/0 items 0/49 secrets 0/4 time 1
+#|the level again level tic 1 kills 0/29 items 0/49 secrets 0/4 time 1
 #|in the secret tic 0 at 400.000000 2040.000000 sector 86 special 9 left 1 counted 0
 #|stood a tic tic 1 at 400.000000 2040.000000 sector 86 special 9 left 0 counted 1
 #|out south tic 24 at 400.037475 1935.800521 sector 87 special 0 left 0 counted 1

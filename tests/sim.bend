@@ -7,19 +7,22 @@
 # lift and off its east edge into the fall and the landing. Freedoom's
 # first map is not id's: the shareware start is 1056, -3616 facing 90.
 # The start's things, as a nushell replay of P_SpawnMapThing over the
-# THINGS records, info.c and m_random.c finds them on Hurt Me Plenty with
-# no monsters: how many, the random index once they and the three flashes
-# have drawn, how many of each type Bendoom defines, the names of the
-# first twelve (records 0, 1, 4 and 5 are for the easy skills, 3 is a
-# monster and 7 for multiplayer), and six records: the first, animated
-# armour, a leg hung from its ceiling, the blue key, the dead former
-# sergeant and the last, each with the sector under it (tools/wad.nu's
-# sector-at), its z, its facing (its record's angle), its state row,
-# its tics and its definition. The blockmap's links against that
-# population: 180 links for 180 things, 79 of them solid (the solid
-# types' counts in ticket 02's nushell inventory), none at another
-# place, type or cell than its thing's, and no thing missing from the
-# cell of its centre. The player's inventory, G_PlayerReborn's.
+# THINGS records, info.c and m_random.c finds them on Hurt Me Plenty:
+# how many, the random index once they and the three flashes have drawn,
+# how many of each type Bendoom defines, the names of the first twelve
+# (records 0, 1, 4 and 5 are for the easy skills and 7 for multiplayer),
+# and ten records: the first, animated armour, a leg hung from its
+# ceiling, the blue key, the dead former sergeant, the last, and one
+# monster of each type, the zombieman and the demon deaf, each with the
+# sector under it (tools/wad.nu's sector-at), its z, its facing (its
+# record's angle), its state row, its tics, its definition and whether
+# P_SpawnMapThing left it in ambush, which is bit 8 of its record's
+# options. The blockmap's links against that population, the player's
+# mobj's left out: 209 links for 209 things, 108 of them solid (the
+# solid types' counts in ticket 02's nushell inventory and the 29
+# monsters), none of a thing gone or in another cell than its centre's,
+# and no thing missing from the cell of its centre. The player's
+# inventory, G_PlayerReborn's.
 # Then the pistol from the start: the weapon sprite's state row, tics and
 # place on the screen, and the flash's, after chosen tics. It rises 6 a
 # tic from 122 for 15 tics, rests at column 1, row 32, bobs on a walk
@@ -59,8 +62,8 @@
 # strobe from the start. The heights and tics are the hand computations
 # in milestone 4's tickets 04 to 10; the blinks' lights, a nushell
 # replay of T_LightFlash over Chocolate Doom's random table from index
-# 254, which from index 2 gives ticket 01's; the positions are
-# regression pins. The key's tic is P_TouchSpecialThing's reach, its
+# 56, where the spawn leaves it; the positions are regression pins.
+# The key's tic is P_TouchSpecialThing's reach, its
 # radius 20 and the player's 16: tic 33 leaves the player 37.79 east of
 # it, tic 34 35.58 east and 28.51 south, the tic Chocolate Doom's status
 # bar first shows the card on the same script; P_GiveCard's flash of 6
@@ -71,9 +74,9 @@
 # barrel, an armour bonus, a health bonus and the twitching impaled
 # body: a nushell replay of P_MobjThinker over info.c's states from the
 # spawn's tics, the rows numbered in info.c's order.
-# Last, on a copy of the map with three monster records rewritten, solid
-# things stop the player and movers, and carried things ride them, as
-# solids says; and the blue key door refuses a use, a blue card is taken
+# Then, on a copy of the map with three of its monster records
+# rewritten, solid things stop the player and movers, and carried things
+# ride them, as solids says; and the blue key door refuses a use, a blue card is taken
 # and the door then opens, in one replay, as locked says.
 # Every run prints, before its own line, a line for each sound its tics
 # started or stopped, under the clock after the tic, and each case ends
@@ -108,6 +111,29 @@
 # (51, 224) and behind (51, 128); 200 ahead (64, 129) and 201 (63); 1184
 # ahead, the last audible unit (1), 1185, which rounds to silence and
 # draws nothing, and 1201, past the clipping distance.
+# Last, the links and the thinkers of things that move, spawn and leave
+# in play, as relinks says, each line with the mobjs of two blockmap
+# cells, the last linked first, the things two sectors show in their
+# lists' order, the next id, the random index and a thing, then the
+# thinkers' order. Every list is worked from vanilla's source over the
+# WAD read in nushell: the blockmap's origin is -712, -1072, so the
+# cells of (-400, 400) and (-400, 300) are 2,11 and 2,10, and the sectors
+# under them (tools/wad.nu's sector-at) 160 and 140. P_SpawnMapThing
+# spawns the records in order and P_SetThingPosition puts each first in
+# its lists, so cell 2,11 lists record 58, cell 2,10 the player's mobj,
+# record 157, sector 160 record 58 and sector 140 records 238 and 157,
+# of which the player's is no thing to show. P_UnsetThingPosition and
+# P_SetThingPosition about the move take 58 out of the first lists and
+# put it first in the second. P_SpawnMobj gives the bonus the next id
+# past the 292 records, draws one random number, leaves it S_BON1's 6
+# tics (row 12) on the floor at 0, links it first, and adds its thinker
+# at the list's tail: 181 mobjs in record order, the player's between
+# records 154 and 166, then the 9 lights (the sectors of special 1, 8 or
+# 12), then the bonus, which thinks that same tic, 5 tics left.
+# P_RemoveMobj unlinks it, its thinker ends at its next turn, and the
+# next spawned is 293, not 292 again. P_TryMove relinks the player's
+# mobj first in its cell on its first move. The random index after a
+# tic is the lights' draws, a regression pin.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -186,11 +212,22 @@ def heights(sectors: List<&2, U32>, +level: L.Level) -> String:
       " sector " ++ U32.show(sector) ++ " " ++ F.Fixed.show(L.Level.floor(level, sector)) ++ " "
         ++ F.Fixed.show(L.Level.ceil(level, sector)) ++ heights(rest, level)
 
+# How many thinkers are not mobjs': the lights, movers and buttons.
+def specials(ts: List<&2, S.Thinker>) -> U32:
+  match ts:
+    case []:
+      0
+    case S.Mobj{id} <> rest:
+      specials(rest)
+    case _ <> rest:
+      (1 + specials(rest) : U32)
+
 # A run of one command in a demo's units, then the clock, the player,
-# the thinkers running, and some sectors' floors and ceilings.
+# the thinkers running that are no mobj's, and some sectors' floors and
+# ceilings.
 def watch(tag: String, sectors: List<&2, U32>, +s: S.State) -> String:
   line(tag ++ " tic " ++ U32.show(S.State.clock(s)), s) ++ " thinkers "
-    ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
+    ++ U32.show(specials(S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
 
 def run(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, s: S.State) -> IO(S.State):
   +r = ran(n, cmd, s)
@@ -203,10 +240,10 @@ def idle() -> K.Cmd:
   K.Cmd.idle()
 
 def use() -> K.Cmd:
-  K.Cmd.demo(0, 0, 0, True{})
+  K.Cmd.demo(0, 0, 0, 2)
 
 def forward() -> K.Cmd:
-  K.Cmd.demo(25, 0, 0, False{})
+  K.Cmd.demo(25, 0, 0, 0)
 
 def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
   S.State.at(level, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
@@ -244,7 +281,7 @@ def crossed(+level: L.Level) -> IO(Unit):
     x1 : S.State <- run("over", 1n, forward(), [145], x0)
     x2 : S.State <- run("-", 61n, idle(), [145], x1)
     x3 : S.State <- run("-", 1n, idle(), [145], x2)
-    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, False{}), [145], x3)
+    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, 0), [145], x3)
     IO.print(drawn(x4))
     IO.print("-")
 
@@ -253,7 +290,7 @@ def crossed(+level: L.Level) -> IO(Unit):
 # pit east of it, used again while it runs, and again once it is back.
 def lift(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, False{}), [98], S.State.start(level))
+    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, 0), [98], S.State.start(level))
     l1 : S.State <- run("-", 4n, idle(), [98], l0)
     l2 : S.State <- run("over", 1n, idle(), [98], l1)
     l3 : S.State <- run("-", 33n, idle(), [98], l2)
@@ -296,11 +333,11 @@ def holding(inv: I.Inventory, s: S.State) -> S.State:
 # alone.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, False{}),
+    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, 0),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
-    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), k0)
-    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
-    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
+    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, 0), k0)
+    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, 0), k1)
+    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, 0), k2)
     b0 : S.State <- keyed("blue walk with the skull", 87, 30n, forward(),
       holding(I.Inventory.card(8, I.Inventory.start()), at(level, 832, 1400, 90)))
     b1 : S.State <- keyed("use", 87, 1n, use(), b0)
@@ -323,7 +360,7 @@ def exits(+level: L.Level) -> IO(Unit):
     x0 : S.State <- ending("exit first tic use", 1n, use(), at(level, 65184, 1296, 180))
     x1 : S.State <- ending("-", 19n, idle(), x0)
     x2 : S.State <- ending("use", 1n, use(), x1)
-    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, True{}), x2)
+    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, 2), x2)
     IO.print(drawn(x3))
     IO.print("-")
 
@@ -408,11 +445,16 @@ def opens(+open: S.State) -> IO(Unit):
     IO.print("-")
 
 # A state with a fresh player at rest some way south of the first
-# door's sound origin, 832, 528, facing an angle.
+# door's sound origin, 832, 528, facing an angle, its mobj relinked
+# where it now stands, as P_UnsetThingPosition and P_SetThingPosition
+# relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
-  S.State{S.Player.at(level, L.Start{F.Fixed.of_map(832), F.Fixed.of_map((528 - d : U32)), A.Angle.of_thing(degrees)}),
-    level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  +x = F.Fixed.of_map(832)
+  +y = F.Fixed.of_map((528 - d : U32))
+  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
+    S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
+    sounds, mrnd, secrets}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -435,9 +477,10 @@ def placements(+open: S.State) -> IO(Unit):
     listen("door 1201 ahead", 1201, 90, open)
     IO.print("-")
 
-# The first door, sector 10, from the pit south of it: used, held open,
-# shut; turned twice; use held down all the while; walked through; its
-# close heard from eight places.
+# The first door, sector 10, from the pit south of it, at 872 where the
+# zombieman of record 176 does not reach: used, held open, shut; turned
+# twice; use held down all the while; walked through; its close heard
+# from eight places.
 def used(+before: S.State) -> IO(Unit):
   do IO<Unit>:
     d1 : S.State <- run("use", 1n, use(), [10], before)
@@ -484,9 +527,9 @@ def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Ar
   L.Level.load((patch.record(patch.record(patch.record(a, pos, 3, 96, 216, 48), pos, 35, 800, 528, 2035), pos, 82,
     824, 1352, 5), lumps))
 
-# E1M1 with records 3, 35 and 82, monsters neither game spawns, made a
-# tech column on the first lift, a barrel in the first door and a second
-# blue card in the hall south of the blue key door, as tools/oracle.nu's
+# E1M1 with records 3, 35 and 82, a demon and two imps, made a tech
+# column on the first lift, a barrel in the first door and a second blue
+# card in the hall south of the blue key door, as tools/oracle.nu's
 # --things "3,48,96,216 35,2035,800,528 82,5,824,1352" has them: each
 # spawns as the map's other things do, drawing its random numbers in
 # record order.
@@ -513,7 +556,11 @@ def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & L.Level:
 # barrel's 42 is undone at -86, tic 295, and the door goes back up.
 # Meanwhile the barrel runs S_BAR1 (row 10) and S_BAR2 (row 11), 6 tics
 # each, from the 3 its spawn drew: the next row on tic 3 and every 6
-# tics after.
+# tics after. A monster stops the player as those solids do: walking
+# north at 25 from 832, 384, under the deaf zombieman of record 176 at
+# 816, 448, the player stops 36.34 south of it, since its radius of 20
+# and the player's 16 leave 36 between their centres, and no later tic
+# moves it.
 def solids(+level: L.Level, +placed: L.Level) -> IO(Unit):
   do IO<Unit>:
     c0 : S.State <- run("column walk", 17n, forward(), [],
@@ -523,6 +570,9 @@ def solids(+level: L.Level, +placed: L.Level) -> IO(Unit):
     k0 : S.State <- run("corpse walk", 10n, forward(), [],
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 128, 432, 270)))
     k1 : S.State <- run("-", 8n, forward(), [], k0)
+    z0 : S.State <- run("zombieman walk", 24n, forward(), [],
+      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 832, 384, 90)))
+    z1 : S.State <- run("-", 20n, forward(), [], z0)
     l0 : S.State <- carry("column lift switch walk", 10n, forward(), [98], 3,
       at(placed, 240, 256, 180))
     l1 : S.State <- carry("use", 1n, use(), [98], 3, l0)
@@ -532,7 +582,7 @@ def solids(+level: L.Level, +placed: L.Level) -> IO(Unit):
     l5 : S.State <- carry("-", 105n, idle(), [98], 3, l4)
     l6 : S.State <- carry("-", 34n, idle(), [98], 3, l5)
     b0 : S.State <- carry("barrel door walk", 40n, forward(), [10], 35,
-      at(placed, 832, 384, 90))
+      at(placed, 872, 384, 90))
     b1 : S.State <- carry("use", 1n, use(), [10], 35, b0)
     b2 : S.State <- carry("-", 61n, idle(), [10], 35, b1)
     b3 : S.State <- carry("-", 192n, idle(), [10], 35, b2)
@@ -558,11 +608,11 @@ def locked(+placed: L.Level) -> IO(Unit):
     k0 : S.State <- keyed("blue door refused", 82, 1n, use(),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(placed, 880, 1440, 90)))
     k1 : S.State <- keyed("-", 82, 20n, idle(), k0)
-    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, False{}), k1)
+    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, 0), k1)
     k3 : S.State <- keyed("walk", 82, 13n, forward(), k2)
     k4 : S.State <- keyed("-", 82, 1n, forward(), k3)
     k5 : S.State <- keyed("-", 82, 20n, idle(), k4)
-    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, False{}), k5)
+    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, 0), k5)
     k7 : S.State <- keyed("walk", 82, 19n, forward(), k6)
     k8 : S.State <- keyed("use", 82, 1n, use(), k7)
     k9 : S.State <- keyed("-", 82, 5n, idle(), k8)
@@ -581,7 +631,7 @@ def patched.cases(+level: L.Level, p: Array<U32> & L.Level) -> IO(Unit):
 
 def door(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    d0 : S.State <- run("door walk", 40n, forward(), [10], at(level, 832, 384, 90))
+    d0 : S.State <- run("door walk", 40n, forward(), [10], at(level, 872, 384, 90))
     used(d0)
     floors(switched(level))
     crossed(level)
@@ -589,7 +639,8 @@ def door(+level: L.Level) -> IO(Unit):
     blue(level)
     exits(switched(level))
     states([1n, 1n, 1n, 1n, 1n, 8n, 10n, 12n, 1n, 0n], S.State.start(level))
-    lights([1n, 34n, 1n, 4n, 1n, 23n, 1n, 1n, 1n, 2n, 2n, 60n, 1n, 2n, 1n, 1n, 1n, 1n, 4n, 1n, 0n], S.State.start(level))
+    lights([1n, 7n, 1n, 6n, 20n, 1n, 5n, 24n, 5n, 1n, 5n, 1n, 3n, 1n, 1n, 1n, 8n, 44n, 7n, 2n, 0n],
+      S.State.start(level))
 
 def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
   match things:
@@ -634,9 +685,10 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
   match chosen:
     case []:
       IO.pure(Unit, Unit{})
-    case id <> rest:
+    case +id <> rest:
       do IO<Unit>:
-        IO.print(thing(H.Things.get(S.State.things(s), id)))
+        IO.print(thing(H.Things.get(S.State.things(s), id)) ++ " ambush "
+          ++ Bool.show(H.Thing.ambush(S.State.level(s), id)))
         things(rest, s)
 
 # What the blockmap links hold: how many links, how many of solid
@@ -651,47 +703,59 @@ def solid.def(d: H.Thing.Def) -> Bool:
 def solid(+kind: U32) -> Bool:
   solid.def(H.Thing.info(kind))
 
-# Whether a link agrees with the population: its thing alive, at the
-# link's x and y, of its type, with its centre in cell c.
-def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, link: L.Level.Link) -> Bool:
+def same(a: L.Level.Cell, b: L.Level.Cell) -> Bool:
+  L.Cell{ax, ay} = a
+  L.Cell{bx, by} = b
+  Bool.and(U32.is_eq(ax, bx), U32.is_eq(ay, by))
+
+# Whether a cell's link agrees with the population: its thing alive,
+# with its centre in cell c.
+def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, c: L.Level.Cell) -> Bool:
   match m:
     case None{}:
       False{}
-    case Some{H.Thing{id, +kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics}}:
-      L.Link{next, +lx, +ly, +lkind} = link
-      Bool.and(L.Level.cell.is(L.Level.cell_of(bm, x, y), c),
-        Bool.and(U32.is_eq(x, lx), Bool.and(U32.is_eq(y, ly), U32.is_eq(kind, lkind))))
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      same(L.Level.cell_of(bm, x, y), c)
 
-def links.count(+link: L.Level.Link, m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, t: Links) ->
-  Links:
-  L.Link{next, x, y, +kind} = link
-  Links{n, s, w} = t
-  Links{(n + 1 : U32), (s + Bool.to_u32(solid(kind)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c, link))) : U32)}
+def solid.some(m: Maybe<&2, H.Thing>) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      solid(kind)
 
-def links.cell(ids: List<&2, U32>, +level: L.Level, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
+# A cell's link counted, the player's mobj's left out.
+def links.count(you: Bool, +m: Maybe<&2, H.Thing>, bm: L.Level.Blockmap, c: L.Level.Cell, t: Links) -> Links:
+  match you:
+    case True{}:
+      t
+    case False{}:
+      Links{n, s, w} = t
+      Links{(n + 1 : U32), (s + Bool.to_u32(solid.some(m)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c))) : U32)}
+
+def links.cell(ids: List<&2, U32>, +bm: L.Level.Blockmap, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
   match ids:
     case []:
       t
     case +id <> rest:
-      links.cell(rest, level, ts, c, links.count(L.Level.linked.in(L.Level.things_of(level), id), H.Things.get(ts, id),
-        L.Level.blockmap_of(level), c, t))
+      links.cell(rest, bm, ts, c, links.count(U32.is_eq(id, H.Things.you(ts)), H.Things.get(ts, id), bm, c, t))
 
-def links.cells(cells: List<&2, L.Level.Cell>, +level: L.Level, +ts: H.Things, t: Links) -> Links:
+def links.cells(cells: List<&2, L.Level.Cell>, +bm: L.Level.Blockmap, +ts: H.Things, t: Links) -> Links:
   match cells:
     case []:
       t
     case +c <> rest:
-      links.cells(rest, level, ts, links.cell(L.Level.cell.things(L.Level.geo(level), c), level, ts, c, t))
+      links.cells(rest, bm, ts, links.cell(H.Things.linked(ts, bm, [c]), bm, ts, c, t))
 
 # How many of the things are not in the list of the cell their centre
 # is in.
-def unlinked(things: List<&2, H.Thing>, +level: L.Level) -> U32:
+def unlinked(things: List<&2, H.Thing>, +bm: L.Level.Blockmap, +ts: H.Things) -> U32:
   match things:
     case []:
       0
-    case H.Thing{+id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      (Bool.to_u32(Bool.not(S.Sim.member(L.Level.cell.things(L.Level.geo(level),
-        L.Level.cell_of(L.Level.blockmap_of(level), x, y)), id))) + unlinked(rest, level) : U32)
+    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+      (Bool.to_u32(Bool.not(S.Sim.member(H.Things.linked(ts, bm, [L.Level.cell_of(bm, x, y)]), id)))
+        + unlinked(rest, bm, ts) : U32)
 
 def solids.count(things: List<&2, H.Thing>) -> U32:
   match things:
@@ -700,22 +764,21 @@ def solids.count(things: List<&2, H.Thing>) -> U32:
     case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       (Bool.to_u32(solid(kind)) + solids.count(rest) : U32)
 
-def links.show(t: Links, +things: List<&2, H.Thing>, +level: L.Level) -> String:
+def links.show(t: Links, +things: List<&2, H.Thing>, bm: L.Level.Blockmap, ts: H.Things) -> String:
   Links{n, s, w} = t
   "links " ++ U32.show(n) ++ " of " ++ Nat.show(List.length(&2, H.Thing, things)) ++ " things, solid "
     ++ U32.show(s) ++ " of " ++ U32.show(solids.count(things)) ++ ", wrong " ++ U32.show(w) ++ ", unlinked "
-    ++ U32.show(unlinked(things, level))
+    ++ U32.show(unlinked(things, bm, ts))
 
-# The blockmap links of a state's level against its population, cell by
-# cell over the whole blockmap: as many links as things, as many of them
-# solid as solid things, none that disagrees with its thing, and no
-# thing missing from its centre's cell mean each thing is linked once,
-# in the cell of its centre, with its x, y and type.
-def links.in(bm: L.Level.Blockmap, +s: S.State) -> String:
+# The blockmap links of a state's population, cell by cell over the
+# whole blockmap: as many links as things, as many of them solid as
+# solid things, none that disagrees with its thing, and no thing missing
+# from its centre's cell mean each thing is linked once, in the cell of
+# its centre.
+def links.in(+bm: L.Level.Blockmap, +s: S.State) -> String:
   L.Blockmap{words, ox, oy, +cols, +rows} = bm
-  +level = S.State.level(s)
-  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), level, S.State.things(s),
-    Links{0, 0, 0}), H.Things.list(S.State.things(s)), level)
+  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), bm, S.State.things(s),
+    Links{0, 0, 0}), H.Things.list(S.State.things(s)), bm, S.State.things(s))
 
 def links(+s: S.State) -> String:
   links.in(L.Level.blockmap_of(S.State.level(s)), s)
@@ -731,7 +794,7 @@ def free(+s: S.State) -> IO(S.State):
     IO.print("by type" ++ kinds(H.Thing.defs(), spawned))
     IO.print("first" ++ ids(List.take(&2, H.Thing, spawned, 12n)))
     IO.print(links(s))
-    things([2, 6, 29, 87, 245, 291], s)
+    things([2, 6, 29, 87, 245, 291, 176, 240, 81, 3], s)
     return s
 
 # A run, then the tic, the player's place, the inventory, how many
@@ -749,9 +812,9 @@ def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
 def stocked(health: U32, armour: U32, armourtype: U32, ammo: List<&2, U32>, inv: I.Inventory) -> I.Inventory:
-  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, kills, secrets} = inv
+  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(ammo, 4), caps, backpack, weapons, powers, items,
-    bonus, kills, secrets}
+    bonus}
 
 # Walking forward from a place for some tics, then one more: the tic
 # before contact and the tic of it.
@@ -791,10 +854,10 @@ def box(tag: String, +s: S.State) -> IO(Unit):
 def chainsaw(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
   +s = holding(inv, at(level, 3158, 2176, 180))
   do IO<S.State>:
-    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), s,
+    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, 0), s,
       S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
-        [K.Cmd.demo(0, 0, 4294967280, False{})]), s))
-    b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, False{}), s, a)
+        [K.Cmd.demo(0, 0, 4294967280, 0)]), s))
+    b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, 0), s, a)
     finished(b)
 
 # The ammo and the chainsaw, then health, armour and berserk, a pickup
@@ -829,6 +892,106 @@ def pickups(+level: L.Level) -> IO(Unit):
     g1 : S.State <- walked("green armour at 100", 11n,
       holding(stocked(100, 100, 1, [50, 0, 0, 0], I.Inventory.start()), at(level, 1664, 1008, 90)))
     IO.print("-")
+
+def names(ids: List<&2, U32>) -> String:
+  match ids:
+    case []:
+      ""
+    case id <> rest:
+      " " ++ U32.show(id) ++ names(rest)
+
+# The mobjs that think before any special does, and those after one.
+def lead(ts: List<&2, S.Thinker>) -> List<&2, U32>:
+  match ts:
+    case S.Mobj{id} <> rest:
+      id <> lead(rest)
+    case _:
+      []
+
+def late(ts: List<&2, S.Thinker>, special: Bool) -> List<&2, U32>:
+  match ts special:
+    case [] _:
+      []
+    case S.Mobj{id} <> rest True{}:
+      id <> late(rest, True{})
+    case S.Mobj{id} <> rest False{}:
+      late(rest, False{})
+    case _ <> rest _:
+      late(rest, True{})
+
+# The thinkers' order: how many mobjs think before the specials, the
+# five about the player's among them, how many specials, and the mobjs
+# after a special.
+def order(tag: String, +ts: List<&2, S.Thinker>) -> String:
+  tag ++ " thinkers: " ++ Nat.show(List.length(&2, U32, lead(ts))) ++ " mobjs, about the player's"
+    ++ names(List.take(&2, U32, List.drop(&2, U32, lead(ts), 103n), 5n)) ++ ", " ++ U32.show(specials(ts))
+    ++ " specials, then mobjs" ++ names(late(ts, False{}))
+
+def of.sector(things: List<&2, H.Thing>, +sector: U32) -> List<&2, U32>:
+  match things:
+    case []:
+      []
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +at, state, tics} <> rest:
+      V.Vec.keep(~U32, U32.is_eq(at, sector), id, of.sector(rest, sector))
+
+# The mobjs the blockmap cell of a place in map units lists.
+def cell(+bm: L.Level.Blockmap, ts: H.Things, x: U32, y: U32) -> String:
+  names(H.Things.linked(ts, bm, [L.Level.cell_of(bm, F.Fixed.of_map(x), F.Fixed.of_map(y))]))
+
+# The mobjs of the blockmap cells at (-400, 400) and (-400, 300), the
+# last linked first, the things sectors 160 and 140 show, in their lists'
+# order, the next id, the random index, and a thing.
+def linked(tag: String, +id: U32, +s: S.State) -> String:
+  +bm = L.Level.blockmap_of(S.State.level(s))
+  +ts = S.State.things(s)
+  tag ++ " cell 2,11" ++ cell(bm, ts, 65136, 400) ++ " cell 2,10" ++ cell(bm, ts, 65136, 300) ++ " sector 160"
+    ++ names(of.sector(H.Things.shown(ts), 160)) ++ " sector 140" ++ names(of.sector(H.Things.shown(ts), 140))
+    ++ " next " ++ U32.show(H.Things.count(ts)) ++ " random " ++ U32.show(S.State.rnd(s)) ++ " "
+    ++ thing(H.Things.get(ts, id))
+
+def moved.some(m: Maybe<&2, H.Thing>, x: U32, y: U32, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      S.State.moved(S.Try{True{}, S.State.player(s), H.Things.moved(S.State.things(s),
+        L.Level.blockmap_of(S.State.level(s)), th, H.Thing.at(th, S.State.level(s), F.Fixed.of_map(x),
+          F.Fixed.of_map(y)))}, S.State.level(s), s)
+
+# A state with a thing at another place, unlinked and linked again.
+def moved(+id: U32, x: U32, y: U32, +s: S.State) -> S.State:
+  moved.some(H.Things.get(S.State.things(s), id), x, y, s)
+
+def spawned(d: Maybe<&2, H.Thing.Def>, x: U32, y: U32, s: S.State) -> S.State:
+  match d:
+    case None{}:
+      s
+    case Some{info}:
+      S.Sim.spawn(info, F.Fixed.of_map(x), F.Fixed.of_map(y), H.Thing.onfloor(), s)
+
+# A state's links and a thing, then its thinkers' order.
+def seen(tag: String, id: U32, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    IO.print(linked(tag, id, s))
+    IO.print(order(" ", S.State.thinkers(s)))
+    return s
+
+# Things that move, spawn and leave in play, from the start. The dead
+# former human, record 58, moved from (-400, 400) to (-400, 300), over a
+# cell border and a sector border, as P_UnsetThingPosition and
+# P_SetThingPosition relink it; a health bonus spawned at (-340, 288) as
+# P_SpawnMobj spawns it, an idle tic, its removal as P_RemoveMobj removes
+# it, a tic, and another spawned; then the player's first move.
+def relinks(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    s0 : S.State <- seen("start", 58, S.State.start(level))
+    s1 : S.State <- seen("moved", 58, moved(58, 65136, 300, s0))
+    s2 : S.State <- seen("spawned", 292, spawned(H.Thing.def(2014), 65196, 288, s1))
+    s3 : S.State <- seen("a tic", 292, S.Sim.tic(idle(), s2))
+    s4 : S.State <- seen("removed, a tic", 292, S.Sim.tic(idle(), S.Sim.remove(292, s3)))
+    s5 : S.State <- seen("spawned", 293, spawned(H.Thing.def(2014), 65196, 288, s4))
+    s6 : S.State <- seen("walked", 293, S.Sim.tic(forward(), s5))
+    IO.print(links(s6))
 
 def psprite(psp: S.Psprite) -> String:
   S.Psprite{state, tics, sx, sy} = psp
@@ -867,24 +1030,24 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
   do IO<Unit>:
     s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level))
     p0 : S.State <- free(s)
-    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
-    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p1)
-    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p2)
-    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p3)
-    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
-    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p5)
-    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p6)
-    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p7)
-    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
-    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, p9)
-    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}}, p10)
-    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p11)
-    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p12)
-    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, p13)
-    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.State.start(level))
-    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q1)
-    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q2)
-    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
+    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
+    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p1)
+    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p2)
+    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p3)
+    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
+    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p5)
+    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p6)
+    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p7)
+    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
+    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, p9)
+    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p10)
+    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p11)
+    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p12)
+    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p13)
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, S.State.start(level))
+    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q1)
+    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q2)
+    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q3)
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     IO.print("the walks: " ++ drawn(p14) ++ ", " ++ drawn(q6))
@@ -892,6 +1055,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     pickups(level)
     door(level)
     patched.cases(level, patched(W.Wad.dir(a)))
+    relinks(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -901,17 +1065,21 @@ def main() -> IO(Unit):
 
 #|start -416.000000 256.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000
 #|free at start True
-#|inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0
-#|things at start 180 random 1
-#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1
-#|first 2 6 8 9 10 11 12 13 14 15 16 17
-#|links 180 of 180 things, solid 79 of 79, wrong 0, unlinked 0
-#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1
-#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 angle 270.000 sector 130 state 6 tics 5 radius 20 height 16 flags 1
-#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 angle 90.000 sector 153 state 53 tics 4294967295 radius 20 height 68 flags 768
-#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 angle 270.000 sector 35 state 24 tics 3 radius 20 height 16 flags 33554433
-#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 angle 90.000 sector 170 state 3 tics 4294967295 radius 20 height 16 flags 0
-#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 angle 270.000 sector 150 state 34 tics 4294967295 radius 20 height 16 flags 8388609
+#|inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0
+#|things at start 209 random 59
+#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5
+#|first 2 3 6 8 9 10 11 12 13 14 15 16
+#|links 209 of 209 things, solid 108 of 108, wrong 0, unlinked 0
+#|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1 ambush True
+#|thing 6 type 2018 at 1664.000000 1088.000000 z -144.000000 angle 270.000 sector 130 state 6 tics 2 radius 20 height 16 flags 1 ambush False
+#|thing 29 type 60 at 1184.000000 288.000000 z 60.000000 angle 90.000 sector 153 state 53 tics 4294967295 radius 20 height 68 flags 768 ambush True
+#|thing 87 type 5 at 2192.000000 576.000000 z 136.000000 angle 270.000 sector 35 state 24 tics 1 radius 20 height 16 flags 33554433 ambush False
+#|thing 245 type 19 at 1248.000000 224.000000 z 16.000000 angle 90.000 sector 170 state 3 tics 4294967295 radius 20 height 16 flags 0 ambush True
+#|thing 291 type 2023 at 608.000000 480.000000 z 0.000000 angle 270.000 sector 150 state 34 tics 4294967295 radius 20 height 16 flags 8388609 ambush False
+#|thing 176 type 3004 at 816.000000 448.000000 z -128.000000 angle 225.000 sector 17 state 61 tics 5 radius 20 height 56 flags 4194310 ambush True
+#|thing 240 type 9 at 960.000000 1056.000000 z -128.000000 angle 270.000 sector 56 state 63 tics 6 radius 20 height 56 flags 4194310 ambush False
+#|thing 81 type 3001 at 848.000000 1056.000000 z -128.000000 angle 270.000 sector 56 state 65 tics 8 radius 20 height 56 flags 4194310 ambush False
+#|thing 3 type 3002 at 2576.000000 2112.000000 z 192.000000 angle 315.000 sector 5 state 67 tics 1 radius 30 height 56 flags 4194310 ambush True
 #|U:1 -415.218765 256.000289 0.000 z 0.000000 floor 0.000000 eye 41.000015
 #|U!:34 3.282882 256.157440 0.000 z 0.000000 floor 0.000000 eye 33.430175
 #|sound tic 41 DSPSTART from sector 98 vol 64 sep 149
@@ -919,21 +1087,21 @@ def main() -> IO(Unit):
 #|sound tic 75 DSPSTOP from sector 98 vol 64 sep 78
 #|sound tic 157 stop thing 264
 #|sound tic 157 DSITEMUP from nobody vol 64 sep 128
-#|sound tic 170 stop thing 266
-#|sound tic 170 DSITEMUP from nobody vol 64 sep 128
-#|sound tic 180 DSPSTART from sector 98 vol 22 sep 63
+#|sound tic 180 DSPSTART from sector 98 vol 33 sep 56
+#|sound tic 191 stop thing 266
+#|sound tic 191 DSITEMUP from nobody vol 64 sep 128
 #|sound tic 215 DSPSTOP from sector 98 vol 20 sep 62
-#|U!:200 879.976928 495.961242 61.523 z -128.000000 floor -128.000000 eye 40.722702
-#|-:40 879.976928 495.961242 61.523 z -128.000000 floor -128.000000 eye 41.000000
-#|R:10 879.976928 495.961242 35.156 z -128.000000 floor -128.000000 eye 41.000000
-#|U!:70 879.976928 495.976135 35.156 z -128.000000 floor -128.000000 eye 40.730163
-#|L:30 879.976928 495.976135 131.835 z -128.000000 floor -128.000000 eye 41.000000
-#|U:100 784.014022 495.985275 131.835 z -128.000000 floor -128.000000 eye 41.065185
-#|S:60 879.981826 495.988571 131.835 z -128.000000 floor -128.000000 eye 41.059051
-#|D!:100 811.054748 331.127044 131.835 z -128.000000 floor -128.000000 eye 41.392868
-#|R:40 803.277694 323.355331 0.000 z -128.000000 floor -128.000000 eye 41.000000
-#|U!:120 879.949401 430.466888 0.000 z -128.000000 floor -128.000000 eye 41.234771
-#|A!:40 879.826950 495.961883 0.000 z -128.000000 floor -128.000000 eye 41.147918
+#|U!:200 879.976715 495.961593 61.523 z -128.000000 floor -128.000000 eye 40.722702
+#|-:40 879.976715 495.961593 61.523 z -128.000000 floor -128.000000 eye 41.000000
+#|R:10 879.976715 495.961593 35.156 z -128.000000 floor -128.000000 eye 41.000000
+#|U!:70 879.976715 495.972946 35.156 z -128.000000 floor -128.000000 eye 40.730163
+#|L:30 879.976715 495.972946 131.835 z -128.000000 floor -128.000000 eye 41.000000
+#|U:100 784.012664 495.984741 131.835 z -128.000000 floor -128.000000 eye 41.065185
+#|S:60 879.983078 495.988449 131.835 z -128.000000 floor -128.000000 eye 41.059051
+#|D!:100 811.047988 331.119094 131.835 z -128.000000 floor -128.000000 eye 41.392868
+#|R:40 803.270935 323.347381 0.000 z -128.000000 floor -128.000000 eye 41.000000
+#|U!:120 879.951141 429.920242 0.000 z -128.000000 floor -128.000000 eye 41.234771
+#|A!:40 879.829803 495.962158 0.000 z -128.000000 floor -128.000000 eye 41.147918
 #|sound tic 39 DSPSTART from sector 98 vol 64 sep 129
 #|ledge U!:47 207.783569 256.234542 0.000 z -24.000000 floor -24.000000 eye 52.658081
 #|U!:1 224.302001 256.240737 0.000 z -24.000000 floor -128.000000 eye 151.570556
@@ -961,189 +1129,187 @@ def main() -> IO(Unit):
 #|weapon tic 124 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000
 #|-
 #|clip walk tic 9 644.340896 991.988937 180.000 z -128.000000 floor -128.000000 eye 42.770172
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 10 stop thing 140
 #|sound tic 10 DSITEMUP from nobody vol 64 sep 128
 #|- tic 10 639.121368 991.986862 180.000 z -128.000000 floor -128.000000 eye 42.064453
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 140
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 140
 #|sounds drew to 64
 #|shells walk tic 8 1082.761047 -223.991744 0.000 z 0.000000 floor 0.000000 eye 43.090270
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 9 stop thing 276
 #|sound tic 9 DSITEMUP from nobody vol 64 sep 128
 #|- tic 9 1087.658264 -223.989990 0.000 z 0.000000 floor 0.000000 eye 42.770034
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 276
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 276
 #|sounds drew to 64
 #|sound tic 18 stop thing 208
 #|sound tic 18 DSITEMUP from nobody vol 64 sep 128
 #|sound tic 26 stop thing 207
 #|sound tic 26 DSITEMUP from nobody vol 64 sep 128
 #|- tic 26 1202.337890 -223.948562 0.000 z 0.000000 floor 0.000000 eye 48.388656
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 12 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 177 taken 207 208 276
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 12 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 206 taken 207 208 276
 #|shells walk at the cap tic 8 1082.761047 -223.991744 0.000 z 0.000000 floor 0.000000 eye 43.090270
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 9 1087.658264 -223.989990 0.000 z 0.000000 floor 0.000000 eye 42.770034
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 64
 #|- tic 26 1202.337890 -223.948562 0.000 z 0.000000 floor 0.000000 eye 48.388656
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|rocket walk tic 8 677.238296 -1000.009109 180.000 z 0.000000 floor 0.000000 eye 43.090423
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 9 stop thing 279
 #|sound tic 9 DSITEMUP from nobody vol 64 sep 128
 #|- tic 9 672.340896 -1000.011062 180.000 z 0.000000 floor 0.000000 eye 42.770172
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 1 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 279
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 1 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 279
 #|sounds drew to 64
 #|rocket walk at the cap tic 8 677.238296 -1000.009109 180.000 z 0.000000 floor 0.000000 eye 43.090423
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 9 672.340896 -1000.011062 180.000 z 0.000000 floor 0.000000 eye 42.770172
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 64
 #|-
 #|shell box walk tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 1 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 52 stop thing 137
 #|sound tic 52 DSITEMUP from nobody vol 64 sep 128
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 20 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 1 things 179 taken 137
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 20 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137
 #|sounds drew to 65
 #|-
 #|shell box walk short of the cap tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 45 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 1 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 45 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 52 stop thing 137
 #|sound tic 52 DSITEMUP from nobody vol 64 sep 128
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 1 things 179 taken 137
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137
 #|sounds drew to 65
 #|-
 #|shell box walk at the cap tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 1 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 1 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 65
 #|-
 #|chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 34 stop thing 2
 #|sound tic 34 DSWPNUP from nobody vol 64 sep 128
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 2
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 2
 #|sounds drew to 65
 #|owned chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 64
 #|health bonus tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 268
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 476.164627 256.015945 0.000 z -128.000000 floor -128.000000 eye 39.730026
-#|  inventory health 101 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 kills 0 secrets 0 things 179 taken 268
+#|  inventory health 101 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 268
 #|sounds drew to 64
 #|health bonus at 200 tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
-#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 268
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 476.164627 256.015945 0.000 z -128.000000 floor -128.000000 eye 39.730026
-#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 kills 0 secrets 0 things 179 taken 268
+#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 268
 #|sounds drew to 64
 #|stimpack at 100 tic 11 -32.015335 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 12 -32.017639 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 64
 #|- tic 22 -32.040420 495.976776 90.000 z 0.000000 floor 0.000000 eye 41.022888
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|stimpack at 60 tic 11 -32.015335 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 215
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 -32.017639 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 70 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 215
+#|  inventory health 70 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 215
 #|sounds drew to 64
 #|medikit at 100 tic 11 31.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 12 31.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 64
 #|medikit at 60 tic 11 31.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 259
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 31.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 259
+#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 259
 #|sounds drew to 64
 #|berserk at 100 tic 11 607.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 291
 #|sound tic 12 DSGETPOW from nobody vol 64 sep 128
 #|- tic 12 607.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 kills 0 secrets 0 things 179 taken 291
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 things 208 taken 291
 #|sounds drew to 65
 #|- tic 22 607.968032 479.134338 90.000 z 0.000000 floor 0.000000 eye 41.174743
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 11 0 0 0 0 items 1 flash 0 kills 0 secrets 0 things 179 taken 291
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 11 0 0 0 0 items 1 flash 0 things 208 taken 291
 #|berserk at 60 tic 11 607.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 291
 #|sound tic 12 DSGETPOW from nobody vol 64 sep 128
 #|- tic 12 607.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 kills 0 secrets 0 things 179 taken 291
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 things 208 taken 291
 #|sounds drew to 65
 #|armour bonus tic 11 624.013870 -758.390090 270.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 204
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 624.015945 -764.166107 270.000 z 0.000000 floor 0.000000 eye 39.729934
-#|  inventory health 100 armour 1 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 kills 0 secrets 0 things 179 taken 204
+#|  inventory health 100 armour 1 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 204
 #|sounds drew to 64
 #|green armour tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sound tic 12 stop thing 6
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
-#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 kills 0 secrets 0 things 179 taken 6
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 6
 #|sounds drew to 64
 #|green armour at 100 tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
-#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
-#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 kills 0 secrets 0 things 180 taken
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
 #|sounds drew to 64
 #|-
-#|sound tic 1 stop thing 266
-#|sound tic 1 DSITEMUP from nobody vol 64 sep 128
-#|door walk tic 40 831.926605 495.977203 90.000 z -128.000000 floor -128.000000 eye 40.975143 thinkers 9 sector 10 -128.000000 -128.000000
-#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 129
-#|use tic 41 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -126.000000
-#|- tic 61 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000
-#|- tic 102 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|- tic 103 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 129
-#|- tic 253 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|- tic 254 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
-#|- tic 315 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -128.000000
-#|- tic 316 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
-#|closing - tic 264 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -26.000000
-#|use tic 265 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -24.000000
-#|- tic 275 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|- tic 279 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|use tic 280 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
+#|door walk tic 40 871.974029 448.783554 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000
+#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
+#|use tic 41 871.971069 456.188186 90.000 z -128.000000 floor -128.000000 eye 40.876480 thinkers 10 sector 10 -128.000000 -126.000000
+#|- tic 61 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000
+#|- tic 102 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|- tic 103 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
+#|- tic 253 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|- tic 254 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
+#|- tic 315 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -128.000000
+#|- tic 316 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
+#|closing - tic 264 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -26.000000
+#|use tic 265 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -24.000000
+#|- tic 275 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|- tic 279 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|use tic 280 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
 #|sounds drew to 66
 #|-
-#|through walk tic 142 831.822738 750.318176 90.000 z -128.000000 floor -128.000000 eye 42.976440 thinkers 10 sector 10 -128.000000 -4.000000
-#|doorway walk tic 108 831.918884 510.046890 90.000 z -128.000000 floor -128.000000 eye 42.444900 thinkers 10 sector 10 -128.000000 -4.000000
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 129
-#|- tic 287 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
-#|sound tic 288 DSDOROPN from sector 10 vol 64 sep 129
-#|- tic 288 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
-#|- tic 289 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -70.000000
-#|- tic 323 831.901535 545.398254 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|through walk tic 142 871.852340 750.246398 90.000 z -128.000000 floor -128.000000 eye 42.976440 thinkers 10 sector 10 -128.000000 -4.000000
+#|doorway walk tic 108 871.948486 509.975112 90.000 z -128.000000 floor -128.000000 eye 42.444900 thinkers 10 sector 10 -128.000000 -4.000000
+#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 40
+#|- tic 287 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
+#|sound tic 288 DSDOROPN from sector 10 vol 64 sep 40
+#|- tic 288 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
+#|- tic 289 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -70.000000
+#|- tic 323 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
 #|sounds drew to 67
 #|-
-#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 129
-#|held use tic 140 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 129
-#|use tic 340 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
+#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
+#|held use tic 140 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
+#|use tic 340 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
 #|sounds drew to 66
 #|-
 #|sound tic 253 DSDORCLS from sector 10 vol 51 sep 33
@@ -1268,17 +1434,17 @@ def main() -> IO(Unit):
 #|use tic 186 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 8.000000 128.000000
 #|sounds drew to 69
 #|-
-#|key turn tic 21 2246.000000 592.000000 157.500 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
-#|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 0 flash 0
+#|key turn tic 21 2246.000000 592.000000 157.500 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
+#|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
 #|sound tic 34 stop thing 87
 #|sound tic 34 DSITEMUP from nobody vol 64 sep 128
-#|- tic 34 2227.581390 547.485961 157.500 z 136.000000 floor 136.000000 eye 37.663955 thinkers 9 sector 71 -128.000000 -128.000000 key False things 179 cards 1 flash 12
-#|- tic 44 2202.145187 486.011810 157.500 z 136.000000 floor 136.000000 eye 46.122497 thinkers 9 sector 71 -128.000000 -128.000000 key False things 179 cards 1 flash 2
-#|blue walk with the skull tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 180 cards 8 flash 0
+#|- tic 34 2227.581390 547.485961 157.500 z 136.000000 floor 136.000000 eye 37.663955 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 12
+#|- tic 44 2202.145187 486.011810 157.500 z 136.000000 floor 136.000000 eye 46.122497 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 2
+#|blue walk with the skull tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 8 flash 0
 #|sound tic 31 DSDOROPN from sector 71 vol 64 sep 129
-#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 180 cards 8 flash 0
-#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 180 cards 8 flash 0
-#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 180 cards 8 flash 0
+#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 209 cards 8 flash 0
+#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 209 cards 8 flash 0
+#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 209 cards 8 flash 0
 #|sounds drew to 65
 #|-
 #|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
@@ -1288,43 +1454,47 @@ def main() -> IO(Unit):
 #|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
 #|sounds drew to 65
 #|-
-#|states tic 0 2:45/4294967295 6:6/5 87:24/3 24:10/4 121:18/6 144:12/1 172:51/6
-#|states tic 1 2:45/4294967295 6:6/4 87:24/2 24:10/3 121:18/5 144:13/6 172:51/5
-#|states tic 2 2:45/4294967295 6:6/3 87:24/1 24:10/2 121:18/4 144:13/5 172:51/4
-#|states tic 3 2:45/4294967295 6:6/2 87:25/10 24:10/1 121:18/3 144:13/4 172:51/3
-#|states tic 4 2:45/4294967295 6:6/1 87:25/9 24:11/6 121:18/2 144:13/3 172:51/2
-#|states tic 5 2:45/4294967295 6:7/7 87:25/8 24:11/5 121:18/1 144:13/2 172:51/1
-#|states tic 13 2:45/4294967295 6:6/5 87:24/10 24:10/3 121:20/5 144:15/6 172:52/1
-#|states tic 23 2:45/4294967295 6:7/2 87:25/10 24:10/5 121:21/1 144:16/2 172:52/5
-#|states tic 35 2:45/4294967295 6:7/3 87:24/8 24:10/5 121:23/1 144:12/2 172:52/7
-#|states tic 36 2:45/4294967295 6:7/2 87:24/7 24:10/4 121:18/6 144:12/1 172:52/6
+#|states tic 0 2:45/4294967295 6:6/2 87:24/1 24:10/3 121:18/1 144:12/2 172:51/5
+#|states tic 1 2:45/4294967295 6:6/1 87:25/10 24:10/2 121:19/6 144:12/1 172:51/4
+#|states tic 2 2:45/4294967295 6:7/7 87:25/9 24:10/1 121:19/5 144:13/6 172:51/3
+#|states tic 3 2:45/4294967295 6:7/6 87:25/8 24:11/6 121:19/4 144:13/5 172:51/2
+#|states tic 4 2:45/4294967295 6:7/5 87:25/7 24:11/5 121:19/3 144:13/4 172:51/1
+#|states tic 5 2:45/4294967295 6:7/4 87:25/6 24:11/4 121:19/2 144:13/3 172:52/8
+#|states tic 13 2:45/4294967295 6:6/2 87:24/8 24:10/2 121:21/6 144:14/1 172:51/6
+#|states tic 23 2:45/4294967295 6:6/5 87:25/8 24:10/4 121:22/2 144:16/3 172:52/4
+#|states tic 35 2:45/4294967295 6:6/6 87:24/6 24:10/4 121:18/2 144:12/3 172:52/6
+#|states tic 36 2:45/4294967295 6:6/5 87:24/5 24:10/3 121:18/1 144:12/2 172:52/5
 #|lights tic 0 sector 32 176 sector 33 176 sector 48 140 sector 90 192
 #|lights tic 1 sector 32 176 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 8 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 9 sector 32 176 sector 33 176 sector 48 120 sector 90 160
+#|lights tic 15 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 35 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 36 sector 32 176 sector 33 176 sector 48 140 sector 90 192
-#|lights tic 40 sector 32 176 sector 33 176 sector 48 140 sector 90 192
 #|lights tic 41 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 64 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|lights tic 65 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 66 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 67 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 69 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 71 sector 32 176 sector 33 176 sector 48 120 sector 90 160
-#|lights tic 131 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 132 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 134 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 135 sector 32 176 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 136 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 137 sector 32 144 sector 33 176 sector 48 140 sector 90 160
-#|lights tic 138 sector 32 144 sector 33 140 sector 48 140 sector 90 160
-#|lights tic 142 sector 32 176 sector 33 140 sector 48 120 sector 90 160
-#|lights tic 143 sector 32 176 sector 33 140 sector 48 120 sector 90 160
+#|lights tic 70 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 71 sector 32 176 sector 33 140 sector 48 140 sector 90 160
+#|lights tic 76 sector 32 176 sector 33 140 sector 48 140 sector 90 192
+#|lights tic 77 sector 32 176 sector 33 176 sector 48 140 sector 90 192
+#|lights tic 80 sector 32 176 sector 33 176 sector 48 120 sector 90 192
+#|lights tic 81 sector 32 176 sector 33 176 sector 48 120 sector 90 160
+#|lights tic 82 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 83 sector 32 176 sector 33 176 sector 48 120 sector 90 160
+#|lights tic 91 sector 32 176 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 135 sector 32 144 sector 33 176 sector 48 140 sector 90 160
+#|lights tic 142 sector 32 176 sector 33 140 sector 48 140 sector 90 160
+#|lights tic 144 sector 32 176 sector 33 176 sector 48 140 sector 90 160
 #|end
 #|column walk tic 37 -191.972503 1635.776504 270.000 z -128.000000 floor -128.000000 eye 35.523132 thinkers 9
 #|- tic 38 -191.970001 1635.776504 270.000 z -128.000000 floor -128.000000 eye 36.104217 thinkers 9
 #|- tic 48 -191.942932 1635.776504 270.000 z -128.000000 floor -128.000000 eye 47.252609 thinkers 9
 #|corpse walk tic 30 128.011886 399.121368 270.000 z 0.000000 floor 0.000000 eye 42.094177 thinkers 9
 #|- tic 38 128.029998 348.859802 270.000 z 0.000000 floor 0.000000 eye 36.104217 thinkers 9
+#|sound tic 21 stop thing 266
+#|sound tic 21 DSITEMUP from nobody vol 64 sep 128
+#|zombieman walk tic 44 831.949234 411.658264 90.000 z -128.000000 floor -128.000000 eye 46.679534 thinkers 9
+#|- tic 64 831.885162 411.658264 90.000 z -128.000000 floor -128.000000 eye 47.334960 thinkers 9
 #|column lift switch walk tic 10 208.160308 255.986923 180.000 z -124.000000 floor -124.000000 eye 40.314453 thinkers 9 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 58 tics 4294967295
 #|sound tic 11 DSPSTART from sector 98 vol 64 sep 129
 #|use tic 11 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 40.500000 thinkers 10 sector 98 8.000000 128.000000 thing 3 type 48 z 8.000000 floor 8.000000 ceiling 128.000000 state 58 tics 4294967295
@@ -1335,37 +1505,50 @@ def main() -> IO(Unit):
 #|sound tic 150 DSPSTART from sector 98 vol 64 sep 129
 #|- tic 150 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 58 tics 4294967295
 #|- tic 184 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 58 tics 4294967295
-#|sound tic 1 stop thing 266
-#|sound tic 1 DSITEMUP from nobody vol 64 sep 128
-#|barrel door walk tic 40 831.926605 495.977203 90.000 z -128.000000 floor -128.000000 eye 40.975143 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 11 tics 5
-#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 129
-#|use tic 41 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -126.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -126.000000 state 11 tics 4
-#|- tic 102 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 11 tics 3
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 129
-#|- tic 294 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 11 tics 3
-#|sound tic 295 DSDOROPN from sector 10 vol 64 sep 129
-#|- tic 295 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 11 tics 2
-#|- tic 296 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -84.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -84.000000 state 11 tics 1
-#|- tic 297 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -82.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -82.000000 state 10 tics 6
-#|- tic 301 831.924514 495.977203 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -74.000000 state 10 tics 2
+#|barrel door walk tic 40 871.974029 448.783554 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 11 tics 5
+#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
+#|use tic 41 871.971069 456.188186 90.000 z -128.000000 floor -128.000000 eye 40.876480 thinkers 10 sector 10 -128.000000 -126.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -126.000000 state 11 tics 4
+#|- tic 102 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 11 tics 3
+#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
+#|- tic 294 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 11 tics 3
+#|sound tic 295 DSDOROPN from sector 10 vol 64 sep 54
+#|- tic 295 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 11 tics 2
+#|- tic 296 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -84.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -84.000000 state 11 tics 1
+#|- tic 297 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -82.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -82.000000 state 10 tics 6
+#|- tic 301 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -74.000000 state 10 tics 2
 #|sounds drew to 67
 #|-
 #|sound tic 21 DSOOF from nobody vol 64 sep 128
-#|blue door refused tic 21 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
-#|- tic 41 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
-#|turn tic 42 880.000000 1440.000000 247.500 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
-#|walk tic 55 860.814102 1393.630569 247.500 z -128.000000 floor -128.000000 eye 36.733230 thinkers 9 sector 71 -128.000000 -128.000000 key True things 183 cards 0 flash 0
+#|blue door refused tic 21 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
+#|- tic 41 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
+#|turn tic 42 880.000000 1440.000000 247.500 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
+#|walk tic 55 860.814102 1393.630569 247.500 z -128.000000 floor -128.000000 eye 36.733230 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
 #|sound tic 56 stop thing 82
 #|sound tic 56 DSITEMUP from nobody vol 64 sep 128
-#|- tic 56 858.431030 1387.871063 247.500 z -128.000000 floor -128.000000 eye 36.145187 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 12
-#|- tic 76 838.610397 1339.968490 247.500 z -128.000000 floor -128.000000 eye 40.905364 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 0
-#|turn tic 77 838.308792 1339.239654 90.000 z -128.000000 floor -128.000000 eye 40.925247 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 0
-#|walk tic 96 835.806503 1423.465972 90.000 z -128.000000 floor -128.000000 eye 34.990249 thinkers 9 sector 71 -128.000000 -128.000000 key False things 182 cards 1 flash 0
+#|- tic 56 858.431030 1387.871063 247.500 z -128.000000 floor -128.000000 eye 36.145187 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 12
+#|- tic 76 838.610397 1339.968490 247.500 z -128.000000 floor -128.000000 eye 40.905364 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0
+#|turn tic 77 838.308792 1339.239654 90.000 z -128.000000 floor -128.000000 eye 40.925247 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0
+#|walk tic 96 835.806503 1423.465972 90.000 z -128.000000 floor -128.000000 eye 34.990249 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0
 #|sound tic 97 DSDOROPN from sector 71 vol 64 sep 123
-#|use tic 97 835.761825 1429.752563 90.000 z -128.000000 floor -128.000000 eye 36.239089 thinkers 10 sector 71 -128.000000 -126.000000 key False things 182 cards 1 flash 0
-#|- tic 102 835.593826 1453.375137 90.000 z -128.000000 floor -128.000000 eye 41.488937 thinkers 10 sector 71 -128.000000 -116.000000 key False things 182 cards 1 flash 0
-#|- tic 117 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -86.000000 key False things 182 cards 1 flash 0
-#|- tic 158 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 182 cards 1 flash 0
-#|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 182 cards 1 flash 0
+#|use tic 97 835.761825 1429.752563 90.000 z -128.000000 floor -128.000000 eye 36.239089 thinkers 10 sector 71 -128.000000 -126.000000 key False things 208 cards 1 flash 0
+#|- tic 102 835.593826 1453.375137 90.000 z -128.000000 floor -128.000000 eye 41.488937 thinkers 10 sector 71 -128.000000 -116.000000 key False things 208 cards 1 flash 0
+#|- tic 117 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -86.000000 key False things 208 cards 1 flash 0
+#|- tic 158 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0
+#|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0
 #|sounds drew to 66
 #|-
+#|start cell 2,11 58 cell 2,10 157 sector 160 58 sector 140 238 next 292 random 59 thing 58 type 18 at -400.000000 400.000000 z 16.000000 angle 270.000 sector 160 state 2 tics 4294967295 radius 20 height 16 flags 0
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
+#|moved cell 2,11 cell 2,10 58 157 sector 160 sector 140 58 238 next 292 random 59 thing 58 type 18 at -400.000000 300.000000 z 16.000000 angle 270.000 sector 140 state 2 tics 4294967295 radius 20 height 16 flags 0
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
+#|spawned cell 2,11 cell 2,10 292 58 157 sector 160 sector 140 292 58 238 next 293 random 60 thing 292 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 6 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 292
+#|a tic cell 2,11 cell 2,10 292 58 157 sector 160 sector 140 292 58 238 next 293 random 62 thing 292 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 5 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 292
+#|removed, a tic cell 2,11 cell 2,10 58 157 sector 160 sector 140 58 238 next 293 random 62
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
+#|spawned cell 2,11 cell 2,10 293 58 157 sector 160 sector 140 293 58 238 next 294 random 63 thing 293 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 6 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 293
+#|walked cell 2,11 cell 2,10 157 293 58 sector 160 sector 140 293 58 238 next 294 random 63 thing 293 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 5 radius 20 height 16 flags 8388609
+#|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs 293
+#|links 210 of 210 things, solid 108 of 108, wrong 0, unlinked 0

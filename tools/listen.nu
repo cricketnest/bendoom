@@ -17,6 +17,9 @@
 #
 # The sounds: a command script from a place, as tools/oracle.nu takes
 # them, played as a demo with no music, or over the song with --music.
+# The demo is tools/demo.nu's, which spawns the map's monsters, so a
+# script whose place a monster can see hears that monster wake as well;
+# milestone 6's ticket 08 records which places those are.
 # Chocolate Doom quits at the demo's end, which ends the capture, so a
 # script idles at its end for as long as its last sound lasts; timeout
 # stops a run that goes a minute past the script. The report lists each
@@ -231,7 +234,7 @@ def "main sounds" [
   x: int                # the start's x, in map units
   y: int                # the start's y
   angle: int            # its facing in degrees, a multiple of 45
-  script: string        # the commands, runs of "count,forward,side,turn,use"
+  script: string        # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path           # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = "" # records to rewrite, each "record,type,x,y", facing 0
   --music               # play the song under the sounds

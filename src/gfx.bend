@@ -5,9 +5,9 @@
 # palette as RGB words, the colormaps, and the lumps: the flats the
 # sectors name, then the patches of the textures the sides name, then
 # the composed columns, then the sprite lumps of the frames the map's
-# things spawn in or reach and of the weapon's, every rotation; with the
-# map's names go every frame of the animations they touch and the
-# partners of their switches.
+# things spawn in or reach and of the weapon's, every rotation, then the
+# status bar's; with the map's names go every frame of the animations
+# they touch and the partners of their switches.
 # Gfx is the directory into it: Data, so the draw takes it by copy.
 # Every other flat, texture and sprite stays a name in the WAD.
 import Base
@@ -40,7 +40,8 @@ type Gfx.Anims is Data:
 # offset in fixed point (Doom's spritewidth, spriteoffset and
 # spritetopoffset), 1 when it is mirrored, and 1 for a full-bright frame.
 # patches: the index in the array of each patch cached whole by name,
-# which V_DrawPatch draws as it lies.
+# the status bar's and the intermission's, which V_DrawPatch draws as
+# they lie.
 type Gfx is Data:
   Gfx{flats: V.Vec, pics: V.Vec, sky: U32, texs: V.Vec, cols: V.Vec, sidetex: V.Vec, skytex: U32,
     sprites: V.Vec, anims: Gfx.Anims, patches: Map<&2, U32>}
@@ -137,52 +138,6 @@ def Gfx.Names.next(n: Gfx.Names) -> U32:
 def Gfx.Names.fresh(n: Gfx.Names) -> Gfx.Names:
   Names{seen, next, numbers, distinct} = n
   Names{seen, next, [], distinct}
-
-# The intermission's patches
-# --------------------------
-
-# A place on the intermission's screen, where V_DrawPatch puts a patch.
-type Gfx.Spot is Data:
-  Spot{x: U32, y: U32}
-
-def Gfx.Spot.x(s: Gfx.Spot) -> U32:
-  Spot{x, y} = s
-  x
-
-def Gfx.Spot.y(s: Gfx.Spot) -> U32:
-  Spot{x, y} = s
-  y
-
-# wi_stuff.c's epsd0animinfo: the places of episode 1's ten background
-# animations, each ANIM_ALWAYS with three frames and a period of
-# TICRATE/3.
-def Gfx.wi.spots() -> List<&2, Gfx.Spot>:
-  [Spot{224, 104}, Spot{184, 160}, Spot{112, 136}, Spot{72, 112}, Spot{88, 96}, Spot{64, 48},
-    Spot{192, 40}, Spot{136, 16}, Spot{80, 16}, Spot{64, 24}]
-
-# An animation's three frames, named as WI_loadUnloadData spells them.
-def Gfx.wi.anim(+j: U32) -> List<&2, String>:
-  ["WIA00" ++ U32.show(j) ++ "00", "WIA00" ++ U32.show(j) ++ "01", "WIA00" ++ U32.show(j) ++ "02"]
-
-def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
-  match n:
-    case 0n:
-      []
-    case 1n+m:
-      List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
-
-# The patches WI_loadData caches for a single player on episode 1: the
-# background and the two level names it draws, the words, the digits
-# with the percent and the colon, the splat and the two pointers of the
-# next level's screen, and the animations' frames. The net game's, the
-# deathmatch's, the other episodes' level names and WIMINUS, which only
-# a negative count draws, are left out.
-def Gfx.wi.names() -> List<&2, String>:
-  List.append(&2, String,
-    ["WIMAP0", "WILV00", "WILV01", "WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR",
-      "WISUCKS", "WIPCNT", "WICOLON", "WINUM0", "WINUM1", "WINUM2", "WINUM3", "WINUM4", "WINUM5",
-      "WINUM6", "WINUM7", "WINUM8", "WINUM9", "WISPLAT", "WIURH0", "WIURH1"],
-    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0))
 
 # Switches
 # --------
@@ -885,7 +840,7 @@ def Gfx.sprite.rows.go(n: Nat, +row: U32, +marks: V.Vec) -> List<&2, U32>:
 
 # A weapon's rows and those they lead to, marked.
 def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
-  H.Weapon{+up, +ready} = w
+  H.Weapon{+up, +ready, ammo} = w
   Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks))
 
 # The state rows the level's things spawn in, the pistol's, and those
@@ -955,6 +910,77 @@ def Gfx.sprite.table(slots: List<&2, U32>, numbers: List<&2, U32>, flips: List<&
         (s * 6 + 5 : U32), Bool.to_u32(H.Thing.Row.bright(H.Thing.row((s >> 3n : U32))))))
     case _ _ _:
       table
+
+# The status bar
+# --------------
+
+# Lumps of one name and a number from first, as ST_loadUnloadGraphics
+# builds their names.
+def Gfx.bar.numbered(n: Nat, +name: String, +first: U32) -> List<&2, String>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      (name ++ U32.show(first)) <> Gfx.bar.numbered(m, name, (first + 1 : U32))
+
+# The patches ST_loadGraphics loads that a single player's bar draws, in
+# the order Gfx.bar numbers them: the ten tall digits, the ten short
+# ones, the percent sign, the six key icons, the six grey weapon
+# numbers, the arms panel, and the background. STMBARL and STMBARR
+# belong to Doom 1.0, which neither WAD is; the minus sign shows on a
+# negative count alone, the face background on a net game's bar, and the
+# faces are ticket 23's.
+def Gfx.bar.names() -> List<&2, String>:
+  List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),
+    ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"]])
+
+# A place on the intermission's screen, where V_DrawPatch puts a patch.
+type Gfx.Spot is Data:
+  Spot{x: U32, y: U32}
+
+def Gfx.Spot.x(s: Gfx.Spot) -> U32:
+  Spot{x, y} = s
+  x
+
+def Gfx.Spot.y(s: Gfx.Spot) -> U32:
+  Spot{x, y} = s
+  y
+
+# wi_stuff.c's epsd0animinfo: the places of episode 1's ten background
+# animations, each ANIM_ALWAYS with three frames and a period of
+# TICRATE/3.
+def Gfx.wi.spots() -> List<&2, Gfx.Spot>:
+  [Spot{224, 104}, Spot{184, 160}, Spot{112, 136}, Spot{72, 112}, Spot{88, 96}, Spot{64, 48},
+    Spot{192, 40}, Spot{136, 16}, Spot{80, 16}, Spot{64, 24}]
+
+# An animation's three frames, named as WI_loadUnloadData spells them.
+def Gfx.wi.anim(+j: U32) -> List<&2, String>:
+  ["WIA00" ++ U32.show(j) ++ "00", "WIA00" ++ U32.show(j) ++ "01", "WIA00" ++ U32.show(j) ++ "02"]
+
+def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
+
+# The patches WI_loadData caches for a single player on episode 1: the
+# background and the two level names it draws, the words, the digits
+# with the percent and the colon, the splat and the two pointers of the
+# next level's screen, and the animations' frames. The net game's, the
+# deathmatch's, the other episodes' level names and WIMINUS, which only
+# a negative count draws, are left out.
+def Gfx.wi.names() -> List<&2, String>:
+  List.append(&2, String,
+    ["WIMAP0", "WILV00", "WILV01", "WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR",
+      "WISUCKS", "WIPCNT", "WICOLON", "WINUM0", "WINUM1", "WINUM2", "WINUM3", "WINUM4", "WINUM5",
+      "WINUM6", "WINUM7", "WINUM8", "WINUM9", "WISPLAT", "WIURH0", "WIURH1"],
+    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0))
+
+# Every patch cached whole: the bar's, which its widgets reach by the
+# number of their place in that list, and the intermission's.
+def Gfx.patch.names() -> List<&2, String>:
+  List.append(&2, String, Gfx.bar.names(), Gfx.wi.names())
 
 # Loading
 # -------
@@ -1028,6 +1054,7 @@ def Gfx.plan(lumps: List<&2, W.Wad.Lump>, +fields: List<&2, U32>) -> List<&2, U3
     case l <> rest:
       B.Bytes.fields.one(fields, Gfx.lump.pos(l), Gfx.plan(rest, fields))
 
+# The array sized for everything; the first palette, the colormaps, the
 # Each cached patch's index in the array, by its lump's name.
 def Gfx.patches(lumps: List<&2, W.Wad.Lump>, bases: List<&2, U32>, m: Map<&2, U32>) -> Map<&2, U32>:
   match lumps bases:
@@ -1247,7 +1274,7 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
     pnames : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PNAMES")
     texture1 : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "TEXTURE1")
     sprites : Gfx.Sprites <- Gfx.sprites(Gfx.sprite.rows(H.Thing.spawn(level)), Gfx.sprite.space(lumps, False{}))
-    pics : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.wi.names(), dir, "W_CacheLumpName")
+    pics : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.patch.names(), dir, "W_CacheLumpName")
     Gfx.load.textures(Base{level, fl, pal, cmap, flats, sprites,
       Anims{Gfx.anim.of(frames, 0, Gfx.Names.next(fl)), Gfx.anim.of([], 1, 0), 0}, pics}, dir, a, pnames,
       texture1)
@@ -1362,8 +1389,17 @@ def Gfx.sprite(+g: Gfx, state: U32, rot: U32, k: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, patches} = g
   V.Vec.get(sprites, ((state * 8 + rot) * 6 + k : U32))
 
+# The index in the array of status bar patch k: 0 to 9 the tall digits,
+# 10 to 19 the short ones, 20 the percent sign, 21 to 26 the key icons,
+# 27 to 32 the grey weapon numbers, 33 the arms panel, 34 the
+# background, as Gfx.bar.names() lists them.
 # Where a patch cached by name lies in the array: its lump whole, from
 # its width word on, as V_DrawPatch reads it.
 def Gfx.patch(+g: Gfx, name: String) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, patches} = g
   Pair.snd(Map<&2, U32>, U32, Map.get(U32, 0, patches, name))
+
+# The bar's patches by the number of their place in Gfx.bar.names(),
+# which its widgets count from.
+def Gfx.bar(+g: Gfx, k: U32) -> U32:
+  Gfx.patch(g, Maybe.default(&2, String, List.get(&2, String, Gfx.bar.names(), U32.to_nat(k)), ""))
