@@ -82,7 +82,7 @@ def restored.one(m: Maybe<&2, H.Thing>, +id: U32) -> String:
   match m:
     case None{}:
       " " ++ U32.show(id) ++ ":missing"
-    case Some{H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+    case Some{H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
       " " ++ U32.show(id) ++ ":" ++ U32.show(state) ++ "/" ++ U32.show(tics)
 
 def restored.pick(taken: Maybe<&2, H.Thing>, again: Maybe<&2, H.Thing>, +id: U32, rest: String) -> String:
@@ -97,7 +97,7 @@ def restored(first: List<&2, H.Thing>, +ended: H.Things, +again: H.Things) -> St
   match first:
     case []:
       ""
-    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
       restored.pick(H.Things.get(ended, id), H.Things.get(again, id), id, restored(rest, ended, again))
 
 # The state the game holds after a frame, and the records the route

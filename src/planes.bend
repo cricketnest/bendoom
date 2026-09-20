@@ -152,7 +152,7 @@ def Planes.colormap(light: U32, distance: U32) -> U32:
 
 def Planes.step.at(+view: P.View, +distance: U32, xscale: U32, yscale: U32, light: U32, +angle: U32,
   +length: U32) -> Planes.Step:
-  P.View{vx, vy, z, va, sin, cos, tables} = view
+  P.View{vx, vy, z, va, sin, cos, tables, extralight} = view
   Step{(vx + F.Fixed.mul(A.Angle.cos(P.View.sine(view), angle), length) : U32),
     (F.Fixed.neg(vy) - F.Fixed.mul(A.Angle.sin(P.View.sine(view), angle), length) : U32),
     F.Fixed.mul(distance, xscale), F.Fixed.mul(distance, yscale), Planes.colormap(light, distance)}
@@ -294,9 +294,6 @@ def Planes.yscale(+view: P.View) -> U32:
   F.Fixed.neg(F.Fixed.div(A.Angle.sin(P.View.sine(view),
     A.Angle.fine((P.View.angle(view) - A.Angle.ang90() : U32))), P.Project.centerx()))
 
-def Planes.lightnum(light: U32) -> U32:
-  U32.min((light >> 4n : U32), 15)
-
 def Planes.draw.one(empty: Bool, sky: Bool, +view: P.View, +gfx: G.Gfx, +i: U32, head: D.Draw.Plane,
   st: Planes.Both) -> Planes.Both:
   match empty sky:
@@ -313,7 +310,7 @@ def Planes.draw.one(empty: Bool, sky: Bool, +view: P.View, +gfx: G.Gfx, +i: U32,
       Planes.Run.both(D.Draw.each(~Planes.Run, ~Planes.run, D.Draw.rows(minx, (maxx + 1 : U32)),
         U32.to_nat(minx), Run{mem, cols, (i << 10n : U32), 255, 0,
           Flat{view, Planes.xscale(view), Planes.yscale(view), F.Fixed.abs((height - P.View.z(view) : U32)),
-            Planes.lightnum(light), G.Gfx.flat(gfx, pic)}}))
+            P.Project.lightnum(light, P.View.extralight(view)), G.Gfx.flat(gfx, pic)}}))
 
 def Planes.draw.go(heads: List<&2, D.Draw.Plane>, +view: P.View, +gfx: G.Gfx, +i: U32, st: Planes.Both) ->
   Planes.Both:

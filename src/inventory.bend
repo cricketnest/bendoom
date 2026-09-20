@@ -147,6 +147,19 @@ def Inventory.suit(+kind: U32, inv: Inventory) -> Maybe<&2, Inventory>:
 def Inventory.clip(+t: U32) -> U32:
   V.Vec.get(V.Vec.of_list([10, 4, 20, 1], 4), t)
 
+# The rounds of an ammo type left.
+def Inventory.rounds(+t: U32, inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  V.Vec.get(ammo, t)
+
+# Doom's DecreaseAmmo: a shot spends rounds of its weapon's type. No
+# weapon Bendoom carries has an ammo type past the four, so vanilla's
+# overflow into the caps has no caller.
+def Inventory.spend(+t: U32, +amount: U32, inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  Inventory{health, armour, armourtype, cards, V.Vec.set(ammo, t, (V.Vec.get(ammo, t) - amount : U32)), caps,
+    backpack, weapons, powers, items, bonus}
+
 # Whether an ammo type is short of its cap: P_GiveAmmo gives nothing
 # otherwise.
 def Inventory.room(+t: U32, inv: Inventory) -> Bool:

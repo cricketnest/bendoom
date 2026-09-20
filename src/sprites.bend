@@ -59,8 +59,8 @@ def Sprites.rotation(seen: U32, facing: U32) -> U32:
 # fake contrast, and its scale.
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, nth: U32, thing: H.Thing,
   rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
-  P.View{+vx, +vy, +vz, angle, +sin, +cos, tables} = view
-  H.Thing{id, kind, +x, +y, +z, floorz, ceilz, facing, sector, +state, tics} = thing
+  P.View{+vx, +vy, +vz, angle, +sin, +cos, tables, extralight} = view
+  H.Thing{id, kind, +x, +y, +z, floorz, ceilz, facing, sector, +state, tics, momz} = thing
   +trx = (x - vx : U32)
   +try = (y - vy : U32)
   +tz = (F.Fixed.mul(trx, cos) + F.Fixed.mul(try, sin) : U32)
@@ -81,7 +81,8 @@ def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, nth:
     Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32),
       (Bool.pick(U32, flip, (width - 1 : U32), 0) + step * (first - x1) : U32), step,
       G.Gfx.sprite(gfx, state, rot, 0), Bool.pick(U32, U32.is_eq(G.Gfx.sprite(gfx, state, rot, 5), 1),
-        G.Gfx.colormap(), S.Segs.colormap((L.Level.sector.light(level, sector) >> 4n : U32), xscale)),
+        G.Gfx.colormap(), S.Segs.colormap(P.Project.lightnum(L.Level.sector.light(level, sector), extralight),
+        xscale)),
       rank, nth},
     rest)
 
@@ -100,10 +101,10 @@ def Sprites.gather(things: List<&2, H.Thing>, +nth: U32, +ranks: V.Vec, +view: P
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics, momz} <> rest:
       +rank = V.Vec.get(ranks, sector)
       Sprites.gather.if(Bool.not(U32.is_zero(rank)), view, level, gfx, rank, nth,
-        H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics},
+        H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz},
         Sprites.gather(rest, (nth + 1 : U32), ranks, view, level, gfx))
 
 # Doom's R_SortVisSprites: whether a sprite is drawn before another. The
