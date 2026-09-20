@@ -1,30 +1,33 @@
 # The game's frame, from the WAD named by BENDOOM_IWAD: a clock reading
-# and the frame's key events in, the state and what it prints out. No
-# window opens. Each line is the clock, whether the level has ended, the
-# player, the thinkers running, the floor and ceiling of sector 64 (the
-# exit room's door), line 407's special (the exit switch, 11 as loaded),
-# whether its side shows the switch's partner, how many things there
-# are and the random index.
-# First the state the game starts with. Then a game handed the state
-# a script leaves beside Freedoom's exit switch with the room's door
-# open behind the player, 50 tics in. A frame 200 ms on with Space
-# pressed runs 7 tics: the first ends the level and the rest change
-# nothing, and the frame prints the time, 51 tics, a second. A held
-# Space repeating, as X sends it, a release and a press in one frame,
-# restarts nothing, nor does its release; a press of Enter does,
-# and with no time gone the state is the one the game started with:
-# the door shut, the switch's special back, the things and the random
-# index as they spawned (tests/route.bend restarts a level whose things
-# the route took). Esc quits.
+# and the frame's key events in, the play and what it prints out. No
+# window opens. A level's line is the clock, whether the level has
+# ended, the player, the thinkers running, the floor and ceiling of
+# sector 64 (the exit room's door), line 407's special (the exit switch,
+# 11 as loaded), whether its side shows the switch's partner, how many
+# things there are and the random index. The tally's line is its screen
+# and counts.
+# First the state the game starts with. Then a game handed the state a
+# script leaves beside Freedoom's exit switch with the room's door open
+# behind the player, 50 tics in. Every frame 200 ms on runs 7 tics. The
+# first, with Space pressed, ends the level on its first tic and shows
+# the tally for the six after it; Space held through the exit does not
+# skip the tally's first pause, since WI_checkForAccelerate finds the
+# player's usedown flag already set, and neither does a held Space
+# repeating, as X sends it, a release and a press in one frame. A press
+# of Enter once Space is released shows every count at once, the next
+# press leaves for the screen that names E1M2, and the third cuts its
+# four seconds to WI_initNoState's ten tics; four tics later they are
+# up, and the tic after that starts E1M1 again from the map as loaded,
+# the door shut, the switch's special back, and the things and the
+# random index as they spawned. Esc quits.
 # Before the game, what a tic of use beside the switch is heard to
 # start, and M_Random's index after it. P_ChangeSwitchTexture clears the
 # line's special before it looks for the exit's 11, so the click is
 # sfx_swtchn, and it comes from nobody, since no button runs. The index
 # is 64 after the wipe, one more for the route's door, one for the
 # click.
-# Then the time of a few clocks, worked out by hand in milestone 4's
-# ticket 09. The door's height is the hand computation's (4 under
-# sector 68's ceiling of -56); the positions are regression pins.
+# The door's height is milestone 4's hand computation (4 under sector
+# 68's ceiling of -56); the positions are regression pins.
 import Base
 import ../src/vec.bend as V
 import ../src/fixed.bend as F
@@ -34,6 +37,7 @@ import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/things.bend as H
+import ../src/inter.bend as W
 import ../src/project.bend as P
 import ../src/game.bend as M
 import ../src/sound.bend as Sn
@@ -53,6 +57,14 @@ def line(tag: String, +s: S.State) -> String:
     ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(s)))) ++ " random "
     ++ U32.show(S.State.rnd(s))
 
+# A level's line, or the tally's, whichever the play is showing.
+def played(tag: String, play: W.Play) -> String:
+  match play:
+    case W.Playing{+state}:
+      line(tag, state)
+    case W.Showing{+wi}:
+      tag ++ " tally " ++ W.Inter.show(wi)
+
 def heard(es: List<&2, Sn.Sound.Event>) -> String:
   match es:
     case []:
@@ -63,9 +75,9 @@ def heard(es: List<&2, Sn.Sound.Event>) -> String:
 def clicked(+s: S.State) -> String:
   "use heard" ++ heard(S.State.sounds(s)) ++ " drew to " ++ U32.show(S.State.mrnd(s))
 
-def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
+def told(tag: String, +play: W.Play, g: M.Game) -> IO(Maybe<M.Game>):
   do IO<Maybe<M.Game>>:
-    IO.print(line(tag, state))
+    IO.print(played(tag, play))
     return Some{g}
 
 def reported(quit: Bool, tag: String, g: M.Game) -> IO(Maybe<M.Game>):
@@ -75,14 +87,14 @@ def reported(quit: Bool, tag: String, g: M.Game) -> IO(Maybe<M.Game>):
         IO.print(tag ++ " quit")
         return None{}
     case False{}:
-      M.Game{level, gfx, tables, +state, input, again, last, owed, mem, demo, music} = g
-      told(tag, state, M.Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music})
+      M.Game{level, gfx, tables, +play, input, again, last, owed, mem, demo, music} = g
+      told(tag, play, M.Game{level, gfx, tables, play, input, again, last, owed, mem, demo, music})
 
 def report(tag: String, p: Bool & M.Game) -> IO(Maybe<M.Game>):
   (quit, g) = p
   reported(quit, tag, g)
 
-# A frame of the game, then its state's line; a game that has quit stays
+# A frame of the game, then its play's line; a game that has quit stays
 # quit.
 def frame(tag: String, now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Maybe<M.Game>):
   match m:
@@ -107,12 +119,19 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("beside", beside))
     IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, True{}), beside)))
     g1 : Maybe<M.Game> <- frame("space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), beside, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
+      P.Project.tables(level), W.Playing{beside}, K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{},
+      None{}}})
     g2 : Maybe<M.Game> <- frame("repeat", 400n, [Key{32, False{}}, Key{32, True{}}], g1)
     g3 : Maybe<M.Game> <- frame("release", 600n, [Key{32, False{}}], g2)
-    g4 : Maybe<M.Game> <- frame("enter", 600n, [Key{13, True{}}], g3)
-    g5 : Maybe<M.Game> <- frame("esc", 1200n, [Key{27, True{}}], g4)
-    IO.print(M.Game.time(21) ++ ", " ++ M.Game.time(2099) ++ ", " ++ M.Game.time(2100) ++ ", " ++ M.Game.time(4321))
+    g4 : Maybe<M.Game> <- frame("enter", 800n, [Key{13, True{}}], g3)
+    g5 : Maybe<M.Game> <- frame("held", 1000n, [], g4)
+    g6 : Maybe<M.Game> <- frame("let go", 1200n, [Key{13, False{}}], g5)
+    g7 : Maybe<M.Game> <- frame("space again", 1400n, [Key{32, True{}}], g6)
+    g8 : Maybe<M.Game> <- frame("let go again", 1600n, [Key{32, False{}}], g7)
+    g9 : Maybe<M.Game> <- frame("last press", 1800n, [Key{32, True{}}], g8)
+    ga : Maybe<M.Game> <- frame("the level again", 2000n, [Key{32, False{}}], g9)
+    gb : Maybe<M.Game> <- frame("esc", 2200n, [Key{27, True{}}], ga)
+    return Unit{}
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -122,14 +141,17 @@ def main() -> IO(Unit):
   do IO<Unit>:
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
-
 #|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 1
 #|beside tic 50 ended False at -367.958084 1282.988662 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 180 random 5
 #|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 66
-#|Time 0:01
-#|space tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
-#|repeat tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
-#|release tic 51 ended True at -367.958084 1283.156616 180.000 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 180 random 5
-#|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 1
+#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 0 - - - 0 0 0 random 76
+#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 0 1 0 0 0 0 0 1 0 random 76
+#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 1 1 1 random 76
+#|enter tally count 10 cnt 15 bcnt 27 shown 0 0 0 1 30 anims 2 1 2 2 1 1 1 2 2 1 random 76
+#|held tally count 10 cnt 15 bcnt 34 shown 0 0 0 1 30 anims 2 2 0 2 2 2 2 2 0 2 random 76
+#|let go tally count 10 cnt 15 bcnt 41 shown 0 0 0 1 30 anims 0 0 0 0 2 0 0 0 0 0 random 76
+#|space again tally next cnt 134 bcnt 48 shown 0 0 0 1 30 anims - - 0 0 - - 0 - 0 0 random 86
+#|let go again tally next cnt 127 bcnt 55 shown 0 0 0 1 30 anims 0 0 0 1 0 0 1 0 1 0 random 86
+#|last press tally done cnt 4 bcnt 62 shown 0 0 0 1 30 anims 1 0 1 1 0 1 1 0 1 1 random 86
+#|the level again tic 3 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 180 random 3
 #|esc quit
-#|Time 0:00, Time 0:59, Time 1:00, Time 2:03

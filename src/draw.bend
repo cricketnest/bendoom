@@ -155,6 +155,19 @@ def Draw.span(mem: Array<U32>, y: U32, +x1: U32, x2: U32, xfrac: U32, yfrac: U32
     Span{mem, (G.Gfx.frame() + y * 320 : U32), Draw.span.pack(xfrac, yfrac), Draw.span.pack(xstep, ystep),
       src, cmap}))
 
+def Draw.put(+at: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, v) = p
+  Array.set(U32, mem, at, v)
+
+# Doom's V_DrawPatch's inner loop: n texels from src down a column of
+# the frame from at, as they lie, through no colormap and at no scale.
+def Draw.post(n: Nat, mem: Array<U32>, +at: U32, +src: U32) -> Array<U32>:
+  match n:
+    case 0n:
+      mem
+    case 1n+m:
+      Draw.post(m, Draw.put(at, B.Bytes.at(mem, src)), (at + 320 : U32), (src + 1 : U32))
+
 # n slots from i set to v.
 def Draw.set(n: Nat, mem: Array<U32>, +i: U32, +v: U32) -> Array<U32>:
   match n:

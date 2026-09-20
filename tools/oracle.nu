@@ -15,6 +15,15 @@
 # outside the status bar rows and the pause graphic. The default script
 # idles 20 tics, past the pistol's rise.
 #
+# --tally compares the tally the exit leads to instead. Its script takes
+# the exit and then idles long enough for WI_updateStats to settle,
+# after which the screen stands still until a press, so no pause tic is
+# written: its buttons byte carries BT_ATTACK, which WI_checkForAccelerate
+# would read as that press. A shot counts once it shows "Finished!"
+# where WI_drawLF puts it, all 200 rows are compared, and the ten
+# animations of WIMAP0 are masked, since they keep turning on the
+# wall clock while the shot is taken.
+#
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
 # "count,forward,side,turn,use" in a demo's units:
@@ -23,6 +32,7 @@
 #   tools/oracle.nu -416 256 0
 #   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 #   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
+#   tools/oracle.nu -224 1340 90 "5,0,0,0,0 1,0,0,0,1 1,0,0,96,0 12,25,0,0,0 1,0,0,224,0 20,25,0,0,0 10,0,0,0,0 1,0,0,0,1 250,0,0,0,0" --tally
 
 source demo.nu
 
@@ -68,17 +78,50 @@ def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<a
   } | flatten | flatten
 }
 
+# A patch's size and where its offsets put it when drawn at x, y.
+def patch-box [wad: binary, name: string, x: int, y: int]: nothing -> list<int> {
+  let patch = $wad | lumps | where name == $name | last | get pos
+  let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
+  let height = $wad | bytes at ($patch + 2)..($patch + 3) | into int --endian little
+  let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
+  let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
+  0..<$height | each {|r| 0..<$width | each {|c| (($top + $r) * 320 + $left + $c) } } | flatten
+}
+
+# wi_stuff.c's epsd0animinfo: where each of WIMAP0's ten animations is
+# drawn, three frames apiece.
+const anims = [[224 104] [184 160] [112 136] [72 112] [88 96] [64 48] [192 40] [136 16] [80 16] [64 24]]
+
+# Every pixel those animations can cover, which the tally's comparison
+# leaves out.
+def anim-boxes [wad: binary]: nothing -> list<int> {
+  $anims | enumerate | each {|a|
+    0..<3 | each {|i| patch-box $wad $"WIA00($a.index)0($i)" ($a.item | get 0) ($a.item | get 1) }
+  } | flatten | flatten | uniq
+}
+
+# WI_drawLF's "Finished!", centred under the level's name: the pixels
+# that say the tally is showing its counts.
+def finished [wad: binary]: nothing -> table<at: int, colour: string> {
+  let name = $wad | lumps | where name == "WILV00" | last | get pos
+  let f = $wad | lumps | where name == "WIF" | last | get pos
+  let height = $wad | bytes at ($name + 2)..($name + 3) | into int --endian little
+  let width = $wad | bytes at $f..($f + 1) | into int --endian little
+  patch-pixels $wad WIF ((320 - $width) // 2) (2 + 5 * $height // 4)
+}
+
 # Chocolate Doom's frame after the demo's script, paused. It can only
 # take a screenshot while it runs, so it runs on an X server of its own
 # with no screen, Xvfb, where nothing shows on the desktop and no window
 # takes the focus; the server picks its display number and writes it
 # out, so runs side by side never share one. Once the script has had
 # its time, xdotool presses the screenshot key until a shot shows the
-# pause graphic whole, which is the frame the pause froze. The config
+# patch that tells the frame is the one wanted whole: the pause graphic
+# the pause froze, or the tally's "Finished!". The config
 # sets screen size 10, the full 320 by 168 view over the status bar that
 # Bendoom draws (Doom's default 9 borders a 288 by 144 view), and turns
 # messages off.
-def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
+def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
@@ -104,12 +147,12 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table
       sleep 400ms
       let file = $dir | path join $"DOOM($n | fill --alignment right --character '0' --width 2).pcx"
       if ($file | path exists) { open --raw $file | pcx-indices } else { [] }
-    } | where {|shot| ($shot | is-not-empty) and ($pause | all {|p| ($shot | get $p.at) == $p.colour }) } | first 1
+    } | where {|shot| ($shot | is-not-empty) and ($told | all {|p| ($shot | get $p.at) == $p.colour }) } | first 1
   } } finally {
     job kill $game
     job kill $server
   }
-  if ($shot | is-empty) { error make {msg: "no screenshot showed the pause graphic"} }
+  if ($shot | is-empty) { error make {msg: "no screenshot showed the patch asked for"} }
   $shot | first
 }
 
@@ -121,6 +164,7 @@ def main [
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
+  --tally                                  # the script takes the exit: compare the tally, all 200 rows
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
@@ -128,21 +172,23 @@ def main [
   let bytes = open --raw $wad
   let runs = $script | runs
   let tics = $runs | get tics | math sum
-  let pause = patch-pixels $bytes M_PAUSE 126 4
+  let rows = if $tally { 200 } else { 168 }
+  let told = if $tally { finished $bytes } else { patch-pixels $bytes M_PAUSE 126 4 }
+  let masked = if $tally { anim-boxes $bytes } else { $told | get at }
   let dir = mktemp --directory
   let name = $wad | path basename
-  let paused = $runs | append [{tics: 1, bytes: 0x[00 00 00 81]} {tics: 2100, bytes: 0x[00 00 00 00]}] | demo
-  let shot = vanilla ($bytes | placed $x $y $angle $things) $name $paused $tics $pause $dir
+  let tail = if $tally { [{tics: 2100, bytes: 0x[00 00 00 00]}] } else {
+    [{tics: 1, bytes: 0x[00 00 00 81]} {tics: 2100, bytes: 0x[00 00 00 00]}] }
+  let shot = vanilla ($bytes | placed $x $y $angle $things) $name ($runs | append $tail | demo) $tics $told $dir
   let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
     | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let masked = $pause | get at
-  let differing = 0..<(168 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
+  let differing = 0..<($rows * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
   if not $keep { rm --recursive $dir }
   {
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
-    masked: ($masked | uniq | where $it < 168 * 320 | length)
+    masked: ($masked | uniq | where $it < $rows * 320 | length)
     first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })
   }

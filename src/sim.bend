@@ -1165,61 +1165,68 @@ type Thinker is Data:
 # them), the thinkers in the order they run, the random table's index,
 # the clock (Doom's leveltime), whether the level has ended, whether
 # use was down on the last tic, the sounds the last tic started and
-# stopped, in order, and M_Random's index, the random numbers no demo
-# depends on.
+# stopped, in order, M_Random's index, the random numbers no demo
+# depends on, and the secret sectors left to count, one word a sector,
+# 1 while its special 9 has not counted. Doom clears the sector's
+# special there; here a sector's special is geometry, which no tic
+# writes.
 type State is Data:
   State{player: Player, level: L.Level, things: H.Things, sidetex: V.Vec,
     thinkers: List<&2, Thinker>, rnd: U32, clock: U32, ended: Bool, usedown: Bool,
-    sounds: List<&2, Sn.Sound.Event>, mrnd: U32}
+    sounds: List<&2, Sn.Sound.Event>, mrnd: U32, secrets: V.Vec}
 
 def State.player(s: State) -> Player:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   player
 
 def State.level(s: State) -> L.Level:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   level
 
 def State.things(s: State) -> H.Things:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   things
 
 def State.sidetex(s: State) -> V.Vec:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   sidetex
 
 def State.thinkers(s: State) -> List<&2, Thinker>:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   thinkers
 
 def State.rnd(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   rnd
 
 def State.clock(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   clock
 
 def State.ended(s: State) -> Bool:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   ended
 
 def State.usedown(s: State) -> Bool:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   usedown
 
 def State.sounds(s: State) -> List<&2, Sn.Sound.Event>:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   sounds
 
 def State.mrnd(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   mrnd
+
+def State.secrets(s: State) -> V.Vec:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  secrets
 
 # The state with a thinker more, last to run.
 def State.thinking(s: State, t: Thinker) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  State{player, level, things, sidetex, List.append(&2, Thinker, thinkers, [t]), rnd, clock, ended, usedown, sounds, mrnd}
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  State{player, level, things, sidetex, List.append(&2, Thinker, thinkers, [t]), rnd, clock, ended, usedown, sounds, mrnd, secrets}
 
 # Sounds
 # ------
@@ -1227,9 +1234,10 @@ def State.thinking(s: State, t: Thinker) -> State:
 # The state after the tic reports an event: a start draws from M_Random
 # as S_StartSound does.
 def State.heard(+e: Sn.Sound.Event, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, +mrnd} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, +mrnd, secrets} = s
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown,
-    List.append(&2, Sn.Sound.Event, sounds, [e]), Bool.pick(U32, Sn.Sound.Event.draws(e), M.Random.next(mrnd), mrnd)}
+    List.append(&2, Sn.Sound.Event, sounds, [e]), Bool.pick(U32, Sn.Sound.Event.draws(e), M.Random.next(mrnd), mrnd),
+    secrets}
 
 def State.told.go(events: List<&2, Sn.Sound.Event>, s: State) -> State:
   match events:
@@ -1240,9 +1248,9 @@ def State.told.go(events: List<&2, Sn.Sound.Event>, s: State) -> State:
 
 # The state once it has reported what its things were heard doing.
 def State.told(s: State) -> State:
-  State{player, level, H.Things{tree, count, you, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, H.Things{tree, count, you, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   State.told.go(heard, State{player, level, H.Things{tree, count, you, []}, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd})
+    usedown, sounds, mrnd, secrets})
 
 def Sim.sound.spot(xy: U32 & U32) -> Sn.Sound.Source:
   (x, y) = xy
@@ -1307,11 +1315,11 @@ def Sim.light(s: State, sector: U32) -> U32:
 # time, or for a random count under it.
 def Sim.blink.to(+lit: Bool, +sector: U32, +dark: U32, +bright: U32, +darktime: U32, +brighttime: U32,
   +random: Bool, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   +time = Bool.pick(U32, lit, darktime, brighttime)
   +i = Bool.pick(U32, random, M.Random.next(rnd), rnd)
   State.thinking(State{player, L.Level.light.put(level, sector, Bool.pick(U32, lit, dark, bright)), things, sidetex,
-    thinkers, i, clock, ended, usedown, sounds, mrnd}, Blink{sector, Bool.pick(U32, random,
+    thinkers, i, clock, ended, usedown, sounds, mrnd, secrets}, Blink{sector, Bool.pick(U32, random,
     ((M.Random.at(i) .&. time : U32) + 1 : U32), time), dark, bright, darktime, brighttime, random})
 
 def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, darktime: U32, brighttime: U32,
@@ -1326,12 +1334,12 @@ def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, dar
 # Doom's T_Glow: 8 a tic, and a step that would reach an end is undone
 # and turns the glow.
 def Sim.glow(+sector: U32, +dark: U32, +bright: U32, +down: Bool, s: State) -> State:
-  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   +light = L.Level.sector.light(level, sector)
   +next = Bool.pick(U32, down, (light - 8 : U32), (light + 8 : U32))
   +turn = Bool.pick(Bool, down, F.Fixed.le(next, dark), F.Fixed.ge(next, bright))
   State.thinking(State{player, L.Level.light.put(level, sector, Bool.pick(U32, turn, light, next)), things, sidetex,
-    thinkers, rnd, clock, ended, usedown, sounds, mrnd}, Glow{sector, dark, bright, Bool.xor(down, turn)})
+    thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}, Glow{sector, dark, bright, Bool.xor(down, turn)})
 
 # Movers
 # ------
@@ -1472,8 +1480,8 @@ def Sim.change(+level: L.Level, +sector: U32, p: Player, things: H.Things) -> Si
 # The state with a try's player and things, in a level.
 def State.moved(t: Sim.Try, level: L.Level, s: State) -> State:
   Try{ok, p, got} = t
-  State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  State{p, level, got, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+  State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  State{p, level, got, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}
 
 def Sim.Noise.start(n: Sim.Noise) -> U32:
   Noise{start, wake, up, down, crush, grind} = n
@@ -1521,7 +1529,7 @@ def Sim.mover.fitted(t: Sim.Try, +sector: U32, +ceiling: Bool, speed: U32, was: 
 def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest: U32,
   +rest: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, +noise: Sim.Noise, s: State) -> State:
   Noise{start, wake, rose, fell, crush, grind} = noise
-  State{+player, +level, +things, sidetex, thinkers, rnd, +clock, ended, usedown, sounds, mrnd} = s
+  State{+player, +level, +things, sidetex, thinkers, rnd, +clock, ended, usedown, sounds, mrnd, secrets} = s
   +was = L.Level.plane(level, sector, ceiling)
   +next = Bool.pick(U32, down, (was - speed : U32), (was + speed : U32))
   +past = Bool.pick(Bool, down, F.Fixed.lt(next, dest), F.Fixed.gt(next, dest))
@@ -1531,7 +1539,7 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
     Sim.change(moved, sector, player, things)), sector, ceiling, speed, was, past, rest,
     Bool.pick(List<&2, Sim.Step>, past, rest, Travel{down, dest} <> rest), plan, noise,
     Bool.pick(U32, U32.is_zero((clock .&. 7 : U32)), grind, 0), stop, Bool.pick(U32, past, stop, crush),
-    State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd})
+    State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets})
 
 # Doom's button in P_UpdateSpecials: the tic its count reaches zero the
 # side shows its texture again. Vanilla sounds the pop-back from the
@@ -1541,9 +1549,9 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
 def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: State) -> State:
   match done:
     case True{}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
       Sim.sound(Sn.Sound.swtchn(), Sn.Spot{0, 0}, State{player, level, things,
-        V.Vec.set(sidetex, (side * 3 + slot : U32), texture), thinkers, rnd, clock, ended, usedown, sounds, mrnd})
+        V.Vec.set(sidetex, (side * 3 + slot : U32), texture), thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets})
     case False{}:
       State.thinking(s, Button{side, slot, texture, (tics - 1 : U32)})
 
@@ -1578,8 +1586,8 @@ def Sim.thinkers.go(todo: List<&2, Thinker>, s: State) -> State:
       Sim.thinkers.go(rest, Sim.think(t, s))
 
 def Sim.thinkers(s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  Sim.thinkers.go(thinkers, State{player, level, H.Things.tics(things), sidetex, [], rnd, clock, ended, usedown, sounds, mrnd})
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  Sim.thinkers.go(thinkers, State{player, level, H.Things.tics(things), sidetex, [], rnd, clock, ended, usedown, sounds, mrnd, secrets})
 
 # The sectors across a sector's two-sided lines, as Doom's getNextSector
 # answers them line by line: the back of a line whose front is the
@@ -1682,12 +1690,28 @@ def Sim.lights(n: Nat, +sector: U32, +s: State) -> State:
       Sim.lights(m, (sector + 1 : U32),
         Sim.light.spawn(L.Level.sector.special(State.level(s), sector), sector, s))
 
+# Doom's secret sectors, those of special 9, one word a sector: 1 for a
+# secret still to count. P_SpawnSpecials counts them into totalsecret
+# as it walks the sectors, and P_PlayerInSpecialSector clears one as it
+# is entered.
+def Sim.secrets.go(n: Nat, +sector: U32, +level: L.Level, v: V.Vec) -> V.Vec:
+  match n:
+    case 0n:
+      v
+    case 1n+m:
+      Sim.secrets.go(m, (sector + 1 : U32), level,
+        V.Vec.set(v, sector, Bool.to_u32(U32.is_eq(L.Level.sector.special(level, sector), 9))))
+
+def Sim.secrets(+level: L.Level) -> V.Vec:
+  Sim.secrets.go(U32.to_nat(L.Level.nsectors(level)), 0, level,
+    V.Vec.of_list([], L.Level.nsectors(level)))
+
 # A state with other things, their ids under count, linked in its
 # level's blockmap as they come, the player's link where it was.
 def State.populated(+things: List<&2, H.Thing>, +count: U32, s: State) -> State:
-  State{player, +level, old, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  State{player, +level, old, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   State{player, H.Thing.linked(level, things, count), H.Things.of(things, count, H.Things.you(old)), sidetex,
-    thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+    thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}
 
 # The state a level starts in, from the map as loaded, with the player
 # at rest at a place, the things spawned with the random numbers they
@@ -1699,7 +1723,7 @@ def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn
   H.Spawn{things, rnd, you} = spawn
   Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0, State.populated(things, L.Level.nthings(level),
     State{Player.at(level, place), level, H.Things.of([], 0, you), L.Level.sidetex(level), [], rnd, 0, False{},
-      True{}, [], 64}))
+      True{}, [], 64, Sim.secrets(level)}))
 
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
   State.at.spawned(level, place, H.Thing.spawn(level))
@@ -1742,9 +1766,9 @@ def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, Sim.Step>:
 def Sim.door.on(moving: Bool, +sector: U32, speed: U32, noise: Sim.Noise, +s: State) -> State:
   match moving:
     case True{}:
-      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
       State{player, level, things, sidetex, Sim.door.turn(thinkers, sector, L.Level.floor(level, sector)), rnd,
-        clock, ended, usedown, sounds, mrnd}
+        clock, ended, usedown, sounds, mrnd, secrets}
     case False{}:
       Sim.mover.begin(sector, True{}, speed, Sim.door.plan(State.level(s), sector), noise, s)
 
@@ -1842,12 +1866,12 @@ def Sim.switch.swap(none: Bool, again: Bool, +side: U32, +slot: U32, s: State) -
     case True{}:
       s
     case False{}:
-      State{player, +level, things, +sidetex, +thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+      State{player, +level, things, +sidetex, +thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
       +showed = V.Vec.get(sidetex, (side * 3 + slot : U32))
       Sim.switch.button(Bool.and(again, Bool.not(Sim.pressed.side(thinkers, side))), side, slot, showed,
         Sim.sound(Sn.Sound.swtchn(), Sim.switch.origin(thinkers, level),
           State{player, level, things, V.Vec.set(sidetex, (side * 3 + slot : U32), L.Level.switch(level, showed)),
-            thinkers, rnd, clock, ended, usedown, sounds, mrnd}))
+            thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}))
 
 # Doom's P_ChangeSwitchTexture on the line's front side.
 def Sim.switch(again: Bool, line: U32, +s: State) -> State:
@@ -1857,13 +1881,13 @@ def Sim.switch(again: Bool, line: U32, +s: State) -> State:
 
 # A line that works once has no special afterwards.
 def Sim.once(line: U32, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}
 
 # Doom's G_ExitLevel: the level ends, and the tic it ends on runs on.
 def State.end(s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
-  State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, secrets}
 
 # A switch that works once: when its tag starts a mover, its texture is
 # swapped and its special cleared.
@@ -2080,7 +2104,7 @@ def Player.stood(moved: Player, +q: Player) -> Player:
 def Sim.tic.kept(geo: L.Level.Geo, moved: Player, clock: U32, use: Bool, +after: State) -> State:
   State{Player.stood(moved, State.player(after)), L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after))},
     State.things(after), State.sidetex(after), State.thinkers(after), State.rnd(after), (clock + 1 : U32),
-    State.ended(after), use, State.sounds(after), State.mrnd(after)}
+    State.ended(after), use, State.sounds(after), State.mrnd(after), State.secrets(after)}
 
 # P_PlayerThink's counters.
 def Sim.counters(p: Player) -> Player:
@@ -2106,22 +2130,43 @@ def Sim.mobj.z(t: Sim.Try) -> Sim.Try:
 def Sim.mobj(cmd: K.Cmd, +level: L.Level, p: Player, +s: State) -> State:
   State.moved(Sim.mobj.z(Sim.xy(level, State.things(s), cmd, p)), State.level(s), s)
 
+# The secret counted: the player has one more, and that sector counts no
+# more.
+def Sim.secret.count(counts: Bool, +sector: U32, s: State) -> State:
+  match counts:
+    case False{}:
+      s
+    case True{}:
+      State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
+      State{Player.holding(player, I.Inventory.secret(Player.inv(player))), level, things, sidetex, thinkers,
+        rnd, clock, ended, usedown, sounds, mrnd, V.Vec.set(secrets, sector, 0)}
+
+# Doom's P_PlayerInSpecialSector for special 9, the only sector special
+# the player acts on: a secret sector counts once, when the player
+# stands on its floor. The damaging floors E1M1 carries wait for
+# milestone 6's ticket 17.
+def Sim.secret(+s: State) -> State:
+  +sector = L.Level.sector_at(State.level(s), Player.x(State.player(s)), Player.y(State.player(s)))
+  Sim.secret.count(Bool.and(U32.is_eq(V.Vec.get(State.secrets(s), sector), 1),
+    U32.is_eq(Player.z(State.player(s)), L.Level.floor(State.level(s), sector))), sector, s)
+
 # One tic in Doom's order: the player thinks (the move, the eye, the
-# player sprites, the counters, use on the press), its mobj moves, the
-# lines that movement crossed fire, the things go through their states,
-# the thinkers run in the order they were started, the clock counts. The
-# tic's sounds start from none. An ended level stands still: no tic runs,
-# so its sounds stay the last live tic's, and whoever gathers sounds tic
-# by tic passes over it.
+# player sprites, the counters, the sector it stands in, use on the
+# press), its mobj moves, the lines that movement crossed fire, the
+# things go through their states, the thinkers run in the order they
+# were started, the clock counts. The tic's sounds start from none. An
+# ended level stands still: no tic runs, so its sounds stay the last
+# live tic's, and whoever gathers sounds tic by tic passes over it.
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
-    case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}
-    case State{player, L.Level{+geo, sectors, specials}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd}:
+    case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, secrets}:
+      State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, secrets}
+    case State{player, L.Level{+geo, sectors, specials}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd, secrets}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = Sim.counters(Sim.psprites(level, clock, Sim.eye(level, clock, Sim.move(level, cmd, player))))
-      +went = Sim.mobj(cmd, level, thought, Sim.use(Sim.pressed(cmd, usedown),
-        State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd}))
+      +felt = Sim.secret(State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd,
+        secrets})
+      +went = Sim.mobj(cmd, level, State.player(felt), Sim.use(Sim.pressed(cmd, usedown), felt))
       Sim.tic.kept(geo, State.player(went), clock, K.Cmd.use(cmd), State.told(Sim.thinkers(Sim.cross(
         Player.crossed(State.player(went)), went))))
 
@@ -2132,3 +2177,35 @@ def Sim.replay(script: List<&2, K.Cmd>, s: State) -> State:
       s
     case cmd <> rest:
       Sim.replay(rest, Sim.tic(cmd, s))
+
+# The tally
+# ---------
+
+# What G_DoCompleted hands the intermission: the player's kills, items
+# and secrets, the totals they are counted against (totalkills,
+# totalitems and totalsecret) and leveltime. The totals are the level's
+# own, counted as it spawned, so they stand whatever a tic took.
+type Sim.Tally is Data:
+  Tally{kills: U32, items: U32, secrets: U32, maxkills: U32, maxitems: U32, maxsecret: U32, time: U32}
+
+def Sim.secrets.total(n: Nat, +i: U32, +v: V.Vec, +total: U32) -> U32:
+  match n:
+    case 0n:
+      total
+    case 1n+m:
+      Sim.secrets.total(m, (i + 1 : U32), v, (total + V.Vec.get(v, i) : U32))
+
+def Sim.tally.of(+inv: I.Inventory, t: H.Thing.Totals, +secrets: U32, +time: U32) -> Sim.Tally:
+  H.Totals{kills, items} = t
+  Tally{I.Inventory.kills(inv), I.Inventory.items(inv), I.Inventory.secrets(inv), kills, items, secrets, time}
+
+def Sim.tally(+s: State) -> Sim.Tally:
+  Sim.tally.of(Player.inv(State.player(s)), H.Thing.totals(State.level(s)),
+    Sim.secrets.total(U32.to_nat(L.Level.nsectors(State.level(s))), 0, Sim.secrets(State.level(s)), 0),
+    State.clock(s))
+
+def Sim.Tally.show(t: Sim.Tally) -> String:
+  Tally{kills, items, secrets, maxkills, maxitems, maxsecret, time} = t
+  "kills " ++ U32.show(kills) ++ "/" ++ U32.show(maxkills) ++ " items " ++ U32.show(items) ++ "/"
+    ++ U32.show(maxitems) ++ " secrets " ++ U32.show(secrets) ++ "/" ++ U32.show(maxsecret) ++ " time "
+    ++ U32.show(time)

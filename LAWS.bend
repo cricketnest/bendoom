@@ -26,6 +26,7 @@ import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
 import ./src/sfx.bend as X
+import ./src/inter.bend as In
 
 # Bytes and the WAD
 # -----------------
@@ -201,7 +202,7 @@ def Closed.unarmed() -> S.Psprites:
 
 # A level's first state with the player as given, at a clock.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
-  S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, False{}, False{}, [], 0}
+  S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, False{}, False{}, [], 0, V.Leaf{0}}
 
 # LAW: one tic of the idle command from rest leaves the player where it
 # was, on any level, at any position.
@@ -223,8 +224,8 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0}))
-    == ((clock + 1 : U32), S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0}) : U32 & S.State}
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0, V.Leaf{0}}))
+    == ((clock + 1 : U32), S.State{p, level, Closed.none(), V.Leaf{0}, [], 0, clock, True{}, False{}, [], 0, V.Leaf{0}}) : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
 # floor at 0 and the ceiling at 128 map units. Every number is computed
@@ -398,7 +399,7 @@ law blazing_door_timeline:
 # A state of the literal level with one mover running and a player at
 # rest at a place under a ceiling.
 def Closed.moving(level: L.Level, t: S.Thinker, x: U32, y: U32, ceilz: U32) -> S.State:
-  S.State{Closed.player(x, y, 0, ceilz), level, Closed.none(), V.Leaf{0}, [t], 0, 0, False{}, False{}, [], 0}
+  S.State{Closed.player(x, y, 0, ceilz), level, Closed.none(), V.Leaf{0}, [t], 0, 0, False{}, False{}, [], 0, V.Leaf{0}}
 
 def Closed.idled(n: Nat, s: S.State) -> S.State:
   S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
@@ -454,7 +455,7 @@ law door_crushed:
 def Closed.turbo(x: U32, momx: U32) -> S.State:
   S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed()},
     L.Level.special.put(L.Level.plane.put(L.Level.plane.put(L.Level.plane.put(Closed.doors(), 1, False{},
-      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0}
+      1048576), 1, True{}, 8388608), 2, True{}, 8388608), 0, 36), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0, V.Leaf{0}}
 
 def Closed.floors(+s: S.State) -> U32 & U32 & U32:
   (L.Level.floor(S.State.level(s), 0), L.Level.floor(S.State.level(s), 1), L.Level.floor(S.State.level(s), 2))
@@ -489,7 +490,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}, [], 0}
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), [], 0, 0, False{}, False{}, [], 0, V.Leaf{0}}
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -578,8 +579,9 @@ law use_fires_once:
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: U32
+  for secrets: V.Vec
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, secrets}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -598,7 +600,7 @@ def Closed.exit() -> L.Level:
 # The west room's player after two idle tics and then a tic of use.
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}, [], 0})
+    Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()), [], 0, 0, False{}, False{}, [], 0, V.Leaf{0}})
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -675,7 +677,7 @@ law random_table:
 # spawned the player.
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, [], 1, 0, False{}, False{}, [], 0})
+    L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, [], 1, 0, False{}, False{}, [], 0, V.Leaf{0}})
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -741,7 +743,7 @@ law blue_door_locked:
 # under 128, on the literal level.
 def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [],
-    inv, Closed.unarmed()}, Closed.doors(), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0})
+    inv, Closed.unarmed()}, Closed.doors(), Closed.none(), V.Leaf{0}, [], 0, 0, False{}, False{}, [], 0, V.Leaf{0}})
 
 # A thing named id of a type at (x, y) and z in the west room, its state
 # lasting: the laws below are about its touch and its heights, not its
@@ -773,35 +775,37 @@ type Closed.Edit is Data:
 def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
   match inv e:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Health{n}:
-      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, kills, secrets} Health{n}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Armour{points, kind}:
-      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, kills, secrets} Armour{points, kind}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Cards{bits}:
-      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus}
+      bonus, kills, secrets} Cards{bits}:
+      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Ammo{rounds}:
+      bonus, kills, secrets} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
-        bonus}
+        bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Backpack{}:
+      bonus, kills, secrets} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
-        powers, items, bonus}
+        powers, items, bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Weapons{bits}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus}
+      bonus, kills, secrets} Weapons{bits}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Strength{n}:
+      bonus, kills, secrets} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus}
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Items{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus}
+      bonus, kills, secrets} Items{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus,
+        kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus} Flash{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n}
+      bonus, kills, secrets} Flash{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n,
+        kills, secrets}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -1548,7 +1552,7 @@ def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
 def Sprite.gfx() -> G.Gfx:
   G.Gfx{V.Leaf{0}, V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0,
     V.Vec.of_list(List.append(&2, U32, Sprite.slots(8n, 1000, 0), Sprite.slots(8n, 2000, 1)), 96),
-    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}}
+    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}, Map.new(&2, U32)}
 
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
@@ -1842,3 +1846,27 @@ law sfx_rates_unserved:
   for bytes: List<&2, U32>
   {(X.Sfx.run(X.Sound{16000, count, bytes}), X.Sfx.run(X.Sound{17990, count, bytes}))
     == (None{}, None{}) : Maybe<&2, X.Sfx.Run> & Maybe<&2, X.Sfx.Run>}
+
+# The tally
+# ---------
+
+# LAW: WI_initVariables counts a total of none as one, so a level with
+# nothing to count shows none of it taken and not all; the route's 4
+# items of 49 are 8 per cent and its 1 secret of 4 is 25.
+law tally_percents:
+  {(In.Inter.percent(0, 0), In.Inter.percent(4, 49), In.Inter.percent(1, 4), In.Inter.percent(49, 49))
+    == (0, 8, 25, 100) : U32 & U32 & U32 & U32}
+
+# LAW: WI_updateStats' count-up stops at its target and moves the screen
+# on there, and not before: from Doom's -1 a target of none is reached
+# on the first tic, one of a hundred on the fifty-first.
+law tally_climbs:
+  {(In.Inter.climb(In.Inter.none(), 0, 2), In.Inter.climb(In.Inter.none(), 100, 2), In.Inter.climb(99, 100, 2))
+    == (In.Climb{0, True{}}, In.Climb{1, False{}}, In.Climb{100, True{}})
+    : In.Inter.Climb & In.Inter.Climb & In.Inter.Climb}
+
+# LAW: WI_drawNum draws one digit for zero and as many as the number has
+# otherwise (sanity).
+law tally_digits:
+  {(In.Inter.digits(0), In.Inter.digits(8), In.Inter.digits(45), In.Inter.digits(100))
+    == (1n, 1n, 2n, 3n) : Nat & Nat & Nat & Nat}

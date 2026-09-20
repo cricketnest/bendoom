@@ -166,13 +166,13 @@ def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
 # Every weapon and every ammo type at its cap, so that no ammo or weapon
 # pickup can be taken.
 def maxed(inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus} = inv
-  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus}
+  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus, kills, secrets} = inv
+  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus, kills, secrets}
 
 def full(s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets} = s
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd}
+    usedown, sounds, mrnd, secrets}
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl

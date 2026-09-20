@@ -322,7 +322,7 @@ def Laws.lift_crushed():
   {==}
 
 def Laws.use_fires_once(forward, side, turn, next, player, level, things, sidetex, thinkers, rnd, clock, usedown, sounds,
-  mrnd):
+  mrnd, secrets):
   match next level:
     case K.Cmd{f, s, t, True{}} L.Level{geo, sectors, specials}:
       {==}
@@ -345,7 +345,7 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
@@ -846,6 +846,25 @@ def counters_free(+level: L.Level, p: S.Player, hp: Free(level, p)) -> Free(leve
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}:
       hp
 
+# Counting a secret sector changes the inventory alone, so the player
+# stands where it stood.
+def secret_count_free(counts: Bool, +level: L.Level, +sector: U32, s: S.State,
+  hp: Free(level, S.State.player(s))) ->
+  Free(level, S.State.player(S.Sim.secret.count(counts, sector, s))):
+  match counts s:
+    case False{} _:
+      hp
+    case True{} S.State{S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites}, lv, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
+      hp
+
+def secret_free(+level: L.Level, +s: S.State, hp: Free(level, S.State.player(s))) ->
+  Free(level, S.State.player(S.Sim.secret(s))):
+  secret_count_free(Bool.and(U32.is_eq(V.Vec.get(S.State.secrets(s),
+      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))), 1),
+    U32.is_eq(S.Player.z(S.State.player(s)), L.Level.floor(S.State.level(s),
+      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))))), level,
+    L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))), s, hp)
+
 def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.Sim.Try.player(S.Sim.mobj.z(t))):
   match t:
@@ -855,7 +874,7 @@ def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(
 def moved_free(+level: L.Level, t: S.Sim.Try, at: L.Level, s: S.State, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.State.player(S.State.moved(t, at, s))):
   match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, secrets}:
       ht
 
 # Free reads the geometry alone
@@ -1018,29 +1037,33 @@ def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Pl
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, secrets}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, secrets}:
       {==}
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, secrets}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +secrets}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = S.Sim.counters(S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))))
-      +used = S.Sim.use(S.Sim.pressed(cmd, usedown),
-        {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd} : S.State})
-      +went = S.Sim.mobj(cmd, level, thought, used)
+      +felt = S.Sim.secret({S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [],
+        mrnd, secrets} : S.State})
+      +used = S.Sim.use(S.Sim.pressed(cmd, usedown), felt)
+      +went = S.Sim.mobj(cmd, level, S.State.player(felt), used)
       kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
         S.State.told(S.Sim.thinkers(S.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
-        moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, S.State.things(used), cmd, thought)), S.State.level(used), used,
-          mobj_z_free(level, S.Sim.xy(level, S.State.things(used), cmd, thought), xy_free(level,
-            S.State.things(used), cmd, thought,
+        moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, S.State.things(used), cmd, S.State.player(felt))),
+          S.State.level(used), used,
+          mobj_z_free(level, S.Sim.xy(level, S.State.things(used), cmd, S.State.player(felt)), xy_free(level,
+            S.State.things(used), cmd, S.State.player(felt),
+            secret_free(level, {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [],
+              mrnd, secrets} : S.State},
             counters_free(level, S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))),
               psprites_free(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player)),
-                eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free))))))))
+                eye_free(level, clock, S.Sim.move(level, cmd, player), move_free(level, cmd, player, free)))))))))
 
 def Laws.replay_keeps_free(script, s, free):
   match script:
@@ -1445,4 +1468,13 @@ def Laws.sfx_refusals():
   {==}
 
 def Laws.sfx_rates_unserved(count, bytes):
+  {==}
+
+def Laws.tally_percents():
+  {==}
+
+def Laws.tally_climbs():
+  {==}
+
+def Laws.tally_digits():
   {==}

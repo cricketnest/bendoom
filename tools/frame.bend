@@ -1,10 +1,12 @@
 # A frame as hex rows: E1M1 from the WAD named by BENDOOM_IWAD, the
 # player put at rest on the floor at the place FRAME names, the commands
-# SCRIPT names replayed through the sim (tools/script.bend has both
-# forms; unset for none), and the frame rendered through the game's
-# renderer, printed as 200 lines of 320 palette indices, two hex digits
-# each. tools/oracle.nu diffs it against Chocolate Doom's frame after
-# the same commands from the same place.
+# SCRIPT names replayed through the play (tools/script.bend has both
+# forms; unset for none), and the frame drawn as the game draws it,
+# printed as 200 lines of 320 palette indices, two hex digits each. A
+# script that takes the exit leaves the tally showing, and the commands
+# after it are the tally's tics, their use the press that accelerates
+# it. tools/oracle.nu diffs the frame against Chocolate Doom's after the
+# same commands from the same place.
 #
 #   bend tools/frame.bend -o frame
 #   FRAME="-416 256 0" SCRIPT="20,0,0,0,0 34,50,0,0,0" ./frame
@@ -14,8 +16,8 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/inter.bend as I
 import ../src/project.bend as P
-import ../src/render.bend as R
 import ./script.bend as T
 
 def Frame.line(p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
@@ -41,8 +43,8 @@ def Frame.rows(n: Nat, +row: U32, mem: Array<U32>) -> IO(Unit):
 def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, gl: G.Gfx & L.Level) ->
   IO(Unit):
   (+gfx, +level) = gl
-  Frame.rows(200n, 0, R.Render.frame(P.Project.tables(level), gfx,
-    S.Sim.replay(script, S.State.at(level, place)), mem))
+  Frame.rows(200n, 0, I.Play.frame(P.Project.tables(level), gfx,
+    I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), mem))
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
