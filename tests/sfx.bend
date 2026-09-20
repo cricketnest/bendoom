@@ -16,8 +16,8 @@
 #
 # "heard" is what the capture holds. Both sounds play centred at the
 # default volume, which I_SDL_UpdateSoundParams makes a left of 63 and a
-# right of 64, and SDL_mixer's _Eff_position_s16lsb scales each side as
-# (Sint16) ((float) sample * (side / 255.0f)). The hash is over the
+# right of 64, and the mixer's Stream.side scales each side as
+# SDL_mixer's _Eff_position_s16lsb does. The hash is over the
 # sound's frames so scaled, each a 32-bit word with the left in the low
 # half, and the lines after it are frames by index: the first ones, the
 # loudest, the last. The expected values are read in nushell from
@@ -40,6 +40,7 @@ import ../src/fnv.bend as H
 import ../src/wad.bend as W
 import ../src/sfx.bend as X
 import ../src/sfx_taps.bend as T
+import ../src/stream.bend as A
 
 def Test.bits(xs: List<&2, F32>) -> List<&2, U32>:
   match xs:
@@ -56,15 +57,8 @@ def Test.all(n: Nat, +r: X.Sfx.Run, acc: List<&2, U32>) -> List<&2, U32>:
     case 1n+m:
       Test.all(m, X.Sfx.next(r), List.reverse.go(&2, U32, X.Sfx.out(r), acc))
 
-# _Eff_position_s16lsb on one side: the product truncates toward zero,
-# so a negative sample is scaled as its magnitude.
-def Test.side(+s: U32, +side: U32) -> U32:
-  +neg = U32.is_ge(s, 32768)
-  +q = F32.to_u32((U32.to_f32(Bool.pick(U32, neg, (65536 - s : U32), s)) * (U32.to_f32(side) / 255.0 : F32) : F32))
-  (Bool.pick(U32, neg, (65536 - q : U32), q) .&. 65535 : U32)
-
 def Test.word(+s: U32) -> U32:
-  (Test.side(s, 63) .|. (Test.side(s, 64) << 16n) : U32)
+  (A.Stream.side(s, 63) .|. (A.Stream.side(s, 64) << 16n) : U32)
 
 def Test.heard(samples: List<&2, U32>, h: U32) -> U32:
   match samples:
