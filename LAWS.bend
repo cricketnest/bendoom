@@ -419,6 +419,41 @@ def Closed.west() -> S.State:
 def Closed.east() -> S.State:
   Closed.state(Closed.player(7340032, 4194304, 2147483648, 4718592), Closed.doors(), 0)
 
+# The door level with a barrel, radius 10, standing between its two
+# faces at x 72, y 64, linked into the one cell as P_SetThingPosition
+# links it.
+def Closed.barrel() -> L.Level:
+  L.Level.link(L.Level.unlinked(Closed.doors(), 1), 0, 4718592, 4194304, 2035)
+
+# What a ray of the use key's 64 units, east from (32, 64), meets, and
+# what the use key's visitor makes of the same ray.
+def Closed.met(level: L.Level) -> List<&2, S.Sim.Meet>:
+  S.Sim.meets(level, True{}, True{}, 2097152, 4194304, 6291456, 4194304)
+
+def Closed.reach(level: L.Level) -> S.Sim.Reach:
+  S.Sim.path(~S.Sim.Reach, ~S.Sim.use.visit, level, True{}, False{}, 2097152, 4194304, 6291456, 4194304,
+    S.Nothing{})
+
+# LAW: one traversal gathers the lines of the cell it crosses and the
+# things linked in it, and hands them over in order of distance: the ray
+# meets the door's west face at half its length, the barrel at 0.625 and
+# the east face at 0.75, so the thing comes between the two lines. The
+# fractions are P_InterceptVector by hand. For the west face, from
+# (64, 128) to (64, 0): num is (64 - 32) >> 8 times its dy, -1048576,
+# den is its dy >> 8 times the ray's dx, -2097152, and the quotient is
+# 32768. For the east face, from (80, 0) to (80, 128): num 1572864, den
+# 2097152, quotient 49152. For the barrel, PIT_AddThingIntercepts takes
+# the diagonal of its box that a rising ray can cross, from (62, 74) to
+# (82, 54): num is (62 - 32) >> 8 times -20 plus (64 - 74) >> 8 times
+# 20, -204800, den is -20 >> 8 times the ray's dx, -327680, and the
+# quotient is 40960. The use key asks for lines alone, so the barrel is
+# not gathered for it, and its refusal at the first line with a special
+# ends the walk before the east face (sanity).
+law ray_meets:
+  {(Closed.met(Closed.barrel()), Closed.reach(Closed.barrel()))
+    == ([S.Meet{32768, True{}, 0}, S.Meet{40960, False{}, 0}, S.Meet{49152, True{}, 1}], S.Special{0})
+    : List<&2, S.Sim.Meet> & S.Sim.Reach}
+
 # The state after a tic of use and then idle tics.
 def Closed.used(idle: Nat, s: S.State) -> S.State:
   S.Sim.replay(K.Cmd{0, 0, 0, 2} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)

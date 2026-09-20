@@ -410,6 +410,9 @@ def Laws.armour_absorbs():
 def Laws.damage_count():
   {==}
 
+def Laws.ray_meets():
+  {==}
+
 def Laws.door_timeline():
   {==}
 

@@ -13,7 +13,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **A call result is not a pattern.** `(a, b) = f(x)` and `match f(x)` are refused: pass the result to a def that destructures its parameter. A let-bound variable is refused the same way.
 - **A `do` block binds actions and typed lets:** `x : T <- act` and `+x : T = f(y)` pass, but an untyped let (`+x = f(y)`) inside one is refused with "expected a pattern".
 - **A list holds Data only.** A pair is a Type, so a list of pairs is refused; a law comparing many cases as one list wraps each in a Data record (`LAWS.bend`'s `Closed.Got`).
-- **Templates take their function first,** with an affine parameter (`x: U32`, not `+x`).
+- **Templates take their function first,** with an affine parameter (`x: U32`, not `+x`). A `~` argument may not follow an ordinary one, so a template whose function mentions a type variable takes the type as a template too (`~A: Data`, as `Bytes.each` and `Sim.path` do), never as a `-A: Kind(a)` parameter before it.
 - **Reuse needs `+` everywhere:** on parameters, on pattern fields (`Player{+x, ..}`, `case 1n++p`, `(+a, b) = p`), and in laws (`for +level`).
 - **Linear arrays cannot be shared across nested calls.** A quadtree from an `Array` is an explicit stack (`Show.fold`); a copyable indexed structure is a `Vec` tree (`src/vec.bend`).
 - **Literals have limits:** a Nat literal of a few thousand (`4096n` already) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`. A float literal has no sign: a negative one is `F32.neg(x)`.
