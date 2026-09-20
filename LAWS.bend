@@ -1297,6 +1297,34 @@ def Closed.lasting(d: H.Thing.Def) -> Bool:
 law solid_stays:
   {List.all(~&2, ~H.Thing.Def, ~Closed.lasting, H.Thing.defs()) == True{} : Bool}
 
+def Closed.blocks(d: H.Thing.Def) -> Bool:
+  H.Def{kind, state, radius, height, +flags} = d
+  Bool.or(U32.is_zero((flags .&. 4194304 : U32)), U32.is_eq((flags .&. 6 : U32), 6))
+
+# LAW: every type the tally counts as a kill, info.c's flag 4194304, is
+# solid and shootable, so a monster stops the player as the solid things
+# of clear_pins_things do and a mover as the barrel of barrel_stops_door
+# does (sanity).
+law monsters_block:
+  {List.all(~&2, ~H.Thing.Def, ~Closed.blocks, H.Thing.defs()) == True{} : Bool}
+
+def Closed.row(+s: U32) -> Bool:
+  U32.is_lt(s, U32.from_nat(List.length(&2, H.Thing.Row, H.Thing.rows())))
+
+def Closed.leads(r: H.Thing.Row) -> Bool:
+  Closed.row(H.Thing.Row.next(r))
+
+def Closed.spawns(d: H.Thing.Def) -> Bool:
+  H.Def{kind, state, radius, height, flags} = d
+  Closed.row(state)
+
+# LAW: every type's spawn state and every row's next state is a row of
+# the table, so no thing enters the empty row Thing.row gives past its
+# end (sanity).
+law states_exist:
+  {Bool.and(List.all(~&2, ~H.Thing.Row, ~Closed.leads, H.Thing.rows()),
+    List.all(~&2, ~H.Thing.Def, ~Closed.spawns, H.Thing.defs())) == True{} : Bool}
+
 # Solid things
 # ------------
 

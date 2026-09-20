@@ -1571,6 +1571,12 @@ def Laws.radius_within():
 def Laws.solid_stays():
   {==}
 
+def Laws.monsters_block():
+  {==}
+
+def Laws.states_exist():
+  {==}
+
 def Laws.blocker_geometry():
   {==}
 
