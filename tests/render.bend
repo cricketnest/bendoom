@@ -392,31 +392,31 @@ def main() -> IO(Unit):
 #|shotgun guy from the side 987 1947 225 hash 3040449328 pixels 5 6 109 108 96 72 covered True palette 0
 #|demon mirrored 2448 2112 0 hash 2350286645 pixels 39 2 6 79 96 72 covered True palette 0
 #|stride U!:34 hash 250131952 pixels 2 5 164 6 96 72 covered True palette 0
-#|air U!:56 hash 3788238705 pixels 5 110 15 6 96 64 covered True palette 0
-#|landed U!:66 hash 1149665840 pixels 6 110 14 79 96 64 covered True palette 10
+#|air U!:56 hash 2263461618 pixels 5 110 15 6 96 64 covered True palette 0
+#|landed U!:66 hash 36073354 pixels 6 110 14 79 96 64 covered True palette 10
 #|door half open hash 1169190636 pixels 7 14 110 79 96 64 covered True palette 0
 #|switch pressed hash 644900545 pixels 3 110 107 7 96 64 covered True palette 0
 #|exit pressed hash 786890588 pixels 102 95 102 3 96 72 covered True palette 0
-#|blink dark hash 1109576201 pixels 94 73 73 101 96 72 covered True palette 0
-#|key 2380 600 180 22 hash 491721407 pixels 5 1 6 110 96 72 covered True palette 0
-#|key bright 23 hash 491721407 pixels 5 1 6 110 96 72 covered True palette 0
-#|key before hash 398974500 pixels 6 10 5 89 96 72 covered True palette 0
-#|key after hash 1310564919 pixels 105 10 2 89 96 72 covered True palette 11
+#|blink dark hash 2817285794 pixels 95 72 103 93 96 65 covered True palette 0
+#|key 2380 600 180 22 hash 3985974813 pixels 5 1 6 110 96 72 covered True palette 0
+#|key bright 23 hash 4138847691 pixels 5 1 6 110 96 72 covered True palette 0
+#|key before hash 2059559509 pixels 6 10 5 89 96 72 covered True palette 0
+#|key after hash 3772851500 pixels 105 10 2 89 96 72 covered True palette 11
 #|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True palette 0
 #|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True palette 10
-#|green armour before hash 3593952694 pixels 110 110 6 1 96 59 covered True palette 0
-#|green armour after hash 1489547737 pixels 8 110 103 2 96 59 covered True palette 10
+#|green armour before hash 123771255 pixels 110 110 6 1 96 72 covered True palette 0
+#|green armour after hash 4258495022 pixels 8 110 103 2 96 72 covered True palette 10
 #|stimpack and medikit before hash 1702492025 pixels 111 109 7 111 96 72 covered True palette 0
 #|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True palette 0
 #|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True palette 0
 #|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True palette 10
 #|rocket refused hash 3744069241 pixels 106 109 105 77 160 72 covered True palette 0
-#|chainsaw after hash 958764125 pixels 5 5 137 141 96 79 covered True palette 10
-#|chainsaw refused hash 957078586 pixels 5 5 137 141 160 64 covered True palette 0
+#|chainsaw after hash 1752609615 pixels 5 5 137 141 96 79 covered True palette 10
+#|chainsaw refused hash 1360841628 pixels 5 5 137 141 160 64 covered True palette 0
 #|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True palette 0
 #|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True palette 0
 #|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True palette 0
-#|dead 1600 1000 90 hash 4043722533 pixels 6 111 110 5 96 8 covered True palette 0
+#|dead 1600 1000 90 hash 1289269632 pixels 189 1 103 1 96 44 covered True palette 2
 #|nukage 1600 1000 90 hash 3477668975 pixels 11 2 107 1 96 77 covered True palette 2
 #|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True palette 0
 #|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True palette 0

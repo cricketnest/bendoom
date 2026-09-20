@@ -27,12 +27,13 @@ type Thing is Data:
     tics: U32, momz: U32, hurt: V.Vec}
 
 # The rest of Doom's mobj_t, which the definition answers for until a
-# blow, a death or a look changes it, nine counts in one vector as the
-# player's wound is: its health, the thing it is after (its own name
-# for none), its reaction time, the threshold that keeps it on that
+# blow, a death or a look changes it, eleven counts in one vector as
+# the player's wound is: its health, the thing it is after (its own
+# name for none), its reaction time, the threshold that keeps it on that
 # target, the horizontal momentum a blow gave it, its flags, which
 # P_KillMobj and A_Fall clear bits of, its height, which a death
-# quarters, and the player A_Look last looked at.
+# quarters, the player A_Look last looked at, the eight-way direction
+# A_Chase walks it, and the tics it keeps that direction.
 def Thing.hurt.health() -> U32:
   0
 
@@ -60,6 +61,16 @@ def Thing.hurt.height() -> U32:
 def Thing.hurt.lastlook() -> U32:
   8
 
+def Thing.hurt.movedir() -> U32:
+  9
+
+def Thing.hurt.movecount() -> U32:
+  10
+
+# Doom's DI_NODIR, the ninth direction, which is none of the eight.
+def Thing.nodir() -> U32:
+  8
+
 def Thing.hurt(th: Thing) -> V.Vec:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = th
   hurt
@@ -80,6 +91,20 @@ def Thing.target(th: Thing) -> U32:
 
 def Thing.threshold(th: Thing) -> U32:
   V.Vec.get(Thing.hurt(th), Thing.hurt.threshold())
+
+# Doom's mobj->movedir, one of the eight directions A_Chase walks, or
+# DI_NODIR where it can walk none.
+def Thing.movedir(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.movedir())
+
+# Doom's mobj->movecount, signed: the tics left before A_Chase picks
+# another direction.
+def Thing.movecount(th: Thing) -> U32:
+  V.Vec.get(Thing.hurt(th), Thing.hurt.movecount())
+
+# One of the counts written back.
+def Thing.counted(+th: Thing, +slot: U32, value: U32) -> Thing:
+  Thing.hurting(th, V.Vec.set(Thing.hurt(th), slot, value))
 
 def Thing.momx(th: Thing) -> U32:
   V.Vec.get(Thing.hurt(th), Thing.hurt.momx())
@@ -164,8 +189,9 @@ def Thing.null() -> U32:
 # What a state row does as it is entered, Doom's action pointers: a
 # weapon's A_Raise, A_WeaponReady, A_Lower, A_FirePistol and A_ReFire, a
 # mobj's A_Pain, A_Scream (A_PlayerScream on the player's own rows),
-# A_XScream, A_Fall, A_Explode, A_Look and A_Chase, or nothing. A row of
-# one kind never holds the other's.
+# A_XScream, A_Fall, A_Explode, A_Look, A_Chase, A_FaceTarget,
+# A_PosAttack and A_SPosAttack, or nothing. A row of one kind never
+# holds the other's.
 type Thing.Action is Data:
   Null{}
   Raise{}
@@ -180,6 +206,9 @@ type Thing.Action is Data:
   Explode{}
   Look{}
   Chase{}
+  Face{}
+  PosAttack{}
+  SPosAttack{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -199,9 +228,9 @@ type Thing.Row is Data:
 # mobj's own, whose death ends in row 0, the corpse a dead marine record
 # spawns in, then the pistol's fire states, its muzzle flash's, the
 # state that puts the flash's light out, the bullet puff's, then the
-# monsters' eight run states each, where A_Chase would chase the player,
-# and last their pain, death and gib rows, the barrel's explosion and
-# the blood. A monster's second pain row leads back to its see state.
+# monsters' eight run states each, where A_Chase hunts the player, their
+# pain, death and gib rows, the barrel's explosion, the blood, and last
+# the three attack rows each of the zombieman and the shotgun guy. A monster's second pain row leads back to its see state.
 # Only S_LIGHTDONE, row 84, has 0 tics, and it is a player sprite's; it
 # carries A_Light0 in vanilla and here only puts the light out by being
 # the last row before S_NULL.
@@ -297,7 +326,11 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"BEXP", 1, True{}, 5, 178, Scream{}, 0}, Row{"BEXP", 2, True{}, 5, 179, Null{}, 0},
     Row{"BEXP", 3, True{}, 10, 180, Explode{}, 0}, Row{"BEXP", 4, True{}, 10, 4294967295, Null{}, 0},
     Row{"BLUD", 2, False{}, 8, 182, Null{}, 0}, Row{"BLUD", 1, False{}, 8, 183, Null{}, 0},
-    Row{"BLUD", 0, False{}, 8, 4294967295, Null{}, 0}]
+    Row{"BLUD", 0, False{}, 8, 4294967295, Null{}, 0},
+    Row{"POSS", 4, False{}, 10, 185, Face{}, 0}, Row{"POSS", 5, False{}, 8, 186, PosAttack{}, 0},
+    Row{"POSS", 4, False{}, 8, 89, Null{}, 0},
+    Row{"SPOS", 4, False{}, 10, 188, Face{}, 0}, Row{"SPOS", 5, True{}, 10, 189, SPosAttack{}, 0},
+    Row{"SPOS", 4, False{}, 10, 97, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -469,6 +502,32 @@ def Thing.seesound(+kind: U32) -> U32:
   Bool.pick(U32, U32.is_eq(kind, 3004), 36, Bool.pick(U32, U32.is_eq(kind, 9), 37,
     Bool.pick(U32, U32.is_eq(kind, 3001), 39, Bool.pick(U32, U32.is_eq(kind, 3002), 41, 0))))
 
+# Doom's mobjinfo speed, the map units a chasing thing of the type walks
+# a move tic: 8 for the former humans and the imp, 10 for the demon.
+def Thing.speed(+kind: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(kind, 3002), 10, 8)
+
+# Doom's mobjinfo activesound, the call a chasing thing makes on a draw
+# under 3.
+def Thing.activesound(+kind: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(kind, 3001), 76, Bool.pick(U32, U32.is_eq(kind, 3002), 77, 75))
+
+# Doom's mobjinfo attacksound, which A_Chase starts as it enters a
+# melee state. Only the demon of these four has one, and its melee is
+# ticket 18's.
+def Thing.attacksound(+kind: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(kind, 3002), 52, 0)
+
+# Doom's mobjinfo meleestate and missilestate, the rows A_Chase enters
+# to claw and to shoot, 0 where the type has none. The imp's and the
+# demon's are ticket 18's: until it gives them their rows both answer 0
+# here, which is the guard that keeps their A_Chase from ever attacking.
+def Thing.melee(+kind: U32) -> U32:
+  0
+
+def Thing.missile(+kind: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187, 0))
+
 # The rest of Doom's mobjinfo for the types a blow reaches, read by kind
 # for the same reason: the spawn health, the pain chance, the rows of
 # the pain state, the death and the gib death, the mass the thrust
@@ -510,10 +569,13 @@ def Thing.deathsound(+kind: U32) -> U32:
 
 # Doom's mobj_t as P_SpawnMobj leaves it: the type's spawn health, no
 # target, vanilla's reaction time of 8, no threshold, no momentum, the
-# type's flags and height, which only a death changes, and the player
-# the spawn's draw left it looking at.
+# type's flags and height, which only a death changes, the player the
+# spawn's draw left it looking at, and a direction of east with no tics
+# on it: P_SpawnMobj clears the whole mobj and DI_EAST is the zero of
+# dirtype_t, so a thing's first A_Chase snaps its facing to the eight
+# directions and turns it, where DI_NODIR would leave it alone.
 def Thing.Hurt.start(+kind: U32, flags: U32, height: U32, lastlook: U32) -> V.Vec:
-  V.Vec.of([Thing.spawnhealth(kind), Thing.you(), 8, 0, 0, 0, flags, height, lastlook])
+  V.Vec.of([Thing.spawnhealth(kind), Thing.you(), 8, 0, 0, 0, flags, height, lastlook, 0, 0])
 
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:

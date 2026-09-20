@@ -169,7 +169,7 @@ def main [
     differing: ($differing | length)
     face: ($off | where $it in $box | length)
     masked: ($masked | uniq | where $it < 200 * 320 | length)
-    palette: ($dump | first | into int --radix 16)
+    palette: ($"0x($dump | first)" | into int)
     shot_plain: ($shot.palette == ($bytes | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
     first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })

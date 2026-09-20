@@ -1447,6 +1447,23 @@ law move_is_checked:
   {True{} == S.Sim.Fit.ok(S.Sim.check(level, things, p,
     S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y), 1)) : Bool}
 
+# LAW: a thing's move is taken only where its box passes the check,
+# for all bodies, things, levels and places. The twin of
+# move_is_checked for everything that is not the player: the mask is 3,
+# since the lines that block monsters stop a thing as well.
+law thing_move_is_checked:
+  for +m: S.Sim.Body
+  for th: H.Thing
+  for +id: U32
+  for +level: L.Level
+  for +x: U32
+  for +y: U32
+  for +ts: H.Things
+  for +p: S.Player
+  for s: S.State
+  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y, ts, p, s)) : Bool}
+  {True{} == S.Sim.Fit.ok(S.Sim.check(level, ts, p, S.Sim.Body.at(m, x, y), 3)) : Bool}
+
 # LAW: clear is pinned to the mobjs: when nothing stops a box, every
 # mobj linked in the cells around it, whichever position in the list it
 # holds, does not stop it (blocker_geometry shows the numbers). That the

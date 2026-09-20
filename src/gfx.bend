@@ -848,12 +848,23 @@ def Gfx.sprite.from(none: Bool, +n: Nat, +state: U32, marks: V.Vec) -> V.Vec:
 def Gfx.sprite.hurt(+kind: U32, +n: Nat, marks: V.Vec) -> V.Vec:
   Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind), marks)
 
+# The rows a type reaches that no chain from its spawn state does: the
+# chase rows A_Look sends it to, the melee and missile rows A_Chase
+# sends it to, and the rows it dies through. Vanilla's R_InitSprites
+# copies every frame of every sprite the WAD holds; Bendoom copies only
+# the frames its rows name, so each entry point has to be followed or a
+# woken monster draws nothing at all.
+def Gfx.sprite.woken(+kind: U32, +n: Nat, marks: V.Vec) -> V.Vec:
+  Gfx.sprite.from(U32.is_zero(H.Thing.missile(kind)), n, H.Thing.missile(kind),
+    Gfx.sprite.from(U32.is_zero(H.Thing.melee(kind)), n, H.Thing.melee(kind),
+      Gfx.sprite.from(U32.is_zero(H.Thing.see(kind)), n, H.Thing.see(kind), Gfx.sprite.hurt(kind, n, marks))))
+
 def Gfx.sprite.marks(things: List<&2, H.Thing>, +n: Nat, marks: V.Vec) -> V.Vec:
   match things:
     case []:
       marks
     case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, hurt} <> rest:
-      Gfx.sprite.marks(rest, n, Gfx.sprite.hurt(kind, n, Gfx.sprite.chase(n, False{}, state, state, marks)))
+      Gfx.sprite.marks(rest, n, Gfx.sprite.woken(kind, n, Gfx.sprite.chase(n, False{}, state, state, marks)))
 
 def Gfx.sprite.keep(kept: Bool, row: U32, rest: List<&2, U32>) -> List<&2, U32>:
   match kept:

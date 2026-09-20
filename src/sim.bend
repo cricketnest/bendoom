@@ -77,12 +77,13 @@ type Sim.Met is Data:
   Met{before: List<&2, U32>, hit: Maybe<&2, U32>}
 
 # What Doom's P_CheckPosition answers for a mobj's box: whether no thing
-# stops it and no line does, and the floor and ceiling there. A thing in
-# the way leaves the sector's under the point; otherwise each two-sided
-# line the box crosses narrows them, up to the first line that stops the
-# box.
+# stops it and no line does, the floor and ceiling there, and the lowest
+# floor beyond an opening it crosses, vanilla's tmdropoffz, which is the
+# ledge a monster refuses to walk off. A thing in the way leaves the
+# sector's heights under the point; otherwise each two-sided line the
+# box crosses narrows them, up to the first line that stops the box.
 type Sim.Fit is Data:
-  Fit{ok: Bool, floor: U32, ceil: U32}
+  Fit{ok: Bool, floor: U32, ceil: U32, drop: U32}
 
 # A move that was tried: whether it was taken, the player after, and
 # the things left by the pickups its position checks made, taken or
@@ -626,6 +627,12 @@ def Sim.open_top(+level: L.Level, +line: L.Level.Line) -> U32:
   L.Line{x1, y1, x2, y2, flags, front, back} = line
   F.Fixed.min(L.Level.ceil(level, front), L.Level.ceil(level, back))
 
+# Doom's P_LineOpening lowfloor, the floor on the far side of the
+# opening: what a thing would drop to if it walked across the line.
+def Sim.open_low(+level: L.Level, +line: L.Level.Line) -> U32:
+  L.Line{x1, y1, x2, y2, flags, front, back} = line
+  F.Fixed.min(L.Level.floor(level, front), L.Level.floor(level, back))
+
 # Doom's ML_TWOSIDED: the flag that says a line has an opening at all.
 def Sim.twosided(+line: L.Level.Line) -> Bool:
   L.Line{x1, y1, x2, y2, +flags, front, back} = line
@@ -645,11 +652,12 @@ def Sim.fit.narrow(hit: Bool, +level: L.Level, +line: L.Level.Line, fit: Sim.Fit
     case False{}:
       fit
     case True{}:
-      Fit{ok, floor, ceil} = fit
+      Fit{ok, floor, ceil, drop} = fit
       Fit{ok, F.Fixed.max(floor, Sim.open_bottom(level, line)),
-        F.Fixed.min(ceil, Sim.open_top(level, line))}
+        F.Fixed.min(ceil, Sim.open_top(level, line)), F.Fixed.min(drop, Sim.open_low(level, line))}
 
-# A two-sided line the box crosses narrows the floor and ceiling.
+# A two-sided line the box crosses narrows the floor and ceiling, and
+# takes the drop-off down to the floor on its far side.
 def Sim.fit.heights(+level: L.Level, +x: U32, +y: U32, +r: U32, +line: L.Level.Line, fit: Sim.Fit) ->
   Sim.Fit:
   L.Line{x1, y1, x2, y2, flags, front, +back} = line
@@ -657,22 +665,23 @@ def Sim.fit.heights(+level: L.Level, +x: U32, +y: U32, +r: U32, +line: L.Level.L
     Bool.and(Sim.box_touches(x, y, r, line), Sim.box_crosses(x, y, r, line))), level, line, fit)
 
 def Sim.fit.cross(ok: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32, +line: L.Level.Line, floor: U32,
-  ceil: U32) -> Sim.Fit:
+  ceil: U32, drop: U32) -> Sim.Fit:
   match ok:
     case False{}:
-      Fit{False{}, floor, ceil}
+      Fit{False{}, floor, ceil, drop}
     case True{}:
-      Sim.fit.heights(level, x, y, r, line, Fit{True{}, floor, ceil})
+      Sim.fit.heights(level, x, y, r, line, Fit{True{}, floor, ceil, drop})
 
 # Doom's PIT_CheckLine: a line that stops the box ends the check, the
 # floor and ceiling as the lines before it left them; any other narrows
 # them.
 def Sim.fit.line(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, +i: U32, fit: Sim.Fit) -> Sim.Fit:
   match fit:
-    case Fit{False{}, floor, ceil}:
-      Fit{False{}, floor, ceil}
-    case Fit{True{}, floor, ceil}:
-      Sim.fit.cross(Sim.line_ok(level, x, y, r, mask, i), level, x, y, r, L.Level.line(level, i), floor, ceil)
+    case Fit{False{}, floor, ceil, drop}:
+      Fit{False{}, floor, ceil, drop}
+    case Fit{True{}, floor, ceil, drop}:
+      Sim.fit.cross(Sim.line_ok(level, x, y, r, mask, i), level, x, y, r, L.Level.line(level, i), floor, ceil,
+        drop)
 
 def Sim.fit.go(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, fit: Sim.Fit) ->
   Sim.Fit:
@@ -781,6 +790,14 @@ def Sim.Body.at(m: Sim.Body, x: U32, y: U32) -> Sim.Body:
   Body{id, ox, oy, z, radius, height, flags} = m
   Body{id, x, y, z, radius, height, flags}
 
+def Sim.Body.x(m: Sim.Body) -> U32:
+  Body{id, x, y, z, radius, height, flags} = m
+  x
+
+def Sim.Body.y(m: Sim.Body) -> U32:
+  Body{id, x, y, z, radius, height, flags} = m
+  y
+
 # The mobj an id names: the player's, a thing alive, or none.
 def Sim.body(+things: H.Things, +p: Player, +id: U32) -> Maybe<&2, Sim.Body>:
   Bool.pick(Maybe<&2, Sim.Body>, U32.is_eq(id, H.Things.you(things)), Some{Player.body(p, id)},
@@ -851,7 +868,7 @@ def Sim.blocked(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body) -> 
 # The floor and ceiling of the sector under a point.
 def Sim.fit.start(ok: Bool, +level: L.Level, +x: U32, +y: U32) -> Sim.Fit:
   +sector = L.Level.sector_at(level, x, y)
-  Fit{ok, L.Level.floor(level, sector), L.Level.ceil(level, sector)}
+  Fit{ok, L.Level.floor(level, sector), L.Level.ceil(level, sector), L.Level.floor(level, sector)}
 
 # The line half of Doom's P_CheckPosition for a box of radius r at
 # (x, y), stopped by the mask's lines, after its things gave their
@@ -878,7 +895,7 @@ def Sim.check(+level: L.Level, things: H.Things, p: Player, +m: Sim.Body, mask: 
   Sim.check.met(Sim.met(level, things, p, m), level, m, mask)
 
 def Sim.Fit.ok(f: Sim.Fit) -> Bool:
-  Fit{ok, floor, ceil} = f
+  Fit{ok, floor, ceil, drop} = f
   ok
 
 # Free: no solid line in the cells the player's box touches crosses the
@@ -890,9 +907,19 @@ def Sim.free(+level: L.Level, x: U32, y: U32) -> Bool:
 # mobj, the ceiling is high enough from its feet, and the floor is at
 # most 24 units up.
 def Sim.passes(f: Sim.Fit, +z: U32, +height: U32) -> Bool:
-  Fit{ok, +floor, +ceil} = f
+  Fit{ok, +floor, +ceil, drop} = f
   Bool.and(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), height),
     Bool.and(F.Fixed.ge((ceil - z : U32), height), F.Fixed.le((floor - z : U32), Sim.step_up()))))
+
+# P_TryMove's last rule, for a mobj with neither MF_DROPOFF nor
+# MF_FLOAT, which is every monster either E1M1 spawns: it will not stand
+# where the floor it would leave behind is more than 24 units below the
+# floor it would stand on. The player carries MF_DROPOFF and never
+# meets it.
+def Sim.walks(f: Sim.Fit, +z: U32, +height: U32) -> Bool:
+  Fit{ok, +floor, ceil, +drop} = f
+  Bool.and(Sim.passes(Fit{ok, floor, ceil, drop}, z, height),
+    F.Fixed.le((floor - drop : U32), Sim.step_up()))
 
 # Pickups
 # -------
@@ -985,30 +1012,74 @@ def Sim.member(xs: List<&2, U32>, +i: U32) -> Bool:
       Bool.or(U32.is_eq(x, i), Sim.member(rest, i))
 
 # Whether a move from (ox, oy) to (x, y) crosses a line with a special:
-# Doom's spechit, a two-sided special line the box at the new place is
-# across, tested as P_TryMove tests it, by the side of the player's
-# centre before and after.
-def Sim.crosses(+level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32, +i: U32) -> Bool:
+# Doom's spechit, a two-sided special line the box of radius r at the
+# new place is across, tested as P_TryMove tests it, by the side of the
+# mover's centre before and after.
+def Sim.crosses(+level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32, +r: U32, +i: U32) -> Bool:
   +line = L.Level.line(level, i)
   Bool.and(Bool.not(U32.is_zero(L.Level.special(level, i))),
-    Bool.and(Bool.not(Sim.solid(1, line)), Bool.and(Sim.box_touches(x, y, Sim.radius(), line),
-      Bool.and(Sim.box_crosses(x, y, Sim.radius(), line),
+    Bool.and(Bool.not(Sim.solid(1, line)), Bool.and(Sim.box_touches(x, y, r, line),
+      Bool.and(Sim.box_crosses(x, y, r, line),
         Bool.xor(Sim.point_side(ox, oy, line), Sim.point_side(x, y, line))))))
 
 # The lines a move crosses, the last gathered first, as Doom fires them,
 # a line the blockmap lists twice taken once.
-def Sim.crossings.go(lines: List<&2, U32>, +level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32,
+def Sim.crossings.go(lines: List<&2, U32>, +level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32, +r: U32,
   +found: List<&2, U32>) -> List<&2, U32>:
   match lines:
     case []:
       found
     case +i <> rest:
-      Sim.crossings.go(rest, level, ox, oy, x, y, V.Vec.keep(~U32, Bool.and(Sim.crosses(level, ox, oy, x, y, i),
-        Bool.not(Sim.member(found, i))), i, found))
+      Sim.crossings.go(rest, level, ox, oy, x, y, r,
+        V.Vec.keep(~U32, Bool.and(Sim.crosses(level, ox, oy, x, y, r, i),
+          Bool.not(Sim.member(found, i))), i, found))
 
-def Sim.crossings(+level: L.Level, ox: U32, oy: U32, +x: U32, +y: U32) -> List<&2, U32>:
-  Sim.crossings.go(Sim.lines(level, (x - Sim.radius() : U32), (y - Sim.radius() : U32),
-    (x + Sim.radius() : U32), (y + Sim.radius() : U32)), level, ox, oy, x, y, [])
+def Sim.crossings(+level: L.Level, ox: U32, oy: U32, +x: U32, +y: U32, +r: U32) -> List<&2, U32>:
+  Sim.crossings.go(Sim.lines(level, (x - r : U32), (y - r : U32), (x + r : U32), (y + r : U32)), level, ox, oy,
+    x, y, r, [])
+
+# Doom's spechit as P_Move reads it: the special lines the box of radius
+# r at (x, y) crosses, whichever side of them it is on, gathered as
+# PIT_CheckLine gathers them and cut short by the first line that stops
+# the box, the last found first.
+type Sim.Spec is Data:
+  Spec{open: Bool, lines: List<&2, U32>}
+
+def Sim.spechit.at(ok: Bool, special: Bool, +i: U32, lines: List<&2, U32>) -> Sim.Spec:
+  match ok special:
+    case False{} _:
+      Spec{False{}, lines}
+    case True{} True{}:
+      Spec{True{}, i <> lines}
+    case True{} False{}:
+      Spec{True{}, lines}
+
+def Sim.spechit.line(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, +i: U32, sp: Sim.Spec) -> Sim.Spec:
+  match sp:
+    case Spec{False{}, lines}:
+      Spec{False{}, lines}
+    case Spec{True{}, +lines}:
+      Sim.spechit.at(Sim.line_ok(level, x, y, r, mask, i),
+        Bool.and(Bool.not(U32.is_zero(L.Level.special(level, i))),
+          Bool.and(Sim.box_touches(x, y, r, L.Level.line(level, i)),
+            Bool.and(Sim.box_crosses(x, y, r, L.Level.line(level, i)), Bool.not(Sim.member(lines, i))))),
+        i, lines)
+
+def Sim.spechit.go(ids: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, sp: Sim.Spec) ->
+  Sim.Spec:
+  match ids:
+    case []:
+      sp
+    case i <> rest:
+      Sim.spechit.go(rest, level, x, y, r, mask, Sim.spechit.line(level, x, y, r, mask, i, sp))
+
+def Sim.Spec.lines(sp: Sim.Spec) -> List<&2, U32>:
+  Spec{open, lines} = sp
+  lines
+
+def Sim.spechit(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32) -> List<&2, U32>:
+  Sim.Spec.lines(Sim.spechit.go(Sim.lines(level, (x - r : U32), (y - r : U32), (x + r : U32), (y + r : U32)),
+    level, x, y, r, mask, Spec{True{}, []}))
 
 # The player's mobj unlinked from one place and linked at another, as
 # Doom's P_TryMove does about a move.
@@ -1033,7 +1104,7 @@ def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x:
 def Sim.try_move.fit(+level: L.Level, +p: Player, x: U32, y: U32, touched: I.Inventory & H.Things, +f: Sim.Fit,
   over: List<&2, U32>) -> Sim.Try:
   (inv, things) = touched
-  Fit{ok, floor, ceil} = f
+  Fit{ok, floor, ceil, drop} = f
   Sim.try_move.fin(Sim.passes(f, Player.z(p), Sim.height()), level, Player.holding(p, inv), things, x, y, floor,
     ceil, over)
 
@@ -1049,7 +1120,7 @@ def Sim.try_move.met(+level: L.Level, things: H.Things, +p: Player, +m: Sim.Body
 def Sim.try_move(+level: L.Level, +things: H.Things, +p: Player, +x: U32, +y: U32) -> Sim.Try:
   Sim.try_move.met(level, things, p, Sim.Body.at(Player.body(p, H.Things.you(things)), x, y),
     Sim.met(level, things, p, Sim.Body.at(Player.body(p, H.Things.you(things)), x, y)),
-    Sim.crossings(level, Player.x(p), Player.y(p), x, y))
+    Sim.crossings(level, Player.x(p), Player.y(p), x, y, Sim.radius()))
 
 def Sim.Try.ok(t: Sim.Try) -> Bool:
   Try{ok, p, things} = t
@@ -3561,7 +3632,7 @@ def Sim.fits(+floor: U32, +ceil: U32, +height: U32) -> Bool:
 def Sim.reclip.fit(p: Player, touched: I.Inventory & H.Things, f: Sim.Fit) -> Sim.Try:
   Player{x, y, +z, angle, momx, momy, momz, +floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   (held, things) = touched
-  Fit{ok, +floor, +ceil} = f
+  Fit{ok, +floor, +ceil, drop} = f
   Try{Sim.fits(floor, ceil, Sim.height()), Player{x, y, Sim.clip(z, floorz, floor, ceil, Sim.height()), angle,
     momx, momy, momz, floor, ceil, viewheight, deltaview, viewz, crossed, held, psprites, hurt}, things}
 
@@ -3580,7 +3651,7 @@ def Sim.reclip(+level: L.Level, +things: H.Things, +p: Player) -> Sim.Try:
 def Sim.reclip.fin(th: H.Thing, m: Sim.Body, f: Sim.Fit) -> Bool & H.Thing:
   H.Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   Body{i, mx, my, mz, radius, +height, flags} = m
-  Fit{ok, +floor, +ceil} = f
+  Fit{ok, +floor, +ceil, drop} = f
   (Bool.or(Sim.fits(floor, ceil, height), U32.is_zero((flags .&. 4 : U32))),
     H.Thing{id, kind, x, y, Sim.clip(z, floorz, floor, ceil, height), floor, ceil, angle, sector, state, tics,
       momz, hurt})
@@ -3714,14 +3785,52 @@ def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: Sta
     case False{}:
       State.kept(s, Button{side, slot, texture, (tics - 1 : U32)})
 
-# Doom's P_LookForPlayers with allaround false, for the one player in
-# the game: the player has to be in sight, and then either within the
-# half turn the monster faces or near enough that MELEERANGE, 64 units,
-# excuses the rest. A monster whose spawn draw left it looking at player
-# 2 stops at player 1 without looking at all, which is the one turn
-# vanilla's loop wastes; every other start looks at player 1 first, and
-# the loop leaves lastlook there either way.
-def Sim.look.sees(blind: Bool, +level: L.Level, +p: Player, m: Sim.Body, +angle: U32) -> Bool:
+# One of the counts a thing's hunt keeps, written back where the
+# population still has the thing, and read back with 0 for one gone.
+def Sim.thing.count(m: Maybe<&2, H.Thing>, +id: U32, +slot: U32, value: U32, s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      State.thing.put(id, H.Thing.counted(th, slot, value), s)
+
+def Sim.thing.counted(+id: U32, +slot: U32, value: U32, +s: State) -> State:
+  Sim.thing.count(State.thing(id, s), id, slot, value, s)
+
+def Sim.thing.counter(m: Maybe<&2, H.Thing>, +slot: U32) -> U32:
+  match m:
+    case None{}:
+      0
+    case Some{th}:
+      V.Vec.get(H.Thing.hurt(th), slot)
+
+def Sim.thing.reads(+things: H.Things, +id: U32, +slot: U32) -> U32:
+  Sim.thing.counter(H.Things.get(things, id), slot)
+
+# What a thing is after, its own name for nothing.
+def Sim.thing.target(+things: H.Things, +id: U32) -> U32:
+  Sim.thing.reads(things, id, H.Thing.hurt.target())
+
+# One of the flags a thing's attacks set, raised and dropped as
+# vanilla's flags |= and flags &= ~ do.
+def Sim.thing.flagged(+id: U32, +bit: U32, +s: State) -> State:
+  Sim.thing.counted(id, H.Thing.hurt.flags(),
+    (Sim.thing.reads(State.things(s), id, H.Thing.hurt.flags()) .|. bit : U32), s)
+
+def Sim.thing.cleared(+id: U32, +bit: U32, +s: State) -> State:
+  Sim.thing.counted(id, H.Thing.hurt.flags(),
+    (Sim.thing.reads(State.things(s), id, H.Thing.hurt.flags()) .&. U32.not(bit) : U32), s)
+
+# Doom's P_LookForPlayers for the one player in the game: a dead player
+# is never taken, a live one has to be in sight, and where the look is
+# not all around it has to be either within the half turn the monster
+# faces or near enough that MELEERANGE, 64 units, excuses the rest.
+# A_Look looks in front and A_Chase looks all around. A monster whose
+# spawn draw left it looking at player 2 stops at player 1 without
+# looking at all, which is the one turn vanilla's loop wastes; every
+# other start looks at player 1 first, and the loop leaves lastlook
+# there either way.
+def Sim.look.sees(blind: Bool, around: Bool, +level: L.Level, +p: Player, m: Sim.Body, +angle: U32) -> Bool:
   match blind:
     case True{}:
       False{}
@@ -3730,9 +3839,11 @@ def Sim.look.sees(blind: Bool, +level: L.Level, +p: Player, m: Sim.Body, +angle:
       +dx = (Player.x(p) - x : U32)
       +dy = (Player.y(p) - y : U32)
       +away = (A.Angle.of(L.Level.tanto(level), dx, dy) - angle : U32)
-      Bool.and(Sim.sight(level, Body{id, x, y, z, radius, height, flags}, Player.body(p, H.Thing.you())),
-        Bool.or(Bool.not(Bool.and(U32.is_lt(A.Angle.ang90(), away), U32.is_lt(away, A.Angle.ang270()))),
-          F.Fixed.le(F.Fixed.approx(dx, dy), 4194304)))
+      Bool.and(Bool.not(Player.dead(p)),
+        Bool.and(Sim.sight(level, Body{id, x, y, z, radius, height, flags}, Player.body(p, H.Thing.you())),
+          Bool.or(around,
+            Bool.or(Bool.not(Bool.and(U32.is_lt(A.Angle.ang90(), away), U32.is_lt(away, A.Angle.ang270()))),
+              F.Fixed.le(F.Fixed.approx(dx, dy), 4194304)))))
 
 # A_Look's sight sound: vanilla's switch picks one of the three former
 # human calls or one of the two imp calls with a P_Random draw, which it
@@ -3760,17 +3871,21 @@ def Sim.look.sound(+first: U32, +count: U32, +id: U32, s: State) -> State:
 type Sim.Acted is Data:
   Acted{state: Maybe<&2, U32>, s: State}
 
-def Sim.look.at(seen: Bool, +kind: U32, +id: U32, s: State) -> Sim.Acted:
+# The end of A_Look: P_LookForPlayers took the player as the thing's
+# target, and the thing calls out and enters its chase state.
+def Sim.look.at(seen: Bool, +kind: U32, +id: U32, +s: State) -> Sim.Acted:
   match seen:
     case False{}:
       Acted{None{}, s}
     case True{}:
       +sound = Sim.look.first(H.Thing.seesound(kind))
-      Acted{Some{H.Thing.see(kind)}, Sim.look.sound(sound, Sim.look.count(sound), id, s)}
+      +you = H.Things.you(State.things(s))
+      Acted{Some{H.Thing.see(kind)}, Sim.look.sound(sound, Sim.look.count(sound), id,
+        Sim.thing.counted(id, H.Thing.hurt.target(), you, s))}
 
 def Sim.look.thing(+th: H.Thing, +id: U32, +s: State) -> Sim.Acted:
   +looked = H.Thing.looked(th)
-  Sim.look.at(Sim.look.sees(H.Thing.blind(th), State.level(s), State.player(s), Sim.body.of(looked),
+  Sim.look.at(Sim.look.sees(H.Thing.blind(th), False{}, State.level(s), State.player(s), Sim.body.of(looked),
     H.Thing.angle(th)), H.Thing.kind(th), id, State.thing.put(id, looked, s))
 
 def Sim.look.some(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> Sim.Acted:
@@ -3794,7 +3909,7 @@ def Sim.thing.mom(+th: H.Thing, momx: U32, momy: U32) -> H.Thing:
   H.Thing.hurting(th, V.Vec.set(V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.momx(), momx), H.Thing.hurt.momy(), momy))
 
 def Sim.thing.relink(+id: U32, was: H.Thing, now: H.Thing, fit: Sim.Fit, s: State) -> State:
-  Fit{ok, +floor, +ceil} = fit
+  Fit{ok, +floor, +ceil, drop} = fit
   State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   State{player, level, H.Things.moved(things, L.Level.blockmap_of(level), was,
       H.Thing.between(now, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
@@ -3945,116 +4060,6 @@ def Sim.thing.acts(action: H.Thing.Action, m: Maybe<&2, H.Thing>, +id: U32, s: S
       s
     case Some{th}:
       Sim.thing.acted(action, id, th, s)
-
-# The dispatch over a mobj's action pointers. A_Chase's turn, its move
-# and its attacks are ticket 16's, so a monster that has seen the player
-# runs its chase states where it stands. The two weapon actions are the
-# player sprites' and no state row a mobj holds carries them.
-def Sim.thing.act(action: H.Thing.Action, +id: U32, +s: State) -> Sim.Acted:
-  match action:
-    case H.Look{}:
-      Sim.look(id, s)
-    case other:
-      Acted{None{}, Sim.thing.acts(other, State.thing(id, s), id, s)}
-
-def Sim.thing.entered(m: Maybe<&2, H.Thing>, +id: U32, +state: U32, s: State) -> State:
-  match m:
-    case None{}:
-      s
-    case Some{th}:
-      State.thing.put(id, H.Thing.entering(th, state), s)
-
-# Doom's P_SetMobjState: the thing enters the state for its tics and the
-# state's action runs, which may set another state. A_Look's chase state
-# is the longest chain vanilla's monsters have, and no row of the table
-# lasts no tics, so the loop never turns more than twice.
-def Sim.thing.set(fuel: Nat, a: Sim.Acted, +id: U32) -> State:
-  match fuel a:
-    case 1n+f Acted{Some{+state}, +s}:
-      Sim.thing.set(f, Sim.thing.act(H.Thing.Row.action(H.Thing.row(state)), id,
-        Sim.thing.entered(H.Things.get(State.things(s), id), id, state, s)), id)
-    case _ Acted{state, s}:
-      s
-
-# The state half of Doom's P_MobjThinker for a thing: a lasting state
-# stays as it is; another counts its tics down, and the tic they run out
-# the thing enters the next state, whose action runs.
-def Sim.thing.step(lasting: Bool, out: Bool, th: H.Thing, +id: U32, s: State) -> State:
-  match lasting out:
-    case True{} _:
-      s
-    case False{} True{}:
-      Sim.thing.set(3n, Acted{Some{H.Thing.Row.next(H.Thing.row(H.Thing.state(th)))}, s}, id)
-    case False{} False{}:
-      State.thing.put(id, H.Thing.spent(th), s)
-
-# The thing as its vertical move left it, written back, and then its
-# state half against the state that holds it.
-def Sim.thing.moved(+th: H.Thing, +id: U32, s: State) -> State:
-  Sim.thing.step(H.Thing.lasting(th), H.Thing.over(th), th, id, State.thing.put(id, th, s))
-
-# The thing after its tic: one that entered S_NULL removed itself, as
-# P_SetMobjState does, and its thinker ends at its next turn.
-def Sim.thing.left(gone: Bool, +id: U32, s: State) -> State:
-  match gone:
-    case True{}:
-      State.kept(Sim.remove(id, s), Mobj{id})
-    case False{}:
-      State.kept(s, Mobj{id})
-
-def Sim.thing.ended(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
-  match m:
-    case None{}:
-      State.kept(s, Mobj{id})
-    case Some{th}:
-      Sim.thing.left(H.Thing.gone(th), id, s)
-
-def Sim.thing.after(+id: U32, +s: State) -> State:
-  Sim.thing.ended(H.Things.get(State.things(s), id), id, s)
-
-def Sim.thing.stepped(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
-  match m:
-    case None{}:
-      Sim.thing.after(id, s)
-    case Some{th}:
-      Sim.thing.after(id, Sim.thing.moved(H.Thing.risen(th), id, s))
-
-# Doom's P_MobjThinker for a thing: the horizontal move a blow gave it,
-# then the vertical, then its tic through its states, whose actions run
-# as the states are entered. One already removed has no thing, and its
-# thinker ends here, as Doom's does when the run reaches it.
-def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
-  match m:
-    case None{}:
-      s
-    case Some{+th}:
-      +after = Sim.thing.xy(id, th, s)
-      Sim.thing.stepped(State.thing(id, after), id, after)
-
-def Sim.thing(+id: U32, +s: State) -> State:
-  Sim.thing.tic(H.Things.get(State.things(s), id), id, s)
-
-# A thinker's tic. A wait counts down, and the tic it reaches zero
-# sounds the mover's wake and does nothing else, as Doom's doors and
-# lifts turn. A blink turns on the tic its count runs out.
-def Sim.think(t: Thinker, s: State) -> State:
-  match t:
-    case Mobj{id}:
-      Sim.thing(id, s)
-    case Mover{sector, ceiling, speed, [], plan, noise}:
-      s
-    case Mover{+sector, ceiling, speed, Hold{+tics} <> +rest, plan, +noise}:
-      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(tics, 1), rest,
-        Hold{(tics - 1 : U32)} <> rest), plan, noise,
-        Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
-    case Mover{sector, ceiling, speed, Travel{down, dest} <> rest, plan, noise}:
-      Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
-    case Button{side, slot, texture, +tics}:
-      Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
-    case Blink{sector, +count, dark, bright, darktime, brighttime, random}:
-      Sim.blink(U32.is_eq(count, 1), sector, (count - 1 : U32), dark, bright, darktime, brighttime, random, s)
-    case Glow{sector, dark, bright, down}:
-      Sim.glow(sector, dark, bright, down, s)
 
 # The sectors across a sector's two-sided lines, as Doom's getNextSector
 # answers them line by line: the back of a line whose front is the
@@ -4228,24 +4233,29 @@ def State.start(+level: L.Level) -> State:
 # -----
 
 # Doom's EV_VerticalDoor on a door already moving: one closing goes back
-# up through its plan, any other starts down at once.
-def Sim.door.turned(steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>, floor: U32) ->
+# up through its plan, and any other starts down at once for the player
+# and is left alone for anything else, since bad guys never close doors.
+def Sim.door.turned(steps: List<&2, Sim.Step>, shuts: Bool, plan: List<&2, Sim.Step>, floor: U32) ->
   List<&2, Sim.Step>:
-  match steps:
-    case Travel{True{}, dest} <> rest:
+  match steps shuts:
+    case Travel{True{}, dest} <> rest _:
       plan
-    case _:
+    case other True{}:
       [Travel{True{}, floor}]
+    case other False{}:
+      other
 
-def Sim.door.turn(thinkers: List<&2, Thinker>, +sector: U32, +floor: U32) -> List<&2, Thinker>:
+def Sim.door.turn(thinkers: List<&2, Thinker>, +shuts: Bool, +sector: U32, +floor: U32) ->
+  List<&2, Thinker>:
   match thinkers:
     case []:
       []
     case Mover{+s, ceiling, speed, +steps, +plan, noise} <> rest:
       Mover{s, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(s, sector),
-        Sim.door.turned(steps, plan, floor), steps), plan, noise} <> Sim.door.turn(rest, sector, floor)
+        Sim.door.turned(steps, shuts, plan, floor), steps), plan, noise} <>
+        Sim.door.turn(rest, shuts, sector, floor)
     case other <> rest:
-      other <> Sim.door.turn(rest, sector, floor)
+      other <> Sim.door.turn(rest, shuts, sector, floor)
 
 # A door's top: 4 under the lowest ceiling around it.
 def Sim.door.top(+level: L.Level, sector: U32) -> U32:
@@ -4256,26 +4266,29 @@ def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, Sim.Step>:
   [Travel{False{}, Sim.door.top(level, sector)}, Hold{150}, Travel{True{}, L.Level.floor(level, sector)}]
 
 # A door already moving is turned without a sound.
-def Sim.door.on(moving: Bool, +sector: U32, speed: U32, noise: Sim.Noise, +s: State) -> State:
+def Sim.door.on(moving: Bool, +shuts: Bool, +sector: U32, speed: U32, noise: Sim.Noise, +s: State) -> State:
   match moving:
     case True{}:
       State{player, +level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-      State{player, level, things, sidetex, Thinkers{Sim.door.turn(ran, sector, L.Level.floor(level, sector)),
-        Sim.door.turn(due, sector, L.Level.floor(level, sector))}, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+      State{player, level, things, sidetex,
+        Thinkers{Sim.door.turn(ran, shuts, sector, L.Level.floor(level, sector)),
+          Sim.door.turn(due, shuts, sector, L.Level.floor(level, sector))}, rnd, clock, ended, usedown, sounds,
+        mrnd, reborn}
     case False{}:
       Sim.mover.begin(sector, True{}, speed, Sim.door.plan(State.level(s), sector), noise, s)
 
-# Doom's EV_VerticalDoor: the door is the sector behind the line.
-def Sim.door(line: L.Level.Line, speed: U32, noise: Sim.Noise, +s: State) -> State:
+# Doom's EV_VerticalDoor: the door is the sector behind the line. Only
+# the player may send a door that is not already closing back down.
+def Sim.door(line: L.Level.Line, shuts: Bool, speed: U32, noise: Sim.Noise, +s: State) -> State:
   L.Line{x1, y1, x2, y2, flags, front, +back} = line
-  Sim.door.on(Sim.moving(State.thinkers(s), back), back, speed, noise, s)
+  Sim.door.on(Sim.moving(State.thinkers(s), back), shuts, back, speed, noise, s)
 
 # Doom's locked EV_VerticalDoor: without the key it refuses with a grunt
 # from nobody; with it, it is the manual door.
 def Sim.door.locked(opens: Bool, line: L.Level.Line, s: State) -> State:
   match opens:
     case True{}:
-      Sim.door(line, 131072, Sim.noise.door(), s)
+      Sim.door(line, True{}, 131072, Sim.noise.door(), s)
     case False{}:
       Sim.sound(Sn.Sound.oof(), Sn.Nobody{}, State.says(Msg.Message.pd_bluek(), s))
 
@@ -4466,9 +4479,9 @@ def Sim.cross(lines: List<&2, U32>, +s: State) -> State:
 def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: State) -> State:
   match special:
     case 1:
-      Sim.door(L.Level.line(State.level(s), i), 131072, Sim.noise.door(), s)
+      Sim.door(L.Level.line(State.level(s), i), True{}, 131072, Sim.noise.door(), s)
     case 117:
-      Sim.door(L.Level.line(State.level(s), i), 524288, Sim.noise.blazing(), s)
+      Sim.door(L.Level.line(State.level(s), i), True{}, 524288, Sim.noise.blazing(), s)
     case 26:
       Sim.door.locked(I.Inventory.blue(inv), L.Level.line(State.level(s), i), s)
     case 23:
@@ -4558,6 +4571,778 @@ def Sim.sector(+level: L.Level, +clock: U32, +s: State) -> State:
   Sim.sector.hurt(Bool.and(U32.is_eq(L.Level.sector.special(State.level(s), sector), 7),
     Bool.and(U32.is_zero((clock .&. 31 : U32)),
       U32.is_eq(Player.z(State.player(s)), L.Level.floor(level, sector)))), s)
+
+# Chasing
+# -------
+
+# Doom's xspeed table, the fixed-point step a thing of speed 1 takes in
+# each of the eight directions: a whole unit along an axis and 47000 of
+# 65536 along each half of a diagonal. yspeed is the same table read six
+# places on, since it is the sine where this is the cosine.
+def Sim.chase.xspeed(+dir: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(dir, 0), 65536,
+    Bool.pick(U32, U32.is_eq(dir, 1), 47000,
+      Bool.pick(U32, U32.is_eq(dir, 2), 0,
+        Bool.pick(U32, U32.is_eq(dir, 3), 4294920296,
+          Bool.pick(U32, U32.is_eq(dir, 4), 4294901760,
+            Bool.pick(U32, U32.is_eq(dir, 5), 4294920296,
+              Bool.pick(U32, U32.is_eq(dir, 6), 0, 47000)))))))
+
+def Sim.chase.yspeed(+dir: U32) -> U32:
+  Sim.chase.xspeed(((dir + 6 : U32) .&. 7 : U32))
+
+# Doom's opposite table: the way a thing walking a direction came from.
+def Sim.chase.opposite(+dir: U32) -> U32:
+  Bool.pick(U32, U32.is_ge(dir, H.Thing.nodir()), H.Thing.nodir(), ((dir + 4 : U32) .&. 7 : U32))
+
+# Doom's diags table: the diagonal that points at the target, chosen by
+# the signs of the two distances to it.
+def Sim.chase.diag(+deltax: U32, +deltay: U32) -> U32:
+  Bool.pick(U32, F.Fixed.is_neg(deltay), Bool.pick(U32, F.Fixed.gt(deltax, 0), 7, 5),
+    Bool.pick(U32, F.Fixed.gt(deltax, 0), 1, 3))
+
+# A_Chase's turn: the facing snapped down to the eight directions and
+# moved a further 45 degrees toward the one the thing walks.
+def Sim.chase.turn(+angle: U32, +dir: U32) -> U32:
+  +snapped = (angle .&. 3758096384 : U32)
+  +delta = (snapped - (dir << 29n : U32) : U32)
+  Bool.pick(U32, U32.is_zero(delta), snapped,
+    Bool.pick(U32, F.Fixed.is_neg(delta), (snapped + 536870912 : U32), (snapped - 536870912 : U32)))
+
+# A counter one tic further down, which never passes zero.
+def Sim.chase.counted(+n: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(n), 0, (n - 1 : U32))
+
+# What a thing's move answers: whether it was taken, which thing moved,
+# and the world after.
+type Sim.Walk is Data:
+  Walk{ok: Bool, id: U32, s: State}
+
+def Sim.Walk.ok(w: Sim.Walk) -> Bool:
+  Walk{ok, id, s} = w
+  ok
+
+def Sim.Walk.left(w: Sim.Walk) -> State:
+  Walk{ok, id, s} = w
+  s
+
+# Doom's ML_SECRET: a thing that is not the player never opens a door on
+# a line marked secret. Each E1M1 has one such door.
+def Sim.secret(+line: L.Level.Line) -> Bool:
+  L.Line{x1, y1, x2, y2, +flags, front, back} = line
+  Bool.not(U32.is_zero((flags .&. 32 : U32)))
+
+# Doom's P_UseSpecialLine for a thing that is not the player: it opens a
+# manual door, special 1, unless the line is secret, and answers no to
+# every other special either E1M1 carries. The three manual locked doors
+# vanilla also lets a thing press, 32 to 34, are in neither map, and
+# EV_VerticalDoor turns a thing with no player away from them anyway.
+def Sim.thing.use.at(opens: Bool, +i: U32, w: Sim.Walk) -> Sim.Walk:
+  match opens:
+    case False{}:
+      w
+    case True{}:
+      Walk{ok, id, +s} = w
+      +line = L.Level.line(State.level(s), i)
+      Walk{True{}, id, Sim.door(line, False{}, 131072, Sim.noise.door(), s)}
+
+def Sim.thing.use(+i: U32, w: Sim.Walk) -> Sim.Walk:
+  Walk{ok, id, +s} = w
+  Sim.thing.use.at(Bool.and(U32.is_eq(L.Level.special(State.level(s), i), 1),
+    Bool.not(Sim.secret(L.Level.line(State.level(s), i)))), i, Walk{ok, id, s})
+
+def Sim.thing.uses(lines: List<&2, U32>, w: Sim.Walk) -> Sim.Walk:
+  match lines:
+    case []:
+      w
+    case i <> rest:
+      Sim.thing.uses(rest, Sim.thing.use(i, w))
+
+# The walk-over specials a thing's move crossed. Doom's
+# P_CrossSpecialLine lets a thing that is not the player fire only seven
+# of them, and the lift's retrigger, special 88, is the one of those
+# either E1M1 carries.
+def Sim.thing.crossed(lines: List<&2, U32>, +s: State) -> State:
+  match lines:
+    case []:
+      s
+    case +line <> rest:
+      Sim.thing.crossed(rest, Sim.cross.special(Bool.pick(U32,
+        U32.is_eq(L.Level.special(State.level(s), line), 88), 88, 0), line, s))
+
+# The thing where its move landed: on the floor it found, as P_Move puts
+# a thing that does not float, between the heights its check gathered,
+# and in the sector under it.
+def Sim.chase.landed(th: H.Thing, +level: L.Level, +x: U32, +y: U32, +floor: U32, +ceil: U32) -> H.Thing:
+  H.Thing{id, kind, ox, oy, z, wasfloor, wasceil, angle, was, state, tics, momz, ai} = th
+  H.Thing{id, kind, x, y, floor, floor, ceil, angle, L.Level.sector_at(level, x, y), state, tics, momz, ai}
+
+# P_UnsetThingPosition and P_SetThingPosition about a thing's move.
+def Sim.chase.placed(+th: H.Thing, +level: L.Level, +x: U32, +y: U32, +floor: U32, +ceil: U32, s: State) ->
+  State:
+  State{player, lv, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State{player, lv, H.Things.moved(things, L.Level.blockmap_of(level), th,
+    Sim.chase.landed(th, level, x, y, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds,
+    mrnd, reborn}
+
+def Sim.chase.step.fin(taken: Bool, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32,
+  +y: U32, +r: U32, +floor: U32, +ceil: U32, s: State) -> Sim.Walk:
+  match taken:
+    case False{}:
+      Walk{False{}, id, s}
+    case True{}:
+      Walk{True{}, id, Sim.thing.crossed(Sim.crossings(level, ox, oy, x, y, r),
+        Sim.chase.placed(th, level, x, y, floor, ceil, s))}
+
+def Sim.chase.step.fit(+z: U32, +height: U32, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32,
+  +x: U32, +y: U32, +r: U32, f: Sim.Fit, s: State) -> Sim.Walk:
+  Fit{ok, +floor, +ceil, +drop} = f
+  Sim.chase.step.fin(Sim.walks(Fit{ok, floor, ceil, drop}, z, height), th, id, level, ox, oy, x, y, r, floor,
+    ceil, s)
+
+def Sim.chase.step.met(m: Sim.Body, th: H.Thing, +id: U32, +level: L.Level, +x: U32, +y: U32, +ts: H.Things,
+  +p: Player, s: State) -> Sim.Walk:
+  Body{i, +ox, +oy, +z, +radius, +height, flags} = m
+  Sim.chase.step.fit(z, height, th, id, level, ox, oy, x, y, radius,
+    Sim.check(level, ts, p, Body{i, x, y, z, radius, height, flags}, 3), s)
+
+# Doom's P_TryMove for a thing of the population: its position check at
+# the place with mask 3, so the lines that block monsters stop it as
+# well; the rules P_TryMove adds, the ledge among them; the relink; and
+# the walk-over specials the move crossed.
+def Sim.chase.step(+th: H.Thing, +id: U32, +level: L.Level, +x: U32, +y: U32, +s: State) -> Sim.Walk:
+  Sim.chase.step.met(Sim.body.of(th), th, id, level, x, y, State.things(s), State.player(s), s)
+
+# P_Move's blocked branch: with no special line in the way the move
+# simply failed; with one, the thing stops where it is and presses each,
+# the last gathered first, and counts as having moved if any opened.
+def Sim.chase.opened(lines: List<&2, U32>, +id: U32, s: State) -> Sim.Walk:
+  match lines:
+    case []:
+      Walk{False{}, id, s}
+    case some:
+      Sim.thing.uses(some, Walk{False{}, id, Sim.thing.counted(id, H.Thing.hurt.movedir(), H.Thing.nodir(), s)})
+
+def Sim.chase.move.tried(w: Sim.Walk, +level: L.Level, +x: U32, +y: U32, +r: U32) -> Sim.Walk:
+  match w:
+    case Walk{True{}, id, s}:
+      Walk{True{}, id, s}
+    case Walk{False{}, +id, s}:
+      Sim.chase.opened(Sim.spechit(level, x, y, r, 3), id, s)
+
+def Sim.chase.move.at(+tx: U32, +ty: U32, +r: U32, th: H.Thing, +id: U32, +level: L.Level, s: State) ->
+  Sim.Walk:
+  Sim.chase.move.tried(Sim.chase.step(th, id, level, tx, ty, s), level, tx, ty, r)
+
+def Sim.chase.move.go(m: Sim.Body, th: H.Thing, +id: U32, +level: L.Level, +speed: U32, +dir: U32, s: State) ->
+  Sim.Walk:
+  Body{i, x, y, z, radius, height, flags} = m
+  Sim.chase.move.at((x + (speed * Sim.chase.xspeed(dir) : U32) : U32),
+    (y + (speed * Sim.chase.yspeed(dir) : U32) : U32), radius, th, id, level, s)
+
+def Sim.chase.move.dir(nodir: Bool, m: Sim.Body, th: H.Thing, +id: U32, +level: L.Level, +speed: U32,
+  +dir: U32, s: State) -> Sim.Walk:
+  match nodir:
+    case True{}:
+      Walk{False{}, id, s}
+    case False{}:
+      Sim.chase.move.go(m, th, id, level, speed, dir, s)
+
+def Sim.chase.move.of(+th: H.Thing, +id: U32, +level: L.Level, +kind: U32, +dir: U32, s: State) -> Sim.Walk:
+  Sim.chase.move.dir(U32.is_ge(dir, H.Thing.nodir()), Sim.body.of(th), th, id, level, H.Thing.speed(kind), dir,
+    s)
+
+def Sim.chase.move.some(m: Maybe<&2, H.Thing>, +id: U32, +level: L.Level, s: State) -> Sim.Walk:
+  match m:
+    case None{}:
+      Walk{False{}, id, s}
+    case Some{+th}:
+      Sim.chase.move.of(th, id, level, H.Thing.kind(th), V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.movedir()), s)
+
+# Doom's P_Move: the thing walks its type's speed in the direction it
+# holds. A thing with no direction never moves; one whose move is
+# blocked opens the special lines its box reached.
+def Sim.chase.move(w: Sim.Walk, +level: L.Level) -> Sim.Walk:
+  Walk{ok, +id, +s} = w
+  Sim.chase.move.some(H.Things.get(State.things(s), id), id, level, s)
+
+# Doom's P_TryWalk: a move that was taken draws the tics the thing keeps
+# the direction for, 0 to 15.
+def Sim.chase.walked(w: Sim.Walk) -> Sim.Walk:
+  match w:
+    case Walk{False{}, id, s}:
+      Walk{False{}, id, s}
+    case Walk{True{}, +id, State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}}:
+      +drawn = M.Random.next(rnd)
+      Walk{True{}, id, Sim.thing.counted(id, H.Thing.hurt.movecount(), (M.Random.at(drawn) .&. 15 : U32),
+        State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn})}
+
+def Sim.chase.walk(w: Sim.Walk, +level: L.Level) -> Sim.Walk:
+  Sim.chase.walked(Sim.chase.move(w, level))
+
+# One of P_NewChaseDir's attempts: the thing takes the direction and
+# walks it, unless an earlier attempt already carried it or this one is
+# no direction at all or the way it came.
+def Sim.chase.try(w: Sim.Walk, allowed: Bool, +dir: U32, +level: L.Level) -> Sim.Walk:
+  match w allowed:
+    case Walk{True{}, id, s} _:
+      Walk{True{}, id, s}
+    case Walk{False{}, id, s} False{}:
+      Walk{False{}, id, s}
+    case Walk{False{}, +id, s} True{}:
+      Sim.chase.walk(Walk{False{}, id, Sim.thing.counted(id, H.Thing.hurt.movedir(), dir, s)}, level)
+
+# P_NewChaseDir's direct route: with both axes pointing away the thing
+# faces the diagonal between them whether or not it may walk it, and
+# walks it unless that is the way it came.
+def Sim.chase.diagonal(direct: Bool, +dir: U32, +back: Bool, w: Sim.Walk, +level: L.Level) -> Sim.Walk:
+  match direct:
+    case False{}:
+      w
+    case True{}:
+      Walk{ok, +id, s} = w
+      Sim.chase.try(Walk{False{}, id, Sim.thing.counted(id, H.Thing.hurt.movedir(), dir, s)}, Bool.not(back), dir,
+        level)
+
+# P_NewChaseDir mid-run: the walk so far and the two axis directions
+# still to try, in the order the swap draw left them and with the way it
+# came struck out.
+type Sim.Chase is Data:
+  Chase{w: Sim.Walk, first: U32, second: U32}
+
+def Sim.chase.unless(+dir: U32, +back: U32) -> U32:
+  Bool.pick(U32, U32.is_eq(dir, back), H.Thing.nodir(), dir)
+
+def Sim.chase.swapped(swap: Bool, w: Sim.Walk, +d1: U32, +d2: U32, +back: U32) -> Sim.Chase:
+  match swap:
+    case True{}:
+      Chase{w, Sim.chase.unless(d2, back), Sim.chase.unless(d1, back)}
+    case False{}:
+      Chase{w, Sim.chase.unless(d1, back), Sim.chase.unless(d2, back)}
+
+# P_NewChaseDir's draw that may swap the two axis directions: made
+# whether or not the distances decide it on their own, as C's || leaves
+# it, and only where the direct route did not already carry the thing.
+def Sim.chase.order(w: Sim.Walk, +d1: U32, +d2: U32, +back: U32, +far: Bool) -> Sim.Chase:
+  match w:
+    case Walk{True{}, id, s}:
+      Chase{Walk{True{}, id, s}, H.Thing.nodir(), H.Thing.nodir()}
+    case Walk{False{}, id, State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}}:
+      +drawn = M.Random.next(rnd)
+      Sim.chase.swapped(Bool.or(U32.is_lt(200, M.Random.at(drawn)), far),
+        Walk{False{}, id,
+          State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn}},
+        d1, d2, back)
+
+def Sim.chase.axes(c: Sim.Chase, +level: L.Level) -> Sim.Walk:
+  Chase{w, +first, +second} = c
+  Sim.chase.try(Sim.chase.try(w, Bool.not(U32.is_eq(first, H.Thing.nodir())), first, level),
+    Bool.not(U32.is_eq(second, H.Thing.nodir())), second, level)
+
+# P_NewChaseDir after the direct route: the two axis directions in the
+# order the draw left them, then the direction the thing already walked.
+def Sim.chase.after(c: Sim.Chase, +olddir: U32, +level: L.Level) -> Sim.Walk:
+  Sim.chase.try(Sim.chase.axes(c, level), Bool.not(U32.is_eq(olddir, H.Thing.nodir())), olddir, level)
+
+# P_NewChaseDir's search over all eight directions, from the east
+# upward or from the south-east downward as a draw decides, the way it
+# came left out. A direction already taken makes each turn a no-op,
+# where vanilla returns.
+def Sim.chase.scan(fuel: Nat, w: Sim.Walk, +dir: U32, +down: Bool, +back: U32, +level: L.Level) -> Sim.Walk:
+  match fuel:
+    case 0n:
+      w
+    case 1n+f:
+      Sim.chase.scan(f, Sim.chase.try(w, Bool.not(U32.is_eq(dir, back)), dir, level),
+        Bool.pick(U32, down, (dir - 1 : U32), (dir + 1 : U32)), down, back, level)
+
+def Sim.chase.search(w: Sim.Walk, +back: U32, +level: L.Level) -> Sim.Walk:
+  match w:
+    case Walk{True{}, id, s}:
+      Walk{True{}, id, s}
+    case Walk{False{}, id, State{player, lv, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}}:
+      +drawn = M.Random.next(rnd)
+      Sim.chase.scan(8n, Walk{False{}, id,
+          State{player, lv, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn}},
+        Bool.pick(U32, U32.is_zero((M.Random.at(drawn) .&. 1 : U32)), 7, 0),
+        U32.is_zero((M.Random.at(drawn) .&. 1 : U32)), back, level)
+
+# The end of P_NewChaseDir: the way it came, and then nowhere at all.
+def Sim.chase.stuck(w: Sim.Walk) -> Sim.Walk:
+  match w:
+    case Walk{True{}, id, s}:
+      Walk{True{}, id, s}
+    case Walk{False{}, +id, s}:
+      Walk{False{}, id, Sim.thing.counted(id, H.Thing.hurt.movedir(), H.Thing.nodir(), s)}
+
+def Sim.chase.last(w: Sim.Walk, +back: U32, +level: L.Level) -> Sim.Walk:
+  Sim.chase.stuck(Sim.chase.try(Sim.chase.search(w, back, level),
+    Bool.not(U32.is_eq(back, H.Thing.nodir())), back, level))
+
+def Sim.chase.newdir.at(w: Sim.Walk, +deltax: U32, +deltay: U32, +olddir: U32, +level: L.Level) -> Sim.Walk:
+  +d1 = Bool.pick(U32, F.Fixed.gt(deltax, 655360), 0,
+    Bool.pick(U32, F.Fixed.lt(deltax, 4294311936), 4, H.Thing.nodir()))
+  +d2 = Bool.pick(U32, F.Fixed.lt(deltay, 4294311936), 6,
+    Bool.pick(U32, F.Fixed.gt(deltay, 655360), 2, H.Thing.nodir()))
+  +back = Sim.chase.opposite(olddir)
+  +diag = Sim.chase.diag(deltax, deltay)
+  Sim.chase.last(Sim.chase.after(Sim.chase.order(
+        Sim.chase.diagonal(Bool.and(Bool.not(U32.is_eq(d1, H.Thing.nodir())),
+          Bool.not(U32.is_eq(d2, H.Thing.nodir()))), diag, U32.is_eq(diag, back), w, level),
+      d1, d2, back, F.Fixed.gt(F.Fixed.abs(deltay), F.Fixed.abs(deltax))), olddir, level), back, level)
+
+# Doom's P_NewChaseDir: the diagonal straight at the target first, then
+# the two axis directions in the order a draw leaves them, then the
+# direction already walked, then all eight in a drawn order, then the
+# way it came, and nowhere if none of them works. Every attempt is a
+# P_TryWalk, which moves the thing and draws its move count where it
+# carries. The direction it starts from is read here and not before,
+# since a P_Move that opened a door has cleared it.
+def Sim.chase.newdir(w: Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level) -> Sim.Walk:
+  Walk{ok, +id, +s} = w
+  Sim.chase.newdir.at(Walk{ok, id, s}, deltax, deltay,
+    Sim.thing.reads(State.things(s), id, H.Thing.hurt.movedir()), level)
+
+# Doom's A_FaceTarget: the thing turns to face its target. The shadow
+# branch that spreads the turn is the spectre's, which neither map
+# spawns on this skill.
+def Sim.chase.face.at(+level: L.Level, th: H.Thing, +tx: U32, +ty: U32) -> H.Thing:
+  H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, ai} = th
+  H.Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of(L.Level.tanto(level), (tx - x : U32), (ty - y : U32)),
+    sector, state, tics, momz, ai}
+
+def Sim.chase.faced(mt: Maybe<&2, Sim.Body>, mm: Maybe<&2, H.Thing>, +id: U32, +level: L.Level, s: State) ->
+  State:
+  match mt mm:
+    case Some{Body{i, +tx, +ty, tz, r, h, f}} Some{th}:
+      State.thing.put(id, Sim.chase.face.at(level, th, tx, ty), s)
+    case _ _:
+      s
+
+def Sim.chase.face(+id: U32, +target: U32, +s: State) -> State:
+  Sim.chase.faced(Sim.body(State.things(s), State.player(s), target), H.Things.get(State.things(s), id), id,
+    State.level(s), s)
+
+# A thing's facing set by A_Chase's turn, which leaves a thing with no
+# direction facing where it was.
+def Sim.chase.turned(th: H.Thing, +dir: U32) -> H.Thing:
+  H.Thing{id, kind, x, y, z, floorz, ceilz, +angle, sector, state, tics, momz, ai} = th
+  H.Thing{id, kind, x, y, z, floorz, ceilz,
+    Bool.pick(U32, U32.is_ge(dir, H.Thing.nodir()), angle, Sim.chase.turn(angle, dir)), sector, state, tics,
+    momz, ai}
+
+# A_Chase's head: the reaction time counts down, the threshold counts
+# down or is dropped outright where the target can no longer be shot,
+# and the thing turns 45 degrees toward the direction it walks.
+def Sim.chase.head(+th: H.Thing, +alive: Bool) -> H.Thing:
+  Sim.chase.turned(H.Thing.counted(H.Thing.counted(th, H.Thing.hurt.reaction(),
+      Sim.chase.counted(V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.reaction()))), H.Thing.hurt.threshold(),
+    Bool.pick(U32, alive, Sim.chase.counted(V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.threshold())), 0)),
+    V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.movedir()))
+
+# Whether a thing's target can still be shot, which A_Chase asks before
+# it keeps it. P_KillMobj clears the player's MF_SHOOTABLE where this
+# keeps the flag and reads the health instead.
+def Sim.chase.alive(t: Sim.Body, +you: Bool, +live: Bool) -> Bool:
+  Body{i, x, y, z, r, h, +flags} = t
+  Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))), Bool.or(Bool.not(you), live))
+
+def Sim.chase.tick.at(th: H.Thing, +alive: Bool, +id: U32, s: State) -> State:
+  State.thing.put(id, Sim.chase.head(th, alive), s)
+
+def Sim.chase.tick.some(m: Maybe<&2, H.Thing>, +alive: Bool, +id: U32, s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      Sim.chase.tick.at(th, alive, id, s)
+
+def Sim.chase.tick.body(mt: Maybe<&2, Sim.Body>, +you: Bool, +live: Bool) -> Bool:
+  match mt:
+    case None{}:
+      False{}
+    case Some{t}:
+      Sim.chase.alive(t, you, live)
+
+def Sim.chase.tick(+id: U32, +s: State) -> State:
+  +target = Sim.thing.reads(State.things(s), id, H.Thing.hurt.target())
+  +you = H.Things.you(State.things(s))
+  Sim.chase.tick.some(H.Things.get(State.things(s), id),
+    Sim.chase.tick.body(Sim.body(State.things(s), State.player(s), target), U32.is_eq(target, you),
+      Bool.not(Player.dead(State.player(s)))), id, s)
+
+# A_Chase's target test: a thing whose target is gone or can no longer
+# be shot looks all around for the player, takes it where it finds one,
+# and goes back to its spawn state where it does not.
+def Sim.chase.relook(found: Bool, +kind: U32, +id: U32, +s: State) -> Sim.Acted:
+  match found:
+    case True{}:
+      +you = H.Things.you(State.things(s))
+      Acted{None{}, Sim.thing.counted(id, H.Thing.hurt.target(), you, s)}
+    case False{}:
+      Acted{Some{H.Thing.Def.state(H.Thing.info(kind))}, s}
+
+def Sim.chase.lost(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> Sim.Acted:
+  match m:
+    case None{}:
+      Acted{None{}, s}
+    case Some{+th}:
+      Sim.chase.relook(Sim.look.sees(H.Thing.blind(th), True{}, State.level(s), State.player(s),
+        Sim.body.of(th), H.Thing.angle(th)), H.Thing.kind(th), id, s)
+
+def Sim.chase.gone(+id: U32, +s: State) -> Sim.Acted:
+  Sim.chase.lost(H.Things.get(State.things(s), id), id, s)
+
+# Doom's P_CheckMissileRange's own draw: the whole units between the two
+# have to beat it, so a thing close enough for the count to go negative
+# always fires.
+def Sim.chase.range.draw(+dist: U32, w: Sim.Walk) -> Sim.Walk:
+  match w:
+    case Walk{ok, id, State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}}:
+      +drawn = M.Random.next(rnd)
+      Walk{F.Fixed.ge(M.Random.at(drawn), dist), id,
+        State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn}}
+
+# P_CheckMissileRange's distance: the whole units between the two, 64
+# off for the range and 128 more where the type has no melee attack, and
+# never more than 200.
+def Sim.chase.range.dist(+deltax: U32, +deltay: U32, +melee: U32) -> U32:
+  +units = F.Fixed.sarn((F.Fixed.approx(deltax, deltay) - 4194304 -
+    Bool.pick(U32, U32.is_zero(melee), 8388608, 0) : U32), 16n)
+  Bool.pick(U32, F.Fixed.gt(units, 200), 200, units)
+
+def Sim.chase.range.held(ready: Bool, +dist: U32, +id: U32, s: State) -> Sim.Walk:
+  match ready:
+    case False{}:
+      Walk{False{}, id, s}
+    case True{}:
+      Sim.chase.range.draw(dist, Walk{False{}, id, s})
+
+# Doom's P_CheckMissileRange: the target has to be in sight; a thing
+# just hit fires back at once and forgets the blow; one still inside its
+# reaction time holds its fire; and otherwise the distance has to beat a
+# draw.
+def Sim.chase.range(sighted: Bool, justhit: Bool, +reaction: U32, +dist: U32, +id: U32, s: State) -> Sim.Walk:
+  match sighted justhit:
+    case False{} _:
+      Walk{False{}, id, s}
+    case True{} True{}:
+      Walk{True{}, id, Sim.thing.cleared(id, 64, s)}
+    case True{} False{}:
+      Sim.chase.range.held(U32.is_zero(reaction), dist, id, s)
+
+# A_Chase's move: the count of tics on this direction runs out, or the
+# move is blocked, and the thing picks a new direction.
+def Sim.chase.redir(w: Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level) -> Sim.Walk:
+  match w:
+    case Walk{True{}, id, s}:
+      Walk{True{}, id, s}
+    case Walk{False{}, id, s}:
+      Sim.chase.newdir(Walk{False{}, id, s}, deltax, deltay, level)
+
+def Sim.chase.stepped(spent: Bool, +deltax: U32, +deltay: U32, +level: L.Level, w: Sim.Walk) -> Sim.Walk:
+  match spent:
+    case True{}:
+      Sim.chase.newdir(w, deltax, deltay, level)
+    case False{}:
+      Sim.chase.redir(Sim.chase.move(w, level), deltax, deltay, level)
+
+# A_Chase's idle call: a draw made every tic whether or not anything
+# under 3 comes of it.
+def Sim.chase.sounded(+kind: U32, w: Sim.Walk) -> Sim.Acted:
+  match w:
+    case Walk{ok, +id, State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}}:
+      +drawn = M.Random.next(rnd)
+      Acted{None{}, Sim.sound(Bool.pick(U32, U32.is_lt(M.Random.at(drawn), 3), H.Thing.activesound(kind), 0),
+        Sn.Thing{id},
+        State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn})}
+
+def Sim.chase.walks(+kind: U32, +id: U32, +deltax: U32, +deltay: U32, +movecount: U32, +level: L.Level,
+  s: State) -> Sim.Acted:
+  Sim.chase.sounded(kind, Sim.chase.stepped(F.Fixed.is_neg((movecount - 1 : U32)), deltax, deltay, level,
+    Walk{False{}, id, Sim.thing.counted(id, H.Thing.hurt.movecount(), (movecount - 1 : U32), s)}))
+
+# A_Chase after the range check: it passed, and the thing enters its
+# missile state marked as having just attacked; it failed, and the thing
+# walks on.
+def Sim.chase.ranged(w: Sim.Walk, +missile: U32, +kind: U32, +movecount: U32, +deltax: U32, +deltay: U32,
+  +level: L.Level) -> Sim.Acted:
+  match w:
+    case Walk{True{}, +id, +s}:
+      Acted{Some{missile}, Sim.thing.flagged(id, 128, s)}
+    case Walk{False{}, id, s}:
+      Sim.chase.walks(kind, id, deltax, deltay, movecount, level, s)
+
+# A_Chase's missile branch: a type with no missile state, or one still
+# walking out its move count, never fires, as vanilla's skill test
+# leaves it below nightmare.
+def Sim.chase.fire(may: Bool, m: Sim.Body, t: Sim.Body, +kind: U32, +movecount: U32, +reaction: U32,
+  +deltax: U32, +deltay: U32, +id: U32, +s: State) -> Sim.Acted:
+  match may:
+    case False{}:
+      +level = State.level(s)
+      Sim.chase.walks(kind, id, deltax, deltay, movecount, level, s)
+    case True{}:
+      +level = State.level(s)
+      Sim.chase.ranged(Sim.chase.range(Sim.sight(level, m, t),
+          Bool.not(U32.is_zero((Sim.thing.reads(State.things(s), id, H.Thing.hurt.flags()) .&. 64 : U32))),
+          reaction, Sim.chase.range.dist(deltax, deltay, H.Thing.melee(kind)), id, s),
+        H.Thing.missile(kind), kind, movecount, deltax, deltay, level)
+
+# A_Chase's MF_JUSTATTACKED: a thing that attacked last tic does not
+# attack again, and picks a new direction instead.
+def Sim.chase.hit(attacked: Bool, m: Sim.Body, t: Sim.Body, +kind: U32, +movecount: U32, +reaction: U32,
+  +deltax: U32, +deltay: U32, +id: U32, +s: State) -> Sim.Acted:
+  match attacked:
+    case True{}:
+      +level = State.level(s)
+      Acted{None{}, Sim.Walk.left(Sim.chase.newdir(Walk{False{}, id, Sim.thing.cleared(id, 128, s)}, deltax,
+        deltay, level))}
+    case False{}:
+      Sim.chase.fire(Bool.and(Bool.not(U32.is_zero(H.Thing.missile(kind))), U32.is_zero(movecount)), m, t,
+        kind, movecount, reaction, deltax, deltay, id, s)
+
+def Sim.chase.kept(m: Maybe<&2, H.Thing>, +t: Sim.Body, +id: U32, +s: State) -> Sim.Acted:
+  match m:
+    case None{}:
+      Acted{None{}, s}
+    case Some{+th}:
+      Sim.chase.hit(Bool.not(U32.is_zero((V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.flags()) .&. 128 : U32))),
+        Sim.body.of(th), t, H.Thing.kind(th), V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.movecount()),
+        V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.reaction()), (Sim.Body.x(t) - H.Thing.x(th) : U32),
+        (Sim.Body.y(t) - H.Thing.y(th) : U32), id, s)
+
+def Sim.chase.armed(shootable: Bool, t: Sim.Body, +id: U32, +s: State) -> Sim.Acted:
+  match shootable:
+    case False{}:
+      Sim.chase.gone(id, s)
+    case True{}:
+      Sim.chase.kept(H.Things.get(State.things(s), id), t, id, s)
+
+def Sim.chase.aimed(mt: Maybe<&2, Sim.Body>, +you: Bool, +live: Bool, +id: U32, +s: State) -> Sim.Acted:
+  match mt:
+    case None{}:
+      Sim.chase.gone(id, s)
+    case Some{+t}:
+      Sim.chase.armed(Sim.chase.alive(t, you, live), t, id, s)
+
+def Sim.chase.on(+id: U32, +s: State) -> Sim.Acted:
+  +target = Sim.thing.reads(State.things(s), id, H.Thing.hurt.target())
+  +you = H.Things.you(State.things(s))
+  Sim.chase.aimed(Sim.body(State.things(s), State.player(s), target), U32.is_eq(target, you),
+    Bool.not(Player.dead(State.player(s))), id, s)
+
+# Doom's A_Chase, the thinker of every woken monster: its reaction time
+# and its threshold count down and it turns 45 degrees toward the
+# direction it walks; then it gives up a target that can no longer be
+# shot, holds its fire for a tic after an attack, fires where its type
+# and its range let it, and otherwise walks, picking a new direction when
+# its count runs out or its move is blocked, and calling out on a draw
+# under 3. The netgame branch that looks for a nearer player is left
+# out with the other players. Ticket 18 adds the melee branch, between
+# the just-attacked test and the missile one, when it gives the imp and
+# the demon the rows H.Thing.melee answers 0 for here.
+def Sim.chase(+id: U32, +s: State) -> Sim.Acted:
+  Sim.chase.on(id, Sim.chase.tick(id, s))
+
+# One bullet of a former human's attack: the spread of a P_SubRandom
+# turn, the damage of a draw, 3 to 15, and P_LineAttack, which is the
+# player's own.
+def Sim.bullet.at(+x: U32, +y: U32, +shootz: U32, +id: U32, +angle: U32, +slope: U32, +damage: U32,
+  +s: State) -> State:
+  Sim.attack(State.level(s), State.things(s), State.player(s), x, y, shootz, id, angle, Sim.missilerange(),
+    slope, damage, s)
+
+def Sim.bullet(+x: U32, +y: U32, +shootz: U32, +id: U32, +bangle: U32, +slope: U32, s: State) -> State:
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  +a = M.Random.next(rnd)
+  +b = M.Random.next(a)
+  +c = M.Random.next(b)
+  Sim.bullet.at(x, y, shootz, id, (bangle + ((M.Random.at(a) - M.Random.at(b) : U32) << 20n) : U32), slope,
+    (3 * ((M.Random.at(c) % 5 : U32) + 1 : U32) : U32),
+    State{player, level, things, sidetex, thinkers, c, clock, ended, usedown, sounds, mrnd, reborn})
+
+def Sim.posattack.body(m: Sim.Body, +id: U32, +angle: U32, +s: State) -> State:
+  Body{i, +x, +y, +z, radius, +height, flags} = m
+  +shootz = Sim.shootz(z, height)
+  +slope = Sim.Aim.slope(Sim.aim(State.level(s), State.things(s), State.player(s), x, y, shootz, id, angle,
+    Sim.missilerange()))
+  Sim.bullet(x, y, shootz, id, angle, slope, Sim.sound(Sn.Sound.pistol(), Sn.Thing{id}, s))
+
+def Sim.posattack.of(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      Sim.posattack.body(Sim.body.of(th), id, H.Thing.angle(th), s)
+
+def Sim.posattack.target(mt: Maybe<&2, Sim.Body>, +id: U32, +target: U32, +s: State) -> State:
+  match mt:
+    case None{}:
+      s
+    case Some{t}:
+      +faced = Sim.chase.face(id, target, s)
+      Sim.posattack.of(H.Things.get(State.things(faced), id), id, faced)
+
+# Doom's A_PosAttack: the zombieman turns to its target, aims where it
+# then looks, calls its shot and fires one bullet.
+def Sim.posattack(+id: U32, +s: State) -> State:
+  +target = Sim.thing.reads(State.things(s), id, H.Thing.hurt.target())
+  Sim.posattack.target(Sim.body(State.things(s), State.player(s), target), id, target, s)
+
+def Sim.sposattack.go(n: Nat, +x: U32, +y: U32, +shootz: U32, +id: U32, +bangle: U32, +slope: U32, s: State) ->
+  State:
+  match n:
+    case 0n:
+      s
+    case 1n+k:
+      Sim.sposattack.go(k, x, y, shootz, id, bangle, slope, Sim.bullet(x, y, shootz, id, bangle, slope, s))
+
+def Sim.sposattack.body(m: Sim.Body, +id: U32, +angle: U32, +s: State) -> State:
+  Body{i, +x, +y, +z, radius, +height, flags} = m
+  +shootz = Sim.shootz(z, height)
+  Sim.sposattack.go(3n, x, y, shootz, id, angle,
+    Sim.Aim.slope(Sim.aim(State.level(s), State.things(s), State.player(s), x, y, shootz, id, angle,
+      Sim.missilerange())), s)
+
+def Sim.sposattack.of(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      Sim.sposattack.body(Sim.body.of(th), id, H.Thing.angle(th), s)
+
+def Sim.sposattack.target(mt: Maybe<&2, Sim.Body>, +id: U32, +target: U32, +s: State) -> State:
+  match mt:
+    case None{}:
+      s
+    case Some{t}:
+      +faced = Sim.chase.face(id, target, Sim.sound(Sn.Sound.shotgn(), Sn.Thing{id}, s))
+      Sim.sposattack.of(H.Things.get(State.things(faced), id), id, faced)
+
+# Doom's A_SPosAttack: the shotgun guy calls its shot before it turns,
+# aims once, and fires three bullets, each with its own spread and its
+# own damage.
+def Sim.sposattack(+id: U32, +s: State) -> State:
+  +target = Sim.thing.reads(State.things(s), id, H.Thing.hurt.target())
+  Sim.sposattack.target(Sim.body(State.things(s), State.player(s), target), id, target, s)
+
+# The dispatch over a mobj's action pointers. The two weapon actions are
+# the player sprites' and no state row a mobj holds carries them.
+def Sim.thing.act(action: H.Thing.Action, +id: U32, +s: State) -> Sim.Acted:
+  match action:
+    case H.Look{}:
+      Sim.look(id, s)
+    case H.Chase{}:
+      Sim.chase(id, s)
+    case H.Face{}:
+      +target = Sim.thing.target(State.things(s), id)
+      Acted{None{}, Sim.chase.face(id, target, s)}
+    case H.PosAttack{}:
+      Acted{None{}, Sim.posattack(id, s)}
+    case H.SPosAttack{}:
+      Acted{None{}, Sim.sposattack(id, s)}
+    case other:
+      Acted{None{}, Sim.thing.acts(other, State.thing(id, s), id, s)}
+
+def Sim.thing.entered(m: Maybe<&2, H.Thing>, +id: U32, +state: U32, s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      State.thing.put(id, H.Thing.entering(th, state), s)
+
+# Doom's P_SetMobjState: the thing enters the state for its tics and the
+# state's action runs, which may set another state. A_Look's chase state
+# is the longest chain vanilla's monsters have, and no row of the table
+# lasts no tics, so the loop never turns more than twice.
+def Sim.thing.set(fuel: Nat, a: Sim.Acted, +id: U32) -> State:
+  match fuel a:
+    case 1n+f Acted{Some{+state}, +s}:
+      Sim.thing.set(f, Sim.thing.act(H.Thing.Row.action(H.Thing.row(state)), id,
+        Sim.thing.entered(H.Things.get(State.things(s), id), id, state, s)), id)
+    case _ Acted{state, s}:
+      s
+
+# The state half of Doom's P_MobjThinker for a thing: a lasting state
+# stays as it is; another counts its tics down, and the tic they run out
+# the thing enters the next state, whose action runs.
+def Sim.thing.step(lasting: Bool, out: Bool, th: H.Thing, +id: U32, s: State) -> State:
+  match lasting out:
+    case True{} _:
+      s
+    case False{} True{}:
+      Sim.thing.set(3n, Acted{Some{H.Thing.Row.next(H.Thing.row(H.Thing.state(th)))}, s}, id)
+    case False{} False{}:
+      State.thing.put(id, H.Thing.spent(th), s)
+
+# The thing as its vertical move left it, written back, and then its
+# state half against the state that holds it.
+def Sim.thing.moved(+th: H.Thing, +id: U32, s: State) -> State:
+  Sim.thing.step(H.Thing.lasting(th), H.Thing.over(th), th, id, State.thing.put(id, th, s))
+
+# The thing after its tic: one that entered S_NULL removed itself, as
+# P_SetMobjState does, and its thinker ends at its next turn.
+def Sim.thing.left(gone: Bool, +id: U32, s: State) -> State:
+  match gone:
+    case True{}:
+      State.kept(Sim.remove(id, s), Mobj{id})
+    case False{}:
+      State.kept(s, Mobj{id})
+
+def Sim.thing.ended(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
+  match m:
+    case None{}:
+      State.kept(s, Mobj{id})
+    case Some{th}:
+      Sim.thing.left(H.Thing.gone(th), id, s)
+
+def Sim.thing.after(+id: U32, +s: State) -> State:
+  Sim.thing.ended(H.Things.get(State.things(s), id), id, s)
+
+def Sim.thing.stepped(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
+  match m:
+    case None{}:
+      Sim.thing.after(id, s)
+    case Some{th}:
+      Sim.thing.after(id, Sim.thing.moved(H.Thing.risen(th), id, s))
+
+# Doom's P_MobjThinker for a thing: the horizontal move a blow gave it,
+# then the vertical, then its tic through its states, whose actions run
+# as the states are entered. One already removed has no thing, and its
+# thinker ends here, as Doom's does when the run reaches it.
+def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      +after = Sim.thing.xy(id, th, s)
+      Sim.thing.stepped(State.thing(id, after), id, after)
+
+def Sim.thing(+id: U32, +s: State) -> State:
+  Sim.thing.tic(H.Things.get(State.things(s), id), id, s)
+
+# A thinker's tic. A wait counts down, and the tic it reaches zero
+# sounds the mover's wake and does nothing else, as Doom's doors and
+# lifts turn. A blink turns on the tic its count runs out.
+def Sim.think(t: Thinker, s: State) -> State:
+  match t:
+    case Mobj{id}:
+      Sim.thing(id, s)
+    case Mover{sector, ceiling, speed, [], plan, noise}:
+      s
+    case Mover{+sector, ceiling, speed, Hold{+tics} <> +rest, plan, +noise}:
+      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, Sim.Step>, U32.is_eq(tics, 1), rest,
+        Hold{(tics - 1 : U32)} <> rest), plan, noise,
+        Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
+    case Mover{sector, ceiling, speed, Travel{down, dest} <> rest, plan, noise}:
+      Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
+    case Button{side, slot, texture, +tics}:
+      Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
+    case Blink{sector, +count, dark, bright, darktime, brighttime, random}:
+      Sim.blink(U32.is_eq(count, 1), sector, (count - 1 : U32), dark, bright, darktime, brighttime, random, s)
+    case Glow{sector, dark, bright, down}:
+      Sim.glow(sector, dark, bright, down, s)
 
 # Dying
 # -----

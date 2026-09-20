@@ -555,8 +555,8 @@ def and_true_right(a: Bool, -b: Bool, e: {True{} == Bool.and(a, b) : Bool}) ->
 # The thing check's verdict is carried by a line's pass only while it
 # holds, and a line that stops the box ends it: a True verdict after a
 # line means the verdict before and the line's condition both held.
-def cross_true(ok: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32, +line: L.Level.Line, fl: U32, cl: U32,
-  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.cross(ok, level, x, y, r, line, fl, cl)) : Bool}) -> {True{} == ok : Bool}:
+def cross_true(ok: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32, +line: L.Level.Line, fl: U32, cl: U32, dl: U32,
+  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.cross(ok, level, x, y, r, line, fl, cl, dl)) : Bool}) -> {True{} == ok : Bool}:
   match ok:
     case False{}:
       e
@@ -567,19 +567,19 @@ def line_ok_of(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, +i: U32, 
   e: {True{} == S.Sim.Fit.ok(S.Sim.fit.line(level, x, y, r, mask, i, f)) : Bool}) ->
   {True{} == S.Sim.line_ok(level, x, y, r, mask, i) : Bool}:
   match f:
-    case S.Fit{False{}, fl, cl}:
+    case S.Fit{False{}, fl, cl, dl}:
       %e : BD(_, Unit, {True{} == S.Sim.line_ok(level, x, y, r, mask, i) : Bool})
       Unit{}
-    case S.Fit{True{}, fl, cl}:
-      cross_true(S.Sim.line_ok(level, x, y, r, mask, i), level, x, y, r, L.Level.line(level, i), fl, cl, e)
+    case S.Fit{True{}, fl, cl, dl}:
+      cross_true(S.Sim.line_ok(level, x, y, r, mask, i), level, x, y, r, L.Level.line(level, i), fl, cl, dl, e)
 
 def fit_of(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, +i: U32, f: S.Sim.Fit,
   e: {True{} == S.Sim.Fit.ok(S.Sim.fit.line(level, x, y, r, mask, i, f)) : Bool}) ->
   {True{} == S.Sim.Fit.ok(f) : Bool}:
   match f:
-    case S.Fit{False{}, fl, cl}:
+    case S.Fit{False{}, fl, cl, dl}:
       e
-    case S.Fit{True{}, fl, cl}:
+    case S.Fit{True{}, fl, cl, dl}:
       {==}
 
 # The fold only ands: a True verdict at the end means one at the start.
@@ -694,32 +694,32 @@ def at_clear(c: Bool, +level: L.Level, +x: U32, +y: U32,
     case True{}:
       e
 
-def fit_ok(c: Bool, +level: L.Level, +x: U32, +y: U32, +ok: Bool, fl: U32, cl: U32, +h: Bool,
+def fit_ok(c: Bool, +level: L.Level, +x: U32, +y: U32, +ok: Bool, fl: U32, cl: U32, dl: U32, +h: Bool,
   e: {True{} == Bool.and(ok, h) : Bool},
-  hf: {S.Fit{ok, fl, cl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}) ->
+  hf: {S.Fit{ok, fl, cl, dl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}) ->
   {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}:
   %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
   and_true_left(ok, h, e)
 
 def fin_free(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32,
-  ceil: U32, over: List<&2, U32>, +c: Bool, +ok: Bool, fl: U32, cl: U32, +h: Bool,
+  ceil: U32, over: List<&2, U32>, +c: Bool, +ok: Bool, fl: U32, cl: U32, dl: U32, +h: Bool,
   e: {go == Bool.and(ok, h) : Bool},
-  hf: {S.Fit{ok, fl, cl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
+  hf: {S.Fit{ok, fl, cl, dl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over))):
   match go p:
     case False{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case True{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      at_clear(c, level, x, y, fit_ok(c, level, x, y, ok, fl, cl, h, e, hf))
+      at_clear(c, level, x, y, fit_ok(c, level, x, y, ok, fl, cl, dl, h, e, hf))
 
 def fit_free(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things,
   f: S.Sim.Fit, over: List<&2, U32>, +c: Bool,
   hf: {f == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.try_move.fit(level, p, x, y, touched, f, over))):
   match touched f:
-    case (+inv, +things) S.Fit{+ok, +floor, +ceil}:
-      fin_free(level, S.Sim.passes(S.Fit{ok, floor, ceil}, S.Player.z(p), S.Sim.height()),
-        S.Player.holding(p, inv), things, x, y, floor, ceil, over, c, ok, floor, ceil,
+    case (+inv, +things) S.Fit{+ok, +floor, +ceil, +drop}:
+      fin_free(level, S.Sim.passes(S.Fit{ok, floor, ceil, drop}, S.Player.z(p), S.Sim.height()),
+        S.Player.holding(p, inv), things, x, y, floor, ceil, over, c, ok, floor, ceil, drop,
         Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
           Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
             F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))), {==}, hf, holding_free(level, p, inv, hp))
@@ -728,7 +728,7 @@ def try_free(+level: L.Level, +things: H.Things, +p: S.Player, +x: U32, +y: U32,
   Free(level, S.Sim.Try.player(S.Sim.try_move(level, things, p, x, y))):
   +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
   fit_free(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
-    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y),
+    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y, S.Sim.radius()),
     Maybe.is_none(&2, U32, S.Sim.blocked(level, things, p, m)), {==}, hp)
 
 def done_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
@@ -1010,9 +1010,9 @@ def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(
 def narrow_ok(hit: Bool, +level: L.Level, +line: L.Level.Line, f: S.Sim.Fit) ->
   {S.Sim.Fit.ok(f) == S.Sim.Fit.ok(S.Sim.fit.narrow(hit, level, line, f)) : Bool}:
   match hit f:
-    case True{} S.Fit{ok, floor, ceil}:
+    case True{} S.Fit{ok, floor, ceil, drop}:
       {==}
-    case False{} S.Fit{ok, floor, ceil}:
+    case False{} S.Fit{ok, floor, ceil, drop}:
       {==}
 
 def heights_ok(+level: L.Level, +x: U32, +y: U32, +r: U32, line: L.Level.Line, f: S.Sim.Fit) ->
@@ -1036,39 +1036,39 @@ def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, 
 
 # Past a line the box does not stop, the verdict is True in any level.
 def cross_same(ok: Bool, +la: L.Level, +lb: L.Level, +x: U32, +y: U32, +r: U32, +linea: L.Level.Line,
-  +lineb: L.Level.Line, +fl: U32, +cl: U32, +gl: U32, +hl: U32) ->
-  {S.Sim.Fit.ok(S.Sim.fit.cross(ok, la, x, y, r, linea, fl, cl))
-    == S.Sim.Fit.ok(S.Sim.fit.cross(ok, lb, x, y, r, lineb, gl, hl)) : Bool}:
+  +lineb: L.Level.Line, +fl: U32, +cl: U32, +dl: U32, +gl: U32, +hl: U32, +il: U32) ->
+  {S.Sim.Fit.ok(S.Sim.fit.cross(ok, la, x, y, r, linea, fl, cl, dl))
+    == S.Sim.Fit.ok(S.Sim.fit.cross(ok, lb, x, y, r, lineb, gl, hl, il)) : Bool}:
   match ok:
     case False{}:
       {==}
     case True{}:
-      %heights_ok(la, x, y, r, linea, S.Fit{True{}, fl, cl})
-        : {_ == S.Sim.Fit.ok(S.Sim.fit.heights(lb, x, y, r, lineb, S.Fit{True{}, gl, hl})) : Bool}
-      heights_ok(lb, x, y, r, lineb, S.Fit{True{}, gl, hl})
+      %heights_ok(la, x, y, r, linea, S.Fit{True{}, fl, cl, dl})
+        : {_ == S.Sim.Fit.ok(S.Sim.fit.heights(lb, x, y, r, lineb, S.Fit{True{}, gl, hl, il})) : Bool}
+      heights_ok(lb, x, y, r, lineb, S.Fit{True{}, gl, hl, il})
 
 def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +r: U32,
   +mask: U32, +i: U32, fa: S.Sim.Fit, fb: S.Sim.Fit, e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
   {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, fa))
     == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb)) : Bool}:
   match fa fb:
-    case S.Fit{False{}, fl, cl} S.Fit{False{}, gl, hl}:
+    case S.Fit{False{}, fl, cl, dl} S.Fit{False{}, gl, hl, il}:
       {==}
-    case S.Fit{True{}, +fl, +cl} S.Fit{True{}, +gl, +hl}:
+    case S.Fit{True{}, +fl, +cl, +dl} S.Fit{True{}, +gl, +hl, +il}:
       %cond_same(geo, sa, pa, sb, pb, x, y, r, mask, i)
         : {S.Sim.Fit.ok(S.Sim.fit.cross(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa},
-          x, y, r, L.Level.line(L.Level{geo, sa, pa}, i), fl, cl))
+          x, y, r, L.Level.line(L.Level{geo, sa, pa}, i), fl, cl, dl))
           == S.Sim.Fit.ok(S.Sim.fit.cross(_, L.Level{geo, sb, pb}, x, y, r, L.Level.line(L.Level{geo, sb, pb}, i), gl,
-            hl)) : Bool}
+            hl, il)) : Bool}
       cross_same(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa}, L.Level{geo, sb, pb}, x,
-        y, r, L.Level.line(L.Level{geo, sa, pa}, i), L.Level.line(L.Level{geo, sb, pb}, i), fl, cl, gl, hl)
-    case S.Fit{True{}, fl, cl} S.Fit{False{}, gl, hl}:
-      %e : BD(_, Unit, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, S.Fit{True{}, fl, cl}))
-        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, S.Fit{False{}, gl, hl})) : Bool})
+        y, r, L.Level.line(L.Level{geo, sa, pa}, i), L.Level.line(L.Level{geo, sb, pb}, i), fl, cl, dl, gl, hl, il)
+    case S.Fit{True{}, fl, cl, dl} S.Fit{False{}, gl, hl, il}:
+      %e : BD(_, Unit, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, S.Fit{True{}, fl, cl, dl}))
+        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, S.Fit{False{}, gl, hl, il})) : Bool})
       Unit{}
-    case S.Fit{False{}, fl, cl} S.Fit{True{}, gl, hl}:
-      %e : BD(_, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, S.Fit{False{}, fl, cl}))
-        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, S.Fit{True{}, gl, hl})) : Bool}, Unit)
+    case S.Fit{False{}, fl, cl, dl} S.Fit{True{}, gl, hl, il}:
+      %e : BD(_, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, S.Fit{False{}, fl, cl, dl}))
+        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, S.Fit{True{}, gl, hl, il})) : Bool}, Unit)
       Unit{}
 
 def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
@@ -1315,17 +1315,56 @@ def fit_taken(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Invent
   taken: {True{} == S.Sim.Try.ok(S.Sim.try_move.fit(level, p, x, y, touched, f, over)) : Bool}) ->
   {True{} == S.Sim.Fit.ok(f) : Bool}:
   match touched f:
-    case (+inv, +things) S.Fit{+ok, +floor, +ceil}:
+    case (+inv, +things) S.Fit{+ok, +floor, +ceil, +drop}:
       and_true_left(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
           Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
             F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))),
-        fin_taken(S.Sim.passes(S.Fit{ok, floor, ceil}, S.Player.z(p), S.Sim.height()), level,
+        fin_taken(S.Sim.passes(S.Fit{ok, floor, ceil, drop}, S.Player.z(p), S.Sim.height()), level,
           S.Player.holding(p, inv), things, x, y, floor, ceil, over, taken))
+
+def thing_fin_taken(go: Bool, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32, +y: U32,
+  +r: U32, +floor: U32, +ceil: U32, s: S.State,
+  taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.fin(go, th, id, level, ox, oy, x, y, r, floor, ceil,
+    s)) : Bool}) -> {True{} == go : Bool}:
+  match go:
+    case False{}:
+      taken
+    case True{}:
+      {==}
+
+# Sim.walks ands the shared rules with the ledge, and Sim.passes ands
+# the verdict with the heights, so a thing that walked stood where the
+# check passed.
+def walks_taken(f: S.Sim.Fit, +z: U32, +height: U32, e: {True{} == S.Sim.walks(f, z, height) : Bool}) ->
+  {True{} == S.Sim.Fit.ok(f) : Bool}:
+  match f:
+    case S.Fit{+ok, +floor, +ceil, +drop}:
+      and_true_left(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), height),
+          Bool.and(F.Fixed.ge((ceil - z : U32), height),
+            F.Fixed.le((floor - z : U32), S.Sim.step_up()))),
+        and_true_left(S.Sim.passes(S.Fit{ok, floor, ceil, drop}, z, height),
+          F.Fixed.le((floor - drop : U32), S.Sim.step_up()), e))
+
+def thing_fit_taken(+z: U32, +height: U32, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32,
+  +x: U32, +y: U32, +r: U32, f: S.Sim.Fit, s: S.State,
+  taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.fit(z, height, th, id, level, ox, oy, x, y, r, f,
+    s)) : Bool}) -> {True{} == S.Sim.Fit.ok(f) : Bool}:
+  match f:
+    case S.Fit{+ok, +floor, +ceil, +drop}:
+      walks_taken(S.Fit{ok, floor, ceil, drop}, z, height,
+        thing_fin_taken(S.Sim.walks(S.Fit{ok, floor, ceil, drop}, z, height), th, id, level, ox, oy, x, y, r,
+          floor, ceil, s, taken))
+
+def Laws.thing_move_is_checked(m, th, id, level, x, y, ts, p, s, taken):
+  match m:
+    case S.Body{i, ox, oy, +z, +radius, +height, flags}:
+      thing_fit_taken(z, height, th, id, level, ox, oy, x, y, radius,
+        S.Sim.check(level, ts, p, S.Body{i, x, y, z, radius, height, flags}, 3), s, taken)
 
 def Laws.move_is_checked(level, things, p, x, y, taken):
   +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
   fit_taken(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
-    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y), taken)
+    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y, S.Sim.radius()), taken)
 
 # Things compute.
 

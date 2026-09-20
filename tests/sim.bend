@@ -1588,6 +1588,75 @@ def sights(+level: L.Level) -> IO(Unit):
     sighting("over the pit", [177, 176], 20n, 488, 256, 0, level)
     sighting("off the pit", [177, 176], 20n, 488, 320, 0, level)
 
+# Where a chasing monster stands, which way it faces, the eight-way
+# direction it walks and the row it is in.
+def hunt(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}}:
+      " " ++ U32.show(id) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y) ++ " facing "
+        ++ A.Angle.show(angle) ++ " dir " ++ U32.show(V.Vec.get(hurt, H.Thing.hurt.movedir())) ++ " row "
+        ++ U32.show(state) ++ "/" ++ U32.show(tics)
+
+def hunts(ids: List<&2, U32>, +things: H.Things) -> String:
+  match ids:
+    case []:
+      ""
+    case +id <> rest:
+      hunt(H.Things.get(things, id)) ++ hunts(rest, things)
+
+# One tic of a chase, with the monsters watched and the player's health.
+def chased(+ids: List<&2, U32>, n: Nat, s: S.State) -> S.State:
+  Run.state(ran(n, idle(), s))
+
+def chasing.go(n: Nat, +ids: List<&2, U32>, s: S.State) -> IO(S.State):
+  match n:
+    case 0n:
+      IO.pure(S.State, s)
+    case 1n+k:
+      +r = ran(1n, idle(), s)
+      +q = Run.state(r)
+      do IO<S.State>:
+        IO.print(Run.log(r) ++ "tic " ++ U32.show(S.State.clock(q)) ++ hunts(ids, S.State.things(q))
+          ++ " health " ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " random "
+          ++ U32.show(S.State.rnd(q)))
+        chasing.go(k, ids, q)
+
+# A chase from a place held still: each tic's sounds, then where each
+# monster watched stands, which way it faces, the direction it walks and
+# the row it is in, with the player's health after.
+def chasing(tag: String, ids: List<&2, U32>, n: Nat, x: U32, y: U32, degrees: U32, +level: L.Level) ->
+  IO(Unit):
+  do IO<Unit>:
+    IO.print(tag)
+    a : S.State <- chasing.go(n, ids, at(level, x, y, degrees))
+    b : S.State <- finished(a)
+    IO.pure(Unit, Unit{})
+
+# A_Chase over Freedoom's monsters, held at one place so that only the
+# monsters move. Head on: the demon of record 92 at (-48, 1616) wakes on
+# tic 7 and walks its speed of 10 straight east at a player 96 units
+# away; it never bites, since ticket 18 has its melee row. Across a
+# room: zombieman 177 at (752, 336) wakes on tic 15 and walks south-west
+# at a player standing at (488, 256), 8 units a move tic. Around a
+# corner: shotgun guy 96 at (144, 1952) wakes on tic 6, walks south
+# three moves and then turns east, 45 degrees a tic, when the wall stops
+# it. At a ledge: zombieman 186 stands on a floor at 120 with an eight
+# unit floor all round it, and a player at (1004, -672) is 100 units
+# west of it; the drop of 64 is more than the 24 P_TryMove allows, so it
+# never steps off. The two longer runs are the
+# former humans' shots, where the reaction time of 8 has run out and the
+# move count is zero on a tic the range check passes.
+def chases(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    chasing("head on", [92], 12n, 48, 1616, 180, level)
+    chasing("across the room", [177], 24n, 488, 256, 0, level)
+    chasing("round the corner", [96], 24n, 144, 1888, 0, level)
+    chasing("at the ledge", [185], 40n, 1004, 4294966624, 0, level)
+    chasing("the zombieman shoots", [177], 70n, 488, 256, 0, level)
+    chasing("the shotgun guy shoots", [96], 70n, 144, 1888, 0, level)
+
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
@@ -1616,6 +1685,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     IO.print("the walks: " ++ drawn(p14) ++ ", " ++ drawn(q6))
     cases(a, level)
     sights(level)
+    chases(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -1646,23 +1716,76 @@ def main() -> IO(Unit):
 #|sound tic 75 DSPSTOP from sector 98 vol 64 sep 78
 #|sound tic 135 DSPOSIT1 from thing 177 vol 63 sep 204
 #|sound tic 145 DSPOSIT1 from thing 176 vol 59 sep 168
-#|sound tic 157 stop thing 264
-#|sound tic 157 DSITEMUP from nobody vol 64 sep 128
-#|sound tic 180 DSPSTART from sector 98 vol 33 sep 56
-#|sound tic 191 stop thing 266
-#|sound tic 191 DSITEMUP from nobody vol 64 sep 128
-#|sound tic 215 DSPSTOP from sector 98 vol 20 sep 62
-#|U!:200 879.976715 495.961593 61.523 z -128.000000 floor -128.000000 eye 40.722702
-#|-:40 879.976715 495.961593 61.523 z -128.000000 floor -128.000000 eye 41.000000
-#|R:10 879.976715 495.961593 35.156 z -128.000000 floor -128.000000 eye 41.000000
-#|U!:70 879.976715 495.972946 35.156 z -128.000000 floor -128.000000 eye 40.730163
-#|L:30 879.976715 495.972946 131.835 z -128.000000 floor -128.000000 eye 41.000000
-#|U:100 784.012664 495.984741 131.835 z -128.000000 floor -128.000000 eye 41.065185
-#|S:60 879.983078 495.988449 131.835 z -128.000000 floor -128.000000 eye 41.059051
-#|D!:100 811.047988 331.119094 131.835 z -128.000000 floor -128.000000 eye 41.392868
-#|R:40 803.270935 323.347381 0.000 z -128.000000 floor -128.000000 eye 41.000000
-#|U!:120 879.951141 429.920242 0.000 z -128.000000 floor -128.000000 eye 41.234771
-#|A!:40 879.829803 495.962158 0.000 z -128.000000 floor -128.000000 eye 41.147918
+#|sound tic 155 DSPOSACT from thing 177 vol 64 sep 218
+#|sound tic 180 DSPSTART from sector 98 vol 38 sep 50
+#|sound tic 181 DSPOSACT from thing 176 vol 64 sep 156
+#|sound tic 185 stop thing 264
+#|sound tic 185 DSITEMUP from nobody vol 64 sep 128
+#|sound tic 215 DSPSTOP from sector 98 vol 30 sep 58
+#|sound tic 217 DSPISTOL from thing 177 vol 64 sep 164
+#|sound tic 232 stop thing 292
+#|sound tic 247 DSPISTOL from thing 177 vol 62 sep 122
+#|sound tic 250 DSPOPAIN from thing 176 vol 64 sep 155
+#|U!:200 879.977035 495.961868 61.523 z -128.000000 floor -128.000000 eye 40.722702
+#|sound tic 262 stop thing 293
+#|sound tic 287 DSPISTOL from thing 176 vol 64 sep 139
+#|sound tic 289 DSPOPAIN from thing 177 vol 64 sep 128
+#|sound tic 294 stop thing 294
+#|-:40 879.977035 495.961868 61.523 z -128.000000 floor -128.000000 eye 41.000000
+#|R:10 879.977035 495.961868 35.156 z -128.000000 floor -128.000000 eye 41.000000
+#|sound tic 321 DSPISTOL from thing 176 vol 64 sep 168
+#|sound tic 330 DSPISTOL from thing 177 vol 64 sep 180
+#|sound tic 334 stop thing 295
+#|sound tic 341 DSPOSACT from thing 176 vol 64 sep 165
+#|sound tic 344 stop thing 296
+#|U!:70 879.977035 495.973220 35.156 z -128.000000 floor -128.000000 eye 40.730163
+#|sound tic 387 DSPISTOL from thing 176 vol 64 sep 86
+#|sound tic 394 stop thing 297
+#|L:30 879.977035 495.973220 131.835 z -128.000000 floor -128.000000 eye 41.000000
+#|sound tic 408 DSPISTOL from thing 177 vol 58 sep 37
+#|sound tic 411 DSPODTH3 from thing 176 vol 64 sep 33
+#|sound tic 423 stop thing 298
+#|sound tic 462 DSPISTOL from thing 177 vol 64 sep 51
+#|sound tic 466 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 469 stop thing 299
+#|U:100 784.010986 495.985015 131.835 z -128.000000 floor -128.000000 eye 41.065185
+#|sound tic 516 DSPISTOL from thing 177 vol 64 sep 54
+#|sound tic 530 stop thing 300
+#|sound tic 550 DSPISTOL from thing 177 vol 64 sep 35
+#|sound tic 554 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 557 stop thing 301
+#|S:60 879.982696 495.988311 131.835 z -128.000000 floor -128.000000 eye 41.059051
+#|sound tic 588 DSPISTOL from thing 177 vol 64 sep 58
+#|sound tic 592 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 595 stop thing 302
+#|sound tic 603 stop thing 266
+#|sound tic 603 DSITEMUP from nobody vol 64 sep 128
+#|sound tic 656 DSDOROPN from sector 10 vol 64 sep 195
+#|D!:100 816.720352 336.791397 131.835 z -128.000000 floor -128.000000 eye 41.392868
+#|sound tic 666 DSPOSIT1 from thing 240 vol 26 sep 203
+#|sound tic 668 DSBGSIT2 from thing 81 vol 29 sep 189
+#|sound tic 669 DSBGSIT2 from thing 82 vol 22 sep 186
+#|R:40 808.943298 329.019683 0.000 z -128.000000 floor -128.000000 eye 41.000000
+#|sound tic 711 DSPOSACT from thing 240 vol 35 sep 33
+#|sound tic 755 DSBGACT from thing 81 vol 50 sep 35
+#|sound tic 762 DSPISTOL from thing 177 vol 64 sep 220
+#|sound tic 766 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 781 DSSHOTGN from thing 240 vol 55 sep 33
+#|sound tic 782 stop thing 303
+#|sound tic 784 DSPOPAIN from thing 177 vol 64 sep 222
+#|sound tic 785 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 796 stop thing 304
+#|sound tic 796 stop thing 305
+#|sound tic 796 stop thing 306
+#|U!:120 879.949234 504.252487 0.000 z -128.000000 floor -128.000000 eye 41.234771
+#|sound tic 837 DSPISTOL from thing 177 vol 64 sep 223
+#|sound tic 841 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 844 DSBGSIT1 from thing 84 vol 8 sep 49
+#|sound tic 844 stop thing 307
+#|sound tic 854 DSBGACT from thing 81 vol 64 sep 46
+#|sound tic 859 DSSHOTGN from thing 240 vol 64 sep 33
+#|sound tic 863 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|A!:40 879.928482 669.570968 0.000 z -128.000000 floor -128.000000 eye 47.059570
 #|sound tic 39 DSPSTART from sector 98 vol 64 sep 129
 #|ledge U!:47 207.783569 256.234542 0.000 z -24.000000 floor -24.000000 eye 52.658081
 #|U!:1 224.302001 256.240737 0.000 z -24.000000 floor -128.000000 eye 151.570556
@@ -1677,8 +1800,9 @@ def main() -> IO(Unit):
 #|sound tic 75 stop thing 267
 #|sound tic 75 DSITEMUP from nobody vol 64 sep 128
 #|sound tic 75 DSPOSIT1 from thing 176 vol 57 sep 64
-#|-:40 662.189941 256.402572 0.000 z -128.000000 floor -128.000000 eye 41.011581
-#|the walks: sounds drew to 167, sounds drew to 174
+#|sound tic 79 DSPOSACT from thing 176 vol 59 sep 60
+#|-:40 658.543090 256.402572 0.000 z -128.000000 floor -128.000000 eye 41.011581
+#|the walks: sounds drew to 204, sounds drew to 175
 #|weapon tic 0 state Some(60) tics 1 at 0.000000 122.000000 flash None tics 0 at 0.000000 0.000000
 #|weapon tic 1 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000
 #|weapon tic 14 state Some(60) tics 1 at 0.000000 38.000000 flash None tics 0 at 0.000000 38.000000
@@ -1712,60 +1836,71 @@ def main() -> IO(Unit):
 #|dry tic 44 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 0 rnd 70
 #|sound tic 5 DSPOSIT2 from thing 176 vol 60 sep 46
 #|sound tic 15 DSPOSIT2 from thing 177 vol 64 sep 46
-#|ledge tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 69
+#|ledge tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 75
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|ledge tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 74 mobj 292 type -1 at 763.999084 256.022888 -90.953125 state 85/3
+#|sound tic 25 DSPOSACT from thing 176 vol 64 sep 42
+#|ledge tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 83 mobj 292 type -1 at 763.999084 256.022888 -91.453125 state 85/2
 #|sky tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 65
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
 #|sky tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 66
 #|-
 #|sound tic 17 DSPOSIT2 from thing 182 vol 48 sep 43
-#|sound tic 17 DSPOSIT1 from thing 265 vol 64 sep 129
-#|zombieman ready tic 20 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 67 265 hp 20 state 89/1 at 944.000000 -224.000000 0.000000 after 4294967295
+#|sound tic 17 DSPOSIT3 from thing 265 vol 64 sep 129
+#|zombieman ready tic 20 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 73 265 hp 20 state 89/1 at 952.000000 -224.000000 0.000000 after 157
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|shot tic 26 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 73 265 hp 10 state 91/3 at 941.617202 -223.999099 0.000000 after 157 mobj 292 type -2 at 954.032302 -224.026702 33.516174 state 182/6
+#|shot tic 26 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 85 265 hp 15 state 121/1 at 958.808593 -223.999572 0.000000 after 157 mobj 292 type -2 at 970.032058 -224.020599 31.422485 state 183/6
+#|sound tic 27 DSPOPAIN from thing 265 vol 64 sep 129
+#|sound tic 32 stop thing 292
 #|sound tic 39 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|sound tic 40 stop thing 292
-#|held tic 40 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 81 265 hp 5 state 121/1 at 932.234802 -223.996154 0.000000 after 157 mobj 293 type -2 at 944.942321 -223.182067 31.561645 state 183/6
-#|sound tic 41 DSPOPAIN from thing 265 vol 64 sep 129
-#|sound tic 46 stop thing 293
+#|held tic 40 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 106 265 hp 0 state 123/1 at 975.138702 -223.997390 0.000000 after 157 mobj 293 type -2 at 991.069473 -222.420394 36.984542 state 181/4
+#|sound tic 41 DSPODTH3 from thing 265 vol 64 sep 129
 #|sound tic 53 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|held tic 54 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 89 265 hp 0 state 123/1 at 924.882812 -223.994445 0.000000 after 157 mobj 294 type -2 at 942.652862 -218.533569 33.446289 state 183/6
-#|sound tic 55 DSPODTH2 from thing 265 vol 64 sep 129
-#|sound tic 60 stop thing 294
+#|held tic 54 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 127 265 hp 0 state 126/2 at 961.819946 -223.993392 0.000000 after 157 mobj 293 type -2 at 991.069473 -222.420394 0.000000 state 183/6 mobj 294 type -1 at 884.005065 -227.166610 35.906250 state 85/2
+#|sound tic 60 stop thing 293
 #|sound tic 67 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|held tic 68 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 98 265 hp 0 state 126/2 at 919.233993 -223.993591 0.000000 after 157 mobj 295 type -1 at 884.005065 -220.833404 40.078125 state 85/1
-#|sound tic 81 stop thing 295
-#|corpse tic 98 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 108 265 hp 0 state 127/4294967295 at 917.913940 -223.993591 0.000000 after 157
+#|sound tic 68 stop thing 294
+#|held tic 68 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 147 265 hp 0 state 127/4294967295 at 958.462326 -223.993072 0.000000 after 157 mobj 295 type -1 at 884.019226 -226.307128 38.031250 state 85/2
+#|sound tic 82 stop thing 295
+#|corpse tic 98 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 179 265 hp 0 state 127/4294967295 at 957.898498 -223.993072 0.000000 after 157
 #|sound tic 6 DSPOSIT2 from thing 240 vol 53 sep 137
-#|sound tic 8 DSBGSIT2 from thing 81 vol 49 sep 165
+#|sound tic 8 DSBGSIT1 from thing 81 vol 49 sep 165
 #|sound tic 9 DSBGSIT2 from thing 82 vol 42 sep 157
 #|sound tic 14 DSBGSIT2 from thing 84 vol 17 sep 78
-#|barrels ready tic 20 at 992.000000 704.000000 health 100 armour 100/1 rnd 72 24 hp 20 state 11/1 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 20 state 11/4 at 992.000000 640.000000 -128.000000 after 4294967295 26 hp 20 state 10/5 at 960.000000 608.000000 -128.000000 after 4294967295
+#|sound tic 15 DSPOSACT from thing 240 vol 55 sep 131
+#|barrels ready tic 20 at 992.000000 704.000000 health 100 armour 100/1 rnd 90 24 hp 20 state 11/1 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 20 state 11/4 at 992.000000 640.000000 -128.000000 after 4294967295 26 hp 20 state 10/5 at 960.000000 608.000000 -128.000000 after 4294967295
+#|sound tic 24 DSPOSACT from thing 240 vol 56 sep 126
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|shot tic 26 at 992.000000 704.000000 health 100 armour 100/1 rnd 79 24 hp 20 state 10/1 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 15 state 10/4 at 992.000427 638.808593 -128.000000 after 157 26 hp 20 state 11/5 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 292 type -1 at 992.020584 650.032058 -103.076568 state 86/3
-#|sound tic 37 stop thing 292
+#|shot tic 26 at 992.000000 704.000000 health 100 armour 100/1 rnd 104 24 hp 20 state 10/1 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 10 state 10/4 at 992.000900 637.617202 -128.000000 after 157 26 hp 20 state 11/5 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 292 type -1 at 992.020584 650.032058 -103.701568 state 85/1
+#|sound tic 38 DSBGACT from thing 81 vol 55 sep 154
 #|sound tic 39 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|sound tic 40 DSBAREXP from thing 25 vol 64 sep 129
-#|held tic 40 at 992.000000 704.000000 health 100 armour 100/1 rnd 87 24 hp 20 state 11/5 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 0 state 177/5 at 992.002609 631.138702 -128.000000 after 157 26 hp 20 state 11/3 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 293 type -1 at 990.401367 646.897659 -105.160736 state 86/4
-#|sound tic 52 DSBAREXP from thing 24 vol 64 sep 129
-#|sound tic 52 DSBAREXP from thing 26 vol 64 sep 169
+#|sound tic 39 stop thing 292
+#|held tic 40 at 992.000000 704.000000 health 100 armour 100/1 rnd 133 24 hp 20 state 11/5 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 5 state 10/2 at 992.003845 628.234802 -128.000000 after 157 26 hp 20 state 11/3 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 293 type -1 at 990.544082 641.735855 -100.369110 state 86/4
 #|sound tic 52 stop thing 293
 #|sound tic 53 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|sound tic 53 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|held tic 54 at 991.986053 740.279876 health 53 armour 77/1 rnd 97 24 hp -97 state 177/3 at 991.994415 593.375213 -128.000000 after 4294967295 25 hp 0 state 179/6 at 992.003173 629.469375 -128.000000 after 157 26 hp -86 state 177/3 at 929.989440 587.864288 -128.000000 after 4294967295 mobj 294 type -1 at 995.109191 580.024398 -89.484375 state 86/3
-#|burning tic 64 at 991.971878 776.013107 health 53 armour 77/1 rnd 98 24 hp -97 state 179/8 at 991.994415 593.375213 -128.000000 after 4294967295 25 hp 0 state 180/6 at 992.003173 629.469375 -128.000000 after 157 26 hp -86 state 179/8 at 929.989440 587.864288 -128.000000 after 4294967295 mobj 294 type -1 at 995.109191 580.024398 -79.484375 state 88/1
+#|held tic 54 at 992.000000 704.000000 health 100 armour 100/1 rnd 163 24 hp 20 state 11/3 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp -5 state 176/2 at 992.003845 628.234802 -128.000000 after 157 26 hp 20 state 11/1 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 294 type -1 at 992.819839 639.193420 -100.619934 state 86/3
+#|sound tic 56 DSBAREXP from thing 25 vol 64 sep 129
+#|burning tic 64 at 992.000000 704.000000 health 100 armour 100/1 rnd 176 24 hp 20 state 11/5 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp -5 state 178/2 at 992.003845 628.234802 -128.000000 after 157 26 hp 20 state 11/3 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 294 type -1 at 992.819839 639.193420 -90.619934 state 88/1
 #|sound tic 65 stop thing 294
-#|sound tic 70 stop thing 25
-#|blast tic 74 at 991.966156 789.364822 health 53 armour 77/1 rnd 103 24 hp -97 state 180/8 at 991.994415 593.375213 -128.000000 after 4294967295 gone 26 hp -86 state 180/8 at 929.989440 587.864288 -128.000000 after 4294967295
-#|sound tic 82 stop thing 24
-#|sound tic 82 stop thing 26
-#|chain tic 94 at 991.961898 796.216888 health 53 armour 77/1 rnd 111 gone gone gone
-#|over tic 134 at 991.960830 796.770080 health 53 armour 77/1 rnd 125 gone gone gone
+#|sound tic 69 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 70 DSBAREXP from thing 24 vol 64 sep 129
+#|sound tic 70 DSBAREXP from thing 26 vol 64 sep 166
+#|blast tic 74 at 991.979141 758.065628 health 54 armour 77/1 rnd 199 24 hp -98 state 177/1 at 991.994369 593.250213 -128.000000 after 4294967295 25 hp -5 state 179/2 at 992.003845 628.234802 -128.000000 after 157 26 hp -86 state 177/1 at 929.460037 588.677139 -128.000000 after 4294967295
+#|sound tic 79 DSSHOTGN from thing 240 vol 64 sep 123
+#|sound tic 83 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 86 stop thing 25
+#|sound tic 91 stop thing 296
+#|sound tic 91 stop thing 297
+#|chain tic 94 at 991.013504 775.298110 health 44 armour 72/1 rnd 2 24 hp -98 state 180/6 at 991.994369 593.250213 -128.000000 after 4294967295 gone 26 hp -86 state 180/6 at 929.460037 588.677139 -128.000000 after 4294967295 mobj 295 type -2 at 1000.111862 774.684585 -128.000000 state 183/7
+#|sound tic 100 stop thing 24
+#|sound tic 100 stop thing 26
+#|sound tic 101 stop thing 295
+#|sound tic 126 DSBGACT from thing 85 vol 5 sep 33
+#|sound tic 132 DSBGACT from thing 82 vol 64 sep 128
+#|over tic 134 at 990.940673 775.486297 health 44 armour 72/1 rnd 105 gone gone gone
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
-#|sound tic 9 DSBGSIT2 from thing 82 vol 58 sep 192
+#|sound tic 9 DSBGSIT1 from thing 82 vol 58 sep 192
 #|clip walk tic 9 644.340896 991.988937 180.000 z -128.000000 floor -128.000000 eye 42.770172
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 10 stop thing 140
@@ -1781,10 +1916,11 @@ def main() -> IO(Unit):
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 276 message 13 "Picked up 4 shotgun shells." tics 140
 #|sounds drew to 73
 #|sound tic 11 DSPOSIT3 from thing 185 vol 47 sep 224
-#|sound tic 17 DSPOSIT2 from thing 182 vol 44 sep 203
-#|sound tic 17 DSPOSIT3 from thing 265 vol 64 sep 129
+#|sound tic 17 DSPOSIT1 from thing 182 vol 44 sep 203
+#|sound tic 17 DSPOSIT2 from thing 265 vol 64 sep 129
 #|sound tic 18 stop thing 208
 #|sound tic 18 DSITEMUP from nobody vol 64 sep 128
+#|sound tic 25 DSPOSACT from thing 265 vol 62 sep 129
 #|sound tic 26 stop thing 207
 #|sound tic 26 DSITEMUP from nobody vol 64 sep 128
 #|- tic 26 1202.337890 -223.948562 0.000 z 0.000000 floor 0.000000 eye 48.388656
@@ -1795,8 +1931,9 @@ def main() -> IO(Unit):
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sounds drew to 73
 #|sound tic 11 DSPOSIT3 from thing 185 vol 47 sep 224
-#|sound tic 17 DSPOSIT2 from thing 182 vol 44 sep 203
-#|sound tic 17 DSPOSIT3 from thing 265 vol 64 sep 129
+#|sound tic 17 DSPOSIT1 from thing 182 vol 44 sep 203
+#|sound tic 17 DSPOSIT2 from thing 265 vol 64 sep 129
+#|sound tic 25 DSPOSACT from thing 265 vol 62 sep 129
 #|- tic 26 1202.337890 -223.948562 0.000 z 0.000000 floor 0.000000 eye 48.388656
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|rocket walk tic 8 677.238296 -1000.009109 180.000 z 0.000000 floor 0.000000 eye 43.090423
@@ -1812,40 +1949,45 @@ def main() -> IO(Unit):
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sounds drew to 73
 #|-
+#|sound tic 39 DSPOSACT from thing 240 vol 48 sep 192
 #|shell box walk tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 52 stop thing 137
 #|sound tic 52 DSITEMUP from nobody vol 64 sep 128
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 20 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137 message 14 "Picked up a box of shotgun shells." tics 140
-#|sounds drew to 121
+#|sounds drew to 124
 #|-
+#|sound tic 39 DSPOSACT from thing 240 vol 48 sep 192
 #|shell box walk short of the cap tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 45 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 52 stop thing 137
 #|sound tic 52 DSITEMUP from nobody vol 64 sep 128
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137 message 14 "Picked up a box of shotgun shells." tics 140
-#|sounds drew to 121
+#|sounds drew to 124
 #|-
+#|sound tic 39 DSPOSACT from thing 240 vol 48 sep 192
 #|shell box walk at the cap tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
-#|sounds drew to 121
+#|sounds drew to 124
 #|-
+#|sound tic 23 DSDMACT from thing 98 vol 37 sep 79
 #|chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 34 stop thing 2
 #|sound tic 34 DSWPNUP from nobody vol 64 sep 128
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 2 message 15 "A chainsaw!  Find some meat!" tics 140
-#|sounds drew to 101
+#|sounds drew to 102
+#|sound tic 23 DSDMACT from thing 98 vol 37 sep 79
 #|owned chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 15 "A chainsaw!  Find some meat!" tics 107
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 15 "A chainsaw!  Find some meat!" tics 106
-#|sounds drew to 100
+#|sounds drew to 101
 #|health bonus tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 268
@@ -1913,76 +2055,115 @@ def main() -> IO(Unit):
 #|sound tic 4 DSBGSIT1 from thing 85 vol 35 sep 217
 #|sound tic 6 DSPOSIT3 from thing 240 vol 30 sep 33
 #|sound tic 8 DSBGSIT1 from thing 81 vol 23 sep 33
-#|sound tic 9 DSBGSIT2 from thing 82 vol 20 sep 34
+#|sound tic 9 DSBGSIT1 from thing 82 vol 20 sep 34
 #|green armour tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sound tic 12 DSBGACT from thing 82 vol 21 sep 33
 #|sound tic 12 stop thing 6
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
 #|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 6 message 1 "Picked up the armor." tics 140
-#|sounds drew to 80
+#|sounds drew to 81
 #|sound tic 4 DSBGSIT1 from thing 85 vol 35 sep 217
 #|sound tic 6 DSPOSIT3 from thing 240 vol 30 sep 33
 #|sound tic 8 DSBGSIT1 from thing 81 vol 23 sep 33
-#|sound tic 9 DSBGSIT2 from thing 82 vol 20 sep 34
+#|sound tic 9 DSBGSIT1 from thing 82 vol 20 sep 34
 #|green armour at 100 tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
 #|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sound tic 12 DSBGACT from thing 82 vol 21 sep 33
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
 #|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
-#|sounds drew to 80
+#|sounds drew to 81
 #|-
 #|nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 4 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
 #|sound tic 4 DSBGSIT1 from thing 85 vol 32 sep 219
 #|sound tic 4 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|- tic 4 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 72/4 damage 1 attacker 4294967295 state Some(60) tics 1 at 0.000000 98.000000 flash None tics 0 at 0.000000 98.000000 random 64 reborn False
+#|- tic 4 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 72/4 damage 1 attacker 4294967295 state Some(60) tics 1 at 0.000000 98.000000 flash None tics 0 at 0.000000 98.000000 random 66 reborn False
 #|sound tic 6 DSPOSIT2 from thing 240 vol 34 sep 33
 #|sound tic 8 DSBGSIT2 from thing 81 vol 26 sep 33
-#|- tic 8 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 4294967295 state Some(60) tics 1 at 0.000000 74.000000 flash None tics 0 at 0.000000 74.000000 random 68 reborn False
-#|sound tic 9 DSBGSIT1 from thing 82 vol 23 sep 35
-#|sound tic 14 DSBGSIT1 from thing 84 vol 45 sep 91
-#|- tic 33 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 90 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 4 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 78 reborn False
+#|- tic 8 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 4294967295 state Some(60) tics 1 at 0.000000 74.000000 flash None tics 0 at 0.000000 74.000000 random 77 reborn False
+#|sound tic 9 DSBGSIT2 from thing 82 vol 23 sep 35
+#|sound tic 14 DSBGSIT2 from thing 84 vol 45 sep 91
+#|sound tic 16 DSBGACT from thing 85 vol 34 sep 220
+#|sound tic 28 DSBGACT from thing 85 vol 36 sep 220
+#|- tic 33 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 90 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 4 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 133 reborn False
 #|sound tic 36 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|- tic 37 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 90 armour 0 type 0 momentum 0.000000 0.000000 state 72/3 damage 0 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 78 reborn False
+#|- tic 37 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 90 armour 0 type 0 momentum 0.000000 0.000000 state 72/3 damage 0 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 141 reborn False
 #|green armour nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 96 armour 99 type 1 momentum 0.000000 0.000000 state 71/3 damage 3 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
 #|green armour worn out tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 96 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 3 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
 #|blue armour nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 97 armour 98 type 2 momentum 0.000000 0.000000 state 71/3 damage 2 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
-#|sounds drew to 108
+#|sounds drew to 110
 #|-
 #|sound tic 4 DSBGSIT1 from thing 85 vol 32 sep 219
 #|sound tic 4 DSPLPAIN from thing 4294967295 vol 64 sep 128
 #|sound tic 6 DSPOSIT2 from thing 240 vol 34 sep 33
 #|sound tic 8 DSBGSIT2 from thing 81 vol 26 sep 33
-#|sound tic 9 DSBGSIT1 from thing 82 vol 23 sep 35
-#|sound tic 14 DSBGSIT1 from thing 84 vol 45 sep 91
+#|sound tic 9 DSBGSIT2 from thing 82 vol 23 sep 35
+#|sound tic 14 DSBGSIT2 from thing 84 vol 45 sep 91
+#|sound tic 16 DSBGACT from thing 85 vol 34 sep 220
+#|sound tic 28 DSBGACT from thing 85 vol 36 sep 220
 #|sound tic 36 DSPLPAIN from thing 4294967295 vol 64 sep 128
 #|sound tic 68 DSPLPAIN from thing 4294967295 vol 64 sep 128
 #|sound tic 100 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 127 DSSHOTGN from thing 240 vol 48 sep 33
+#|sound tic 131 DSBGACT from thing 84 vol 64 sep 100
 #|sound tic 132 DSPLPAIN from thing 4294967295 vol 64 sep 128
 #|sound tic 164 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 190 DSSHOTGN from thing 240 vol 54 sep 33
+#|sound tic 192 DSPOPAIN from thing 84 vol 64 sep 196
+#|sound tic 194 DSBGACT from thing 81 vol 43 sep 34
 #|sound tic 196 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 197 stop thing 292
+#|sound tic 211 stop thing 293
 #|sound tic 228 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 260 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 292 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 324 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 356 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 388 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 420 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 452 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 484 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 516 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 548 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|sound tic 580 DSPLPAIN from thing 4294967295 vol 64 sep 128
-#|nukage until it kills tic 608 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 5 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 4294967295 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 192 reborn False
-#|death tic 609 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 73/8 damage 4 attacker 4294967295 state Some(69) tics 1 at 1.000000 44.000000 flash None tics 0 at 1.000000 44.000000 random 195 reborn False
-#|- tic 615 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 35.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 73/2 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 80.000000 flash None tics 0 at 1.000000 80.000000 random 197 reborn False
-#|- tic 616 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 34.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 73/1 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 86.000000 flash None tics 0 at 1.000000 86.000000 random 198 reborn False
-#|sound tic 617 DSPLDETH from thing 4294967295 vol 64 sep 128
-#|- tic 623 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 27.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 74/4 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 202 reborn False
-#|- tic 650 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 77/7 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 204 reborn False
-#|- tic 682 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn False
-#|use tic 683 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn True
-#|- tic 684 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn True
-#|sounds drew to 5
+#|sound tic 228 DSPOSACT from thing 240 vol 56 sep 33
+#|sound tic 234 DSBGACT from thing 82 vol 62 sep 33
+#|sound tic 246 DSBGACT from thing 82 vol 63 sep 33
+#|sound tic 247 DSSHOTGN from thing 240 vol 57 sep 33
+#|sound tic 249 DSPOPAIN from thing 84 vol 64 sep 218
+#|sound tic 251 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 254 stop thing 295
+#|sound tic 269 stop thing 294
+#|sound tic 296 DSBGACT from thing 81 vol 56 sep 35
+#|sound tic 307 DSSHOTGN from thing 240 vol 61 sep 33
+#|sound tic 309 DSPOPAIN from thing 82 vol 64 sep 34
+#|sound tic 314 stop thing 296
+#|sound tic 322 stop thing 297
+#|sound tic 322 stop thing 298
+#|sound tic 326 DSBGACT from thing 81 vol 61 sep 35
+#|sound tic 342 DSPOSACT from thing 240 vol 64 sep 33
+#|sound tic 394 DSSHOTGN from thing 240 vol 62 sep 44
+#|sound tic 396 DSPOPAIN from thing 81 vol 64 sep 43
+#|sound tic 401 stop thing 300
+#|sound tic 401 stop thing 301
+#|sound tic 409 stop thing 299
+#|sound tic 431 DSBGACT from thing 81 vol 62 sep 68
+#|sound tic 437 DSBGACT from thing 81 vol 62 sep 62
+#|sound tic 457 DSSHOTGN from thing 240 vol 64 sep 33
+#|sound tic 506 DSBGACT from thing 81 vol 64 sep 33
+#|sound tic 535 DSSHOTGN from thing 240 vol 64 sep 34
+#|sound tic 536 DSBGACT from thing 84 vol 64 sep 66
+#|sound tic 539 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 542 stop thing 302
+#|sound tic 542 stop thing 303
+#|sound tic 542 stop thing 304
+#|sound tic 548 DSBGACT from thing 81 vol 64 sep 33
+#|sound tic 607 DSBGACT from thing 85 vol 39 sep 213
+#|nukage until it kills tic 608 1629.265853 1000.887222 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 33 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 5 reborn False
+#|death tic 609 1629.265853 1000.887222 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 33 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 6 reborn False
+#|- tic 615 1629.265853 1000.887222 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 33 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 17 reborn False
+#|- tic 616 1629.265853 1000.887222 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 33 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 19 reborn False
+#|- tic 623 1629.265853 1000.887222 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 33 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 33 reborn False
+#|sound tic 643 DSSHOTGN from thing 240 vol 64 sep 148
+#|sound tic 647 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 650 stop thing 305
+#|- tic 650 1627.191757 991.146087 90.000 z -144.000000 floor -144.000000 eye 41.077529 health 18 armour 0 type 0 momentum -0.196060 -0.920730 state 72/1 damage 8 attacker 240 state Some(59) tics 1 at 1.171035 32.208572 flash None tics 0 at 1.171035 32.208572 random 116 reborn False
+#|sound tic 656 stop thing 306
+#|sound tic 658 stop thing 307
+#|- tic 682 1625.219238 981.889099 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 18 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 200 reborn False
+#|use tic 683 1625.219238 981.889099 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 18 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 208 reborn False
+#|- tic 684 1625.219238 981.889099 90.000 z -144.000000 floor -144.000000 eye 41.000000 health 18 armour 0 type 0 momentum 0.000000 0.000000 state 70/4294967295 damage 0 attacker 240 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 210 reborn False
+#|sounds drew to 24
 #|-
 #|blow from the south tic 0 0.000000 0.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000 health 80 armour 0 type 0 momentum 0.000946 2.499954 state 71/4 damage 20 attacker 0 state Some(60) tics 1 at 0.000000 122.000000 flash None tics 0 at 0.000000 0.000000 random 1 reborn False
 #|- tic 1 0.000946 2.499954 0.000 z 0.000000 floor 0.000000 eye 41.000289 health 80 armour 0 type 0 momentum 0.000854 2.265579 state 71/3 damage 19 attacker 0 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 1 reborn False
@@ -1995,19 +2176,17 @@ def main() -> IO(Unit):
 #|- tic 20 -0.035842 -91.772964 270.000 z 0.000000 floor 0.000000 eye 20.905944 health 0 armour 0 type 0 momentum -0.000595 -1.396286 state 75/10 damage 18 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
 #|sounds drew to 85
 #|-
-#|sound tic 6 DSPOSIT2 from thing 240 vol 54 sep 148
-#|sound tic 8 DSBGSIT2 from thing 81 vol 61 sep 157
-#|sound tic 9 DSBGSIT1 from thing 82 vol 57 sep 191
 #|sound tic 10 DSPLDETH from thing 4294967295 vol 64 sep 128
-#|sound tic 14 DSBGSIT1 from thing 84 vol 12 sep 173
 #|corpse slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 20.976486
 #|  inventory health 0 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 6 DSPOSIT3 from thing 240 vol 54 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 61 sep 157
 #|sound tic 8 stop thing 140
 #|sound tic 8 DSITEMUP from nobody vol 64 sep 128
-#|sound tic 9 DSBGSIT2 from thing 82 vol 57 sep 191
-#|sound tic 14 DSBGSIT2 from thing 84 vol 12 sep 173
+#|sound tic 9 DSBGSIT1 from thing 82 vol 57 sep 191
+#|sound tic 12 DSBGACT from thing 82 vol 58 sep 189
+#|sound tic 14 DSBGSIT1 from thing 84 vol 12 sep 173
+#|sound tic 17 DSBGACT from thing 81 vol 62 sep 148
 #|live slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 40.976486
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 208 taken 140 message 9 "Picked up a clip." tics 128
 #|-
@@ -2016,24 +2195,38 @@ def main() -> IO(Unit):
 #|face tic 35 index 2 health 100 drew 99
 #|glance tic 60 index 2 count 8 health 100 sounds drew to 124
 #|face tic 1 index 5 health 95 drew 65
-#|face tic 36 index 2 health 90 drew 107
-#|face tic 53 index 0 health 90 drew 124
-#|face tic 65 index 7 health 85 drew 136
-#|face tic 129 index 15 health 75 drew 202
-#|nukage tic 200 index 15 count 30 health 65 sounds drew to 20
-#|face tic 257 index 23 health 55 drew 78
-#|face tic 385 index 31 health 35 drew 210
-#|face tic 513 index 39 health 15 drew 86
-#|face tic 609 index 41 health 0 drew 185
-#|nukage until it kills tic 660 index 41 count 0 health 0 sounds drew to 237
+#|face tic 36 index 2 health 90 drew 109
+#|face tic 53 index 1 health 90 drew 126
+#|face tic 65 index 7 health 85 drew 138
+#|face tic 129 index 15 health 75 drew 205
+#|nukage tic 200 index 15 count 30 health 65 sounds drew to 27
+#|face tic 247 index 20 health 45 drew 79
+#|face tic 296 index 18 health 45 drew 131
+#|face tic 330 index 16 health 45 drew 168
+#|face tic 347 index 17 health 45 drew 186
+#|face tic 381 index 16 health 45 drew 220
+#|face tic 398 index 18 health 45 drew 239
+#|face tic 415 index 16 health 45 drew 0
+#|face tic 432 index 18 health 45 drew 18
+#|face tic 449 index 17 health 45 drew 36
+#|face tic 466 index 18 health 45 drew 54
+#|face tic 483 index 16 health 45 drew 71
+#|face tic 500 index 17 health 45 drew 88
+#|face tic 517 index 16 health 45 drew 106
+#|face tic 534 index 17 health 45 drew 123
+#|face tic 535 index 28 health 33 drew 125
+#|face tic 581 index 24 health 33 drew 174
+#|face tic 615 index 25 health 33 drew 209
+#|face tic 643 index 39 health 18 drew 238
+#|nukage until it kills tic 660 index 39 count 31 health 18 sounds drew to 0
 #|face tic 2 index 3 health 80 drew 66
 #|blow from the right tic 4 index 3 count 34 health 80 sounds drew to 68
 #|face tic 2 index 4 health 80 drew 66
 #|blow from the left tic 4 index 4 count 34 health 80 sounds drew to 68
 #|face tic 2 index 7 health 80 drew 66
 #|blow from dead ahead tic 4 index 7 count 34 health 80 sounds drew to 68
-#|face tic 34 index 6 health 100 drew 101
-#|chainsaw grin tic 37 index 6 count 66 health 100 sounds drew to 104
+#|face tic 34 index 6 health 100 drew 102
+#|chainsaw grin tic 37 index 6 count 66 health 100 sounds drew to 105
 #|face tic 1 index 2 health 100 drew 65
 #|face tic 18 index 0 health 100 drew 82
 #|face tic 35 index 1 health 100 drew 101
@@ -2043,73 +2236,182 @@ def main() -> IO(Unit):
 #|held fire tic 75 index 7 count 0 health 100 sounds drew to 144
 #|-
 #|sound tic 5 DSPOSIT2 from thing 176 vol 64 sep 65
-#|door walk tic 40 871.974029 448.783554 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000
-#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
-#|use tic 41 871.971069 456.188186 90.000 z -128.000000 floor -128.000000 eye 40.876480 thinkers 10 sector 10 -128.000000 -126.000000
-#|sound tic 46 DSPOSIT2 from thing 240 vol 37 sep 143
-#|sound tic 48 DSBGSIT2 from thing 81 vol 39 sep 124
-#|sound tic 49 DSBGSIT2 from thing 82 vol 32 sep 125
-#|- tic 61 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000
-#|- tic 102 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|- tic 103 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
-#|- tic 253 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|- tic 254 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
-#|- tic 315 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -128.000000
-#|- tic 316 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
-#|closing - tic 264 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -26.000000
-#|use tic 265 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -24.000000
-#|- tic 275 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|- tic 279 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|use tic 280 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
-#|sounds drew to 94
+#|sound tic 37 DSPOSACT from thing 176 vol 64 sep 126
+#|door walk tic 40 871.990203 392.135299 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000
+#|use tic 41 871.987243 392.135299 90.000 z -128.000000 floor -128.000000 eye 40.876480 thinkers 9 sector 10 -128.000000 -128.000000
+#|- tic 61 871.961898 432.886016 90.000 z -128.000000 floor -128.000000 eye 40.996353 thinkers 9 sector 10 -128.000000 -128.000000
+#|sound tic 69 DSDOROPN from sector 10 vol 64 sep 89
+#|sound tic 76 DSPOSIT3 from thing 240 vol 34 sep 142
+#|sound tic 78 DSBGSIT1 from thing 81 vol 36 sep 125
+#|sound tic 79 DSBGSIT2 from thing 82 vol 29 sep 125
+#|- tic 102 871.955490 442.302398 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -60.000000
+#|- tic 103 871.955490 442.302398 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -58.000000
+#|sound tic 127 DSPISTOL from thing 176 vol 64 sep 130
+#|sound tic 131 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 149 stop thing 292
+#|sound tic 159 DSPOSACT from thing 176 vol 64 sep 130
+#|sound tic 177 DSPISTOL from thing 176 vol 64 sep 129
+#|sound tic 181 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 192 stop thing 293
+#|sound tic 223 DSPISTOL from thing 176 vol 63 sep 129
+#|sound tic 236 stop thing 294
+#|sound tic 253 DSPISTOL from thing 176 vol 63 sep 133
+#|- tic 253 871.551651 411.447174 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|- tic 254 871.498596 410.323425 90.000 z -128.000000 floor -128.000000 eye 40.883651 thinkers 10 sector 10 -128.000000 -4.000000
+#|sound tic 257 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 268 stop thing 295
+#|sound tic 281 DSDORCLS from sector 10 vol 64 sep 100
+#|sound tic 295 DSPOSACT from thing 240 vol 62 sep 152
+#|sound tic 307 DSPISTOL from thing 176 vol 63 sep 125
+#|sound tic 314 stop thing 296
+#|- tic 315 871.010284 400.026016 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
+#|- tic 316 871.010284 400.026016 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000
+#|sound tic 257 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|closing - tic 264 871.176925 403.519348 90.000 z -128.000000 floor -128.000000 eye 41.016159 thinkers 10 sector 10 -128.000000 -4.000000
+#|use tic 265 871.158889 403.138778 90.000 z -128.000000 floor -128.000000 eye 41.016448 thinkers 10 sector 10 -128.000000 -4.000000
+#|sound tic 268 stop thing 295
+#|- tic 275 871.049270 400.834396 90.000 z -128.000000 floor -128.000000 eye 40.997695 thinkers 10 sector 10 -128.000000 -4.000000
+#|- tic 279 871.027755 400.386764 90.000 z -128.000000 floor -128.000000 eye 40.999206 thinkers 10 sector 10 -128.000000 -4.000000
+#|use tic 280 871.023559 400.299774 90.000 z -128.000000 floor -128.000000 eye 40.999588 thinkers 10 sector 10 -128.000000 -4.000000
+#|sounds drew to 102
 #|-
-#|sound tic 124 DSBGSIT2 from thing 84 vol 7 sep 183
-#|through walk tic 142 871.852340 750.246398 90.000 z -128.000000 floor -128.000000 eye 42.976440 thinkers 10 sector 10 -128.000000 -4.000000
-#|doorway walk tic 108 871.948486 509.975112 90.000 z -128.000000 floor -128.000000 eye 42.444900 thinkers 10 sector 10 -128.000000 -4.000000
-#|sound tic 124 DSBGSIT2 from thing 84 vol 3 sep 180
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 40
-#|- tic 287 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
-#|sound tic 288 DSDOROPN from sector 10 vol 64 sep 40
-#|- tic 288 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
-#|- tic 289 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -70.000000
-#|- tic 323 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 139
+#|sound tic 127 DSPISTOL from thing 176 vol 64 sep 132
+#|sound tic 131 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|through walk tic 142 871.351028 486.467025 90.000 z -128.000000 floor -128.000000 eye 42.830184 thinkers 10 sector 10 -128.000000 -4.000000
+#|doorway walk tic 108 871.949859 456.372085 90.000 z -128.000000 floor -128.000000 eye 42.444900 thinkers 10 sector 10 -128.000000 -48.000000
+#|sound tic 127 DSPISTOL from thing 176 vol 64 sep 132
+#|sound tic 131 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 149 stop thing 292
+#|sound tic 159 DSPOSACT from thing 176 vol 64 sep 130
+#|sound tic 177 DSPISTOL from thing 176 vol 64 sep 130
+#|sound tic 181 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 192 stop thing 293
+#|sound tic 209 DSPOSACT from thing 176 vol 64 sep 130
+#|sound tic 212 DSSHOTGN from thing 240 vol 57 sep 131
+#|sound tic 215 DSPOPAIN from thing 176 vol 64 sep 130
+#|sound tic 215 DSPOPAIN from thing 177 vol 64 sep 63
+#|sound tic 219 stop thing 294
+#|sound tic 227 stop thing 295
+#|sound tic 228 DSPISTOL from thing 176 vol 64 sep 129
+#|sound tic 235 stop thing 296
+#|sound tic 242 stop thing 297
+#|sound tic 275 DSSHOTGN from thing 240 vol 62 sep 128
+#|sound tic 277 DSPOPAIN from thing 81 vol 64 sep 144
+#|sound tic 278 DSPODTH3 from thing 176 vol 64 sep 103
+#|sound tic 279 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 281 DSDORCLS from sector 10 vol 64 sep 82
+#|sound tic 282 stop thing 300
+#|sound tic 284 DSPISTOL from thing 177 vol 64 sep 71
+#|sound tic 286 DSPOPAIN from thing 240 vol 62 sep 128
+#|- tic 287 871.143295 455.891799 90.000 z -128.000000 floor -128.000000 eye 41.007919 thinkers 10 sector 10 -128.000000 -16.000000
+#|- tic 288 871.144912 455.661575 90.000 z -128.000000 floor -128.000000 eye 41.005813 thinkers 10 sector 10 -128.000000 -18.000000
+#|- tic 289 871.146377 455.452926 90.000 z -128.000000 floor -128.000000 eye 41.003738 thinkers 10 sector 10 -128.000000 -20.000000
+#|sound tic 290 stop thing 299
+#|sound tic 298 stop thing 298
+#|sound tic 299 stop thing 301
+#|sound tic 314 DSSHOTGN from thing 240 vol 62 sep 116
+#|sound tic 316 DSPOPAIN from thing 81 vol 64 sep 96
+#|sound tic 316 DSPOSACT from thing 177 vol 64 sep 102
+#|sound tic 316 DSDOROPN from sector 10 vol 64 sep 84
+#|sound tic 321 stop thing 303
+#|- tic 323 871.156158 453.996307 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -58.000000
+#|sounds drew to 158
 #|-
-#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
-#|sound tic 46 DSPOSIT2 from thing 240 vol 37 sep 143
-#|sound tic 48 DSBGSIT2 from thing 81 vol 39 sep 124
-#|sound tic 49 DSBGSIT2 from thing 82 vol 32 sep 125
-#|held use tic 140 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
-#|use tic 340 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
-#|sounds drew to 154
+#|sound tic 69 DSDOROPN from sector 10 vol 64 sep 89
+#|sound tic 76 DSPOSIT3 from thing 240 vol 34 sep 142
+#|sound tic 78 DSBGSIT1 from thing 81 vol 36 sep 125
+#|sound tic 79 DSBGSIT2 from thing 82 vol 29 sep 125
+#|sound tic 127 DSPISTOL from thing 176 vol 64 sep 130
+#|sound tic 131 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|held use tic 140 871.739151 427.865997 90.000 z -128.000000 floor -128.000000 eye 40.984725 thinkers 10 sector 10 -128.000000 -4.000000
+#|sound tic 149 stop thing 292
+#|sound tic 159 DSPOSACT from thing 176 vol 64 sep 130
+#|sound tic 177 DSPISTOL from thing 176 vol 64 sep 129
+#|sound tic 181 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 192 stop thing 293
+#|sound tic 223 DSPISTOL from thing 176 vol 63 sep 129
+#|sound tic 236 stop thing 294
+#|sound tic 253 DSPISTOL from thing 176 vol 63 sep 133
+#|sound tic 257 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 268 stop thing 295
+#|sound tic 281 DSDORCLS from sector 10 vol 64 sep 100
+#|sound tic 295 DSPOSACT from thing 240 vol 62 sep 152
+#|sound tic 307 DSPISTOL from thing 176 vol 63 sep 125
+#|sound tic 314 stop thing 296
+#|sound tic 337 DSPISTOL from thing 176 vol 64 sep 124
+#|sound tic 339 DSPOPAIN from thing 81 vol 64 sep 129
+#|use tic 340 871.010284 400.026016 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -30.000000
+#|sounds drew to 167
 #|-
-#|sound tic 253 DSDORCLS from sector 10 vol 51 sep 33
+#|sound tic 160 DSPOSACT from thing 240 vol 28 sep 33
+#|sound tic 205 DSPOSACT from thing 240 vol 36 sep 33
+#|sound tic 214 DSBGACT from thing 82 vol 28 sep 33
+#|sound tic 229 DSPOSACT from thing 176 vol 61 sep 33
 #|door on the left tic 253 832.000000 128.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
-#|sound tic 253 DSDORCLS from sector 10 vol 51 sep 224
+#|sounds drew to 71
+#|sound tic 160 DSPOSACT from thing 240 vol 28 sep 224
+#|sound tic 205 DSPOSACT from thing 240 vol 36 sep 224
+#|sound tic 214 DSBGACT from thing 82 vol 28 sep 224
+#|sound tic 229 DSPOSACT from thing 176 vol 61 sep 224
 #|door on the right tic 253 832.000000 128.000000 180.000 z 0.000000 floor 0.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
-#|sound tic 253 DSDORCLS from sector 10 vol 51 sep 128
+#|sounds drew to 71
+#|sound tic 160 DSPOSACT from thing 240 vol 28 sep 124
+#|sound tic 205 DSPOSACT from thing 240 vol 36 sep 123
+#|sound tic 214 DSBGACT from thing 82 vol 28 sep 128
+#|sound tic 229 DSPOSACT from thing 176 vol 61 sep 137
 #|door behind tic 253 832.000000 128.000000 270.000 z 0.000000 floor 0.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 129
+#|sounds drew to 71
+#|sound tic 127 DSPISTOL from thing 176 vol 62 sep 148
+#|sound tic 141 stop thing 292
+#|sound tic 189 DSPISTOL from thing 176 vol 64 sep 122
+#|sound tic 201 stop thing 293
+#|sound tic 210 DSBGACT from thing 81 vol 50 sep 127
+#|sound tic 217 DSPOSACT from thing 240 vol 51 sep 138
+#|sound tic 247 DSPISTOL from thing 176 vol 64 sep 160
 #|door 200 ahead tic 253 832.000000 328.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
-#|sound tic 253 DSDORCLS from sector 10 vol 63 sep 129
+#|sounds drew to 72
+#|sound tic 127 DSPISTOL from thing 176 vol 62 sep 148
+#|sound tic 141 stop thing 292
+#|sound tic 189 DSPISTOL from thing 176 vol 64 sep 122
+#|sound tic 201 stop thing 293
+#|sound tic 210 DSBGACT from thing 81 vol 50 sep 127
+#|sound tic 217 DSPOSACT from thing 240 vol 51 sep 138
+#|sound tic 247 DSPISTOL from thing 176 vol 64 sep 160
 #|door 201 ahead tic 253 832.000000 327.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
-#|sound tic 111 DSPOSIT2 from thing 185 vol 58 sep 224
-#|sound tic 253 DSDORCLS from sector 10 vol 1 sep 129
-#|door 1184 ahead tic 253 832.000000 -656.000000 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 68
-#|sound tic 111 DSPOSIT2 from thing 185 vol 58 sep 224
-#|door 1185 ahead tic 253 832.000000 -657.000000 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
-#|sound tic 111 DSPOSIT2 from thing 185 vol 59 sep 224
-#|door 1201 ahead tic 253 832.000000 -673.000000 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 67
+#|sounds drew to 72
+#|sound tic 111 DSPOSIT3 from thing 185 vol 58 sep 224
+#|sound tic 180 DSPOSACT from thing 185 vol 58 sep 224
+#|sound tic 220 DSSHOTGN from thing 185 vol 59 sep 224
+#|sound tic 224 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 227 stop thing 292
+#|sound tic 234 stop thing 294
+#|sound tic 235 stop thing 293
+#|door 1184 ahead tic 253 832.000000 -655.915191 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|sounds drew to 71
+#|sound tic 111 DSPOSIT3 from thing 185 vol 58 sep 224
+#|sound tic 180 DSPOSACT from thing 185 vol 58 sep 224
+#|sound tic 220 DSSHOTGN from thing 185 vol 59 sep 224
+#|sound tic 224 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 227 stop thing 292
+#|sound tic 234 stop thing 294
+#|sound tic 235 stop thing 293
+#|door 1185 ahead tic 253 832.000000 -656.928131 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|sounds drew to 71
+#|sound tic 111 DSPOSIT3 from thing 185 vol 59 sep 224
+#|sound tic 138 DSPOSACT from thing 185 vol 59 sep 224
+#|sound tic 157 DSSHOTGN from thing 185 vol 59 sep 224
+#|sound tic 161 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 164 stop thing 294
+#|sound tic 170 stop thing 293
+#|sound tic 172 stop thing 292
+#|sound tic 173 DSPOSACT from thing 176 vol 4 sep 126
+#|sound tic 189 DSPOSACT from thing 176 vol 6 sep 128
+#|sound tic 202 DSSHOTGN from thing 185 vol 59 sep 224
+#|sound tic 214 stop thing 297
+#|sound tic 215 stop thing 296
+#|sound tic 216 stop thing 295
+#|door 1201 ahead tic 253 832.000000 -673.055709 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
+#|sounds drew to 74
 #|-
 #|switch walk tic 30 2063.945510 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.024505 thinkers 9 sector 76 272.000000 272.000000 sector 126 264.000000 264.000000 sector 129 264.000000 264.000000
 #|sound tic 31 DSSWTCHN from nobody vol 64 sep 128
@@ -2176,16 +2478,23 @@ def main() -> IO(Unit):
 #|sounds drew to 29
 #|-
 #|sound tic 3 DSBGSIT1 from thing 243 vol 53 sep 218
-#|sound tic 4 DSBGSIT1 from thing 190 vol 44 sep 68
-#|sound tic 5 DSPOSIT1 from thing 189 vol 49 sep 60
+#|sound tic 4 DSBGSIT2 from thing 190 vol 44 sep 68
+#|sound tic 5 DSPOSIT2 from thing 189 vol 49 sep 60
 #|trigger walk tic 16 2029.450805 -449.974945 0.000 z 128.000000 floor 128.000000 eye 35.541717 thinkers 9 sector 145 136.000000 136.000000
 #|sound tic 17 DSDOROPN from sector 145 vol 45 sep 156
 #|over tic 17 2036.220657 -449.972503 0.000 z 128.000000 floor 128.000000 eye 35.539337 thinkers 10 sector 145 136.000000 138.000000
-#|- tic 78 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 10 sector 145 136.000000 260.000000
-#|- tic 79 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 9 sector 145 136.000000 260.000000
-#|sound tic 115 DSBGSIT1 from thing 241 vol 50 sep 33
-#|back tic 119 1846.728271 -450.053344 0.000 z 136.000000 floor 136.000000 eye 28.955810 thinkers 9 sector 145 136.000000 260.000000
-#|sounds drew to 188
+#|sound tic 19 DSBGACT from thing 190 vol 52 sep 58
+#|sound tic 30 DSBGACT from thing 243 vol 55 sep 205
+#|sound tic 72 DSSHOTGN from thing 189 vol 63 sep 59
+#|sound tic 76 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|- tic 78 2093.700820 -457.707321 0.000 z 128.000000 floor 128.000000 eye 40.803939 thinkers 10 sector 145 136.000000 260.000000
+#|sound tic 79 stop thing 294
+#|- tic 79 2092.841674 -458.610427 0.000 z 128.000000 floor 128.000000 eye 40.880325 thinkers 9 sector 145 136.000000 260.000000
+#|sound tic 86 stop thing 293
+#|sound tic 87 stop thing 292
+#|sound tic 105 DSBGSIT1 from thing 241 vol 48 sep 33
+#|back tic 119 1942.835754 -467.272186 0.000 z 128.000000 floor 128.000000 eye 35.955810 thinkers 9 sector 145 136.000000 260.000000
+#|sounds drew to 192
 #|-
 #|lift run tic 35 11.349639 256.160812 0.000 z 0.000000 floor 0.000000 eye 33.430175 thinkers 9 sector 98 12.000000 128.000000
 #|- tic 39 62.115066 256.179794 0.000 z 12.000000 floor 12.000000 eye 25.687744 thinkers 9 sector 98 12.000000 128.000000
@@ -2207,13 +2516,16 @@ def main() -> IO(Unit):
 #|use tic 13 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 0.000000 128.000000
 #|sound tic 15 DSPOSIT3 from thing 177 vol 39 sep 142
 #|sound tic 45 DSPSTOP from sector 98 vol 64 sep 129
+#|sound tic 47 DSPOSACT from thing 177 vol 44 sep 134
+#|sound tic 119 DSPOSACT from thing 177 vol 51 sep 127
 #|sound tic 150 DSPSTART from sector 98 vol 64 sep 129
+#|sound tic 177 DSPISTOL from thing 177 vol 55 sep 135
 #|- tic 184 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 12.000000 128.000000
 #|sound tic 185 DSPSTOP from sector 98 vol 64 sep 129
 #|- tic 185 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 9 sector 98 12.000000 128.000000
 #|sound tic 186 DSPSTART from sector 98 vol 64 sep 129
 #|use tic 186 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 8.000000 128.000000
-#|sounds drew to 0
+#|sounds drew to 3
 #|-
 #|key turn tic 21 2246.000000 592.000000 157.500 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 0 "" tics 0
 #|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 0 "" tics 0
@@ -2227,8 +2539,10 @@ def main() -> IO(Unit):
 #|sound tic 34 DSPOSIT2 from thing 94 vol 49 sep 144
 #|sound tic 40 DSPOSIT1 from thing 95 vol 57 sep 101
 #|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
+#|sound tic 52 DSPOSACT from thing 94 vol 53 sep 135
+#|sound tic 67 DSPOSACT from thing 94 vol 55 sep 127
 #|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
-#|sounds drew to 159
+#|sounds drew to 161
 #|-
 #|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
 #|sound tic 5 DSPOSIT2 from thing 289 vol 64 sep 33
@@ -2277,8 +2591,9 @@ def main() -> IO(Unit):
 #|- tic 38 128.029998 348.859802 270.000 z 0.000000 floor 0.000000 eye 36.104217 thinkers 9
 #|sound tic 21 stop thing 266
 #|sound tic 21 DSITEMUP from nobody vol 64 sep 128
-#|zombieman walk tic 44 831.949234 411.658264 90.000 z -128.000000 floor -128.000000 eye 46.679534 thinkers 9
-#|- tic 64 831.885162 411.658264 90.000 z -128.000000 floor -128.000000 eye 47.334960 thinkers 9
+#|sound tic 37 DSPOSACT from thing 176 vol 64 sep 64
+#|zombieman walk tic 44 831.949234 410.794219 90.000 z -128.000000 floor -128.000000 eye 46.679534 thinkers 9
+#|- tic 64 831.902633 495.978729 90.000 z -128.000000 floor -128.000000 eye 41.060394 thinkers 9
 #|sound tic 6 DSPOSIT3 from thing 177 vol 40 sep 143
 #|column lift switch walk tic 10 208.160308 255.986923 180.000 z -124.000000 floor -124.000000 eye 40.314453 thinkers 9 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 58 tics 4294967295
 #|sound tic 11 DSPSTART from sector 98 vol 64 sep 129
@@ -2287,24 +2602,54 @@ def main() -> IO(Unit):
 #|- tic 44 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 58 tics 4294967295
 #|sound tic 45 DSPSTOP from sector 98 vol 64 sep 129
 #|- tic 45 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 58 tics 4294967295
+#|sound tic 46 DSPOSACT from thing 177 vol 45 sep 132
+#|sound tic 72 DSPISTOL from thing 177 vol 47 sep 128
+#|sound tic 84 stop thing 292
 #|sound tic 150 DSPSTART from sector 98 vol 64 sep 129
 #|- tic 150 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 -124.000000 128.000000 thing 3 type 48 z -124.000000 floor -124.000000 ceiling 128.000000 state 58 tics 4294967295
-#|- tic 184 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 58 tics 4294967295
+#|sound tic 174 DSPISTOL from thing 177 vol 56 sep 128
+#|sound tic 178 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 181 stop thing 293
+#|- tic 184 208.007965 255.986999 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 12.000000 128.000000 thing 3 type 48 z 12.000000 floor 12.000000 ceiling 128.000000 state 58 tics 4294967295
 #|sound tic 4 DSPOSIT3 from thing 176 vol 64 sep 65
-#|barrel door walk tic 40 871.974029 448.783554 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 11 tics 5
-#|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
-#|use tic 41 871.971069 456.188186 90.000 z -128.000000 floor -128.000000 eye 40.876480 thinkers 10 sector 10 -128.000000 -126.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -126.000000 state 11 tics 4
-#|sound tic 45 DSPOSIT2 from thing 240 vol 37 sep 143
-#|sound tic 50 DSBGSIT2 from thing 81 vol 40 sep 124
-#|- tic 102 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 11 tics 3
-#|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
-#|- tic 294 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 11 tics 3
-#|sound tic 295 DSDOROPN from sector 10 vol 64 sep 54
-#|- tic 295 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -86.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -86.000000 state 11 tics 2
-#|- tic 296 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -84.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -84.000000 state 11 tics 1
-#|- tic 297 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -82.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -82.000000 state 10 tics 6
-#|- tic 301 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -74.000000 state 10 tics 2
-#|sounds drew to 115
+#|barrel door walk tic 40 871.986938 392.114837 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 11 tics 5
+#|use tic 41 871.983978 392.114837 90.000 z -128.000000 floor -128.000000 eye 40.876480 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 11 tics 4
+#|sound tic 50 DSPISTOL from thing 176 vol 64 sep 126
+#|sound tic 54 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 57 stop thing 292
+#|sound tic 88 DSPISTOL from thing 176 vol 64 sep 126
+#|sound tic 92 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|- tic 102 872.318511 392.379150 90.000 z -128.000000 floor -128.000000 eye 41.003234 thinkers 9 sector 10 -128.000000 -128.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -128.000000 state 11 tics 3
+#|sound tic 103 stop thing 293
+#|sound tic 120 DSDOROPN from sector 10 vol 64 sep 101
+#|sound tic 130 DSBGSIT1 from thing 81 vol 33 sep 125
+#|sound tic 146 DSPISTOL from thing 176 vol 64 sep 127
+#|sound tic 150 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 153 stop thing 294
+#|sound tic 155 DSPOSIT2 from thing 240 vol 31 sep 141
+#|sound tic 186 DSSHOTGN from thing 240 vol 35 sep 136
+#|sound tic 188 DSPOPAIN from thing 81 vol 39 sep 137
+#|sound tic 193 stop thing 295
+#|sound tic 201 stop thing 296
+#|sound tic 201 stop thing 297
+#|sound tic 218 DSPOSACT from thing 240 vol 38 sep 132
+#|sound tic 224 DSPISTOL from thing 176 vol 64 sep 45
+#|sound tic 228 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 245 stop thing 298
+#|sound tic 254 DSPISTOL from thing 176 vol 64 sep 41
+#|sound tic 258 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 261 stop thing 299
+#|sound tic 264 DSSHOTGN from thing 240 vol 41 sep 120
+#|sound tic 274 DSBGACT from thing 81 vol 42 sep 143
+#|sound tic 277 stop thing 302
+#|sound tic 278 stop thing 301
+#|sound tic 279 stop thing 300
+#|- tic 294 875.030654 395.040512 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 11 tics 3
+#|- tic 295 875.030654 395.040512 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 11 tics 2
+#|- tic 296 875.030654 395.040512 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 11 tics 1
+#|- tic 297 875.030654 395.040512 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 10 tics 6
+#|- tic 301 875.030654 395.040512 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -4.000000 state 10 tics 2
+#|sounds drew to 128
 #|-
 #|sound tic 21 DSOOF from nobody vol 64 sep 128
 #|blue door refused tic 21 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 17 "You need a blue key to open this door" tics 140
@@ -2321,13 +2666,25 @@ def main() -> IO(Unit):
 #|use tic 97 835.761825 1429.752563 90.000 z -128.000000 floor -128.000000 eye 36.239089 thinkers 10 sector 71 -128.000000 -126.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 99
 #|- tic 102 835.593826 1453.375137 90.000 z -128.000000 floor -128.000000 eye 41.488937 thinkers 10 sector 71 -128.000000 -116.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 94
 #|sound tic 104 DSPOSIT1 from thing 94 vol 49 sep 143
-#|sound tic 104 DSPOSIT2 from thing 95 vol 56 sep 100
+#|sound tic 104 DSPOSIT3 from thing 95 vol 56 sep 100
+#|sound tic 113 DSPOSACT from thing 95 vol 59 sep 105
 #|- tic 117 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -86.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 79
-#|- tic 158 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 38
-#|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 37
-#|- tic 195 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 1
-#|- tic 196 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 0
-#|sounds drew to 8
+#|sound tic 135 DSSHOTGN from thing 94 vol 53 sep 134
+#|sound tic 137 DSPOPAIN from thing 81 vol 50 sep 131
+#|sound tic 138 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|sound tic 142 stop thing 293
+#|sound tic 149 stop thing 294
+#|sound tic 150 stop thing 292
+#|sound tic 156 DSSHOTGN from thing 95 vol 64 sep 127
+#|- tic 158 834.741424 1443.315551 90.000 z -128.000000 floor -128.000000 eye 40.573959 thinkers 10 sector 71 -128.000000 -4.000000 key False things 211 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 38
+#|sound tic 159 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|- tic 159 834.753067 1441.499908 90.000 z -128.000000 floor -128.000000 eye 40.734329 thinkers 10 sector 71 -128.000000 -4.000000 key False things 211 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 37
+#|sound tic 163 stop thing 296
+#|sound tic 170 stop thing 297
+#|sound tic 171 stop thing 295
+#|- tic 195 834.859802 1424.506103 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 1
+#|- tic 196 834.859802 1424.506103 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 0
+#|sounds drew to 14
 #|-
 #|start cell 2,11 58 cell 2,10 157 sector 160 58 sector 140 238 next 292 random 59 thing 58 type 18 at -400.000000 400.000000 z 16.000000 angle 270.000 sector 160 state 2 tics 4294967295 radius 20 height 16 flags 0
 #|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
@@ -2346,20 +2703,287 @@ def main() -> IO(Unit):
 #|links 210 of 210 things, solid 108 of 108, wrong 0, unlinked 0
 #|reject 17,17 False 36,36 False 17,5 False 36,87 False 36,56 False 5,66 True 181,178 True 181,179 True 181,180 True 181,181 False
 #|sound tic 7 DSSGTSIT from thing 92 vol 64 sep 129
-#|front and deaf tic 12 92:115/1 90:64/8 96:64/4 sight 92 True 90 True 96 False random 64
+#|front and deaf tic 12 92:115/1 90:64/8 96:64/4 sight 92 True 90 True 96 False random 69
 #|sounds drew to 77
 #|sound tic 7 DSSGTSIT from thing 92 vol 49 sep 132
-#|behind tic 30 90:64/10 92:116/1 sight 90 True 92 True random 65
+#|behind tic 30 90:64/10 92:116/1 sight 90 True 92 True random 77
 #|sounds drew to 95
 #|sound tic 7 DSSGTSIT from thing 92 vol 49 sep 125
-#|sound tic 10 DSPOSIT3 from thing 90 vol 64 sep 224
-#|behind in reach tic 12 90:97/1 92:115/1 sight 90 True 92 True random 65
+#|sound tic 10 DSPOSIT1 from thing 90 vol 64 sep 224
+#|behind in reach tic 12 90:97/1 92:115/1 sight 90 True 92 True random 71
 #|sounds drew to 78
 #|sound tic 6 DSPOSIT2 from thing 96 vol 64 sep 33
-#|through the wall tic 20 96:101/1 sight 96 True random 70
+#|through the wall tic 20 96:101/1 sight 96 True random 83
 #|sounds drew to 85
 #|sound tic 15 DSPOSIT3 from thing 177 vol 57 sep 101
-#|over the pit tic 20 177:90/3 176:61/5 sight 177 True 176 False random 69
+#|over the pit tic 20 177:90/3 176:61/5 sight 177 True 176 False random 72
 #|sounds drew to 85
 #|off the pit tic 20 177:61/5 176:61/5 sight 177 False 176 False random 65
 #|sounds drew to 84
+#|head on
+#|tic 1 92 at -48.000000 1616.000000 facing 0.000 dir 0 row 67/6 health 100 random 61
+#|tic 2 92 at -48.000000 1616.000000 facing 0.000 dir 0 row 67/5 health 100 random 61
+#|tic 3 92 at -48.000000 1616.000000 facing 0.000 dir 0 row 67/4 health 100 random 61
+#|tic 4 92 at -48.000000 1616.000000 facing 0.000 dir 0 row 67/3 health 100 random 61
+#|tic 5 92 at -48.000000 1616.000000 facing 0.000 dir 0 row 67/2 health 100 random 61
+#|tic 6 92 at -48.000000 1616.000000 facing 0.000 dir 0 row 67/1 health 100 random 62
+#|sound tic 7 DSSGTSIT from thing 92 vol 64 sep 129
+#|tic 7 92 at -38.000000 1616.000000 facing 0.000 dir 0 row 113/2 health 100 random 65
+#|tic 8 92 at -38.000000 1616.000000 facing 0.000 dir 0 row 113/1 health 100 random 66
+#|tic 9 92 at -28.000000 1616.000000 facing 0.000 dir 0 row 114/2 health 100 random 68
+#|tic 10 92 at -28.000000 1616.000000 facing 0.000 dir 0 row 114/1 health 100 random 68
+#|tic 11 92 at -18.000000 1616.000000 facing 0.000 dir 0 row 115/2 health 100 random 69
+#|tic 12 92 at -18.000000 1616.000000 facing 0.000 dir 0 row 115/1 health 100 random 69
+#|sounds drew to 77
+#|across the room
+#|tic 1 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/4 health 100 random 61
+#|tic 2 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/3 health 100 random 61
+#|tic 3 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/2 health 100 random 61
+#|tic 4 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/1 health 100 random 61
+#|tic 5 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/10 health 100 random 61
+#|tic 6 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/9 health 100 random 62
+#|tic 7 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/8 health 100 random 62
+#|tic 8 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/7 health 100 random 63
+#|tic 9 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/6 health 100 random 64
+#|tic 10 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/5 health 100 random 64
+#|tic 11 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/4 health 100 random 64
+#|tic 12 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/3 health 100 random 64
+#|tic 13 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/2 health 100 random 64
+#|tic 14 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/1 health 100 random 64
+#|sound tic 15 DSPOSIT3 from thing 177 vol 57 sep 101
+#|tic 15 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/4 health 100 random 68
+#|tic 16 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/3 health 100 random 69
+#|tic 17 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/2 health 100 random 69
+#|tic 18 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/1 health 100 random 69
+#|tic 19 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/4 health 100 random 71
+#|tic 20 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/3 health 100 random 72
+#|tic 21 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/2 health 100 random 72
+#|tic 22 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/1 health 100 random 72
+#|tic 23 177 at 734.788085 318.788085 facing 225.000 dir 5 row 91/4 health 100 random 73
+#|tic 24 177 at 734.788085 318.788085 facing 225.000 dir 5 row 91/3 health 100 random 73
+#|sounds drew to 89
+#|round the corner
+#|tic 1 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/5 health 100 random 61
+#|tic 2 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/4 health 100 random 61
+#|tic 3 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/3 health 100 random 61
+#|tic 4 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/2 health 100 random 61
+#|tic 5 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/1 health 100 random 61
+#|sound tic 6 DSPOSIT2 from thing 96 vol 64 sep 33
+#|tic 6 96 at 144.000000 1944.000000 facing 270.000 dir 6 row 97/3 health 100 random 66
+#|tic 7 96 at 144.000000 1944.000000 facing 270.000 dir 6 row 97/2 health 100 random 67
+#|tic 8 96 at 144.000000 1944.000000 facing 270.000 dir 6 row 97/1 health 100 random 68
+#|tic 9 96 at 144.000000 1936.000000 facing 270.000 dir 6 row 98/3 health 100 random 71
+#|tic 10 96 at 144.000000 1936.000000 facing 270.000 dir 6 row 98/2 health 100 random 72
+#|tic 11 96 at 144.000000 1936.000000 facing 270.000 dir 6 row 98/1 health 100 random 72
+#|tic 12 96 at 144.000000 1928.000000 facing 270.000 dir 6 row 99/3 health 100 random 74
+#|tic 13 96 at 144.000000 1928.000000 facing 270.000 dir 6 row 99/2 health 100 random 75
+#|tic 14 96 at 144.000000 1928.000000 facing 270.000 dir 6 row 99/1 health 100 random 75
+#|tic 15 96 at 152.000000 1928.000000 facing 270.000 dir 0 row 100/3 health 100 random 79
+#|tic 16 96 at 152.000000 1928.000000 facing 270.000 dir 0 row 100/2 health 100 random 79
+#|tic 17 96 at 152.000000 1928.000000 facing 270.000 dir 0 row 100/1 health 100 random 79
+#|tic 18 96 at 160.000000 1928.000000 facing 315.000 dir 0 row 101/3 health 100 random 81
+#|tic 19 96 at 160.000000 1928.000000 facing 315.000 dir 0 row 101/2 health 100 random 82
+#|tic 20 96 at 160.000000 1928.000000 facing 315.000 dir 0 row 101/1 health 100 random 83
+#|tic 21 96 at 168.000000 1928.000000 facing 0.000 dir 0 row 102/3 health 100 random 86
+#|tic 22 96 at 168.000000 1928.000000 facing 0.000 dir 0 row 102/2 health 100 random 87
+#|tic 23 96 at 168.000000 1928.000000 facing 0.000 dir 0 row 102/1 health 100 random 87
+#|tic 24 96 at 176.000000 1928.000000 facing 0.000 dir 0 row 103/3 health 100 random 88
+#|sounds drew to 89
+#|at the ledge
+#|sound tic 1 DSPOSIT1 from thing 185 vol 64 sep 129
+#|tic 1 185 at 1112.000000 -672.000000 facing 90.000 dir 0 row 97/3 health 100 random 65
+#|tic 2 185 at 1112.000000 -672.000000 facing 90.000 dir 0 row 97/2 health 100 random 65
+#|tic 3 185 at 1112.000000 -672.000000 facing 90.000 dir 0 row 97/1 health 100 random 65
+#|tic 4 185 at 1112.000000 -664.000000 facing 45.000 dir 2 row 98/3 health 100 random 69
+#|tic 5 185 at 1112.000000 -664.000000 facing 45.000 dir 2 row 98/2 health 100 random 69
+#|tic 6 185 at 1112.000000 -664.000000 facing 45.000 dir 2 row 98/1 health 100 random 69
+#|tic 7 185 at 1104.000000 -664.000000 facing 90.000 dir 4 row 99/3 health 100 random 74
+#|tic 8 185 at 1104.000000 -664.000000 facing 90.000 dir 4 row 99/2 health 100 random 75
+#|tic 9 185 at 1104.000000 -664.000000 facing 90.000 dir 4 row 99/1 health 100 random 75
+#|tic 10 185 at 1096.000000 -664.000000 facing 135.000 dir 4 row 100/3 health 100 random 76
+#|tic 11 185 at 1096.000000 -664.000000 facing 135.000 dir 4 row 100/2 health 100 random 76
+#|tic 12 185 at 1096.000000 -664.000000 facing 135.000 dir 4 row 100/1 health 100 random 76
+#|tic 13 185 at 1096.000000 -672.000000 facing 180.000 dir 6 row 101/3 health 100 random 80
+#|tic 14 185 at 1096.000000 -672.000000 facing 180.000 dir 6 row 101/2 health 100 random 80
+#|tic 15 185 at 1096.000000 -672.000000 facing 180.000 dir 6 row 101/1 health 100 random 81
+#|tic 16 185 at 1096.000000 -680.000000 facing 225.000 dir 6 row 102/3 health 100 random 83
+#|sound tic 17 DSPOSIT2 from thing 182 vol 63 sep 78
+#|sound tic 17 DSPOSIT3 from thing 265 vol 46 sep 33
+#|tic 17 185 at 1096.000000 -680.000000 facing 225.000 dir 6 row 102/2 health 100 random 90
+#|tic 18 185 at 1096.000000 -680.000000 facing 225.000 dir 6 row 102/1 health 100 random 91
+#|tic 19 185 at 1104.000000 -680.000000 facing 270.000 dir 0 row 103/3 health 100 random 95
+#|sound tic 20 DSPOSACT from thing 182 vol 64 sep 80
+#|tic 20 185 at 1104.000000 -680.000000 facing 270.000 dir 0 row 103/2 health 100 random 96
+#|tic 21 185 at 1104.000000 -680.000000 facing 270.000 dir 0 row 103/1 health 100 random 97
+#|tic 22 185 at 1112.000000 -680.000000 facing 315.000 dir 0 row 104/3 health 100 random 98
+#|tic 23 185 at 1112.000000 -680.000000 facing 315.000 dir 0 row 104/2 health 100 random 102
+#|tic 24 185 at 1112.000000 -680.000000 facing 315.000 dir 0 row 104/1 health 100 random 103
+#|tic 25 185 at 1106.262695 -674.262695 facing 0.000 dir 3 row 97/3 health 100 random 108
+#|tic 26 185 at 1106.262695 -674.262695 facing 0.000 dir 3 row 97/2 health 100 random 109
+#|tic 27 185 at 1106.262695 -674.262695 facing 0.000 dir 3 row 97/1 health 100 random 109
+#|tic 28 185 at 1100.525390 -668.525390 facing 45.000 dir 3 row 98/3 health 100 random 110
+#|tic 29 185 at 1100.525390 -668.525390 facing 45.000 dir 3 row 98/2 health 100 random 115
+#|tic 30 185 at 1100.525390 -668.525390 facing 45.000 dir 3 row 98/1 health 100 random 115
+#|tic 31 185 at 1094.788085 -662.788085 facing 90.000 dir 3 row 99/3 health 100 random 116
+#|tic 32 185 at 1094.788085 -662.788085 facing 90.000 dir 3 row 99/2 health 100 random 119
+#|tic 33 185 at 1094.788085 -662.788085 facing 90.000 dir 3 row 99/1 health 100 random 120
+#|tic 34 185 at 1094.788085 -670.788085 facing 135.000 dir 6 row 100/3 health 100 random 124
+#|tic 35 185 at 1094.788085 -670.788085 facing 135.000 dir 6 row 100/2 health 100 random 125
+#|tic 36 185 at 1094.788085 -670.788085 facing 135.000 dir 6 row 100/1 health 100 random 125
+#|tic 37 185 at 1094.788085 -678.788085 facing 180.000 dir 6 row 101/3 health 100 random 127
+#|tic 38 185 at 1094.788085 -678.788085 facing 180.000 dir 6 row 101/2 health 100 random 129
+#|tic 39 185 at 1094.788085 -678.788085 facing 180.000 dir 6 row 101/1 health 100 random 129
+#|tic 40 185 at 1100.525390 -673.050781 facing 225.000 dir 1 row 102/3 health 100 random 133
+#|sounds drew to 108
+#|the zombieman shoots
+#|tic 1 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/4 health 100 random 61
+#|tic 2 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/3 health 100 random 61
+#|tic 3 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/2 health 100 random 61
+#|tic 4 177 at 752.000000 336.000000 facing 180.000 dir 0 row 61/1 health 100 random 61
+#|tic 5 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/10 health 100 random 61
+#|tic 6 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/9 health 100 random 62
+#|tic 7 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/8 health 100 random 62
+#|tic 8 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/7 health 100 random 63
+#|tic 9 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/6 health 100 random 64
+#|tic 10 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/5 health 100 random 64
+#|tic 11 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/4 health 100 random 64
+#|tic 12 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/3 health 100 random 64
+#|tic 13 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/2 health 100 random 64
+#|tic 14 177 at 752.000000 336.000000 facing 180.000 dir 0 row 62/1 health 100 random 64
+#|sound tic 15 DSPOSIT3 from thing 177 vol 57 sep 101
+#|tic 15 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/4 health 100 random 68
+#|tic 16 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/3 health 100 random 69
+#|tic 17 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/2 health 100 random 69
+#|tic 18 177 at 746.262695 330.262695 facing 225.000 dir 5 row 89/1 health 100 random 69
+#|tic 19 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/4 health 100 random 71
+#|tic 20 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/3 health 100 random 72
+#|tic 21 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/2 health 100 random 72
+#|tic 22 177 at 740.525390 324.525390 facing 225.000 dir 5 row 90/1 health 100 random 72
+#|tic 23 177 at 734.788085 318.788085 facing 225.000 dir 5 row 91/4 health 100 random 73
+#|tic 24 177 at 734.788085 318.788085 facing 225.000 dir 5 row 91/3 health 100 random 73
+#|tic 25 177 at 734.788085 318.788085 facing 225.000 dir 5 row 91/2 health 100 random 73
+#|tic 26 177 at 734.788085 318.788085 facing 225.000 dir 5 row 91/1 health 100 random 73
+#|tic 27 177 at 729.050781 313.050781 facing 225.000 dir 5 row 92/4 health 100 random 74
+#|tic 28 177 at 729.050781 313.050781 facing 225.000 dir 5 row 92/3 health 100 random 75
+#|tic 29 177 at 729.050781 313.050781 facing 225.000 dir 5 row 92/2 health 100 random 75
+#|tic 30 177 at 729.050781 313.050781 facing 225.000 dir 5 row 92/1 health 100 random 75
+#|tic 31 177 at 723.313476 307.313476 facing 225.000 dir 5 row 93/4 health 100 random 76
+#|tic 32 177 at 723.313476 307.313476 facing 225.000 dir 5 row 93/3 health 100 random 76
+#|tic 33 177 at 723.313476 307.313476 facing 225.000 dir 5 row 93/2 health 100 random 76
+#|tic 34 177 at 723.313476 307.313476 facing 225.000 dir 5 row 93/1 health 100 random 76
+#|tic 35 177 at 717.576171 301.576171 facing 225.000 dir 5 row 94/4 health 100 random 78
+#|tic 36 177 at 717.576171 301.576171 facing 225.000 dir 5 row 94/3 health 100 random 78
+#|tic 37 177 at 717.576171 301.576171 facing 225.000 dir 5 row 94/2 health 100 random 78
+#|tic 38 177 at 717.576171 301.576171 facing 225.000 dir 5 row 94/1 health 100 random 78
+#|tic 39 177 at 711.838867 295.838867 facing 225.000 dir 5 row 95/4 health 100 random 79
+#|tic 40 177 at 711.838867 295.838867 facing 225.000 dir 5 row 95/3 health 100 random 79
+#|tic 41 177 at 711.838867 295.838867 facing 225.000 dir 5 row 95/2 health 100 random 79
+#|tic 42 177 at 711.838867 295.838867 facing 225.000 dir 5 row 95/1 health 100 random 79
+#|tic 43 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/10 health 100 random 80
+#|tic 44 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/9 health 100 random 80
+#|tic 45 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/8 health 100 random 80
+#|tic 46 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/7 health 100 random 80
+#|tic 47 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/6 health 100 random 80
+#|tic 48 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/5 health 100 random 80
+#|tic 49 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/4 health 100 random 80
+#|tic 50 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/3 health 100 random 80
+#|tic 51 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/2 health 100 random 80
+#|tic 52 177 at 711.838867 295.838867 facing 190.074 dir 5 row 184/1 health 100 random 80
+#|sound tic 53 DSPISTOL from thing 177 vol 61 sep 112
+#|tic 53 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/8 health 100 random 87
+#|tic 54 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/7 health 100 random 87
+#|tic 55 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/6 health 100 random 87
+#|tic 56 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/5 health 100 random 87
+#|tic 57 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/4 health 100 random 87
+#|tic 58 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/3 health 100 random 87
+#|tic 59 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/2 health 100 random 87
+#|tic 60 177 at 711.838867 295.838867 facing 190.074 dir 5 row 185/1 health 100 random 87
+#|tic 61 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/8 health 100 random 87
+#|tic 62 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/7 health 100 random 87
+#|tic 63 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/6 health 100 random 87
+#|tic 64 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/5 health 100 random 87
+#|sound tic 65 stop thing 292
+#|tic 65 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/4 health 100 random 88
+#|tic 66 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/3 health 100 random 88
+#|tic 67 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/2 health 100 random 88
+#|tic 68 177 at 711.838867 295.838867 facing 190.074 dir 5 row 186/1 health 100 random 88
+#|tic 69 177 at 706.101562 290.101562 facing 225.000 dir 5 row 89/4 health 100 random 89
+#|tic 70 177 at 706.101562 290.101562 facing 225.000 dir 5 row 89/3 health 100 random 89
+#|sounds drew to 136
+#|the shotgun guy shoots
+#|tic 1 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/5 health 100 random 61
+#|tic 2 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/4 health 100 random 61
+#|tic 3 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/3 health 100 random 61
+#|tic 4 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/2 health 100 random 61
+#|tic 5 96 at 144.000000 1952.000000 facing 225.000 dir 0 row 63/1 health 100 random 61
+#|sound tic 6 DSPOSIT2 from thing 96 vol 64 sep 33
+#|tic 6 96 at 144.000000 1944.000000 facing 270.000 dir 6 row 97/3 health 100 random 66
+#|tic 7 96 at 144.000000 1944.000000 facing 270.000 dir 6 row 97/2 health 100 random 67
+#|tic 8 96 at 144.000000 1944.000000 facing 270.000 dir 6 row 97/1 health 100 random 68
+#|tic 9 96 at 144.000000 1936.000000 facing 270.000 dir 6 row 98/3 health 100 random 71
+#|tic 10 96 at 144.000000 1936.000000 facing 270.000 dir 6 row 98/2 health 100 random 72
+#|tic 11 96 at 144.000000 1936.000000 facing 270.000 dir 6 row 98/1 health 100 random 72
+#|tic 12 96 at 144.000000 1928.000000 facing 270.000 dir 6 row 99/3 health 100 random 74
+#|tic 13 96 at 144.000000 1928.000000 facing 270.000 dir 6 row 99/2 health 100 random 75
+#|tic 14 96 at 144.000000 1928.000000 facing 270.000 dir 6 row 99/1 health 100 random 75
+#|tic 15 96 at 152.000000 1928.000000 facing 270.000 dir 0 row 100/3 health 100 random 79
+#|tic 16 96 at 152.000000 1928.000000 facing 270.000 dir 0 row 100/2 health 100 random 79
+#|tic 17 96 at 152.000000 1928.000000 facing 270.000 dir 0 row 100/1 health 100 random 79
+#|tic 18 96 at 160.000000 1928.000000 facing 315.000 dir 0 row 101/3 health 100 random 81
+#|tic 19 96 at 160.000000 1928.000000 facing 315.000 dir 0 row 101/2 health 100 random 82
+#|tic 20 96 at 160.000000 1928.000000 facing 315.000 dir 0 row 101/1 health 100 random 83
+#|tic 21 96 at 168.000000 1928.000000 facing 0.000 dir 0 row 102/3 health 100 random 86
+#|tic 22 96 at 168.000000 1928.000000 facing 0.000 dir 0 row 102/2 health 100 random 87
+#|tic 23 96 at 168.000000 1928.000000 facing 0.000 dir 0 row 102/1 health 100 random 87
+#|tic 24 96 at 176.000000 1928.000000 facing 0.000 dir 0 row 103/3 health 100 random 88
+#|tic 25 96 at 176.000000 1928.000000 facing 0.000 dir 0 row 103/2 health 100 random 88
+#|tic 26 96 at 176.000000 1928.000000 facing 0.000 dir 0 row 103/1 health 100 random 88
+#|tic 27 96 at 184.000000 1928.000000 facing 0.000 dir 0 row 104/3 health 100 random 89
+#|tic 28 96 at 184.000000 1928.000000 facing 0.000 dir 0 row 104/2 health 100 random 90
+#|tic 29 96 at 184.000000 1928.000000 facing 0.000 dir 0 row 104/1 health 100 random 91
+#|tic 30 96 at 192.000000 1928.000000 facing 0.000 dir 0 row 97/3 health 100 random 93
+#|tic 31 96 at 192.000000 1928.000000 facing 0.000 dir 0 row 97/2 health 100 random 93
+#|tic 32 96 at 192.000000 1928.000000 facing 0.000 dir 0 row 97/1 health 100 random 93
+#|tic 33 96 at 200.000000 1928.000000 facing 0.000 dir 0 row 98/3 health 100 random 94
+#|tic 34 96 at 200.000000 1928.000000 facing 0.000 dir 0 row 98/2 health 100 random 94
+#|tic 35 96 at 200.000000 1928.000000 facing 0.000 dir 0 row 98/1 health 100 random 95
+#|sound tic 36 DSPOSACT from thing 96 vol 64 sep 78
+#|tic 36 96 at 208.000000 1928.000000 facing 0.000 dir 0 row 99/3 health 100 random 97
+#|tic 37 96 at 208.000000 1928.000000 facing 0.000 dir 0 row 99/2 health 100 random 97
+#|tic 38 96 at 208.000000 1928.000000 facing 0.000 dir 0 row 99/1 health 100 random 97
+#|tic 39 96 at 216.000000 1928.000000 facing 0.000 dir 0 row 100/3 health 100 random 98
+#|tic 40 96 at 216.000000 1928.000000 facing 0.000 dir 0 row 100/2 health 100 random 99
+#|tic 41 96 at 216.000000 1928.000000 facing 0.000 dir 0 row 100/1 health 100 random 99
+#|tic 42 96 at 224.000000 1928.000000 facing 0.000 dir 0 row 101/3 health 100 random 100
+#|tic 43 96 at 224.000000 1928.000000 facing 0.000 dir 0 row 101/2 health 100 random 100
+#|tic 44 96 at 224.000000 1928.000000 facing 0.000 dir 0 row 101/1 health 100 random 100
+#|tic 45 96 at 232.000000 1928.000000 facing 0.000 dir 0 row 102/3 health 100 random 101
+#|tic 46 96 at 232.000000 1928.000000 facing 0.000 dir 0 row 102/2 health 100 random 101
+#|tic 47 96 at 232.000000 1928.000000 facing 0.000 dir 0 row 102/1 health 100 random 101
+#|tic 48 96 at 240.000000 1928.000000 facing 0.000 dir 0 row 103/3 health 100 random 102
+#|tic 49 96 at 240.000000 1928.000000 facing 0.000 dir 0 row 103/2 health 100 random 102
+#|tic 50 96 at 240.000000 1928.000000 facing 0.000 dir 0 row 103/1 health 100 random 102
+#|tic 51 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/10 health 100 random 103
+#|tic 52 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/9 health 100 random 103
+#|tic 53 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/8 health 100 random 103
+#|tic 54 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/7 health 100 random 103
+#|tic 55 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/6 health 100 random 103
+#|tic 56 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/5 health 100 random 103
+#|tic 57 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/4 health 100 random 103
+#|tic 58 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/3 health 100 random 103
+#|tic 59 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/2 health 100 random 103
+#|tic 60 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 187/1 health 100 random 103
+#|sound tic 61 DSSHOTGN from thing 96 vol 64 sep 92
+#|tic 61 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/10 health 73 random 127
+#|tic 62 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/9 health 73 random 127
+#|tic 63 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/8 health 73 random 127
+#|sound tic 64 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|tic 64 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/7 health 73 random 127
+#|tic 65 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/6 health 73 random 128
+#|tic 66 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/5 health 73 random 128
+#|tic 67 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/4 health 73 random 128
+#|sound tic 68 stop thing 293
+#|tic 68 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/3 health 73 random 128
+#|tic 69 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/2 health 73 random 129
+#|tic 70 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/1 health 73 random 130
+#|sounds drew to 138

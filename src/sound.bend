@@ -12,6 +12,9 @@ import ./angle.bend as A
 def Sound.pistol() -> U32:
   1
 
+def Sound.shotgn() -> U32:
+  2
+
 def Sound.pstart() -> U32:
   18
 
@@ -107,7 +110,8 @@ def Sound.table() -> List<&2, Sound.Sfx>:
     Sfx{26, "DSDMPAIN", 96}, Sfx{27, "DSPOPAIN", 96}, Sfx{31, "DSSLOP", 78}, Sfx{36, "DSPOSIT1", 98},
     Sfx{37, "DSPOSIT2", 98}, Sfx{38, "DSPOSIT3", 98}, Sfx{39, "DSBGSIT1", 98}, Sfx{40, "DSBGSIT2", 98},
     Sfx{41, "DSSGTSIT", 98}, Sfx{59, "DSPODTH1", 70}, Sfx{60, "DSPODTH2", 70}, Sfx{61, "DSPODTH3", 70},
-    Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60}]
+    Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
+    Sfx{2, "DSSHOTGN", 64}, Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel
