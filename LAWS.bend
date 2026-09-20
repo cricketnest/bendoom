@@ -26,6 +26,7 @@ import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
 import ./src/sfx.bend as X
+import ./src/bar.bend as Y
 
 # Bytes and the WAD
 # -----------------
@@ -1743,7 +1744,7 @@ def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
 def Sprite.gfx() -> G.Gfx:
   G.Gfx{V.Leaf{0}, V.Leaf{0}, 0, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0,
     V.Vec.of_list(List.append(&2, U32, Sprite.slots(8n, 1000, 0), Sprite.slots(8n, 2000, 1)), 96),
-    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}}
+    G.Anims{G.Anim{[], 0, V.Leaf{0}}, G.Anim{[], 0, V.Leaf{0}}, 0}, V.Leaf{0}}
 
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(+id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
@@ -2060,3 +2061,25 @@ law sfx_rates_unserved:
   for bytes: List<&2, U32>
   {(X.Sfx.run(X.Sound{16000, count, bytes}), X.Sfx.run(X.Sound{17990, count, bytes}))
     == (None{}, None{}) : Maybe<&2, X.Sfx.Run> & Maybe<&2, X.Sfx.Run>}
+
+# The status bar
+# --------------
+
+# LAW: ST_updateWidgets' keyboxes over the three colours, the icons
+# numbered as ST_loadGraphics loads STKEYS0 to STKEYS5 from slot 21: a
+# colour with neither key shows nothing, the blue card shows the first
+# icon, the blue skull over it shows the fourth, and the red skull alone
+# shows the sixth in the bottom slot.
+law key_boxes:
+  {[Y.Bar.keybox(0, 0), Y.Bar.keybox(0, 2), Y.Bar.keybox(1, 0), Y.Bar.keybox(1, 1), Y.Bar.keybox(9, 0),
+    Y.Bar.keybox(32, 2), Y.Bar.keybox(32, 0)]
+    == [4294967295, 4294967295, 21, 4294967295, 24, 26, 4294967295] : List<&2, U32>}
+
+# LAW: ST_createWidgets' w_arms reads weaponowned[i + 1], so the arms
+# panel counts the pistol first and the BFG last and never the fist or
+# the chainsaw: the starting pair shows the pistol's yellow number, slot
+# 12, and a grey number for every other, and owning the chainsaw leaves
+# slot 6 grey while owning the BFG turns it yellow.
+law arms_numbers:
+  {[Y.Bar.arm(3, 0), Y.Bar.arm(3, 1), Y.Bar.arm(7, 1), Y.Bar.arm(3, 5), Y.Bar.arm(131, 5), Y.Bar.arm(64, 5)]
+    == [12, 28, 13, 32, 32, 17] : List<&2, U32>}

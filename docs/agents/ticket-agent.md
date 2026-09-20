@@ -35,7 +35,7 @@ Half the effort goes to removing. Replacing X with Y includes deleting X. Update
 
 ## Run and report
 
-1. Run the proof, every test on both lanes, the oracle cases, then `nix flake check` from the worktree. It sees only files that are git-added.
+1. Run the proof, every test on both lanes and the oracle cases. Run `nix flake check` once, on your own work before the final merge; it sees only files that are git-added. After merging the integration branch, run the proof and the tests again but not the flake check: the orchestrator runs it on the integration branch, and the lock it holds for ten minutes is what lets the integration branch move under the agents waiting behind you.
 2. Commit in the repo's style: a conventional prefix and a lower-case subject that says what now holds (`git log --oneline -15`). No `Co-Authored-By` trailer. Do not change git config; preserve the configured author and GitHub no-reply email.
 3. In the ticket file, tick the boxes you met, set `**Status:** resolved` only if every box is met, and append under `## Comments`: where each expected value came from, the oracle reports, what was built, what was deleted, what was pulled forward from a later ticket, what surprised you. Plain words, no em dashes, no puffery.
 4. The final message: commit hashes, the proof, test and oracle results verbatim with output on failure, the interface later tickets call, every trade-off taken, and anything left open. Report failures plainly, and claim no box you did not verify.

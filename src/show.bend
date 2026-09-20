@@ -49,7 +49,8 @@ def Show.quad.if(same: Bool, tl: Image, tr: Image, bl: Image, br: Image) -> Imag
 
 # Four quadrants as one image: a single pixel when all four are one
 # colour, since the window's fill pays for every level it descends, and
-# the black band under the view alone is a sixth of the window.
+# a flat stretch of wall, floor or status bar is many quadrants of one
+# colour.
 def Show.quad(tl: Image, tr: Image, bl: Image, br: Image) -> Image:
   match tl tr bl br:
     case Pix{+a} Pix{+b} Pix{+c} Pix{+d}:

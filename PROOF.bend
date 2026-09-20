@@ -1644,3 +1644,9 @@ def Laws.sfx_refusals():
 
 def Laws.sfx_rates_unserved(count, bytes):
   {==}
+
+def Laws.key_boxes():
+  {==}
+
+def Laws.arms_numbers():
+  {==}
