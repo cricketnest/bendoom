@@ -39,37 +39,6 @@ def pcx-indices []: binary -> list<string> {
   | str trim | split row ' '
 }
 
-# The posts of the patch column whose first is at the offset piped in:
-# each one's first row in the patch, its length, and where its pixels
-# start, up to the column's 255.
-def posts [wad: binary]: int -> table<delta: int, length: int, pixels: int> {
-  let first = $in
-  generate {|at|
-    let delta = $wad | bytes at $at..$at | into int
-    if $delta != 255 {
-      let length = $wad | bytes at ($at + 1)..($at + 1) | into int
-      {out: {delta: $delta, length: $length, pixels: ($at + 3)}, next: ($at + $length + 4)}
-    }
-  } $first
-}
-
-# The pixels a patch covers when drawn at x, y, its offsets taken off as
-# V_DrawPatch takes them: each one's frame index and colour.
-def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<at: int, colour: string> {
-  let patch = $wad | lumps | where name == $name | last | get pos
-  let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
-  let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
-  let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
-  0..<$width | each {|c|
-    $patch + ($wad | bytes at ($patch + 8 + $c * 4)..($patch + 11 + $c * 4) | into int --endian little)
-    | posts $wad
-    | each {|post| 0..<$post.length | each {|k| {
-        at: (($top + $post.delta + $k) * 320 + $left + $c)
-        colour: ($wad | bytes at ($post.pixels + $k)..($post.pixels + $k) | encode hex | str lowercase)
-      } } }
-  } | flatten | flatten
-}
-
 # Every frame pixel the marine's face can cover: the box around the
 # places ST_loadGraphics' 42 face patches take at the face widget's
 # ST_FACESX and ST_FACESY, each less its own offsets.

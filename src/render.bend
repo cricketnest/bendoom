@@ -93,15 +93,18 @@ def Render.line(text: String, +gfx: G.Gfx, st: Render.Line) -> Array<U32>:
     case SCon{c, rest} Line{mem, +x, False{}}:
       Render.line(rest, gfx, Render.line.char(Msg.Message.glyph(c), gfx, x, mem))
 
-# Doom's HU_Drawer: the message line in the WAD's font at HU_MSGX,
-# HU_MSGY, over the view, while the line is on. A frame drawn with
-# messages off shows none, as vanilla's show_messages 0 does.
 def Render.messages(on: Bool, +gfx: G.Gfx, n: U32, mem: Array<U32>) -> Array<U32>:
   match on:
     case False{}:
       mem
     case True{}:
       Render.line(Msg.Message.text(n), gfx, Line{mem, Msg.Message.x(), False{}})
+
+# Doom's HU_Drawer: the message line in the WAD's font at HU_MSGX,
+# HU_MSGY, over the view, while its counter runs. A frame drawn with
+# messages off shows none, as vanilla's show_messages 0 does.
+def Render.hud(on: Bool, +gfx: G.Gfx, shown: U32, tics: U32, mem: Array<U32>) -> Array<U32>:
+  Render.messages(Bool.and(on, Bool.not(U32.is_zero(tics))), gfx, shown, mem)
 
 # The sectors' heights and light come from the state's level, the
 # sides' textures from the state, and the animations' frames and the
@@ -111,7 +114,7 @@ def Render.messages(on: Bool, +gfx: G.Gfx, n: U32, mem: Array<U32>) -> Array<U32
 # for and one is up.
 def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, messages: Bool, mem: Array<U32>) ->
   Array<U32>:
-  Render.messages(Bool.and(messages, Bool.not(U32.is_zero(S.State.msgtics(s)))), gfx, S.State.message(s),
+  Render.hud(messages, gfx, S.State.message(s), S.State.msgtics(s),
     Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)), gfx,
       Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
         G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.shown(S.State.things(s)),

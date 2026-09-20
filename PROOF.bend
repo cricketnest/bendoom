@@ -396,7 +396,7 @@ def Laws.lift_crushed():
   {==}
 
 def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
-  sounds, mrnd, message, msgtics, held):
+  sounds, mrnd, held):
   match level:
     case L.Level{geo, sectors, specials}:
       %held : {S.Sim.pressed(next, _) == False{} : Bool}
@@ -418,7 +418,7 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
@@ -1072,16 +1072,15 @@ def held_y(before: S.Player, after: S.Player) ->
 # leaves the place its turn left it.
 def hud_free(s: S.State, h: Laws.Free(s)) -> Laws.Free(S.State.hud(s)):
   match s:
-    case S.State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message,
-      msgtics}:
-      holding_free(level, player, I.Inventory.saying(Msg.Message.none(), S.Player.inv(player)), h)
+    case S.State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
+      holding_free(level, player, I.Inventory.hud(S.Player.inv(player)), h)
 
 # What a turn holds is free where the state before it was: the level it
 # packs has the geometry, and the player it packs the place.
 def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
   Held(geo, S.State.held(geo, before, after)):
   match before after:
-    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wmessage, wmsgtics} S.State{+player, L.Level{g, +sectors, +specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd} S.State{+player, L.Level{g, +sectors, +specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       %held_x(was, player)
         : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, _, S.Player.y(S.Player.held(was, player))) : Bool}
       %held_y(was, player)
@@ -1093,13 +1092,13 @@ def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, b
 
 def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> Held(geo, S.State.kept(s, t)):
   match s:
-    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd}:
       h
 
 def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, t: S.Sim.Try, s: S.State,
   ht: Free(L.Level{geo, sa, pa}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa}, s)):
   match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       ht
 
 # The player's own turn: its move is checked against the geometry, and
@@ -1126,32 +1125,32 @@ def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.St
 def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.Sim.thinkers.go(fuel, cmd, geo, s)):
   match fuel s:
-    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       h
-    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd}:
       h
-    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +message, +msgtics}:
+    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd}:
       run_held(rest, cmd, geo, S.Sim.turn(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}),
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd}),
         turn_held(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}, h))
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd}, h))
 
 def all_held(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.Sim.thinkers.all(fuel, cmd, geo, s)):
   match fuel s:
-    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       h
-    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd}:
       h
-    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +message, +msgtics}:
+    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd}:
       all_held(f, cmd, geo, S.Sim.thinkers.go(t <> due, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}),
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd}),
         run_held(t <> due, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}, h))
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd}, h))
 
 def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.rested(s)):
   match s:
-    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd}:
       h
 
 # Reporting a sound keeps the place: it writes the sounds and the index
@@ -1159,7 +1158,7 @@ def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.St
 def heard_held(geo: L.Level.Geo, e: Sn.Sound.Event, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.State.heard(e, s)):
   match s:
-    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       h
 
 def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.State, h: Held(geo, s)) ->
@@ -1172,27 +1171,26 @@ def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.Stat
 
 def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.told(s)):
   match s:
-    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd}:
       told_go_held(geo, heard,
         S.State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd, clock, ended,
-          usedown, sounds, mrnd, message, msgtics}, h)
+          usedown, sounds, mrnd}, h)
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}:
       {==}
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, message, msgtics}:
+    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +message, +msgtics}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
       +thought = S.Sim.counters(S.Sim.psprites(level, clock, S.Sim.eye(level, clock, S.Sim.move(level, cmd, player))))
-      +before = {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, message,
-        msgtics} : S.State}
+      +before = {S.State{thought, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd} : S.State}
       hud_free(S.Sim.tic.kept(geo, clock, K.Cmd.use(cmd), S.State.told(S.Sim.thinkers(cmd, geo,
           S.State.held(geo, before, S.Sim.use(S.Sim.pressed(cmd, usedown), before))))),
         told_held(geo,
@@ -1575,6 +1573,9 @@ def Laws.backpack_later():
   {==}
 
 def Laws.weapon_taken():
+  {==}
+
+def Laws.pickup_messages():
   {==}
 
 def Laws.radius_within():

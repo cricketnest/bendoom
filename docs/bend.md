@@ -22,6 +22,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **`type` and `def` are keywords,** refused as a field, parameter or pattern name; a thing's DoomEd type is its `kind`.
 - **A type may take a type:** `type Tree<-A: Data> is Data`, and each def over it takes `-A: Data` first and is called with the type spelled out (`V.Tree.get(H.Thing, tree, i)`). A self-call that rebuilds its scrutinee (growing a path under an empty leaf) is refused as not decreasing.
 - **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun. Base's `List.length` recurses once an element, so it may not measure a WAD lump there; `List.drop` is a loop.
+- **The native lane refuses an arity over 255.** The JS lane takes it, so a program can pass `bend f.bend` and `bend f.bend -o f.js` and fail `bend f.bend -o f`. What pushes it over is not the source's own parameter lists (the widest is fourteen) but what the backend makes of a record the sim reads everywhere: two more fields on `Sim.State`, or one record-typed field on `Inventory`, each broke it where two more U32 fields on `Inventory` did not.
 
 ## Proofs
 

@@ -216,14 +216,14 @@ def Closed.unarmed() -> S.Psprites:
 # over every level can compute.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
   S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], [S.Mobj{H.Thing.you()}]}, 0, clock, False{}, False{},
-    [], 0, 0, 0}
+    [], 0}
 
 # A state with the player as given and some thinkers, among things named
 # under 128, all of them entered: linked where they stand, their mobjs
 # thinking.
 def Closed.at(p: S.Player, level: L.Level, ts: List<&2, S.Thinker>, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], ts}, 0, 0, False{},
-    False{}, [], 0, 0, 0})
+    False{}, [], 0})
 
 # The thinkers running that are no mobj's.
 def Closed.running.go(ts: List<&2, S.Thinker>) -> List<&2, S.Thinker>:
@@ -258,10 +258,9 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0,
-      0, 0}))
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0}))
     == ((clock + 1 : U32),
-      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0, 0, 0})
+      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], 0})
     : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
@@ -567,7 +566,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, 0, 0})
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0})
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -657,12 +656,9 @@ law use_fires_once:
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: U32
-  for message: U32
-  for msgtics: U32
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, message,
-      msgtics}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -682,7 +678,7 @@ def Closed.exit() -> L.Level:
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Closed.player(2097152, 4194304, 0, 8388608), Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()),
-      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, 0, 0}))
+      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0}))
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -760,7 +756,7 @@ law random_table:
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, False{}, False{},
-    [], 0, 0, 0}))
+    [], 0}))
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -854,39 +850,43 @@ type Closed.Edit is Data:
   Strength{n: U32}
   Items{n: U32}
   Flash{n: U32}
+  Said{n: U32, tics: U32}
 
 def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
   match inv e:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Health{n}:
-      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message}
+      bonus, message, msgtics} Health{n}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Armour{points, kind}:
-      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, message}
+      bonus, message, msgtics} Armour{points, kind}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Cards{bits}:
-      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, message}
+      bonus, message, msgtics} Cards{bits}:
+      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Ammo{rounds}:
+      bonus, message, msgtics} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
-        bonus, message}
+        bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Backpack{}:
+      bonus, message, msgtics} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
-        powers, items, bonus, message}
+        powers, items, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Weapons{bits}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, message}
+      bonus, message, msgtics} Weapons{bits}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Strength{n}:
+      bonus, message, msgtics} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, message}
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Items{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, message}
+      bonus, message, msgtics} Items{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, message, msgtics}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, message} Flash{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, message}
+      bonus, message, msgtics} Flash{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, message, msgtics}
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus, message, msgtics} Said{n, tics}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, n, tics}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -904,8 +904,32 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
     case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       id <> Closed.ids(rest)
 
+# The inventory with the heads-up line taken off it: the laws below are
+# about the grants, and pickup_messages about the line.
+def Closed.hushed(inv: I.Inventory) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, message,
+    msgtics} = inv
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, 0, 0}
+
 def Closed.kept(+s: S.State) -> Closed.Got:
-  Got{Closed.ids(H.Things.list(S.State.things(s))), S.Player.inv(S.State.player(s))}
+  Got{Closed.ids(H.Things.list(S.State.things(s))), Closed.hushed(S.Player.inv(S.State.player(s)))}
+
+# What the heads-up line shows and how long it has left there.
+type Closed.Line is Data:
+  Shown{message: U32, tics: U32}
+
+def Closed.line(+s: S.State) -> Closed.Line:
+  Shown{I.Inventory.message(S.Player.inv(S.State.player(s))),
+    I.Inventory.msgtics(S.Player.inv(S.State.player(s)))}
+
+# The line after the tic that brings the player 8 from a thing of a
+# type, in its reach.
+def Closed.said(inv: I.Inventory, kind: U32) -> Closed.Line:
+  Closed.line(Closed.idled(1n, Closed.among(inv, 2097152, 0, 524288, [Closed.thing(1, kind, 2097152, 5242880, 0)])))
+
+# The line after n tics of a player with nothing to pick up.
+def Closed.counted(n: Nat, inv: I.Inventory) -> Closed.Line:
+  Closed.line(Closed.idled(n, Closed.among(inv, 2097152, 0, 0, [])))
 
 # What is left after n tics of the west room's player, holding an
 # inventory, walking north by a momentum a tic toward a thing of a type
@@ -1162,6 +1186,28 @@ law weapon_taken:
       Got{[1], Closed.inv([Weapons{131}])}]
     : List<&2, Closed.Got>}
 
+# LAW: the heads-up line. d_englsh.h's string for each pickup type the
+# two E1M1s hold, PD_BLUEK for the blue door that refuses, and
+# hu_stuff.c's four seconds. A pickup takes the line on its own tic with
+# HU_MSGTIMEOUT tics left; a pickup the grant refuses says nothing and
+# leaves the line as it was; the counter falls by one a tic and the line
+# goes out at zero.
+law pickup_messages:
+  {[Closed.said(I.Inventory.start(), 2014), Closed.said(Closed.inv([Health{99}]), 2011),
+    Closed.said(Closed.inv([Health{99}]), 2012), Closed.said(I.Inventory.start(), 2018),
+    Closed.said(I.Inventory.start(), 2019), Closed.said(I.Inventory.start(), 5),
+    Closed.said(I.Inventory.start(), 2005), Closed.said(I.Inventory.start(), 2023),
+    Closed.said(I.Inventory.start(), 2011), Closed.said(Closed.inv([Armour{150, 2}]), 2018),
+    Closed.said(Closed.inv([Said{3, 90}]), 2011),
+    Closed.counted(1n, Closed.inv([Said{3, 2}])), Closed.counted(2n, Closed.inv([Said{3, 2}])),
+    Closed.counted(3n, Closed.inv([Said{3, 2}])),
+    Closed.line(Closed.used(0n, Closed.locked(I.Inventory.start()))),
+    Closed.line(Closed.used(0n, Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start()))))]
+    == [Shown{3, 140}, Shown{5, 140}, Shown{6, 140}, Shown{1, 140}, Shown{2, 140}, Shown{7, 140}, Shown{15, 140},
+      Shown{8, 140}, Shown{0, 0}, Shown{0, 0}, Shown{3, 89}, Shown{3, 1}, Shown{3, 0}, Shown{3, 0}, Shown{17, 140},
+      Shown{0, 0}]
+    : List<&2, Closed.Line>}
+
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
 law replay_append:
@@ -1359,7 +1405,7 @@ def Closed.ranked(you: U32, x: U32, momx: U32) -> S.State:
   S.State.populated([Closed.thing(2, 15, 2097152, 2097152, 0), Closed.thing(5, 15, 2097152, 2097152, 0),
     Closed.thing(9, 15, 2097152, 2097152, 0)], 128, S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976,
       0, 2686976, [], I.Inventory.start(), Closed.unarmed()}, Closed.doors(), H.Things.none(0, you, 0, 0), V.Leaf{0},
-    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0, 0, 0})
+    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0})
 
 # The mobjs the one cell lists.
 def Closed.cell(s: S.State) -> List<&2, U32>:

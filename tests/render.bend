@@ -78,6 +78,7 @@ import ../src/draw.bend as D
 import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
+import ../src/message.bend as Msg
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32}
@@ -128,6 +129,46 @@ def frame(tag: String, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem:
   IO(Array<U32>):
   print(tag, again(tables, gfx, s, hashed(tables, gfx, s, 0, mem)))
 
+# The frame's first eight rows, which is every row the font's tallest
+# glyph reaches.
+def band(mem: Array<U32>) -> Array<U32> & List<&2, U32>:
+  B.Bytes.each(~U32, ~B.Bytes.at, B.Bytes.fields(2560n, G.Gfx.frame(), 1, [0]), mem)
+
+def said.at(+i: U32, +v: U32) -> String:
+  " " ++ U32.show(i) ++ "," ++ U32.show(v)
+
+# Where the frame with the message differs from the same frame without
+# it: how many pixels, and the first four, each its index in the frame
+# and the palette index the line left there.
+def said.go(off: List<&2, U32>, on: List<&2, U32>, +i: U32, +n: U32, +text: String) -> U32 & String:
+  match off on:
+    case a <> as +b <> bs:
+      +hit = Bool.not(U32.is_eq(a, b))
+      said.go(as, bs, (i + 1 : U32), (n + Bool.to_u32(hit) : U32),
+        Bool.pick(String, Bool.and(hit, U32.is_lt(n, 4)), text ++ said.at((i + G.Gfx.frame() : U32), b), text))
+    case _ _:
+      (n, text)
+
+def said.show(+shown: U32, tics: U32, r: U32 & String, mem: Array<U32>) -> Array<U32> & String:
+  (n, first) = r
+  (mem, "message " ++ U32.show(shown) ++ " \"" ++ Msg.Message.text(shown) ++ "\" tics " ++ U32.show(tics)
+    ++ " pixels " ++ U32.show(n) ++ first)
+
+def said.diff(+s: S.State, off: List<&2, U32>, p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
+  (mem, on) = p
+  said.show(S.State.message(s), S.State.msgtics(s), said.go(off, on, 0, 0, ""), mem)
+
+def said.on(+tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, p: Array<U32> & List<&2, U32>) ->
+  Array<U32> & String:
+  (mem, off) = p
+  said.diff(s, off, band(R.Render.frame(tables, gfx, s, True{}, mem)))
+
+# A frame with its message line drawn, beside the same frame without it:
+# the line's own pixels, which tools/wad.nu's hu-line answers from the
+# WAD's font.
+def said(tag: String, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> IO(Array<U32>):
+  print(tag, said.on(tables, gfx, s, band(R.Render.frame(tables, gfx, s, False{}, mem))))
+
 # The level's first state with the player at rest on the floor at a
 # place: x and y in map units, west and south given as negatives, the
 # angle in degrees.
@@ -173,13 +214,13 @@ def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
 # Every weapon and every ammo type at its cap, so that no ammo or weapon
 # pickup can be taken.
 def maxed(inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus, message} = inv
-  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus, message}
+  I.Inventory{health, armour, armourtype, cards, ammo, +caps, backpack, weapons, powers, items, bonus, message, msgtics} = inv
+  I.Inventory{health, armour, armourtype, cards, caps, caps, backpack, 511, powers, items, bonus, message, msgtics}
 
 def full(s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics} = s
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd} = s
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd, message, msgtics}
+    usedown, sounds, mrnd}
 
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
@@ -244,6 +285,13 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     w2 : Array<U32> <- frame("pistol bob low 48", tables, gfx, after([idle(20n), walk(28n)], S.State.start(level)), w1)
     w3 : Array<U32> <- frame("pistol bob right 64", tables, gfx, after([idle(20n), walk(44n)], S.State.start(level)),
       w2)
+    n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
+      at(level, east(1631), east(1008), 90)), w3)
+    n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
+      at(level, east(2246), east(592), 180)), n1)
+    n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
+      at(level, east(3158), east(2176), 180)), n2)
+    n4 : Array<U32> <- said("said none", tables, gfx, S.Sim.replay(idle(20n), S.State.start(level)), n3)
     IO.print("end")
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -295,4 +343,8 @@ def main() -> IO(Unit):
 #|pistol rising 8 hash 767338383 pixels 1 1 7 5 96 covered True
 #|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
 #|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
+#|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
+#|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
+#|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47
+#|said none message 0 "" tics 0 pixels 0
 #|end
