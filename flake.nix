@@ -99,9 +99,9 @@
             ];
             buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = freedoom;
-          } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             BENDOOM_MUSIC = music freedoom;
             BENDOOM_SOUNDS = sounds freedoom;
+          } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             ALSA_PLUGIN_DIR = alsa-plugins;
           });
         };

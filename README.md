@@ -20,8 +20,7 @@ If flakes aren't enabled on your system, put this after `nix`:
 
     --extra-experimental-features 'nix-command flakes'
 
-It runs on x86_64 Linux. aarch64 Linux and macOS are untested, and on
-macOS the game plays without music or sounds.
+It runs on x86_64 Linux. aarch64 Linux and macOS are untested.
 
 The up and down arrows or W and S walk, the left and right arrows turn,
 A and D strafe, Shift runs, Space opens doors and presses switches, Ctrl
