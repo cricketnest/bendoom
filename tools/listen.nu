@@ -231,7 +231,7 @@ def "main sounds" [
   x: int                # the start's x, in map units
   y: int                # the start's y
   angle: int            # its facing in degrees, a multiple of 45
-  script: string        # the commands, runs of "count,forward,side,turn,use"
+  script: string        # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path           # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = "" # records to rewrite, each "record,type,x,y", facing 0
   --music               # play the song under the sounds

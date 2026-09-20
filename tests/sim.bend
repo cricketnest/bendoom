@@ -16,10 +16,11 @@
 # sergeant and the last, each with the sector under it (tools/wad.nu's
 # sector-at), its z, its facing (its record's angle), its state row,
 # its tics and its definition. The blockmap's links against that
-# population: 180 links for 180 things, 79 of them solid (the solid
-# types' counts in ticket 02's nushell inventory), none at another
-# place, type or cell than its thing's, and no thing missing from the
-# cell of its centre. The player's inventory, G_PlayerReborn's.
+# population, the player's mobj's left out: 180 links for 180 things, 79
+# of them solid (the solid types' counts in ticket 02's nushell
+# inventory), none of a thing gone or in another cell than its centre's,
+# and no thing missing from the cell of its centre. The player's
+# inventory, G_PlayerReborn's.
 # Then the pistol from the start: the weapon sprite's state row, tics and
 # place on the screen, and the flash's, after chosen tics. It rises 6 a
 # tic from 122 for 15 tics, rests at column 1, row 32, bobs on a walk
@@ -71,7 +72,7 @@
 # barrel, an armour bonus, a health bonus and the twitching impaled
 # body: a nushell replay of P_MobjThinker over info.c's states from the
 # spawn's tics, the rows numbered in info.c's order.
-# Last, on a copy of the map with three monster records rewritten, solid
+# Then, on a copy of the map with three monster records rewritten, solid
 # things stop the player and movers, and carried things ride them, as
 # solids says; and the blue key door refuses a use, a blue card is taken
 # and the door then opens, in one replay, as locked says.
@@ -108,6 +109,29 @@
 # (51, 224) and behind (51, 128); 200 ahead (64, 129) and 201 (63); 1184
 # ahead, the last audible unit (1), 1185, which rounds to silence and
 # draws nothing, and 1201, past the clipping distance.
+# Last, the links and the thinkers of things that move, spawn and leave
+# in play, as relinks says, each line with the mobjs of two blockmap
+# cells, the last linked first, the things two sectors show in their
+# lists' order, the next id, the random index and a thing, then the
+# thinkers' order. Every list is worked from vanilla's source over the
+# WAD read in nushell: the blockmap's origin is -712, -1072, so the
+# cells of (-400, 400) and (-400, 300) are 2,11 and 2,10, and the sectors
+# under them (tools/wad.nu's sector-at) 160 and 140. P_SpawnMapThing
+# spawns the records in order and P_SetThingPosition puts each first in
+# its lists, so cell 2,11 lists record 58, cell 2,10 the player's mobj,
+# record 157, sector 160 record 58 and sector 140 records 238 and 157,
+# of which the player's is no thing to show. P_UnsetThingPosition and
+# P_SetThingPosition about the move take 58 out of the first lists and
+# put it first in the second. P_SpawnMobj gives the bonus the next id
+# past the 292 records, draws one random number, leaves it S_BON1's 6
+# tics (row 12) on the floor at 0, links it first, and adds its thinker
+# at the list's tail: 181 mobjs in record order, the player's between
+# records 154 and 166, then the 9 lights (the sectors of special 1, 8 or
+# 12), then the bonus, which thinks that same tic, 5 tics left.
+# P_RemoveMobj unlinks it, its thinker ends at its next turn, and the
+# next spawned is 293, not 292 again. P_TryMove relinks the player's
+# mobj first in its cell on its first move. The random index after a
+# tic is the lights' draws, a regression pin.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -187,11 +211,22 @@ def heights(sectors: List<&2, U32>, +level: L.Level) -> String:
       " sector " ++ U32.show(sector) ++ " " ++ F.Fixed.show(L.Level.floor(level, sector)) ++ " "
         ++ F.Fixed.show(L.Level.ceil(level, sector)) ++ heights(rest, level)
 
+# How many thinkers are not mobjs': the lights, movers and buttons.
+def specials(ts: List<&2, S.Thinker>) -> U32:
+  match ts:
+    case []:
+      0
+    case S.Mobj{id} <> rest:
+      specials(rest)
+    case _ <> rest:
+      (1 + specials(rest) : U32)
+
 # A run of one command in a demo's units, then the clock, the player,
-# the thinkers running, and some sectors' floors and ceilings.
+# the thinkers running that are no mobj's, and some sectors' floors and
+# ceilings.
 def watch(tag: String, sectors: List<&2, U32>, +s: S.State) -> String:
   line(tag ++ " tic " ++ U32.show(S.State.clock(s)), s) ++ " thinkers "
-    ++ Nat.show(List.length(&2, S.Thinker, S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
+    ++ U32.show(specials(S.State.thinkers(s))) ++ heights(sectors, S.State.level(s))
 
 def run(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, s: S.State) -> IO(S.State):
   +r = ran(n, cmd, s)
@@ -204,10 +239,10 @@ def idle() -> K.Cmd:
   K.Cmd.idle()
 
 def use() -> K.Cmd:
-  K.Cmd.demo(0, 0, 0, True{})
+  K.Cmd.demo(0, 0, 0, 2)
 
 def forward() -> K.Cmd:
-  K.Cmd.demo(25, 0, 0, False{})
+  K.Cmd.demo(25, 0, 0, 0)
 
 def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
   S.State.at(level, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
@@ -245,7 +280,7 @@ def crossed(+level: L.Level) -> IO(Unit):
     x1 : S.State <- run("over", 1n, forward(), [145], x0)
     x2 : S.State <- run("-", 61n, idle(), [145], x1)
     x3 : S.State <- run("-", 1n, idle(), [145], x2)
-    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, False{}), [145], x3)
+    x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, 0), [145], x3)
     IO.print(drawn(x4))
     IO.print("-")
 
@@ -254,7 +289,7 @@ def crossed(+level: L.Level) -> IO(Unit):
 # pit east of it, used again while it runs, and again once it is back.
 def lift(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, False{}), [98], S.State.start(level))
+    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, 0), [98], S.State.start(level))
     l1 : S.State <- run("-", 4n, idle(), [98], l0)
     l2 : S.State <- run("over", 1n, idle(), [98], l1)
     l3 : S.State <- run("-", 33n, idle(), [98], l2)
@@ -298,11 +333,11 @@ def holding(inv: I.Inventory, s: S.State) -> S.State:
 # alone.
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, False{}),
+    k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, 0),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
-    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), k0)
-    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, False{}), k1)
-    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, False{}), k2)
+    k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, 0), k0)
+    k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, 0), k1)
+    k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, 0), k2)
     b0 : S.State <- keyed("blue walk with the skull", 87, 30n, forward(),
       holding(I.Inventory.card(8, Msg.Message.none(), I.Inventory.start()), at(level, 832, 1400, 90)))
     b1 : S.State <- keyed("use", 87, 1n, use(), b0)
@@ -325,7 +360,7 @@ def exits(+level: L.Level) -> IO(Unit):
     x0 : S.State <- ending("exit first tic use", 1n, use(), at(level, 65184, 1296, 180))
     x1 : S.State <- ending("-", 19n, idle(), x0)
     x2 : S.State <- ending("use", 1n, use(), x1)
-    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, True{}), x2)
+    x3 : S.State <- ending("walk held use", 10n, K.Cmd.demo(25, 0, 0, 2), x2)
     IO.print(drawn(x3))
     IO.print("-")
 
@@ -410,11 +445,16 @@ def opens(+open: S.State) -> IO(Unit):
     IO.print("-")
 
 # A state with a fresh player at rest some way south of the first
-# door's sound origin, 832, 528, facing an angle.
+# door's sound origin, 832, 528, facing an angle, its mobj relinked
+# where it now stands, as P_UnsetThingPosition and P_SetThingPosition
+# relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics} = s
-  S.State{S.Player.at(level, L.Start{F.Fixed.of_map(832), F.Fixed.of_map((528 - d : U32)), A.Angle.of_thing(degrees)}),
-    level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics}
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, message, msgtics} = s
+  +x = F.Fixed.of_map(832)
+  +y = F.Fixed.of_map((528 - d : U32))
+  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
+    S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
+    sounds, mrnd, message, msgtics}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -560,11 +600,11 @@ def locked(+placed: L.Level) -> IO(Unit):
     k0 : S.State <- keyed("blue door refused", 82, 1n, use(),
       S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(placed, 880, 1440, 90)))
     k1 : S.State <- keyed("-", 82, 20n, idle(), k0)
-    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, False{}), k1)
+    k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, 0), k1)
     k3 : S.State <- keyed("walk", 82, 13n, forward(), k2)
     k4 : S.State <- keyed("-", 82, 1n, forward(), k3)
     k5 : S.State <- keyed("-", 82, 20n, idle(), k4)
-    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, False{}), k5)
+    k6 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 4294967184, 0), k5)
     k7 : S.State <- keyed("walk", 82, 19n, forward(), k6)
     k8 : S.State <- keyed("use", 82, 1n, use(), k7)
     k9 : S.State <- keyed("-", 82, 5n, idle(), k8)
@@ -653,47 +693,59 @@ def solid.def(d: H.Thing.Def) -> Bool:
 def solid(+kind: U32) -> Bool:
   solid.def(H.Thing.info(kind))
 
-# Whether a link agrees with the population: its thing alive, at the
-# link's x and y, of its type, with its centre in cell c.
-def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, link: L.Level.Link) -> Bool:
+def same(a: L.Level.Cell, b: L.Level.Cell) -> Bool:
+  L.Cell{ax, ay} = a
+  L.Cell{bx, by} = b
+  Bool.and(U32.is_eq(ax, bx), U32.is_eq(ay, by))
+
+# Whether a cell's link agrees with the population: its thing alive,
+# with its centre in cell c.
+def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, c: L.Level.Cell) -> Bool:
   match m:
     case None{}:
       False{}
-    case Some{H.Thing{id, +kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics}}:
-      L.Link{next, +lx, +ly, +lkind} = link
-      Bool.and(L.Level.cell.is(L.Level.cell_of(bm, x, y), c),
-        Bool.and(U32.is_eq(x, lx), Bool.and(U32.is_eq(y, ly), U32.is_eq(kind, lkind))))
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      same(L.Level.cell_of(bm, x, y), c)
 
-def links.count(+link: L.Level.Link, m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, +c: L.Level.Cell, t: Links) ->
-  Links:
-  L.Link{next, x, y, +kind} = link
-  Links{n, s, w} = t
-  Links{(n + 1 : U32), (s + Bool.to_u32(solid(kind)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c, link))) : U32)}
+def solid.some(m: Maybe<&2, H.Thing>) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics}}:
+      solid(kind)
 
-def links.cell(ids: List<&2, U32>, +level: L.Level, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
+# A cell's link counted, the player's mobj's left out.
+def links.count(you: Bool, +m: Maybe<&2, H.Thing>, bm: L.Level.Blockmap, c: L.Level.Cell, t: Links) -> Links:
+  match you:
+    case True{}:
+      t
+    case False{}:
+      Links{n, s, w} = t
+      Links{(n + 1 : U32), (s + Bool.to_u32(solid.some(m)) : U32), (w + Bool.to_u32(Bool.not(agrees(m, bm, c))) : U32)}
+
+def links.cell(ids: List<&2, U32>, +bm: L.Level.Blockmap, +ts: H.Things, +c: L.Level.Cell, t: Links) -> Links:
   match ids:
     case []:
       t
     case +id <> rest:
-      links.cell(rest, level, ts, c, links.count(L.Level.linked.in(L.Level.things_of(level), id), H.Things.get(ts, id),
-        L.Level.blockmap_of(level), c, t))
+      links.cell(rest, bm, ts, c, links.count(U32.is_eq(id, H.Things.you(ts)), H.Things.get(ts, id), bm, c, t))
 
-def links.cells(cells: List<&2, L.Level.Cell>, +level: L.Level, +ts: H.Things, t: Links) -> Links:
+def links.cells(cells: List<&2, L.Level.Cell>, +bm: L.Level.Blockmap, +ts: H.Things, t: Links) -> Links:
   match cells:
     case []:
       t
     case +c <> rest:
-      links.cells(rest, level, ts, links.cell(L.Level.cell.things(L.Level.geo(level), c), level, ts, c, t))
+      links.cells(rest, bm, ts, links.cell(H.Things.linked(ts, bm, [c]), bm, ts, c, t))
 
 # How many of the things are not in the list of the cell their centre
 # is in.
-def unlinked(things: List<&2, H.Thing>, +level: L.Level) -> U32:
+def unlinked(things: List<&2, H.Thing>, +bm: L.Level.Blockmap, +ts: H.Things) -> U32:
   match things:
     case []:
       0
-    case H.Thing{+id, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
-      (Bool.to_u32(Bool.not(S.Sim.member(L.Level.cell.things(L.Level.geo(level),
-        L.Level.cell_of(L.Level.blockmap_of(level), x, y)), id))) + unlinked(rest, level) : U32)
+    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
+      (Bool.to_u32(Bool.not(S.Sim.member(H.Things.linked(ts, bm, [L.Level.cell_of(bm, x, y)]), id)))
+        + unlinked(rest, bm, ts) : U32)
 
 def solids.count(things: List<&2, H.Thing>) -> U32:
   match things:
@@ -702,22 +754,21 @@ def solids.count(things: List<&2, H.Thing>) -> U32:
     case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics} <> rest:
       (Bool.to_u32(solid(kind)) + solids.count(rest) : U32)
 
-def links.show(t: Links, +things: List<&2, H.Thing>, +level: L.Level) -> String:
+def links.show(t: Links, +things: List<&2, H.Thing>, bm: L.Level.Blockmap, ts: H.Things) -> String:
   Links{n, s, w} = t
   "links " ++ U32.show(n) ++ " of " ++ Nat.show(List.length(&2, H.Thing, things)) ++ " things, solid "
     ++ U32.show(s) ++ " of " ++ U32.show(solids.count(things)) ++ ", wrong " ++ U32.show(w) ++ ", unlinked "
-    ++ U32.show(unlinked(things, level))
+    ++ U32.show(unlinked(things, bm, ts))
 
-# The blockmap links of a state's level against its population, cell by
-# cell over the whole blockmap: as many links as things, as many of them
-# solid as solid things, none that disagrees with its thing, and no
-# thing missing from its centre's cell mean each thing is linked once,
-# in the cell of its centre, with its x, y and type.
-def links.in(bm: L.Level.Blockmap, +s: S.State) -> String:
+# The blockmap links of a state's population, cell by cell over the
+# whole blockmap: as many links as things, as many of them solid as
+# solid things, none that disagrees with its thing, and no thing missing
+# from its centre's cell mean each thing is linked once, in the cell of
+# its centre.
+def links.in(+bm: L.Level.Blockmap, +s: S.State) -> String:
   L.Blockmap{words, ox, oy, +cols, +rows} = bm
-  +level = S.State.level(s)
-  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), level, S.State.things(s),
-    Links{0, 0, 0}), H.Things.list(S.State.things(s)), level)
+  links.show(links.cells(S.Sim.cells(U32.to_nat(cols), U32.to_nat(rows), 0, 0), bm, S.State.things(s),
+    Links{0, 0, 0}), H.Things.list(S.State.things(s)), bm, S.State.things(s))
 
 def links(+s: S.State) -> String:
   links.in(L.Level.blockmap_of(S.State.level(s)), s)
@@ -793,10 +844,10 @@ def box(tag: String, +s: S.State) -> IO(Unit):
 def chainsaw(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
   +s = holding(inv, at(level, 3158, 2176, 180))
   do IO<S.State>:
-    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, False{}), s,
+    a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, 0), s,
       S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
-        [K.Cmd.demo(0, 0, 4294967280, False{})]), s))
-    b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, False{}), s, a)
+        [K.Cmd.demo(0, 0, 4294967280, 0)]), s))
+    b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, 0), s, a)
     finished(b)
 
 # The ammo and the chainsaw, then health, armour and berserk, a pickup
@@ -831,6 +882,106 @@ def pickups(+level: L.Level) -> IO(Unit):
     g1 : S.State <- walked("green armour at 100", 11n,
       holding(stocked(100, 100, 1, [50, 0, 0, 0], I.Inventory.start()), at(level, 1664, 1008, 90)))
     IO.print("-")
+
+def names(ids: List<&2, U32>) -> String:
+  match ids:
+    case []:
+      ""
+    case id <> rest:
+      " " ++ U32.show(id) ++ names(rest)
+
+# The mobjs that think before any special does, and those after one.
+def lead(ts: List<&2, S.Thinker>) -> List<&2, U32>:
+  match ts:
+    case S.Mobj{id} <> rest:
+      id <> lead(rest)
+    case _:
+      []
+
+def late(ts: List<&2, S.Thinker>, special: Bool) -> List<&2, U32>:
+  match ts special:
+    case [] _:
+      []
+    case S.Mobj{id} <> rest True{}:
+      id <> late(rest, True{})
+    case S.Mobj{id} <> rest False{}:
+      late(rest, False{})
+    case _ <> rest _:
+      late(rest, True{})
+
+# The thinkers' order: how many mobjs think before the specials, the
+# five about the player's among them, how many specials, and the mobjs
+# after a special.
+def order(tag: String, +ts: List<&2, S.Thinker>) -> String:
+  tag ++ " thinkers: " ++ Nat.show(List.length(&2, U32, lead(ts))) ++ " mobjs, about the player's"
+    ++ names(List.take(&2, U32, List.drop(&2, U32, lead(ts), 103n), 5n)) ++ ", " ++ U32.show(specials(ts))
+    ++ " specials, then mobjs" ++ names(late(ts, False{}))
+
+def of.sector(things: List<&2, H.Thing>, +sector: U32) -> List<&2, U32>:
+  match things:
+    case []:
+      []
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +at, state, tics} <> rest:
+      V.Vec.keep(~U32, U32.is_eq(at, sector), id, of.sector(rest, sector))
+
+# The mobjs the blockmap cell of a place in map units lists.
+def cell(+bm: L.Level.Blockmap, ts: H.Things, x: U32, y: U32) -> String:
+  names(H.Things.linked(ts, bm, [L.Level.cell_of(bm, F.Fixed.of_map(x), F.Fixed.of_map(y))]))
+
+# The mobjs of the blockmap cells at (-400, 400) and (-400, 300), the
+# last linked first, the things sectors 160 and 140 show, in their lists'
+# order, the next id, the random index, and a thing.
+def linked(tag: String, +id: U32, +s: S.State) -> String:
+  +bm = L.Level.blockmap_of(S.State.level(s))
+  +ts = S.State.things(s)
+  tag ++ " cell 2,11" ++ cell(bm, ts, 65136, 400) ++ " cell 2,10" ++ cell(bm, ts, 65136, 300) ++ " sector 160"
+    ++ names(of.sector(H.Things.shown(ts), 160)) ++ " sector 140" ++ names(of.sector(H.Things.shown(ts), 140))
+    ++ " next " ++ U32.show(H.Things.count(ts)) ++ " random " ++ U32.show(S.State.rnd(s)) ++ " "
+    ++ thing(H.Things.get(ts, id))
+
+def moved.some(m: Maybe<&2, H.Thing>, x: U32, y: U32, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      S.State.moved(S.Try{True{}, S.State.player(s), H.Things.moved(S.State.things(s),
+        L.Level.blockmap_of(S.State.level(s)), th, H.Thing.at(th, S.State.level(s), F.Fixed.of_map(x),
+          F.Fixed.of_map(y)))}, S.State.level(s), s)
+
+# A state with a thing at another place, unlinked and linked again.
+def moved(+id: U32, x: U32, y: U32, +s: S.State) -> S.State:
+  moved.some(H.Things.get(S.State.things(s), id), x, y, s)
+
+def spawned(d: Maybe<&2, H.Thing.Def>, x: U32, y: U32, s: S.State) -> S.State:
+  match d:
+    case None{}:
+      s
+    case Some{info}:
+      S.Sim.spawn(info, F.Fixed.of_map(x), F.Fixed.of_map(y), H.Thing.onfloor(), s)
+
+# A state's links and a thing, then its thinkers' order.
+def seen(tag: String, id: U32, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    IO.print(linked(tag, id, s))
+    IO.print(order(" ", S.State.thinkers(s)))
+    return s
+
+# Things that move, spawn and leave in play, from the start. The dead
+# former human, record 58, moved from (-400, 400) to (-400, 300), over a
+# cell border and a sector border, as P_UnsetThingPosition and
+# P_SetThingPosition relink it; a health bonus spawned at (-340, 288) as
+# P_SpawnMobj spawns it, an idle tic, its removal as P_RemoveMobj removes
+# it, a tic, and another spawned; then the player's first move.
+def relinks(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    s0 : S.State <- seen("start", 58, S.State.start(level))
+    s1 : S.State <- seen("moved", 58, moved(58, 65136, 300, s0))
+    s2 : S.State <- seen("spawned", 292, spawned(H.Thing.def(2014), 65196, 288, s1))
+    s3 : S.State <- seen("a tic", 292, S.Sim.tic(idle(), s2))
+    s4 : S.State <- seen("removed, a tic", 292, S.Sim.tic(idle(), S.Sim.remove(292, s3)))
+    s5 : S.State <- seen("spawned", 293, spawned(H.Thing.def(2014), 65196, 288, s4))
+    s6 : S.State <- seen("walked", 293, S.Sim.tic(forward(), s5))
+    IO.print(links(s6))
 
 def psprite(psp: S.Psprite) -> String:
   S.Psprite{state, tics, sx, sy} = psp
@@ -869,24 +1020,24 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
   do IO<Unit>:
     s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level))
     p0 : S.State <- free(s)
-    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
-    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p1)
-    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p2)
-    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p3)
-    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
-    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p5)
-    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p6)
-    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p7)
-    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
-    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, p9)
-    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}}, p10)
-    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, p11)
-    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, p12)
-    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, p13)
-    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, S.State.start(level))
-    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q1)
-    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q2)
-    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, q3)
+    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
+    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p1)
+    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p2)
+    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p3)
+    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
+    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p5)
+    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p6)
+    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p7)
+    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
+    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, p9)
+    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p10)
+    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p11)
+    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p12)
+    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p13)
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, S.State.start(level))
+    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q1)
+    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q2)
+    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q3)
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     IO.print("the walks: " ++ drawn(p14) ++ ", " ++ drawn(q6))
@@ -894,6 +1045,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     pickups(level)
     door(level)
     patched.cases(level, patched(W.Wad.dir(a)))
+    relinks(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -1371,3 +1523,18 @@ def main() -> IO(Unit):
 #|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 182 cards 1 flash 0
 #|sounds drew to 66
 #|-
+#|start cell 2,11 58 cell 2,10 157 sector 160 58 sector 140 238 next 292 random 1 thing 58 type 18 at -400.000000 400.000000 z 16.000000 angle 270.000 sector 160 state 2 tics 4294967295 radius 20 height 16 flags 0
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs
+#|moved cell 2,11 cell 2,10 58 157 sector 160 sector 140 58 238 next 292 random 1 thing 58 type 18 at -400.000000 300.000000 z 16.000000 angle 270.000 sector 140 state 2 tics 4294967295 radius 20 height 16 flags 0
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs
+#|spawned cell 2,11 cell 2,10 292 58 157 sector 160 sector 140 292 58 238 next 293 random 2 thing 292 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 6 radius 20 height 16 flags 8388609
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs 292
+#|a tic cell 2,11 cell 2,10 292 58 157 sector 160 sector 140 292 58 238 next 293 random 4 thing 292 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 5 radius 20 height 16 flags 8388609
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs 292
+#|removed, a tic cell 2,11 cell 2,10 58 157 sector 160 sector 140 58 238 next 293 random 4 
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs
+#|spawned cell 2,11 cell 2,10 293 58 157 sector 160 sector 140 293 58 238 next 294 random 5 thing 293 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 6 radius 20 height 16 flags 8388609
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs 293
+#|walked cell 2,11 cell 2,10 157 293 58 sector 160 sector 140 293 58 238 next 294 random 5 thing 293 type 2014 at -340.000000 288.000000 z 0.000000 angle 0.000 sector 140 state 12 tics 5 radius 20 height 16 flags 8388609
+#|  thinkers: 181 mobjs, about the player's 153 154 157 166 167, 9 specials, then mobjs 293
+#|links 181 of 181 things, solid 79 of 79, wrong 0, unlinked 0

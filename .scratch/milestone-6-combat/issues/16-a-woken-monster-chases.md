@@ -7,6 +7,7 @@
 **Status:** ready-for-agent
 
 - [ ] `A_Chase`'s movement half, `P_NewChaseDir`, `P_TryWalk`, `P_Move` and `A_FaceTarget`, with every random draw in place, the active sound's among them
+- [ ] `P_TryMove`'s dropoff test: ticket 03's `Sim.check` does not gather `tmdropoffz`, so this ticket adds it to what the check answers
 - [ ] A blocked move uses the special lines it hit, which opens manual doors
 - [ ] Each monster moves at its speed on its move tics and relinks as it goes
 - [ ] The freedom law grows from the player to every thing that moved

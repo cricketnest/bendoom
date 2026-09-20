@@ -1,9 +1,11 @@
-# Doom's R_RenderPlayerView with the heads-up line HU_Drawer puts over
-# it: a frame of the level from the player's eye, drawn into the array's
-# frame as palette indices. A pure function of the tables, the graphics,
-# the state and the array it redraws, so a frame renders in a test
-# without a window; and the latest tic's state with no interpolation, as
-# vanilla shows it.
+# Doom's R_RenderPlayerView with ST_Drawer under it and HU_Drawer's
+# message line over it: a frame of the level from the player's eye and
+# the status bar, drawn into the array's frame as palette indices. A
+# pure function of the tables, the graphics, the state and the array it
+# redraws, so a frame renders in a test without a window; and the latest
+# tic's state with no interpolation, as vanilla shows it. Vanilla
+# redraws the bar's widgets only where a value changed; a pure frame
+# draws the whole of it every time.
 import Base
 import ./bytes.bend as B2
 import ./level.bend as L
@@ -15,6 +17,7 @@ import ./draw.bend as D
 import ./bsp.bend as B
 import ./planes.bend as N
 import ./sprites.bend as T
+import ./bar.bend as Y
 import ./message.bend as Msg
 
 def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
@@ -102,12 +105,14 @@ def Render.messages(on: Bool, +gfx: G.Gfx, n: U32, mem: Array<U32>) -> Array<U32
 
 # The sectors' heights and light come from the state's level, the
 # sides' textures from the state, and the animations' frames and the
-# walls' scroll from its clock. The heads-up line is drawn last, as
-# D_Display draws it over the view, when messages are asked for and one
-# is up.
+# walls' scroll from its clock. The view fills the frame's first 168
+# rows and the status bar the 32 under it. The message line is drawn
+# last of all, as D_Display draws it over both, when messages are asked
+# for and one is up.
 def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, messages: Bool, mem: Array<U32>) ->
   Array<U32>:
   Render.messages(Bool.and(messages, Bool.not(U32.is_zero(S.State.msgtics(s)))), gfx, S.State.message(s),
-    Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
-      G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.list(S.State.things(s)),
-      S.State.player(s), mem))
+    Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)), gfx,
+      Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
+        G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.shown(S.State.things(s)),
+        S.State.player(s), mem)))
