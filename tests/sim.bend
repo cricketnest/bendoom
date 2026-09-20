@@ -56,6 +56,30 @@
 # floor at 32, which the level shot meets at x 768; and from the yard at
 # (-640, 256), line 1049 has sector 40 behind it, whose ceiling is
 # F_SKY1, so PTR_ShootTraverse's sky hack leaves nothing.
+# Then bullets hurt things, each run printed with the tic, where the
+# player stands, its health and armour, P_Random's index, each watched
+# mobj and every mobj the shots and the blows spawned. The places are
+# the WAD read in nushell: record 265 is the zombieman at (944, -224)
+# in sector 57, shot from 80 units east of it, and records 24, 25 and 26
+# are the barrels at (992, 608), (992, 640) and (960, 608) in sector 13,
+# shot from 64 units north of the nearest. The rows are info.c's:
+# S_POSS_PAIN is row 89 and S_POSS_DIE1 row 91, whose S_POSS_DIE2 runs
+# A_Scream, and the corpse rests in S_POSS_DIE5, row 95, which lasts;
+# the barrel's S_BEXP is row 144, its S_BEXP2 screams and its S_BEXP4,
+# row 147, explodes ten tics later. P_SpawnBlood's frame is the wound's:
+# row 150 for 10 points, row 151 for 5 and row 149 for 15, which is the
+# only one whose tics the draw shortens, since P_SetMobjState gives the
+# other two their whole 8 again. A dead zombieman is no longer
+# shootable, so the fourth shot flies past its corpse to the wall and
+# leaves a puff. The blast the barrels deal is PIT_RadiusAttack by hand:
+# the player 75.77 units north of barrel 25 is 59 whole units away once
+# its own radius of 16 is taken off, so it takes 128 less 59, and green
+# armour saves a third of 69, which is 23, leaving 77 armour and 54
+# health. The blow throws the player 8.6 units a tic north, and by the
+# time the other two barrels explode it is out of their reach. The
+# damage each shot deals and the tics each death state loses are
+# P_Random draws and are regression pins, as the index at the start of
+# each case is.
 # Then the pickups, each run printed with the tic, the player's place,
 # the inventory, the things left and the records taken since the case
 # began: a clip, three shells in a row and the rocket walked into, with
@@ -456,7 +480,7 @@ def phase(m: Maybe<&2, H.Thing>) -> String:
   match m:
     case None{}:
       ""
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}}:
       " " ++ U32.show(id) ++ ":" ++ U32.show(state) ++ "/" ++ U32.show(tics)
 
 def phases(ids: List<&2, U32>, +things: H.Things) -> String:
@@ -569,7 +593,7 @@ def bounded(m: Maybe<&2, H.Thing>) -> String:
   match m:
     case None{}:
       ""
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}}:
       " thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " z " ++ F.Fixed.show(z) ++ " floor "
         ++ F.Fixed.show(floorz) ++ " ceiling " ++ F.Fixed.show(ceilz) ++ " state " ++ U32.show(state) ++ " tics "
         ++ U32.show(tics)
@@ -716,7 +740,7 @@ def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
   match things:
     case []:
       0
-    case H.Thing{id, k, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
+    case H.Thing{id, k, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
       (Bool.to_u32(U32.is_eq(k, kind)) + count(rest, kind) : U32)
 
 # How many things of each type Bendoom defines.
@@ -731,7 +755,7 @@ def ids(things: List<&2, H.Thing>) -> String:
   match things:
     case []:
       ""
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
       " " ++ U32.show(id) ++ ids(rest)
 
 def described(d: Maybe<&2, H.Thing.Def>) -> String:
@@ -746,7 +770,7 @@ def thing(m: Maybe<&2, H.Thing>) -> String:
   match m:
     case None{}:
       ""
-    case Some{H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+    case Some{H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}}:
       "thing " ++ U32.show(id) ++ " type " ++ U32.show(kind) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y)
         ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle) ++ " sector " ++ U32.show(sector)
         ++ " state " ++ U32.show(state) ++ " tics " ++ U32.show(tics) ++ described(H.Thing.def(kind))
@@ -784,14 +808,14 @@ def agrees(m: Maybe<&2, H.Thing>, +bm: L.Level.Blockmap, c: L.Level.Cell) -> Boo
   match m:
     case None{}:
       False{}
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}}:
       same(L.Level.cell_of(bm, x, y), c)
 
 def solid.some(m: Maybe<&2, H.Thing>) -> Bool:
   match m:
     case None{}:
       False{}
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}}:
       solid(kind)
 
 # A cell's link counted, the player's mobj's left out.
@@ -823,7 +847,7 @@ def unlinked(things: List<&2, H.Thing>, +bm: L.Level.Blockmap, +ts: H.Things) ->
   match things:
     case []:
       0
-    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
+    case H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
       (Bool.to_u32(Bool.not(S.Sim.member(H.Things.linked(ts, bm, [L.Level.cell_of(bm, x, y)]), id)))
         + unlinked(rest, bm, ts) : U32)
 
@@ -831,7 +855,7 @@ def solids.count(things: List<&2, H.Thing>) -> U32:
   match things:
     case []:
       0
-    case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz} <> rest:
+    case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
       (Bool.to_u32(solid(kind)) + solids.count(rest) : U32)
 
 def links.show(t: Links, +things: List<&2, H.Thing>, bm: L.Level.Blockmap, ts: H.Things) -> String:
@@ -1001,7 +1025,7 @@ def of.sector(things: List<&2, H.Thing>, +sector: U32) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +at, state, tics, momz} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, +at, state, tics, momz, hurt} <> rest:
       V.Vec.keep(~U32, U32.is_eq(at, sector), id, of.sector(rest, sector))
 
 # The mobjs the blockmap cell of a place in map units lists.
@@ -1177,10 +1201,10 @@ def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
 def struck(health: U32, rnd: U32, tx: U32, ty: U32, tz: U32) -> S.State:
   struck.in(holding(stocked(health, 0, 0, [50, 0, 0, 0], I.Inventory.start()),
     S.State.at(L.Level.room(0, 128), L.Start{0, 0, 0})), rnd,
-    H.Thing{0, 2035, F.Fixed.of_map(tx), F.Fixed.of_map(ty), tz, 0, 8388608, 0, 0, 10, 6, 0})
+    H.Thing{0, 2035, F.Fixed.of_map(tx), F.Fixed.of_map(ty), tz, 0, 8388608, 0, 0, 10, 6, 0, H.Thing.Hurt.of(2035)})
 
-def blown(damage: U32, s: S.State) -> S.State:
-  S.Sim.damage(damage, 0, 0, s)
+def blown(damage: U32, +s: S.State) -> S.State:
+  S.Sim.damage(H.Things.you(S.State.things(s)), damage, 0, 0, s)
 
 # A blow from a thing, which nothing on the map can deal yet: the thrust
 # away from the inflictor, the attacker kept, and after a lethal one the
@@ -1206,13 +1230,17 @@ def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
   S.State{S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
     psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
 
+# The player killed on the spot by a blow from nobody.
+def killed(+s: S.State) -> S.State:
+  S.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
+
 # The clip west of 672, 992, which a walk from there takes on its tenth
 # tic: a corpse killed on the spot and slid west over it at 5 a tic
 # takes nothing, where a living player slid the same way takes it.
 def corpses(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     c0 : S.State <- picked("corpse slide", 20n, idle(), at(level, 672, 992, 180),
-      sliding(4294639616, 0, S.Sim.damage(100, H.Thing.you(), H.Thing.you(), at(level, 672, 992, 180))))
+      sliding(4294639616, 0, killed(at(level, 672, 992, 180))))
     c1 : S.State <- picked("live slide", 20n, idle(), at(level, 672, 992, 180),
       sliding(4294639616, 0, at(level, 672, 992, 180)))
     IO.print("-")
@@ -1228,15 +1256,20 @@ def damaged(+level: L.Level) -> IO(Unit):
 
 # Everything the two walks do not cover, from the map as loaded and from
 # the map with three records rewritten.
-# A thing spawned in play, which in these runs is a bullet puff: where
-# it stands, its state row and the tics left in it.
+# A signed count as text, for a health that goes past zero and for a
+# type of -1 or -2, which the puff and the blood have.
+def signed(+x: U32) -> String:
+  Bool.pick(String, F.Fixed.is_neg(x), "-" ++ U32.show(F.Fixed.neg(x)), U32.show(x))
+
+# A thing spawned in play, a bullet puff or a spot of blood: its type,
+# where it stands, its state row and the tics left in it.
 def spawned.one(m: Maybe<&2, H.Thing>) -> String:
   match m:
     case None{}:
       ""
-    case Some{H.Thing{+id, kind, +x, +y, +z, floorz, ceilz, angle, sector, +state, +tics, momz}}:
-      " puff " ++ U32.show(id) ++ " at " ++ F.Fixed.show(x) ++ " " ++ F.Fixed.show(y) ++ " "
-        ++ F.Fixed.show(z) ++ " state " ++ U32.show(state) ++ "/" ++ U32.show(tics)
+    case Some{H.Thing{+id, +kind, +x, +y, +z, floorz, ceilz, angle, sector, +state, +tics, momz, hurt}}:
+      " mobj " ++ U32.show(id) ++ " type " ++ signed(kind) ++ " at " ++ F.Fixed.show(x) ++ " "
+        ++ F.Fixed.show(y) ++ " " ++ F.Fixed.show(z) ++ " state " ++ U32.show(state) ++ "/" ++ U32.show(tics)
 
 def spawned.go(n: Nat, +i: U32, +things: H.Things) -> String:
   match n:
@@ -1290,10 +1323,77 @@ def firing(+level: L.Level) -> IO(Unit):
     e1 : S.State <- fired("sky", 5n, fire(), 292, e0)
     IO.print("-")
 
+# A mobj a fight watches: its name, its health, the state row it stands
+# in with the tics left in it, where it stands, and what it is after.
+def fighter(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
+      " gone"
+    case Some{+th}:
+      " " ++ U32.show(H.Thing.id(th)) ++ " hp " ++ signed(H.Thing.health(th)) ++ " state "
+        ++ U32.show(H.Thing.state(th)) ++ "/" ++ U32.show(H.Thing.tics(th)) ++ " at "
+        ++ F.Fixed.show(H.Thing.x(th)) ++ " " ++ F.Fixed.show(H.Thing.y(th)) ++ " "
+        ++ F.Fixed.show(H.Thing.z(th)) ++ " after " ++ U32.show(H.Thing.target(th))
+
+def fighters(ids: List<&2, U32>, +things: H.Things) -> String:
+  match ids:
+    case []:
+      ""
+    case +id <> rest:
+      fighter(H.Things.get(things, id)) ++ fighters(rest, things)
+
+# A fight: the sounds it started, then the tic, where the player stands,
+# its health and armour, P_Random's index, each watched mobj, and every
+# mobj past the map's 292 records, which is what the shots and the blows
+# spawned.
+def fight(tag: String, n: Nat, cmd: K.Cmd, ids: List<&2, U32>, s: S.State) -> IO(S.State):
+  +r = play(List.replicate(K.Cmd, n, cmd), Run{"", s})
+  +q = Run.state(r)
+  +inv = S.Player.inv(S.State.player(q))
+  do IO<S.State>:
+    IO.print(Run.log(r) ++ tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " at "
+      ++ F.Fixed.show(S.Player.x(S.State.player(q))) ++ " " ++ F.Fixed.show(S.Player.y(S.State.player(q)))
+      ++ " health " ++ U32.show(I.Inventory.health(inv)) ++ " armour " ++ U32.show(I.Inventory.armour(inv)) ++ "/"
+      ++ U32.show(I.Inventory.armourtype(inv)) ++ " rnd " ++ U32.show(S.State.rnd(q))
+      ++ fighters(ids, S.State.things(q)) ++ spawned.all(292, S.State.things(q)))
+    return q
+
+# The state with green armour and a full clip, so that a barrel's blast
+# is split between the armour and the health.
+def armoured(+s: S.State) -> S.State:
+  holding(stocked(100, 100, 1, [50, 0, 0, 0], S.Player.inv(S.State.player(s))), s)
+
+# Bullets hurt things. Record 265 is the zombieman at (944, -224) in
+# sector 57, shot from 80 units east of it: each shot bleeds it, rolls
+# its pain, and the last sends it through S_POSS_DIE1 to the corpse it
+# rests in. Records 24, 25 and 26 are the three barrels at (992, 608),
+# (992, 640) and (960, 608) in sector 13, shot from 64 units north of
+# the nearest: the first to die explodes and its blast sets off the
+# other two and reaches the player, whose green armour takes a third of
+# it.
+def fighting(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    g0 : S.State <- fight("zombieman ready", 20n, idle(), [265], at(level, 1024, 65312, 180))
+    g1 : S.State <- fight("shot", 6n, fire(), [265], g0)
+    g2 : S.State <- fight("held", 14n, fire(), [265], g1)
+    g3 : S.State <- fight("held", 14n, fire(), [265], g2)
+    g4 : S.State <- fight("held", 14n, fire(), [265], g3)
+    g5 : S.State <- fight("corpse", 30n, idle(), [265], g4)
+    b0 : S.State <- fight("barrels ready", 20n, idle(), [24, 25, 26], armoured(at(level, 992, 704, 270)))
+    b1 : S.State <- fight("shot", 6n, fire(), [24, 25, 26], b0)
+    b2 : S.State <- fight("held", 14n, fire(), [24, 25, 26], b1)
+    b3 : S.State <- fight("held", 14n, fire(), [24, 25, 26], b2)
+    b4 : S.State <- fight("burning", 10n, idle(), [24, 25, 26], b3)
+    b5 : S.State <- fight("blast", 10n, idle(), [24, 25, 26], b4)
+    b6 : S.State <- fight("chain", 20n, idle(), [24, 25, 26], b5)
+    b7 : S.State <- fight("over", 40n, idle(), [24, 25, 26], b6)
+    IO.print("-")
+
 def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
   do IO<Unit>:
     weapon(level)
     firing(level)
+    fighting(level)
     pickups(level)
     damaged(level)
     door(level)
@@ -1338,7 +1438,7 @@ def main() -> IO(Unit):
 #|free at start True
 #|inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0
 #|things at start 209 random 59
-#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5 4294967295:0
+#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5 4294967295:0 4294967294:0
 #|first 2 3 6 8 9 10 11 12 13 14 15 16
 #|links 209 of 209 things, solid 108 of 108, wrong 0, unlinked 0
 #|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1 ambush True
@@ -1402,28 +1502,67 @@ def main() -> IO(Unit):
 #|ready tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 65
 #|press tic 21 state Some(79) tics 4 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 65
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|shot tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 70 puff 292 at 1323.973449 256.663757 35.437500 state 85/2
-#|after tic 35 state Some(82) tics 5 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 49 rnd 70 puff 292 at 1323.973449 256.663757 45.437500 state 88/4
+#|shot tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 70 mobj 292 type -1 at 1323.973449 256.663757 35.437500 state 85/2
+#|after tic 35 state Some(82) tics 5 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 49 rnd 70 mobj 292 type -1 at 1323.973449 256.663757 45.437500 state 88/4
 #|sound tic 39 stop thing 292
 #|gone tic 55 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 49 rnd 70
 #|held tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 65
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|held tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 70 puff 292 at 1323.973449 256.663757 35.437500 state 85/2
+#|held tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 70 mobj 292 type -1 at 1323.973449 256.663757 35.437500 state 85/2
 #|sound tic 39 DSPISTOL from thing 4294967295 vol 64 sep 128
 #|sound tic 39 stop thing 292
-#|held tic 39 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 48 rnd 77 puff 293 at 1324.001388 131.023986 36.343750 state 85/2
-#|held tic 44 state Some(80) tics 1 at 1.000000 32.000000 flash Some(83) tics 1 at 1.000000 32.000000 light 1 bullets 48 rnd 77 puff 293 at 1324.001388 131.023986 41.343750 state 86/1
+#|held tic 39 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 48 rnd 77 mobj 293 type -1 at 1324.001388 131.023986 36.343750 state 85/2
+#|held tic 44 state Some(80) tics 1 at 1.000000 32.000000 flash Some(83) tics 1 at 1.000000 32.000000 light 1 bullets 48 rnd 77 mobj 293 type -1 at 1324.001388 131.023986 41.343750 state 86/1
 #|last tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 1 rnd 65
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|last tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 0 rnd 70 puff 292 at 1323.973449 256.663757 35.437500 state 85/2
+#|last tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 0 rnd 70 mobj 292 type -1 at 1323.973449 256.663757 35.437500 state 85/2
 #|sound tic 39 stop thing 292
 #|dry tic 44 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 0 rnd 70
 #|ledge tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 65
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|ledge tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 70 puff 292 at 763.999084 256.022888 -92.562500 state 85/2
+#|ledge tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 70 mobj 292 type -1 at 763.999084 256.022888 -92.562500 state 85/2
 #|sky tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 65
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
 #|sky tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 49 rnd 66
+#|-
+#|zombieman ready tic 20 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 65 265 hp 20 state 61/7 at 944.000000 -224.000000 0.000000 after 4294967295
+#|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|shot tic 26 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 71 265 hp 10 state 89/1 at 941.617202 -223.999099 0.000000 after 157 mobj 292 type -2 at 954.032302 -224.026702 30.438049 state 150/6
+#|sound tic 27 DSPOPAIN from thing 265 vol 64 sep 129
+#|sound tic 39 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|sound tic 40 stop thing 292
+#|held tic 40 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 79 265 hp 5 state 89/1 at 932.234802 -223.996154 0.000000 after 157 mobj 293 type -2 at 946.435836 -226.112243 31.676666 state 151/6
+#|sound tic 41 DSPOPAIN from thing 265 vol 64 sep 129
+#|sound tic 46 stop thing 293
+#|sound tic 53 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|sound tic 54 DSPODTH2 from thing 265 vol 64 sep 129
+#|held tic 54 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 88 265 hp -10 state 92/5 at 922.500030 -223.993545 0.000000 after 157 mobj 294 type -2 at 939.189895 -221.625686 29.299301 state 149/4
+#|sound tic 67 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|held tic 68 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 96 265 hp -10 state 94/1 at 908.660812 -223.989547 0.000000 after 157 mobj 294 type -2 at 939.189895 -221.625686 0.000000 state 151/6 mobj 295 type -1 at 883.999008 -218.145782 37.078125 state 86/4
+#|sound tic 74 stop thing 294
+#|sound tic 80 stop thing 295
+#|corpse tic 98 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 109 265 hp -10 state 95/4294967295 at 904.586151 -223.989227 0.000000 after 157
+#|barrels ready tic 20 at 992.000000 704.000000 health 100 armour 100/1 rnd 65 24 hp 20 state 11/1 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 20 state 11/4 at 992.000000 640.000000 -128.000000 after 4294967295 26 hp 20 state 10/5 at 960.000000 608.000000 -128.000000 after 4294967295
+#|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|shot tic 26 at 992.000000 704.000000 health 100 armour 100/1 rnd 71 24 hp 20 state 10/1 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 10 state 10/4 at 992.000900 637.617202 -128.000000 after 157 26 hp 20 state 11/5 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 292 type -1 at 992.020584 650.032058 -104.217193 state 85/1
+#|sound tic 39 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|sound tic 39 stop thing 292
+#|held tic 40 at 992.000000 704.000000 health 100 armour 100/1 rnd 79 24 hp 20 state 11/5 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 5 state 10/2 at 992.003845 628.234802 -128.000000 after 157 26 hp 20 state 11/3 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 293 type -1 at 993.688583 641.992401 -103.005889 state 86/3
+#|sound tic 51 stop thing 293
+#|sound tic 53 DSPISTOL from thing 4294967295 vol 64 sep 128
+#|sound tic 54 DSBAREXP from thing 25 vol 64 sep 129
+#|held tic 54 at 992.000000 704.000000 health 100 armour 100/1 rnd 87 24 hp 20 state 11/3 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp -10 state 145/5 at 992.003845 628.234802 -128.000000 after 157 26 hp 20 state 11/1 at 960.000000 608.000000 -128.000000 after 4294967295 mobj 294 type -1 at 990.216842 640.306518 -105.356399 state 86/4
+#|burning tic 64 at 991.996704 712.624862 health 54 armour 77/1 rnd 90 24 hp -98 state 144/2 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp -10 state 147/10 at 992.003845 628.234802 -128.000000 after 157 26 hp -86 state 144/2 at 948.803115 600.915649 -128.000000 after 4294967295 mobj 294 type -1 at 990.216842 640.306518 -95.356399 state 88/2
+#|sound tic 66 DSBAREXP from thing 24 vol 64 sep 129
+#|sound tic 66 DSBAREXP from thing 26 vol 64 sep 170
+#|sound tic 66 stop thing 294
+#|sound tic 67 DSPLPAIN from thing 4294967295 vol 64 sep 128
+#|blast tic 74 at 991.976455 764.844482 health 54 armour 77/1 rnd 96 24 hp -98 state 146/2 at 991.994369 593.250213 -128.000000 after 4294967295 25 hp -10 state 148/10 at 992.003845 628.234802 -128.000000 after 157 26 hp -86 state 146/2 at 929.460037 588.677139 -128.000000 after 4294967295
+#|sound tic 84 stop thing 25
+#|chain tic 94 at 991.964843 791.646759 health 54 armour 77/1 rnd 106 24 hp -98 state 148/2 at 991.994369 593.250213 -128.000000 after 4294967295 gone 26 hp -86 state 148/2 at 929.460037 588.677139 -128.000000 after 4294967295
+#|sound tic 96 stop thing 24
+#|sound tic 96 stop thing 26
+#|over tic 134 at 991.961318 795.444274 health 54 armour 77/1 rnd 109 gone gone gone
 #|-
 #|clip walk tic 9 644.340896 991.988937 180.000 z -128.000000 floor -128.000000 eye 42.770172
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken

@@ -127,9 +127,11 @@ def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
 
 # A player killed where it stands in the nukage of sector 173, which
 # five health a blow would take 609 tics to do.
+def killed.at(+s: S.State) -> S.State:
+  S.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
+
 def killed(level: L.Level) -> S.State:
-  S.Sim.damage(100, H.Thing.you(), H.Thing.you(), S.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000),
-    A.Angle.of_thing(90)}))
+  killed.at(S.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000), A.Angle.of_thing(90)}))
 
 # A game whose player is dead: a frame with Space pressed asks for the
 # level again, and the next frame, with no time gone, answers it.
