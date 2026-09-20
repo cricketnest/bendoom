@@ -12,4 +12,6 @@
 - [ ] Each monster moves at its speed on its move tics and relinks as it goes
 - [ ] The freedom law grows from the player to every thing that moved
 - [ ] Sim cases: a chase across a room, around a corner, through a door, and one stopped at a ledge, with places per tic and the random index from a replay of the source
+- [ ] The rest of ticket 08's ten pinned frames return to zero, or the ticket says which wait for an attack
+- [ ] tests/route.bend and tests/game.bend were routed around standing monsters by ticket 08; with monsters chasing, the route is derived again, and it may now have to wait for tickets 11 to 19 to fight its way through: if no route can reach the exit without fighting, say so and leave the route to ticket 25
 - [ ] A render case shows walking frames mid-chase at zero differing pixels, from a script that ends before any attack would start
