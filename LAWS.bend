@@ -166,26 +166,36 @@ law arrows_wasd:
 # turn is 320 for its first five tics, then 640, or 1280 running; Space
 # is the use button (sanity).
 law cmd_tables:
-  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 5),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, True{}}, 0))
-    == (K.Cmd{25, 0, 0, False{}}, K.Cmd{50, 0, 0, False{}}, K.Cmd{0, 24, 0, False{}}, K.Cmd{0, 4294967256, 0, False{}},
-      K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 640, False{}}, K.Cmd{0, 0, 4294966016, False{}},
-      K.Cmd{0, 0, 0, True{}})
+  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0),
+    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 5),
+    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 6),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 6),
+    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, 0))
+    == (K.Cmd{25, 0, 0, 0}, K.Cmd{50, 0, 0, 0}, K.Cmd{0, 24, 0, 0}, K.Cmd{0, 4294967256, 0, 0},
+      K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 640, 0}, K.Cmd{0, 0, 4294966016, 0},
+      K.Cmd{0, 0, 0, 2})
     : K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd}
+
+# LAW: the lowest held number key wins, whatever the higher ones do, as
+# G_BuildTiccmd's loop breaks at the first: BT_CHANGE, 4, with the key's
+# number less one at BT_WEAPONSHIFT, 3.
+law lowest_number_wins:
+  for two: Bool
+  for three: Bool
+  {(K.Keys.change(True{}, two, three), K.Keys.change(False{}, True{}, three),
+    K.Keys.change(False{}, False{}, True{}), K.Keys.change(False{}, False{}, False{}))
+    == (4, 12, 20, 0) : U32 & U32 & U32 & U32}
 
 # LAW: the held count lives in the input: seven tics of the left key
 # from a fresh input turn 320 five times, then 640 (sanity).
 law turn_script:
-  {K.Input.script(7n, K.Input{K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0})
-    == [K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}},
-      K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 320, False{}}, K.Cmd{0, 0, 640, False{}},
-      K.Cmd{0, 0, 640, False{}}] : List<&2, K.Cmd>}
+  {K.Input.script(7n, K.Input{K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0})
+    == [K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0},
+      K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 640, 0},
+      K.Cmd{0, 0, 640, 0}] : List<&2, K.Cmd>}
 
 # The sim
 # -------
@@ -267,7 +277,7 @@ def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
 # momentum over four is 9999, and half of it times the clock's sine 25
 # is 1 (sanity).
 law tic_from_rest:
-  {Closed.room([K.Cmd{25, 0, 0, False{}}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed()}, 0)
+  {Closed.room([K.Cmd{25, 0, 0, 0}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Closed.unarmed()}, 0)
     == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, [], I.Inventory.start(), Closed.unarmed()} : S.Player}
 
 # LAW: standing still on the floor puts the eye 41 above it, at any
@@ -303,7 +313,7 @@ law landing_dip:
 # over four is 14745600, capped at 16 units, and half of it bobs the eye
 # by 524280, a hair under 8 units (sanity).
 law bob_run_and_cap:
-  {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, False{}}],
+  {(S.Player.viewz(Closed.room([K.Cmd{50, 0, 0, 0}],
       S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Closed.unarmed()}, 5)),
     S.Player.viewz(Closed.room([K.Cmd.idle()],
       S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Closed.unarmed()}, 5)))
@@ -385,9 +395,49 @@ def Closed.west() -> S.State:
 def Closed.east() -> S.State:
   Closed.at(Closed.player(7340032, 4194304, 2147483648, 4718592), Closed.doors(), [], [])
 
+# The door level with a barrel, radius 10, standing between its two
+# faces at x 72, y 64, linked into the one cell as P_SetThingPosition
+# links it. The player stands at (200, 64), off the blockmap, so its own
+# mobj is in no cell and the ray meets the barrel alone; vanilla's
+# PIT_AddThingIntercepts gathers the shooter's mobj too, and it is its
+# visitor that passes over it.
+def Closed.barrel() -> S.State:
+  Closed.at(Closed.player(13107200, 4194304, 0, 8388608), Closed.doors(), [],
+    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295}])
+
+# What a ray of the use key's 64 units, east from (32, 64), meets, and
+# what the use key's visitor makes of the same ray.
+def Closed.met(+s: S.State) -> List<&2, S.Sim.Meet>:
+  S.Sim.meets(S.State.level(s), S.State.things(s), S.State.player(s), True{}, True{}, 2097152, 4194304, 6291456,
+    4194304)
+
+def Closed.reach(+s: S.State) -> S.Sim.Reach:
+  S.Sim.path(~S.Sim.Reach, ~S.Sim.use.visit, S.State.level(s), S.State.things(s), S.State.player(s), True{},
+    False{}, 2097152, 4194304, 6291456, 4194304, S.Nothing{})
+
+# LAW: one traversal gathers the lines of the cell it crosses and the
+# things linked in it, and hands them over in order of distance: the ray
+# meets the door's west face at half its length, the barrel at 0.625 and
+# the east face at 0.75, so the thing comes between the two lines. The
+# fractions are P_InterceptVector by hand. For the west face, from
+# (64, 128) to (64, 0): num is (64 - 32) >> 8 times its dy, -1048576,
+# den is its dy >> 8 times the ray's dx, -2097152, and the quotient is
+# 32768. For the east face, from (80, 0) to (80, 128): num 1572864, den
+# 2097152, quotient 49152. For the barrel, PIT_AddThingIntercepts takes
+# the diagonal of its box that a rising ray can cross, from (62, 74) to
+# (82, 54): num is (62 - 32) >> 8 times -20 plus (64 - 74) >> 8 times
+# 20, -204800, den is -20 >> 8 times the ray's dx, -327680, and the
+# quotient is 40960. The use key asks for lines alone, so the barrel is
+# not gathered for it, and its refusal at the first line with a special
+# ends the walk before the east face (sanity).
+law ray_meets:
+  {(Closed.met(Closed.barrel()), Closed.reach(Closed.barrel()))
+    == ([S.Meet{32768, True{}, 0}, S.Meet{40960, False{}, 0}, S.Meet{49152, True{}, 1}], S.Special{0})
+    : List<&2, S.Sim.Meet> & S.Sim.Reach}
+
 # The state after a tic of use and then idle tics.
 def Closed.used(idle: Nat, s: S.State) -> S.State:
-  S.Sim.replay(K.Cmd{0, 0, 0, True{}} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
+  S.Sim.replay(K.Cmd{0, 0, 0, 2} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
 
 def Closed.ceil(s: S.State, sector: U32) -> U32:
   L.Level.ceil(S.State.level(s), sector)
@@ -592,6 +642,7 @@ law use_fires_once:
   for forward: U32
   for side: U32
   for turn: U32
+  for buttons: U32
   for +next: K.Cmd
   for player: S.Player
   for level: L.Level
@@ -603,7 +654,8 @@ law use_fires_once:
   for usedown: Bool
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: U32
-  {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, True{}},
+  for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
+  {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
     S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
@@ -622,7 +674,7 @@ def Closed.exit() -> L.Level:
 
 # The west room's player after two idle tics and then a tic of use.
 def Closed.exited() -> S.State:
-  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, True{}}], S.State.populated([], 128,
+  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Closed.player(2097152, 4194304, 0, 8388608), Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()),
       S.Thinkers{[], []}, 0, 0, False{}, False{}, [], 0}))
 

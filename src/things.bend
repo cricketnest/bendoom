@@ -146,6 +146,11 @@ def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
   kind
 
+# A type's radius in fixed point.
+def Thing.Def.radius(d: Thing.Def) -> U32:
+  Def{kind, state, radius, height, flags} = d
+  F.Fixed.of_map(radius)
+
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:
     case True{}:
@@ -324,7 +329,7 @@ def Things.without(ids: List<&2, U32>, +id: U32) -> List<&2, U32>:
     case []:
       []
     case +h <> rest:
-      V.Vec.keep(Bool.not(U32.is_eq(h, id)), h, Things.without(rest, id))
+      V.Vec.keep(~U32, Bool.not(U32.is_eq(h, id)), h, Things.without(rest, id))
 
 # List i of some lists with an id put first in it, or taken out of it.
 def Things.edit(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, +lists: V.Tree<List<&2, U32>>, +i: U32,

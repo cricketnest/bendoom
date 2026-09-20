@@ -107,7 +107,7 @@ def Vec.show(+v: Vec, n: Nat, +i: U32) -> String:
       " " ++ U32.show(Vec.get(v, i)) ++ Vec.show(v, m, (i + 1 : U32))
 
 # A list with x before it when it is kept.
-def Vec.keep(keep: Bool, x: U32, rest: List<&2, U32>) -> List<&2, U32>:
+def Vec.keep(~T: Data, keep: Bool, x: T, rest: List<&2, T>) -> List<&2, T>:
   match keep:
     case False{}:
       rest
