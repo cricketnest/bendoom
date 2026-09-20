@@ -48,7 +48,7 @@ def main() -> IO(Unit):
     IO.print("marker" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 128, 0, 0, 0, 25, 0, 0, 0])))
     IO.print("cut" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 25, 0, 0])))
 
-#|header 109 2 1 1 0 0 0 1 0 1 0 0 0
+#|header 109 2 1 1 0 0 0 0 0 1 0 0 0
 #|left 50 216 3 2 0 0 2 0 0 0 3 0 | carry -128 | read 50,-40,768,True 0,0,512,False 0,0,768,False
 #|right 231 24 254 0 0 0 253 0 0 0 254 0 | carry -128 | read -25,24,-512,False 0,0,-768,False 0,0,-512,False
 #|slow 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 | carry 0 | read 0,0,256,False 0,0,512,False 0,0,256,False 0,0,256,False

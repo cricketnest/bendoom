@@ -17,6 +17,9 @@
 #
 # The sounds: a command script from a place, as tools/oracle.nu takes
 # them, played as a demo with no music, or over the song with --music.
+# The demo is tools/demo.nu's, which spawns the map's monsters, so a
+# script whose place a monster can see hears that monster wake as well;
+# milestone 6's ticket 08 records which places those are.
 # Chocolate Doom quits at the demo's end, which ends the capture, so a
 # script idles at its end for as long as its last sound lasts; timeout
 # stops a run that goes a minute past the script. The report lists each

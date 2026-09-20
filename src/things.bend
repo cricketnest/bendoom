@@ -1,9 +1,10 @@
 # Doom's info.c, P_SpawnMapThing and the state half of P_MobjThinker for
 # the things Bendoom spawns: the definitions of the DoomEd types either
-# E1M1 places, less the monsters and the starts, the state rows their
-# spawn states lead to and the pistol's with its entry in d_items.c's
-# weaponinfo, the map's THINGS records made the level's first things, and
-# a thing's tic through its states.
+# E1M1 places, less the starts and the spectre, which Hurt Me Plenty
+# never spawns, the state rows their spawn states lead to and the
+# pistol's with its entry in d_items.c's weaponinfo, the map's THINGS
+# records made the level's first things, and a thing's tic through its
+# states.
 import Base
 import ./fixed.bend as F
 import ./angle.bend as A
@@ -41,7 +42,8 @@ type Thing.Row is Data:
 
 # The state rows by Bendoom's number: every state the spawn states of the
 # types below lead to, in vanilla's order, then the pistol's ready and
-# raise states. None has 0 tics.
+# raise states, then the monsters' two idle states each, whose A_Look is
+# not run yet. None has 0 tics.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}},
@@ -72,7 +74,11 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"GOR4", 0, False{}, 4294967295, 53, Null{}}, Row{"SMIT", 0, False{}, 4294967295, 54, Null{}},
     Row{"CBRA", 0, True{}, 4294967295, 55, Null{}}, Row{"TRE1", 0, False{}, 4294967295, 56, Null{}},
     Row{"TRE2", 0, False{}, 4294967295, 57, Null{}}, Row{"ELEC", 0, False{}, 4294967295, 58, Null{}},
-    Row{"PISG", 0, False{}, 1, 59, WeaponReady{}}, Row{"PISG", 0, False{}, 1, 60, Raise{}}]
+    Row{"PISG", 0, False{}, 1, 59, WeaponReady{}}, Row{"PISG", 0, False{}, 1, 60, Raise{}},
+    Row{"POSS", 0, False{}, 10, 62, Null{}}, Row{"POSS", 1, False{}, 10, 61, Null{}},
+    Row{"SPOS", 0, False{}, 10, 64, Null{}}, Row{"SPOS", 1, False{}, 10, 63, Null{}},
+    Row{"TROO", 0, False{}, 10, 66, Null{}}, Row{"TROO", 1, False{}, 10, 65, Null{}},
+    Row{"SARG", 0, False{}, 10, 68, Null{}}, Row{"SARG", 1, False{}, 10, 67, Null{}}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)), Row{"", 0, False{}, 0, 0, Null{}})
@@ -122,7 +128,8 @@ def Thing.tic(thing: Thing) -> Thing:
 # A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
 # radius and height in map units, and vanilla's flags: 1 special, 2
 # solid, 4 shootable, 256 hung from the ceiling, 512 no gravity, 524288
-# no blood, 8388608 an item the tally counts, 33554432 not in deathmatch.
+# no blood, 4194304 a kill and 8388608 an item the tally counts, 33554432
+# not in deathmatch.
 type Thing.Def is Data:
   Def{kind: U32, state: U32, radius: U32, height: U32, flags: U32}
 
@@ -137,7 +144,8 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{2013, 28, 20, 16, 8388609}, Def{2014, 12, 20, 16, 8388609}, Def{2015, 18, 20, 16, 8388609},
     Def{2018, 6, 20, 16, 1}, Def{2019, 8, 20, 16, 1}, Def{2023, 34, 20, 16, 8388609}, Def{2028, 49, 16, 16, 2},
     Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
-    Def{2049, 42, 20, 16, 1}]
+    Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
+    Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}]
 
 def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
@@ -203,12 +211,12 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
     case _ _ _:
       s
 
-# Doom's P_SpawnMapThing on Hurt Me Plenty with one player and no
-# monsters: player 1's start spawns the player, who draws a random number
-# too and ranks among the things of its cell by the first such record,
-# the start Level.start_of places it at; another record spawns when its
-# options set that skill's bit, 2, and not the multiplayer bit, 16, and
-# its type has a definition.
+# Doom's P_SpawnMapThing on Hurt Me Plenty with one player: player 1's
+# start spawns the player, who draws a random number too and ranks among
+# the things of its cell by the first such record, the start
+# Level.start_of places it at; another record spawns when its options
+# set that skill's bit, 2, and not the multiplayer bit, 16, and its type
+# has a definition.
 def Thing.spawn.one(+level: L.Level, id: U32, record: L.Level.Thing, s: Thing.Spawn) -> Thing.Spawn:
   L.Thing{x, y, angle, +kind, +options} = record
   Thing.spawn.if(U32.is_eq(kind, 1), Bool.and(Bool.not(U32.is_zero((options .&. 2 : U32))),
@@ -229,6 +237,17 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
 # random index once they have spawned, from 0.
 def Thing.spawn(+level: L.Level) -> Thing.Spawn:
   Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
+
+def Thing.ambush.of(record: L.Level.Thing, mapped: Bool) -> Bool:
+  L.Thing{x, y, angle, kind, options} = record
+  Bool.and(mapped, Bool.not(U32.is_zero((options .&. 8 : U32))))
+
+# Doom's MF_AMBUSH, which P_SpawnMapThing sets from bit 8 of the record's
+# options: a map thing's id is its record's index, so the record keeps
+# the flag, and a thing spawned in play, its id past the records, has
+# none.
+def Thing.ambush(+level: L.Level, +id: U32) -> Bool:
+  Thing.ambush.of(L.Level.thing(level, id), U32.is_lt(id, L.Level.nthings(level)))
 
 # The population
 # --------------

@@ -44,12 +44,12 @@ def runs []: string -> table<tics: int, bytes: binary> {
 }
 
 # The runs as a version 109 demo: the 13-byte header (Hurt Me Plenty,
-# E1M1, no deathmatch, respawn or fast, no monsters, console player 0,
+# E1M1, no deathmatch, respawn, fast or -nomonsters, console player 0,
 # player 1 alone in the game), the tics, and the 0x80 that ends a demo.
 # Under -playdemo Chocolate Doom quits when it reads the end.
 def demo []: table<tics: int, bytes: binary> -> binary {
   let tics = $in | each {|run| 0..<$run.tics | each { $run.bytes } } | flatten
-  [0x[6d 02 01 01 00 00 00 01 00 01 00 00 00]]
+  [0x[6d 02 01 01 00 00 00 00 00 01 00 00 00]]
   | append $tics
   | append 0x[80]
   | bytes collect
