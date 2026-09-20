@@ -14,6 +14,7 @@ import ./src/sound.bend as Sn
 import ./src/sim.bend as S
 import ./src/things.bend as H
 import ./src/inventory.bend as I
+import ./src/message.bend as Msg
 import ./src/clip.bend as C
 import ./src/project.bend as P
 import ./src/draw.bend as D
@@ -1642,6 +1643,9 @@ def Laws.backpack_later():
   {==}
 
 def Laws.weapon_taken():
+  {==}
+
+def Laws.pickup_messages():
   {==}
 
 def Laws.radius_within():
