@@ -9,7 +9,7 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **A decision inside a loop is a parameter.** The body cannot `match` a computed Bool and then recurse (that needs a helper, which is mutual recursion), so the caller computes the Bool for the next step and passes it first: `go(fuel, done: Bool, ..)` matched as `match fuel done`. A loop over a record does the same by carrying the flag in the record (`Xy{done, ..}`) and matching it in the pattern.
 - **Scrutinees follow binder order.** Destructuring lets and matches must take parameters in declaration order, and a let may not precede a match on a parameter, so put the flags matched on first and the records opened after.
 - **`[]` is a pattern only in a case's first position:** after another scrutinee it reads as indexing (`case False{} []:` does not parse), so put the list scrutinee first or write `Nil{}` there.
-- **A case cannot open a pair:** `case [] (stop, got):` is refused, so a loop state of several values is a small record matched as `Touch{stop, ..}` (`Sim.Touch`).
+- **A case cannot open a pair:** `case [] (stop, got):` is refused, so a loop state of several values is a small record matched as `Try{ok, ..}` (`Sim.Try`).
 - **A call result is not a pattern.** `(a, b) = f(x)` and `match f(x)` are refused: pass the result to a def that destructures its parameter. A let-bound variable is refused the same way.
 - **A `do` block binds actions and typed lets:** `x : T <- act` and `+x : T = f(y)` pass, but an untyped let (`+x = f(y)`) inside one is refused with "expected a pattern".
 - **A list holds Data only.** A pair is a Type, so a list of pairs is refused; a law comparing many cases as one list wraps each in a Data record (`LAWS.bend`'s `Closed.Got`).
@@ -19,12 +19,14 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **Literals have limits:** a Nat literal of a few thousand (`4096n` already) and a list literal past about four thousand entries overflow the checker's stack. Big tables are 1024-entry chunks; big counts are `U32.to_nat(n)`. A float literal has no sign: a negative one is `F32.neg(x)`.
 - **`Bool.pick` evaluates both branches.** It is a function, and calls are strict, so a pick between a costly value and a cheap one pays for the costly one every time; a branch that builds something is a `match`.
 - **No def named `exit`.** The native runtime has one of its own, and a build that gives the def a function of its own fails with "two names mangle to FID_EXIT"; whether it does depends on what the compiler inlines, so the name can pass for a while.
-- **`type` is a keyword,** refused as a field or parameter name; a thing's DoomEd type is its `kind`.
+- **`type` and `def` are keywords,** refused as a field, parameter or pattern name; a thing's DoomEd type is its `kind`.
+- **A type may take a type:** `type Tree<-A: Data> is Data`, and each def over it takes `-A: Data` first and is called with the type spelled out (`V.Tree.get(H.Thing, tree, i)`). A self-call that rebuilds its scrutinee (growing a path under an empty leaf) is refused as not decreasing.
 - **A big `+` let inside a function with a `do` block is inlined at its use:** binding a whole scripted state beside another one and handing each to a frame fails the native build with "an arity over 255", with no location. The same expression as a def of its own passes, so a state a case needs is built by a def (`tests/game.bend`'s `killed`).
 - **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun. Base's `List.length` recurses once an element, so it may not measure a WAD lump there; `List.drop` is a loop.
 
 ## Proofs
 
+- **A large fuel in a goal overflows the checker.** `U32.to_nat(16777216)` runs, but a law whose goal holds it fails with "the machine stack overflowed". A loop a law speaks of recurses on a list the state already holds, its length the fuel (`Sim.thinkers.go`).
 - **A universal U32 law does not compute.** Every word operation on a symbolic word is stuck in the checker, and Base has only `Word.add_comm`; state arithmetic facts as closed sample laws unless you are writing the word library. An `F32` operation is stuck even on literals, so a float fact is a test line and not a law.
 - **Normalization duplicates.** A def that uses its argument twice, nested n deep (`sar(sar(sar(x)))`), makes the checker's term 2^n large; write it linear.
 - **A let bound to a record is annotated** (`+level = {L.Level{geo, ..} : L.Level}`): the checker cannot infer a constructor's type from its fields.

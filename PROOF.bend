@@ -22,6 +22,7 @@ import ./src/planes.bend as N
 import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
+import ./src/sound.bend as Sn
 import ./LAWS.bend as Laws
 
 # Closed laws compute.
@@ -335,24 +336,34 @@ def Laws.lowest_number_wins(two, three):
   {==}
 
 # The player of tic_rest's law, at rest at a place with the inventory
-# G_PlayerReborn gives, and the state its move and eye leave, which the
-# sector's special is handed.
+# G_PlayerReborn gives, the state a tic begins with, and the state its
+# move and eye leave, which the sector's special is handed.
 def rest_player(+x: U32, +y: U32) -> S.Player:
   S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Laws.Closed.unarmed(), S.Sim.Hurt.start()}
 
-def rest_walked(+level: L.Level, +x: U32, +y: U32) -> S.State:
-  S.State.player.put(Laws.Closed.state(rest_player(x, y), level, 0),
-    S.Sim.eye(level, 0, S.Sim.move(level, K.Cmd.idle(), rest_player(x, y))))
+def rest_before(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
+  Laws.Closed.state(rest_player(x, y), L.Level{geo, sectors, specials}, 0)
 
-# A level whose sector's special the law says nothing about leaves the
-# nukage's flag stuck, so the tic splits on it: the blow it may deal
-# writes the health, the wound and the momentum, and the place a tic
-# from rest leaves is the place either way.
+def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
+  S.State.player.put(rest_before(geo, sectors, specials, x, y),
+    S.Sim.eye(L.Level{geo, sectors, specials}, 0,
+      S.Sim.move(L.Level{geo, sectors, specials}, K.Cmd.idle(), rest_player(x, y))))
+
+# The think a tic from rest makes, once the nukage's flag is known: a
+# level the law says nothing about leaves that flag stuck, and the blow
+# it may deal writes the health, the wound and the momentum, never the
+# place.
+def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
+  S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
+    S.State.player.put(S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y)),
+      S.Sim.counters(S.Sim.psprites(L.Level{geo, sectors, specials}, 0,
+        S.State.player(S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y)))))))
+
 def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) ->
-  {(S.Player.x(S.State.player(S.Sim.tic.live(K.Cmd.idle(), L.Level{geo, sectors, specials}, geo, 0, False{},
-      False{}, S.Sim.sector.hurt(due, rest_walked(L.Level{geo, sectors, specials}, x, y))))),
-    S.Player.y(S.State.player(S.Sim.tic.live(K.Cmd.idle(), L.Level{geo, sectors, specials}, geo, 0, False{},
-      False{}, S.Sim.sector.hurt(due, rest_walked(L.Level{geo, sectors, specials}, x, y))))))
+  {(S.Player.x(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, rest_before(geo, sectors, specials, x, y),
+      rest_think(due, geo, sectors, specials, x, y)))),
+    S.Player.y(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, rest_before(geo, sectors, specials, x, y),
+      rest_think(due, geo, sectors, specials, x, y)))))
     == (x, y) : U32 & U32}:
   match due:
     case True{}:
@@ -365,14 +376,14 @@ def Laws.tic_rest(level, x, y):
     case L.Level{geo, sectors, specials}:
       rest_due(Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials},
           L.Level.sector_at(L.Level{geo, sectors, specials},
-            S.Player.x(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))),
-            S.Player.y(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))))), 7),
+            S.Player.x(S.State.player(rest_walked(geo, sectors, specials, x, y))),
+            S.Player.y(S.State.player(rest_walked(geo, sectors, specials, x, y))))), 7),
         Bool.and(U32.is_zero((0 .&. 31 : U32)),
-          U32.is_eq(S.Player.z(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))),
+          U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, x, y))),
             L.Level.floor(L.Level{geo, sectors, specials},
               L.Level.sector_at(L.Level{geo, sectors, specials},
-                S.Player.x(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y))),
-                S.Player.y(S.State.player(rest_walked(L.Level{geo, sectors, specials}, x, y)))))))),
+                S.Player.x(S.State.player(rest_walked(geo, sectors, specials, x, y))),
+                S.Player.y(S.State.player(rest_walked(geo, sectors, specials, x, y)))))))),
         geo, sectors, specials, x, y)
 
 def Laws.tic_counts(cmd, p, level, clock):
@@ -594,65 +605,60 @@ def go_pins(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +m
     case +h <> rest 1n+j:
       go_pins(rest, level, x, y, r, mask, S.Sim.fit.line(level, x, y, r, mask, h, f), j, i, listed, e)
 
-# A free position passed the thing check, and then every line.
-def at_pins(c: Bool, +level: L.Level, +x: U32, +y: U32, k: Nat, +i: U32,
-  listed: {Some{i} == List.get(&2, U32, S.Sim.lines(level, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), k) : Maybe<&2, U32>},
-  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}) ->
-  {True{} == S.Sim.line_ok(level, x, y, S.Sim.radius(), 1, i) : Bool}:
-  match c:
-    case False{}:
-      %e : BD(_, Unit, {True{} == S.Sim.line_ok(level, x, y, S.Sim.radius(), 1, i) : Bool})
-      Unit{}
-    case True{}:
-      go_pins(S.Sim.lines(level, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32),
-        (y + S.Sim.radius() : U32)), level, x, y, S.Sim.radius(), 1, S.Sim.fit.start(True{}, level, x, y), k, i, listed,
-        e)
-
 def Laws.free_pins_lines(level, x, y, k, i, listed, free):
-  at_pins(S.Sim.clear(level, x, y, S.Sim.radius(), H.Thing.you()), level, x, y, k, i, listed, free)
+  go_pins(S.Sim.lines(level, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32),
+    (y + S.Sim.radius() : U32)), level, x, y, S.Sim.radius(), 1, S.Sim.fit.start(True{}, level, x, y), k, i, listed,
+    free)
 
-# Clear pins the things
-# ---------------------
+# Clear pins the mobjs
+# --------------------
 
-def not_blocker(b: Bool, -c: Bool, e: {True{} == Bool.and(Bool.not(b), c) : Bool}) -> {False{} == b : Bool}:
-  match b:
+# A box that met no mobj that stops it is stopped by none of the list,
+# by its position: the first that stops it would be what it hit.
+def met_none(stops: Bool, id: U32, later: S.Sim.Met,
+  e: {None{} == S.Sim.Met.hit(S.Sim.met.if(stops, id, later)) : Maybe<&2, U32>}) -> {False{} == stops : Bool}:
+  match stops:
     case True{}:
-      %e : BD(_, Unit, {False{} == True{} : Bool})
+      %e : MD(_, {False{} == True{} : Bool}, Unit)
       Unit{}
     case False{}:
       {==}
 
-# A True verdict over the things near means no one of them stops the
-# box, by its position.
-def clear_pins(ids: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, k: Nat, +id: U32,
+def met_later(stops: Bool, id: U32, later: S.Sim.Met,
+  e: {None{} == S.Sim.Met.hit(S.Sim.met.if(stops, id, later)) : Maybe<&2, U32>}) ->
+  {None{} == S.Sim.Met.hit(later) : Maybe<&2, U32>}:
+  match stops later:
+    case True{} S.Met{before, hit}:
+      %e : MD(_, {None{} == hit : Maybe<&2, U32>}, Unit)
+      Unit{}
+    case False{} S.Met{before, hit}:
+      e
+
+def clear_pins(ids: List<&2, U32>, +things: H.Things, +p: S.Player, +m: S.Sim.Body, k: Nat, +id: U32,
   listed: {Some{id} == List.get(&2, U32, ids, k) : Maybe<&2, U32>},
-  e: {True{} == S.Sim.clear.go(ids, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()) : Bool}) ->
-  {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool}:
+  e: {None{} == S.Sim.Met.hit(S.Sim.met.go(ids, things, p, m)) : Maybe<&2, U32>}) ->
+  {False{} == S.Sim.stops.at(things, p, m, id) : Bool}:
   match ids k:
     case [] _:
-      %listed : MD(_, Unit,
-        {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), id) : Bool})
+      %listed : MD(_, Unit, {False{} == S.Sim.stops.at(things, p, m, id) : Bool})
       Unit{}
-    case +h <> rest 0n:
-      %some_eq(id, h, listed)
-        : {False{} == S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), _) : Bool}
-      not_blocker(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), h),
-        S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()), e)
-    case +h <> rest 1n+j:
-      clear_pins(rest, level, x, y, j, id, listed,
-        and_true_right(Bool.not(S.Sim.blocker(L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you(), h)),
-          S.Sim.clear.go(rest, L.Level.things_of(level), x, y, S.Sim.radius(), H.Thing.you()), e))
+    case +h <> +rest 0n:
+      %some_eq(id, h, listed) : {False{} == S.Sim.stops.at(things, p, m, _) : Bool}
+      met_none(S.Sim.stops.at(things, p, m, h), h, S.Sim.met.go(rest, things, p, m), e)
+    case +h <> +rest 1n+j:
+      clear_pins(rest, things, p, m, j, id, listed,
+        met_later(S.Sim.stops.at(things, p, m, h), h, S.Sim.met.go(rest, things, p, m), e))
 
-def Laws.clear_pins_things(level, x, y, k, id, listed, clear):
-  clear_pins(S.Sim.near(level, x, y, S.Sim.radius()), level, x, y, k, id, listed, clear)
+def Laws.clear_pins_things(level, things, p, m, k, id, listed, clear):
+  clear_pins(S.Sim.nearby(level, things, m), things, p, m, k, id, listed, clear)
 
 # The wall law
 # ------------
 
-# Free: the player's position passes Sim.fit. Every move the sim takes
-# has passed it, so each function from the tic down keeps it: a lemma a
-# function, on the flag it decides by and the record it opens.
+# Free: no line stops the player's box. Every move the sim takes has
+# passed Sim.check, whose lines are those, so each function from the tic
+# down keeps it: a lemma a function, on the flag it decides by and the
+# record it opens.
 def Free(level: L.Level, +p: S.Player) -> Type:
   {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
 
@@ -667,33 +673,54 @@ def holding_free(+level: L.Level, p: S.Player, held: I.Inventory, hp: Free(level
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
 
+# A place that passed the check with its things' verdict passes the
+# lines alone.
+def at_clear(c: Bool, +level: L.Level, +x: U32, +y: U32,
+  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}) ->
+  {True{} == S.Sim.free(level, x, y) : Bool}:
+  match c:
+    case False{}:
+      %e : BD(_, Unit, {True{} == S.Sim.free(level, x, y) : Bool})
+      Unit{}
+    case True{}:
+      e
+
+def fit_ok(c: Bool, +level: L.Level, +x: U32, +y: U32, +ok: Bool, fl: U32, cl: U32, +h: Bool,
+  e: {True{} == Bool.and(ok, h) : Bool},
+  hf: {S.Fit{ok, fl, cl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}) ->
+  {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}:
+  %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
+  and_true_left(ok, h, e)
+
 def fin_free(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32,
-  ceil: U32, over: List<&2, U32>, +ok: Bool, fl: U32, cl: U32, +h: Bool, e: {go == Bool.and(ok, h) : Bool},
-  hf: {S.Fit{ok, fl, cl} == S.Sim.fit(level, x, y) : S.Sim.Fit}, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, p, things, x, y, floor, ceil, over))):
+  ceil: U32, over: List<&2, U32>, +c: Bool, +ok: Bool, fl: U32, cl: U32, +h: Bool,
+  e: {go == Bool.and(ok, h) : Bool},
+  hf: {S.Fit{ok, fl, cl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
+  Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over))):
   match go p:
     case False{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case True{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
-      and_true_left(ok, h, e)
+      at_clear(c, level, x, y, fit_ok(c, level, x, y, ok, fl, cl, h, e, hf))
 
 def fit_free(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things,
-  f: S.Sim.Fit, over: List<&2, U32>, hf: {f == S.Sim.fit(level, x, y) : S.Sim.Fit}, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move.fit(p, x, y, touched, f, over))):
+  f: S.Sim.Fit, over: List<&2, U32>, +c: Bool,
+  hf: {f == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
+  Free(level, S.Sim.Try.player(S.Sim.try_move.fit(level, p, x, y, touched, f, over))):
   match touched f:
     case (+inv, +things) S.Fit{+ok, +floor, +ceil}:
-      fin_free(level, Bool.and(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
-        Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
-          F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up())))), S.Player.holding(p, inv), things, x, y,
-        floor, ceil, over, ok, floor, ceil, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
+      fin_free(level, S.Sim.passes(S.Fit{ok, floor, ceil}, S.Player.z(p), S.Sim.height()),
+        S.Player.holding(p, inv), things, x, y, floor, ceil, over, c, ok, floor, ceil,
+        Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
           Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
             F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))), {==}, hf, holding_free(level, p, inv, hp))
 
-def try_free(+level: L.Level, things: H.Things, +p: S.Player, +x: U32, +y: U32, hp: Free(level, p)) ->
+def try_free(+level: L.Level, +things: H.Things, +p: S.Player, +x: U32, +y: U32, hp: Free(level, p)) ->
   Free(level, S.Sim.Try.player(S.Sim.try_move(level, things, p, x, y))):
-  fit_free(level, p, x, y, S.Sim.touch(level, x, y, S.Player.z(p), (S.Player.inv(p), things)), S.Sim.fit(level, x, y),
-    S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y), {==}, hp)
+  +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
+  fit_free(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
+    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y),
+    Maybe.is_none(&2, U32, S.Sim.blocked(level, things, p, m)), {==}, hp)
 
 def done_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
   Free(level, S.Sim.Try.player(S.Sim.Try.done(t))):
@@ -775,13 +802,13 @@ def once_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hit_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
-        S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
+        S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
           S.Sim.lead(x, momx), S.Sim.trail(y, momy), (S.Sim.lead(x, momx) + momx : U32),
           (S.Sim.trail(y, momy) + momy : U32),
-          S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
+          S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
             S.Sim.trail(x, momx), S.Sim.lead(y, momy), (S.Sim.trail(x, momx) + momx : U32),
             (S.Sim.lead(y, momy) + momy : U32),
-            S.Sim.trace(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
+            S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
               S.Sim.lead(x, momx), S.Sim.lead(y, momy), (S.Sim.lead(x, momx) + momx : U32),
               (S.Sim.lead(y, momy) + momy : U32), ((F.Fixed.unit() + 1 : U32), 0)))), hp)
 
@@ -954,8 +981,8 @@ def z_free(+level: L.Level, p: S.Player, hp: Free(level, p)) ->
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-# The player sprites, the counters, the vertical move and the state the
-# mobj leaves keep the place too.
+# The player sprites, the counters and the vertical move keep the place
+# too.
 def psprites_free(+level: L.Level, clock: U32, p: S.Player, hp: Free(level, p)) ->
   Free(level, S.Sim.psprites(level, clock, p)):
   match p:
@@ -972,12 +999,6 @@ def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(
   match t:
     case S.Try{ok, +p, things}:
       z_free(level, p, ht)
-
-def moved_free(+level: L.Level, t: S.Sim.Try, at: L.Level, s: S.State, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.State.player(S.State.moved(t, at, s))):
-  match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      ht
 
 # Free reads the geometry alone
 # -----------------------------
@@ -1061,8 +1082,8 @@ def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb
         S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb),
         line_same(geo, sa, pa, sb, pb, x, y, r, mask, i, fa, fb, e))
 
-# The lines gathered for a box are the blockmap's, and the things near it
-# its links, which two levels of one geometry share.
+# The lines gathered for a box are the blockmap's, which two levels of
+# one geometry share.
 def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x0: U32, +y0: U32, +x1: U32,
   +y1: U32) ->
   {S.Sim.lines(L.Level{geo, sa, pa}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb}, x0, y0, x1, y1)
@@ -1071,389 +1092,142 @@ def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
     case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
       {==}
 
-def clear_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
-  {S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you())
-    == S.Sim.clear(L.Level{geo, sb, pb}, x, y, S.Sim.radius(), H.Thing.you()) : Bool}:
-  match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
-      {==}
-
-def at_same(c: Bool, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
-  {S.Sim.Fit.ok(S.Sim.fit.at(c, L.Level{geo, sa, pa}, x, y, S.Sim.radius(), 1))
-    == S.Sim.Fit.ok(S.Sim.fit.at(c, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1)) : Bool}:
-  match c:
-    case False{}:
-      {==}
-    case True{}:
-      %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-        (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
-        : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32),
-          (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa},
-          x, y,
-          S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y)))
-          == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1,
-            S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y))) : Bool}
-      go_same(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-        (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, sb, pb, x, y, S.Sim.radius(), 1,
-        S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y), {==})
-
-# Free is the same in two levels of one geometry: the things near are
-# its links, the lines gathered its blockmap's, and each one's condition
-# is the geometry's.
+# Free is the same in two levels of one geometry: the lines gathered are
+# its blockmap's, and each one's condition is the geometry's.
 def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
   {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.free(L.Level{geo, sb, pb}, x, y) : Bool}:
-  %clear_same(geo, sa, pa, sb, pb, x, y)
-    : {S.Sim.Fit.ok(S.Sim.fit.at(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you()),
-      L.Level{geo, sa, pa}, x, y, S.Sim.radius(), 1))
-      == S.Sim.Fit.ok(S.Sim.fit.at(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1)) : Bool}
-  at_same(S.Sim.clear(L.Level{geo, sa, pa}, x, y, S.Sim.radius(), H.Thing.you()), geo, sa, pa, sb, pb, x, y)
+  %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
+    : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32),
+      (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa},
+      x, y,
+      S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y)))
+      == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1,
+        S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y))) : Bool}
+  go_same(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, sb, pb, x, y, S.Sim.radius(), 1,
+    S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y), {==})
 
-# A mover's re-clip moves the player up and down alone.
-def stood_x(moved: S.Player, +q: S.Player) -> {S.Player.x(moved) == S.Player.x(S.Player.stood(moved, q)) : U32}:
-  match moved:
-    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}:
+# Held: free in a geometry, whatever the state's sectors and specials
+# have become. Each thinker's turn keeps it: the turn is held to the
+# geometry and the player's place, or is the player's own move.
+def Held(geo: L.Level.Geo, +s: S.State) -> Type:
+  {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s))},
+    S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))) : Bool}
+
+def held_x(before: S.Player, after: S.Player) ->
+  {S.Player.x(before) == S.Player.x(S.Player.held(before, after)) : U32}:
+  match before after:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} S.Player{ax, ay, az, aangle, amomx, amomy, amomz, afloorz, aceilz, aviewheight, adeltaview, aviewz, acrossed, ainv, apsprites, ahurt}:
       {==}
 
-def stood_y(moved: S.Player, +q: S.Player) -> {S.Player.y(moved) == S.Player.y(S.Player.stood(moved, q)) : U32}:
-  match moved:
-    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}:
+def held_y(before: S.Player, after: S.Player) ->
+  {S.Player.y(before) == S.Player.y(S.Player.held(before, after)) : U32}:
+  match before after:
+    case S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} S.Player{ax, ay, az, aangle, amomx, amomy, amomz, afloorz, aceilz, aviewheight, adeltaview, aviewz, acrossed, ainv, apsprites, ahurt}:
       {==}
 
-# The player's think through the state
-# ------------------------------------
-
-# From the sector's special down, the think hands the player on inside
-# the state, so each lemma is about the player the state holds. None of
-# these moves it: a blow writes the health, the wound and the momentum,
-# the sounds write the state's own fields, and dying writes the view.
-
-# The state with another player is free where that player is.
-def put_free(+level: L.Level, s: S.State, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.State.player(S.State.player.put(s, p))):
-  match s:
-    case S.State{was, l, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      hp
-
-# The sounds a tic reports leave the player where it was.
-def heard_free(+level: L.Level, +e: Sn.Sound.Event, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.State.heard(e, s))):
-  match s:
-    case S.State{player, l, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+# What a turn holds is free where the state before it was: the level it
+# packs has the geometry, and the player it packs the place.
+def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
+  Held(geo, S.State.held(geo, before, after)):
+  match before after:
+    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn} S.State{+player, L.Level{g, +sectors, +specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      %held_x(was, player)
+        : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, _, S.Player.y(S.Player.held(was, player))) : Bool}
+      %held_y(was, player)
+        : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, S.Player.x(was), _) : Bool}
+      %free_geo(geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), sectors, specials, S.Player.x(was),
+        S.Player.y(was))
+        : {True{} == _ : Bool}
       h
 
-def told_go_free(events: List<&2, Sn.Sound.Event>, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.State.told.go(events, s))):
+def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> Held(geo, S.State.kept(s, t)):
+  match s:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+
+def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, t: S.Sim.Try, s: S.State,
+  ht: Free(L.Level{geo, sa, pa}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa}, s)):
+  match t s:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      ht
+
+# The player's own turn: its move is checked against the geometry, and
+# the lines it fires are held.
+def mobj_held(+cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) -> Held(geo, S.Sim.mobj(cmd, geo, s)):
+  +level = {L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s))} : L.Level}
+  +went = S.State.moved(S.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), level, s)
+  kept_held(geo, S.State.held(geo, went,
+      S.Sim.mobj.tics(S.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
+    S.Mobj{H.Things.you(S.State.things(s))},
+    held_free(geo, went, S.Sim.mobj.tics(S.Sim.cross(S.Player.crossed(S.State.player(went)), went)),
+      moved_held(geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)),
+        S.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), s,
+        mobj_z_free(level, S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s)),
+          xy_free(level, S.State.things(s), cmd, S.State.player(s), h)))))
+
+def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.turn(mine, t, cmd, geo, s)):
+  match mine:
+    case True{}:
+      mobj_held(cmd, geo, s, h)
+    case False{}:
+      held_free(geo, s, S.Sim.think(t, s), h)
+
+def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.thinkers.go(fuel, cmd, geo, s)):
+  match fuel s:
+    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn}:
+      run_held(rest, cmd, geo, S.Sim.turn(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}),
+        turn_held(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}, h))
+
+def all_held(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.thinkers.all(fuel, cmd, geo, s)):
+  match fuel s:
+    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn}:
+      all_held(f, cmd, geo, S.Sim.thinkers.go(t <> due, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}),
+        run_held(t <> due, cmd, geo,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}, h))
+
+def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.rested(s)):
+  match s:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+
+# Reporting a sound keeps the place: it writes the sounds and the index
+# and nothing the place is read from.
+def heard_held(geo: L.Level.Geo, e: Sn.Sound.Event, s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.State.heard(e, s)):
+  match s:
+    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      h
+
+def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.State.told.go(events, s)):
   match events:
     case []:
       h
     case +e <> rest:
-      told_go_free(rest, level, S.State.heard(e, s), heard_free(level, e, s, h))
+      told_go_held(geo, rest, S.State.heard(e, s), heard_held(geo, e, s, h))
 
-def told_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.State.told(s))):
+def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.told(s)):
   match s:
-    case S.State{player, l, H.Things{tree, count, you, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      told_go_free(heard, level, S.State{player, l, H.Things{tree, count, you, []}, sidetex, thinkers, rnd, clock,
-        ended, usedown, sounds, mrnd, reborn}, h)
-
-def sound_if_free(audible: Bool, +level: L.Level, +e: Sn.Sound.Event, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.sound.if(audible, e, s))):
-  match audible:
-    case False{}:
-      h
-    case True{}:
-      heard_free(level, e, s, h)
-
-def sound_start_free(+sfx: U32, source: Sn.Sound.Source, params: U32 & U32, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.sound.start(sfx, source, params, s))):
-  (+vol, sep) = params
-  sound_if_free(Bool.not(Bool.or(U32.is_zero(sfx), U32.is_zero(vol))), level, Sn.Start{sfx, source, vol, sep}, s, h)
-
-def sound_told_free(sfx: U32, +source: Sn.Sound.Source, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.sound.told(sfx, source, s))):
-  sound_start_free(sfx, source,
-    S.Sim.sound.params(S.Sim.sound.place(source, s), S.State.level(s), S.State.player(s)), level, s, h)
-
-def sound_free(sfx: U32, source: Sn.Sound.Source, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.sound(sfx, source, s))):
-  sound_told_free(sfx, source, level, S.State.told(s), told_free(level, s, h))
-
-# The mobj's own states: entering one, counting its tics down, and the
-# actions the rows run, which are sounds.
-def act_free(action: H.Thing.Action, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.mobj.act(action, s))):
-  match action:
-    case H.Pain{}:
-      sound_free(Sn.Sound.plpain(), Sn.Thing{H.Thing.you()}, level, s, h)
-    case H.Scream{}:
-      sound_free(Sn.Sound.pldeth(), Sn.Thing{H.Thing.you()}, level, s, h)
-    case H.Null{}:
-      h
-    case H.Raise{}:
-      h
-    case H.WeaponReady{}:
-      h
-    case H.Lower{}:
-      h
-
-def entering_free(+state: U32, +level: L.Level, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Player.entering(state, p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, S.Hurt{+was, +tics, +damage, +attacker}}:
-      hp
-
-def counted_free(+n: U32, +level: L.Level, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Player.counted(n, p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, S.Hurt{+st, +tics, +damage, +attacker}}:
-      hp
-
-def enter_free(+state: U32, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.mobj.enter(state, s))):
-  act_free(H.Thing.Row.action(H.Thing.row(state)), level,
-    S.State.player.put(s, S.Player.entering(state, S.State.player(s))),
-    put_free(level, s, S.Player.entering(state, S.State.player(s)),
-      entering_free(state, level, S.State.player(s), h)))
-
-def mobj_step_free(lasting: Bool, out: Bool, +next: U32, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.mobj.step(lasting, out, next, s))):
-  match lasting out:
-    case True{} True{}:
-      h
-    case True{} False{}:
-      h
-    case False{} True{}:
-      enter_free(next, level, s, h)
-    case False{} False{}:
-      put_free(level, s, S.Player.counted(1, S.State.player(s)),
-        counted_free(1, level, S.State.player(s), h))
-
-def mobj_state_free(row: S.Sim.Hurt, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.mobj.state(row, s))):
-  match row:
-    case S.Hurt{+st, +tics, damage, attacker}:
-      mobj_step_free(U32.is_eq(tics, 4294967295), U32.is_eq(tics, 1),
-        H.Thing.Row.next(H.Thing.row(st)), level, s, h)
-
-def mobj_tics_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.mobj.tics(s))):
-  mobj_state_free(S.Player.hurt(S.State.player(s)), level, s, h)
-
-# The blow: the thrust, the armour and the health, the wound, and the
-# death it may end in.
-def dropped_free(+sine: V.Vec, +clock: U32, +level: L.Level, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Player.dropped(sine, clock, p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, S.Psprites{+weapon, +flash}, +hurt}:
-      hp
-
-def drop_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.drop(s))):
-  put_free(level, s, S.Player.dropped(L.Level.sine(S.State.level(s)), S.State.clock(s), S.State.player(s)),
-    dropped_free(L.Level.sine(S.State.level(s)), S.State.clock(s), level, S.State.player(s), h))
-
-def drawn_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.drawn(s))):
-  match s:
-    case S.State{player, l, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      h
-
-def kill_tics_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.kill.tics(s))):
-  put_free(level, s, S.Player.counted((M.Random.at(S.State.rnd(s)) .&. 3 : U32), S.State.player(s)),
-    counted_free((M.Random.at(S.State.rnd(s)) .&. 3 : U32), level, S.State.player(s), h))
-
-def kill_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.kill(s))):
-  kill_tics_free(level, S.Sim.drawn(S.Sim.mobj.enter(H.Thing.play.death(), S.Sim.drop(s))),
-    drawn_free(level, S.Sim.mobj.enter(H.Thing.play.death(), S.Sim.drop(s)),
-      enter_free(H.Thing.play.death(), level, S.Sim.drop(s), drop_free(level, s, h))))
-
-def flinch_free(flinches: Bool, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.damage.flinch(flinches, s))):
-  match flinches:
-    case False{}:
-      h
-    case True{}:
-      enter_free(H.Thing.play.pain(), level, s, h)
-
-def pain_free(+level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.damage.pain(s))):
-  flinch_free(U32.is_lt(M.Random.at(S.State.rnd(s)), 255), level, s, h)
-
-def done_damage_free(dead: Bool, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.damage.done(dead, s))):
-  match dead:
-    case True{}:
-      kill_free(level, s, h)
-    case False{}:
-      pain_free(level, S.Sim.drawn(s), drawn_free(level, s, h))
-
-def took_free(+level: L.Level, p: S.Player, inv: I.Inventory, +left: U32, source: Maybe<&2, U32>,
-  hp: Free(level, p)) -> Free(level, S.Player.took(p, inv, left, source)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +was, +psprites, S.Hurt{+st, +tics, +damage, +old}}:
-      hp
-
-def taken_free(hurt: I.Inventory & U32, +source: Maybe<&2, U32>, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.damage.taken(hurt, source, s))):
-  (+inv, +left) = hurt
-  done_damage_free(I.Inventory.dead(inv), level,
-    S.State.player.put(s, S.Player.took(S.State.player(s), inv, left, source)),
-    put_free(level, s, S.Player.took(S.State.player(s), inv, left, source),
-      took_free(level, S.State.player(s), inv, left, source, h)))
-
-def damage_player_free(+damage: U32, source: Maybe<&2, U32>, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.damage.player(damage, source, s))):
-  taken_free(I.Inventory.hurt(S.Player.inv(S.State.player(s)), damage), source, level, s, h)
-
-# The thrust reads a level for its sines and writes the momentum alone,
-# so the place it leaves is free of the level the law is about.
-def thrust_at_free(+at: L.Level, +level: L.Level, p: S.Player, +angle: U32, +move: U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.thrust(at, p, angle, move)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def thrown_free(+at: L.Level, +level: L.Level, p: S.Player, +angle: U32, +thrust: U32, back: Bool,
-  hp: Free(level, p)) -> Free(level, S.Sim.blow.thrown(at, p, angle, thrust, back)):
-  match back:
-    case False{}:
-      thrust_at_free(at, level, p, angle, thrust, hp)
-    case True{}:
-      thrust_at_free(at, level, p, (angle + A.Angle.ang180() : U32), (thrust * 4 : U32), hp)
-
-def blow_free(+ix: U32, +iy: U32, +iz: U32, +damage: U32, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.blow(ix, iy, iz, damage, s))):
-  match s:
-    case S.State{+player, +at, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      thrown_free(at, level, player, A.Angle.of(L.Level.tanto(at), (S.Player.x(player) - ix : U32),
-          (S.Player.y(player) - iy : U32)), (damage * 8192 : U32),
-        Bool.and(Bool.and(U32.is_lt(damage, 40),
-            Bool.and(F.Fixed.gt(damage, I.Inventory.health(S.Player.inv(player))),
-              F.Fixed.gt((S.Player.z(player) - iz : U32), 4194304))),
-          Bool.not(U32.is_zero((M.Random.at(Bool.pick(U32, Bool.and(U32.is_lt(damage, 40),
-            Bool.and(F.Fixed.gt(damage, I.Inventory.health(S.Player.inv(player))),
-              F.Fixed.gt((S.Player.z(player) - iz : U32), 4194304))), M.Random.next(rnd), rnd)) .&. 1 : U32)))),
-        h)
-
-def damage_hit_free(m: Maybe<&2, H.Thing>, +damage: U32, source: Maybe<&2, U32>, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.damage.hit(m, damage, source, s))):
-  match m:
-    case None{}:
-      damage_player_free(damage, source, level, s, h)
-    case Some{H.Thing{id, kind, +x, +y, +z, floorz, ceilz, angle, sector, st, tics}}:
-      damage_player_free(damage, source, level, S.Sim.blow(x, y, z, damage, s), blow_free(x, y, z, damage, level, s, h))
-
-def damage_if_free(dead: Bool, +damage: U32, inflictor: Maybe<&2, U32>, source: Maybe<&2, U32>, +level: L.Level,
-  +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.damage.if(dead, damage, inflictor, source, s))):
-  match dead:
-    case True{}:
-      h
-    case False{}:
-      damage_hit_free(S.Sim.named(inflictor, S.State.things(s)), damage, source, level, s, h)
-
-def damage_free(damage: U32, inflictor: Maybe<&2, U32>, source: Maybe<&2, U32>, +level: L.Level, +s: S.State,
-  h: Free(level, S.State.player(s))) -> Free(level, S.State.player(S.Sim.damage(damage, inflictor, source, s))):
-  damage_if_free(S.Player.dead(S.State.player(s)), damage, inflictor, source, level, s, h)
-
-# The sector's special, the one blow the map can deal.
-def sector_hurt_free(due: Bool, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.sector.hurt(due, s))):
-  match due:
-    case False{}:
-      h
-    case True{}:
-      damage_free(5, None{}, None{}, level, s, h)
-
-def sector_free(+level: L.Level, +clock: U32, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.sector(level, clock, s))):
-  sector_hurt_free(Bool.and(U32.is_eq(L.Level.sector.special(S.State.level(s),
-      L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))), 7),
-    Bool.and(U32.is_zero((clock .&. 31 : U32)),
-      U32.is_eq(S.Player.z(S.State.player(s)), L.Level.floor(level,
-        L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))))))), level, s, h)
-
-# Dying: the view sinks and turns, which the place does not feel, and
-# the reborn is a flag on the state.
-def sinking_free(+level: L.Level, +p: S.Player, hp: Free(level, p)) -> Free(level, S.Player.sinking(p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def turned_free(near: Bool, +to: U32, +delta: U32, +level: L.Level, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Player.turned(near, to, delta, p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def faced_free(m: Maybe<&2, H.Thing>, +at: L.Level, +level: L.Level, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.death.faced(m, at, p)):
-  match m:
-    case None{}:
-      turned_free(True{}, S.Player.angle(p), 0, level, p, hp)
-    case Some{H.Thing{id, kind, +x, +y, z, floorz, ceilz, angle, sector, st, tics}}:
-      turned_free(Bool.or(U32.is_lt((A.Angle.of(L.Level.tanto(at), (x - S.Player.x(p) : U32),
-            (y - S.Player.y(p) : U32)) - S.Player.angle(p) : U32), S.Sim.ang5()),
-          U32.is_gt((A.Angle.of(L.Level.tanto(at), (x - S.Player.x(p) : U32), (y - S.Player.y(p) : U32))
-            - S.Player.angle(p) : U32), F.Fixed.neg(S.Sim.ang5()))),
-        A.Angle.of(L.Level.tanto(at), (x - S.Player.x(p) : U32), (y - S.Player.y(p) : U32)),
-        (A.Angle.of(L.Level.tanto(at), (x - S.Player.x(p) : U32), (y - S.Player.y(p) : U32))
-          - S.Player.angle(p) : U32), level, p, hp)
-
-def asked_free(use: Bool, +level: L.Level, +s: S.State, h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.death.asked(use, s))):
-  match s:
-    case S.State{player, l, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
-      h
-
-def death_free(+level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.death(level, clock, m, p)):
-  faced_free(m, level, level, S.Sim.eye(level, clock, S.Player.sinking(S.Sim.psprites(level, clock, p))),
-    eye_free(level, clock, S.Player.sinking(S.Sim.psprites(level, clock, p)),
-      sinking_free(level, S.Sim.psprites(level, clock, p), psprites_free(level, clock, p, hp))))
-
-# The think's two halves: what it leaves in the state, and the player it
-# hands the move.
-def player_free(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, +s: S.State,
-  h: Free(level, S.State.player(s))) ->
-  Free(level, S.State.player(S.Sim.player(dead, cmd, level, clock, s))):
-  match dead:
-    case False{}:
-      sector_free(level, clock,
-        S.State.player.put(s, S.Sim.eye(level, clock, S.Sim.move(level, cmd, S.State.player(s)))),
-        put_free(level, s, S.Sim.eye(level, clock, S.Sim.move(level, cmd, S.State.player(s))),
-          eye_free(level, clock, S.Sim.move(level, cmd, S.State.player(s)),
-            move_free(level, cmd, S.State.player(s), h))))
-    case True{}:
-      asked_free(K.Cmd.use(cmd), level, s, h)
-
-def thought_free(dead: Bool, +level: L.Level, +clock: U32, m: Maybe<&2, H.Thing>, +p: S.Player,
-  hp: Free(level, p)) -> Free(level, S.Sim.thought(dead, level, clock, m, p)):
-  match dead:
-    case False{}:
-      counters_free(level, S.Sim.psprites(level, clock, p), psprites_free(level, clock, p, hp))
-    case True{}:
-      death_free(level, clock, m, p, hp)
-
-# What the tic keeps is free where the player it moved was: the level
-# it packs has the geometry the move was checked against, and the
-# player it packs the place.
-def kept_free(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +moved: S.Player, clock: U32, use: Bool,
-  +after: S.State, h: Free(L.Level{geo, sectors, specials}, moved)) ->
-  Laws.Free(S.Sim.tic.kept(geo, moved, clock, use, after)):
-  %stood_x(moved, S.State.player(after))
-    : {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(after)),
-      L.Level.specials(S.State.level(after))}, _,
-      S.Player.y(S.Player.stood(moved, S.State.player(after)))) : Bool}
-  %stood_y(moved, S.State.player(after))
-    : {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(after)),
-      L.Level.specials(S.State.level(after))}, S.Player.x(moved), _) : Bool}
-  %free_geo(geo, sectors, specials, L.Level.sectors(S.State.level(after)),
-    L.Level.specials(S.State.level(after)), S.Player.x(moved), S.Player.y(moved))
-    : {True{} == _ : Bool}
-  h
+    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+      told_go_held(geo, heard,
+        S.State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd, clock, ended,
+          usedown, sounds, mrnd, reborn}, h)
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
@@ -1462,24 +1236,17 @@ def Laws.tic_keeps_geometry(cmd, s):
     case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn}:
       {==}
 
-# The rest of a live tic, from the state the think left: the player it
-# hands the move is free where the think's was, the use does not move
-# it, and the mobj's own move is the checked one.
-def tic_live_free(+cmd: K.Cmd, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +clock: U32,
-  +usedown: Bool, +dead: Bool, +hurt: S.State,
-  h: Free(L.Level{geo, sectors, specials}, S.State.player(hurt))) ->
-  Laws.Free(S.Sim.tic.live(cmd, L.Level{geo, sectors, specials}, geo, clock, usedown, dead, hurt)):
-  +level = {L.Level{geo, sectors, specials} : L.Level}
-  +m = S.Sim.named(S.Sim.Hurt.attacker(S.Player.hurt(S.State.player(hurt))), S.State.things(hurt))
-  +thought = S.Sim.thought(dead, level, clock, m, S.State.player(hurt))
-  +used = S.Sim.use(Bool.and(Bool.not(dead), S.Sim.pressed(cmd, usedown)), S.State.player.put(hurt, thought))
-  +went = S.Sim.mobj(cmd, level, thought, used)
-  kept_free(geo, sectors, specials, S.State.player(went), clock, K.Cmd.use(cmd),
-    S.State.told(S.Sim.thinkers(S.Sim.mobj.tics(S.Sim.cross(S.Player.crossed(S.State.player(went)), went)))),
-    moved_free(level, S.Sim.mobj.z(S.Sim.xy(level, S.State.things(used), cmd, thought)), S.State.level(used), used,
-      mobj_z_free(level, S.Sim.xy(level, S.State.things(used), cmd, thought), xy_free(level,
-        S.State.things(used), cmd, thought,
-        thought_free(dead, level, clock, m, S.State.player(hurt), h)))))
+# The rest of a live tic: the think, the use and the thinkers all run
+# inside the hold, which puts the geometry and the player's place back,
+# and the place a think leaves is the place it began with, since the
+# player's own turn is the only mover. Whatever the think left is a
+# parameter, since a symbolic level leaves it stuck.
+def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State, +after: S.State,
+  h: Held(geo, before)) -> Laws.Free(S.Sim.tic.done(cmd, geo, clock, before, after)):
+  told_held(geo, S.Sim.thinkers(cmd, geo, S.State.held(geo, before, after)),
+    rested_held(geo, S.Sim.thinkers.all(8n, cmd, geo, S.State.held(geo, before, after)),
+      all_held(8n, cmd, geo, S.State.held(geo, before, after),
+        held_free(geo, before, after, h))))
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
@@ -1487,13 +1254,11 @@ def Laws.tic_keeps_free(cmd, s, free):
       free
     case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +reborn}:
       +level = {L.Level{geo, sectors, specials} : L.Level}
-      +dead = S.Player.dead(player)
-      tic_live_free(cmd, geo, sectors, specials, clock, usedown, dead,
-        S.Sim.player(dead, cmd, level, clock,
-          {S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, reborn} : S.State}),
-        player_free(dead, cmd, level, clock,
-          {S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, reborn} : S.State},
-          free))
+      +before = {S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd,
+        reborn} : S.State}
+      tic_done_free(cmd, geo, clock, before,
+        S.Sim.use(Bool.and(Bool.not(S.Player.dead(player)), S.Sim.pressed(cmd, usedown)),
+          S.Sim.player(S.Player.dead(player), cmd, level, clock, before)), free)
 
 def Laws.replay_keeps_free(script, s, free):
   match script:
@@ -1502,20 +1267,58 @@ def Laws.replay_keeps_free(script, s, free):
     case +cmd <> rest:
       Laws.replay_keeps_free(rest, S.Sim.tic(cmd, s), Laws.tic_keeps_free(cmd, s, free))
 
-# A free position is clear: the thing check's verdict starts the fit.
-def free_clear(c: Bool, +level: L.Level, +x: U32, +y: U32,
-  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1)) : Bool}) -> {True{} == c : Bool}:
+# The freedom law
+# ---------------
+
+def at_true(c: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32,
+  e: {True{} == S.Sim.Fit.ok(S.Sim.fit.at(c, level, x, y, r, mask)) : Bool}) -> {True{} == c : Bool}:
   match c:
     case False{}:
       e
     case True{}:
       {==}
 
-def Laws.replay_keeps_clear(script, s, free):
-  +after = S.Sim.replay(script, s)
-  free_clear(S.Sim.clear(S.State.level(after), S.Player.x(S.State.player(after)), S.Player.y(S.State.player(after)),
-    S.Sim.radius(), H.Thing.you()), S.State.level(after), S.Player.x(S.State.player(after)),
-    S.Player.y(S.State.player(after)), Laws.replay_keeps_free(script, s, free))
+def none_is(b: Maybe<&2, U32>, e: {True{} == Maybe.is_none(&2, U32, b) : Bool}) -> {None{} == b : Maybe<&2, U32>}:
+  match b:
+    case None{}:
+      {==}
+    case Some{v}:
+      %e : BD(_, Unit, {None{} == Some{v} : Maybe<&2, U32>})
+      Unit{}
+
+def Laws.check_is_clear(level, things, p, m, mask, passed):
+  match m:
+    case S.Body{+id, +x, +y, +z, +radius, +height, +flags}:
+      none_is(S.Sim.blocked(level, things, p, S.Body{id, x, y, z, radius, height, flags}),
+        at_true(Maybe.is_none(&2, U32, S.Sim.blocked(level, things, p, S.Body{id, x, y, z, radius, height, flags})),
+          level, x, y, radius, mask, passed))
+
+def fin_taken(go: Bool, +level: L.Level, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32, ceil: U32,
+  over: List<&2, U32>,
+  taken: {True{} == S.Sim.Try.ok(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over)) : Bool}) ->
+  {True{} == go : Bool}:
+  match go:
+    case False{}:
+      taken
+    case True{}:
+      {==}
+
+def fit_taken(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things, f: S.Sim.Fit,
+  over: List<&2, U32>,
+  taken: {True{} == S.Sim.Try.ok(S.Sim.try_move.fit(level, p, x, y, touched, f, over)) : Bool}) ->
+  {True{} == S.Sim.Fit.ok(f) : Bool}:
+  match touched f:
+    case (+inv, +things) S.Fit{+ok, +floor, +ceil}:
+      and_true_left(ok, Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
+          Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
+            F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))),
+        fin_taken(S.Sim.passes(S.Fit{ok, floor, ceil}, S.Player.z(p), S.Sim.height()), level,
+          S.Player.holding(p, inv), things, x, y, floor, ceil, over, taken))
+
+def Laws.move_is_checked(level, things, p, x, y, taken):
+  +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
+  fit_taken(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
+    S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y), taken)
 
 # Things compute.
 
@@ -1841,6 +1644,9 @@ def Laws.blocker_geometry():
 def Laws.link_order():
   {==}
 
+def Laws.spawn_thinks_this_tic():
+  {==}
+
 def Laws.thing_blocks():
   {==}
 
@@ -1898,4 +1704,10 @@ def Laws.sfx_refusals():
   {==}
 
 def Laws.sfx_rates_unserved(count, bytes):
+  {==}
+
+def Laws.key_boxes():
+  {==}
+
+def Laws.arms_numbers():
   {==}
