@@ -117,3 +117,12 @@ Trade-offs:
 - **The route lost the tech column that used to hold it.** The old leg walked into record 59 and strafed past; the new route passes the column at a distance. The solid-thing check it exercised is still the sim test's `solids`, which walks the player into that same column and into a corpse.
 - **The route is no longer compared with Chocolate Doom leg by leg.** Milestone 5's ticket 11 did that; with monsters awake in vanilla no long route can match, so the route test is a pin for what the player reaches and what it carries until the monsters chase.
 - **`tools/listen.nu`'s sound capture now hears monsters.** It shares `tools/demo.nu`, so a script whose place a monster sees will have that monster's sight sound in the capture; its music capture passes `-nomonsters` on the command line and is unchanged.
+
+The merge with the integration branch at 23756e3 brought in the tic
+command's buttons byte, the sim's sounds and the one traversal. Every
+script in the tests here takes the byte where it took a use flag, and
+every expected line was regenerated on the merged tree, so the sound
+lines stand beside 209 things and random index 59. Checked there: the
+proof prints "All terms check.", the five tests this ticket touches pass
+on both lanes, `nix flake check` passes, and the 31 comparable oracle
+cases are all at zero.
