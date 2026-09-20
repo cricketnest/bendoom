@@ -3,19 +3,20 @@
 # the same place. Writes a copy of the IWAD whose E1M1 has player 1
 # start at x, y facing angle, the records --things names rewritten and
 # its other things as they are, and the command script as a vanilla
-# demo (tools/demo.nu) with no monsters, so none spawns, then a tic
-# whose buttons press pause (BT_SPECIAL with BTS_PAUSE), then a minute
-# of idle tics. Chocolate Doom plays the demo in real time in a scratch
-# directory, at screen size 10, on a headless X server of its own; a
-# paused game runs no playsim tic but keeps reading the demo, so the
-# tail holds the frame of the script's last tic for a minute, and one
-# paletted screenshot is taken inside it. A shot counts once it shows
-# the pause graphic. It is compared with the frame
-# tools/frame.bend dumps from the same copy after the same script, over
-# all 200 rows but for the pause graphic and the box the marine's face
-# covers: the status bar's ticker runs on while the playsim is paused,
-# so the face keeps changing under the screenshot. The default script
-# idles 20 tics, past the pistol's rise.
+# demo (tools/demo.nu), then a tic whose buttons press pause
+# (BT_SPECIAL with BTS_PAUSE), then a minute of idle tics. Chocolate
+# Doom plays the demo in real time in a scratch directory, at screen
+# size 10, on a headless X server of its own; a paused game runs no
+# playsim tic but keeps reading the demo, so the tail holds the frame of
+# the script's last tic for a minute, and one paletted screenshot is
+# taken inside it. A shot counts once it shows the pause graphic. It is
+# compared with the frame tools/frame.bend dumps from the same copy
+# after the same script, over all 200 rows but for the pause graphic and
+# the box the marine's face covers: the status bar's ticker runs on
+# while the playsim is paused, so the face keeps changing under the
+# screenshot. The default script idles 20 tics, past the pistol's rise.
+# Vanilla's monsters wake when they see the player and Bendoom's do not
+# yet, so a place compares the two only while none sees the player.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each

@@ -27,9 +27,17 @@
 # sprite before every masked texture changes by 837 pixels, the grate's
 # top over the trees; and a hung body and the dead sergeant behind the
 # bars east of the walls hall, which drawing every masked texture before
-# every sprite changes by 516. Then frames after scripts, which the
-# oracle plays too: a stride, riding the lift down, off its east edge,
-# the first door half open, the special 23 switch pressed, the exit
+# every sprite changes by 516. Then the monsters' rotations, each from a
+# place no monster of the map can see, so that none has woken in vanilla
+# either: the demon of record 92 head on at rotation 1, 6 tics in, while
+# its spawn's 7 tics still hold it before its first A_Look; the shotgun
+# guy of record 94 from behind, rotation 5, and from its side, rotation
+# 4; and the demon of record 3 at rotation 6, which SARGA4A6 draws
+# mirrored. Moving the monster's record to the start changes 3758, 375,
+# 736 and 1706 pixels of those frames, so each shows its monster. Then
+# frames after scripts, which the oracle plays too: a stride, riding the
+# lift down, off its east edge, a north room's door half open, the
+# special 23 switch pressed, the exit
 # switch pressed, a blinking wall at its dark level, the blue key on the
 # last tic of its dim state, 22, and the first of its full-bright one,
 # 23, then the pickups: the blue key on the tic before the player
@@ -46,17 +54,23 @@
 # bobbing: 8 tics into its rise, 74 down the screen, and on a walk east
 # from the start at the bob's lowest, tic 48, and at its farthest right,
 # tic 64; the stride has it far left. Every frame holds the things E1M1
-# spawns on Hurt Me Plenty, each in its state on that tic.
+# spawns on Hurt Me Plenty, monsters among them, each in its state on
+# that tic.
 # Every frame carries the status bar the inventory of its state fills,
 # so the bar at the start, after the rocket is taken, after the green
 # armour and after the blue key are the frames named for those pickups.
-# tools/oracle.nu finds no pixel off vanilla's in any frame but the exit,
-# which is not compared: vanilla never stands in it (milestone 4's
-# ticket 09 compares it another way), and the two refused frames, whose
-# full inventory vanilla's demo cannot reach; those three hashes are
-# regression pins.
-# The pickup frames show their pickup: the key is 44 compared pixels of
-# the first key frame and would be 347 of the second, a bonus never
+# tools/oracle.nu finds no pixel off vanilla's in the frames it can
+# compare, over all 200 rows. It cannot compare a frame whose script
+# lets a monster see the player, since vanilla's wakes and Bendoom's
+# cannot yet (milestone 6's ticket 15 gives them A_Look): the two run
+# east past the pit, the two of the blue key in its dim and bright
+# states, the two of the key strafed past, the two of the green armour
+# and the chainsaw taken are regression pins until then, and so are the
+# exit, which vanilla never stands in (milestone 4's ticket 09 compares
+# it another way), and the two refused frames, whose full inventory
+# vanilla's demo cannot reach.
+# The pickup frames show their pickup: the key is 44 pixels of the first
+# key frame and would be 347 of the second, a bonus never
 # taken would be 1465 of the second bonus frame, the green armour is 745
 # of its first frame and would be 419 of its second, and a stimpack and
 # a medikit taken at 100 health 2744 of theirs; a refused frame differs
@@ -233,7 +247,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     m5 : Array<U32> <- frame("grate -416 256 180", tables, gfx, rested(level, west(416), east(256), 180), m4)
     m6 : Array<U32> <- frame("water 3 256 0", tables, gfx, rested(level, east(3), east(256), 0), m5)
     m7 : Array<U32> <- frame("sky -640 256 90", tables, gfx, rested(level, west(640), east(256), 90), m6)
-    m8 : Array<U32> <- frame("pit 488 256 0", tables, gfx, rested(level, east(488), east(256), 0), m7)
+    m8 : Array<U32> <- frame("pit 488 320 0", tables, gfx, rested(level, east(488), east(320), 0), m7)
     m9 : Array<U32> <- frame("sergeant 1144 259 315", tables, gfx, rested(level, east(1144), east(259), 315), m8)
     s1 : Array<U32> <- frame("once 256 1088 0", tables, gfx, rested(level, east(256), east(1088), 0), m9)
     s2 : Array<U32> <- frame("overlap 2752 960 0", tables, gfx, rested(level, east(2752), east(960), 0), s1)
@@ -241,12 +255,20 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     s4 : Array<U32> <- frame("ledge 256 128 90", tables, gfx, rested(level, east(256), east(128), 90), s3)
     d1 : Array<U32> <- frame("yard -640 256 0", tables, gfx, rested(level, west(640), east(256), 0), s4)
     d2 : Array<U32> <- frame("bars 1024 200 0", tables, gfx, rested(level, east(1024), east(200), 0), d1)
-    m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), d2)
+    n1 : Array<U32> <- frame("demon head on 48 1616 180", tables, gfx,
+      S.Sim.replay(idle(6n), at(level, east(48), east(1616), 180)), d2)
+    n2 : Array<U32> <- frame("shotgun guy from behind 896 2048 270", tables, gfx,
+      rested(level, east(896), east(2048), 270), n1)
+    n3 : Array<U32> <- frame("shotgun guy from the side 987 1947 225", tables, gfx,
+      rested(level, east(987), east(1947), 225), n2)
+    n4 : Array<U32> <- frame("demon mirrored 2448 2112 0", tables, gfx,
+      rested(level, east(2448), east(2112), 0), n3)
+    m10 : Array<U32> <- frame("stride U!:34", tables, gfx, ran(level, 34n), n4)
     m11 : Array<U32> <- frame("air U!:56", tables, gfx, ran(level, 56n), m10)
     m12 : Array<U32> <- frame("landed U!:66", tables, gfx, ran(level, 66n), m11)
     m13 : Array<U32> <- frame("door half open", tables, gfx, after([idle(20n), walk(20n),
       [K.Cmd.demo(0, 0, 0, 2)], idle(20n)],
-      at(level, east(832), east(384), 90)), m12)
+      at(level, east(448), east(1968), 90)), m12)
     m14 : Array<U32> <- frame("switch pressed", tables, gfx, after([idle(20n), walk(10n),
       [K.Cmd.demo(0, 0, 0, 2)], idle(27n)],
       at(level, east(2064), west(260), 90)), m13)
@@ -306,11 +328,11 @@ def main() -> IO(Unit):
 #|start hash 2700636673 pixels 1 1 7 5 96 covered True
 #|lit 736 464 135 hash 2106469313 pixels 106 8 95 105 96 covered True
 #|dark -416 256 90 hash 310200639 pixels 110 107 0 238 96 covered True
-#|step 137 256 45 hash 1641445220 pixels 8 0 79 6 96 covered True
+#|step 137 256 45 hash 2860679752 pixels 8 0 79 6 96 covered True
 #|grate -416 256 180 hash 1328291109 pixels 3 111 106 93 96 covered True
 #|water 3 256 0 hash 1619173338 pixels 2 6 77 6 96 covered True
 #|sky -640 256 90 hash 463986778 pixels 239 14 239 105 96 covered True
-#|pit 488 256 0 hash 2518513587 pixels 8 6 111 1 96 covered True
+#|pit 488 320 0 hash 1703692995 pixels 79 110 150 6 96 covered True
 #|sergeant 1144 259 315 hash 495192816 pixels 111 108 0 1 96 covered True
 #|once 256 1088 0 hash 116995530 pixels 110 79 105 7 96 covered True
 #|overlap 2752 960 0 hash 549813406 pixels 79 125 10 78 96 covered True
@@ -318,28 +340,32 @@ def main() -> IO(Unit):
 #|ledge 256 128 90 hash 2908682710 pixels 7 5 15 110 96 covered True
 #|yard -640 256 0 hash 2573863974 pixels 1 100 78 8 96 covered True
 #|bars 1024 200 0 hash 549757620 pixels 109 79 5 5 96 covered True
+#|demon head on 48 1616 180 hash 3726312146 pixels 2 7 111 243 96 covered True
+#|shotgun guy from behind 896 2048 270 hash 3424096709 pixels 5 109 0 5 96 covered True
+#|shotgun guy from the side 987 1947 225 hash 1917549567 pixels 5 6 109 108 96 covered True
+#|demon mirrored 2448 2112 0 hash 2010430582 pixels 39 2 6 79 96 covered True
 #|stride U!:34 hash 3490826559 pixels 2 5 164 6 96 covered True
-#|air U!:56 hash 4098663969 pixels 5 110 15 6 96 covered True
-#|landed U!:66 hash 1275252128 pixels 6 110 14 79 96 covered True
-#|door half open hash 4239436392 pixels 107 6 74 111 96 covered True
+#|air U!:56 hash 1931567747 pixels 5 110 15 6 96 covered True
+#|landed U!:66 hash 1981140472 pixels 6 110 14 79 96 covered True
+#|door half open hash 1804438924 pixels 7 14 110 79 96 covered True
 #|switch pressed hash 724704945 pixels 3 110 107 7 96 covered True
 #|exit pressed hash 982269427 pixels 102 95 102 3 96 covered True
 #|blink dark hash 2296296530 pixels 94 73 73 101 96 covered True
-#|key 2380 600 180 22 hash 1785122885 pixels 5 1 6 110 96 covered True
-#|key bright 23 hash 2206557986 pixels 5 1 6 110 96 covered True
-#|key before hash 3742916879 pixels 6 10 5 89 96 covered True
-#|key after hash 1680916088 pixels 105 10 2 89 96 covered True
+#|key 2380 600 180 22 hash 2965057132 pixels 5 1 6 110 96 covered True
+#|key bright 23 hash 2965057132 pixels 5 1 6 110 96 covered True
+#|key before hash 3669536580 pixels 6 10 5 89 96 covered True
+#|key after hash 417899731 pixels 105 10 2 89 96 covered True
 #|bonus before hash 214362927 pixels 11 79 78 6 96 covered True
 #|bonus after hash 264819507 pixels 10 78 2 11 96 covered True
-#|green armour before hash 181021633 pixels 110 110 6 1 96 covered True
-#|green armour after hash 672230510 pixels 8 110 103 2 96 covered True
+#|green armour before hash 294597789 pixels 110 110 6 1 96 covered True
+#|green armour after hash 1238379616 pixels 8 110 103 2 96 covered True
 #|stimpack and medikit before hash 2244377026 pixels 111 109 7 111 96 covered True
 #|stimpack and medikit refused hash 484170876 pixels 110 108 2 107 96 covered True
 #|rocket before hash 1272649172 pixels 105 109 105 77 96 covered True
 #|rocket after hash 1410101461 pixels 106 109 105 77 96 covered True
 #|rocket refused hash 3698027594 pixels 106 109 105 77 160 covered True
-#|chainsaw after hash 1350594065 pixels 5 5 137 141 96 covered True
-#|chainsaw refused hash 1976571187 pixels 5 5 137 141 160 covered True
+#|chainsaw after hash 4078204320 pixels 5 5 137 141 96 covered True
+#|chainsaw refused hash 2403315746 pixels 5 5 137 141 160 covered True
 #|pistol rising 8 hash 767338383 pixels 1 1 7 5 96 covered True
 #|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
 #|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
