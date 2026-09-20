@@ -337,6 +337,12 @@ def Level.side_names(+l: Level, i: U32) -> List<&2, String>:
 def Level.flat_names(+l: Level, s: U32) -> List<&2, String>:
   List.take(&2, String, List.drop(&2, String, Level.flatnames(l), U32.to_nat((s * 2 : U32))), 2n)
 
+# Whether a sector's ceiling shows the sky: Doom's ceilingpic ==
+# skyflatnum, read from the lump's own name, since the sim has no
+# graphics to number it with.
+def Level.sky(+l: Level, s: U32) -> Bool:
+  String.eq(Maybe.default(&2, String, List.get(&2, String, Level.flat_names(l, s), 1n), ""), "F_SKY1")
+
 def Level.sine(+l: Level) -> V.Vec:
   Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials} = l
