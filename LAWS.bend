@@ -495,7 +495,7 @@ def Closed.east() -> S.State:
 # visitor that passes over it.
 def Closed.barrel() -> S.State:
   Closed.at(Closed.player(13107200, 4194304, 0, 8388608), Closed.doors(), [],
-    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295, 0, 0}])
+    [H.Thing{0, 2035, 4718592, 4194304, 0, 0, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}])
 
 # What a ray of the use key's 64 units, east from (32, 64), meets, and
 # what the use key's visitor makes of the same ray.
@@ -919,13 +919,13 @@ def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2
 # lasting: the laws below are about its touch and its heights, not its
 # tics. Its floor is the room's, at 0.
 def Closed.thing(id: U32, kind: U32, x: U32, y: U32, z: U32) -> H.Thing:
-  H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295, 0, 0}
+  H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}
 
 # The same on a floor of its own height, so that P_ZMovement leaves it
 # where it is: a thing under the room's floor would otherwise be lifted
 # onto it before anything reached it, as vanilla lifts one.
 def Closed.floored(id: U32, kind: U32, x: U32, y: U32, +z: U32) -> H.Thing:
-  H.Thing{id, kind, x, y, z, z, 8388608, 0, 0, 0, 4294967295, 0, 0}
+  H.Thing{id, kind, x, y, z, z, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}
 
 # The pickup laws' expected values are p_inter.c's P_TouchSpecialThing,
 # P_GiveCard, P_GiveBody, P_GiveArmor, P_GivePower, P_GiveAmmo and
@@ -994,7 +994,7 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
   match things:
     case []:
       []
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook} <> rest:
+    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai} <> rest:
       id <> Closed.ids(rest)
 
 def Closed.kept(+s: S.State) -> Closed.Got:
@@ -1523,7 +1523,7 @@ def Closed.tics(m: Maybe<&2, H.Thing>) -> Maybe<&2, U32>:
   match m:
     case None{}:
       None{}
-    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, lastlook}}:
+    case Some{H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, ai}}:
       Some{tics}
 
 # LAW: a mobj spawned while the thinkers run joins the tail of the list
@@ -1577,10 +1577,10 @@ def Closed.lowering(n: Nat) -> List<&2, H.Thing>:
 # under the ceiling at 128 stays at 60, over its floor at -4 (sanity).
 law floor_carries_things:
   {(Closed.lowering(1n), Closed.lowering(2n))
-    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, 0},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, 0}],
-      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, 0},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, 0}])
+    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}],
+      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)},
+        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}])
     : List<&2, H.Thing> & List<&2, H.Thing>}
 
 # The door open at 68 and closing, 2 a tic, over a thing, the west room's
@@ -1606,7 +1606,7 @@ law barrel_stops_door:
     == (2752512, 2752512,
       [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
         [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], S.Sim.noise.door()}],
-      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295, 0, 0}], 2883584)
+      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}], 2883584)
     : U32 & U32 & List<&2, S.Thinker> & List<&2, H.Thing> & U32}
 
 # LAW: a lamp is solid but not shootable, and vanilla's PIT_ChangeSector
@@ -1617,7 +1617,7 @@ law lamp_under_door:
   {(Closed.ceil(Closed.idled(34n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0))), 1),
     Closed.running(Closed.idled(35n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0)))),
     Closed.things(Closed.idled(35n, Closed.closing(Closed.thing(8, 2028, 4718592, 1048576, 0)))))
-    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295, 0, 0}])
+    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}])
     : U32 & List<&2, S.Thinker> & List<&2, H.Thing>}
 
 def Closed.over_barrel() -> S.State:
@@ -1631,7 +1631,7 @@ def Closed.over_barrel() -> S.State:
 # (sanity).
 law door_opens_over_barrel:
   {(Closed.ceil(Closed.used(0n, Closed.over_barrel()), 1), Closed.things(Closed.used(1n, Closed.over_barrel())))
-    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295, 0, 0}]) : U32 & List<&2, H.Thing>}
+    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295, 0, H.Thing.ai.start(0)}]) : U32 & List<&2, H.Thing>}
 
 # Things
 # ------
@@ -1649,10 +1649,10 @@ def Closed.stocked() -> S.State:
 
 # The bonus and the armour as they spawned, in a state for some tics.
 def Closed.bonus(state: U32, tics: U32) -> H.Thing:
-  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, 1}
+  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, H.Thing.ai.start(1)}
 
 def Closed.armour(state: U32, tics: U32) -> H.Thing:
-  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, 2}
+  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, H.Thing.ai.start(2)}
 
 # LAW: the spawn's phase, vanilla's P_SpawnMapThing. The player draws
 # the random table's entry 1. The bonus draws entry 2 for P_SpawnMobj,
@@ -1910,7 +1910,7 @@ def Sprite.gfx() -> G.Gfx:
 # Thing id in a state row, x ahead of the eye and y to its left.
 def Sprite.at(+id: U32, x: U32, y: U32, state: U32) -> List<&2, Z.Sprites.Vis>:
   Z.Sprites.project(Sprite.view(), Closed.doors(), Sprite.gfx(), 1, id,
-    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295, 0, 0}, [])
+    H.Thing{id, 2014, x, y, 0, 0, 0, 0, 0, state, 4294967295, 0, H.Thing.ai.start(0)}, [])
 
 # LAW: R_ProjectSprite holds a sprite's columns to the screen, and
 # R_DrawVisSprite steps down a column by the scale's reciprocal. Facing

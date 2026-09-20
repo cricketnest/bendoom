@@ -827,12 +827,31 @@ def Gfx.sprite.chase(fuel: Nat, done: Bool, +first: U32, +state: U32, marks: V.V
     case _ _:
       marks
 
+# A row a type is sent to from outside its own chain, marked with the
+# rows that follow it. Vanilla's R_InitSprites copies every frame of
+# every sprite the WAD holds; Bendoom copies only the frames its rows
+# name, so each of a type's entry points has to be followed or a woken
+# monster draws nothing at all.
+def Gfx.sprite.reached(some: Bool, +state: U32, +n: Nat, marks: V.Vec) -> V.Vec:
+  match some:
+    case False{}:
+      marks
+    case True{}:
+      Gfx.sprite.chase(n, False{}, state, state, marks)
+
+# The rows a type reaches past its spawn chain: the chase rows A_Look
+# sends it to, and the melee and missile rows A_Chase sends it to.
+def Gfx.sprite.woken(+kind: U32, +n: Nat, marks: V.Vec) -> V.Vec:
+  Gfx.sprite.reached(Bool.not(U32.is_zero(H.Thing.missile(kind))), H.Thing.missile(kind), n,
+    Gfx.sprite.reached(Bool.not(U32.is_zero(H.Thing.melee(kind))), H.Thing.melee(kind), n,
+      Gfx.sprite.reached(Bool.not(U32.is_zero(H.Thing.see(kind))), H.Thing.see(kind), n, marks)))
+
 def Gfx.sprite.marks(things: List<&2, H.Thing>, +n: Nat, marks: V.Vec) -> V.Vec:
   match things:
     case []:
       marks
-    case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, lastlook} <> rest:
-      Gfx.sprite.marks(rest, n, Gfx.sprite.chase(n, False{}, state, state, marks))
+    case H.Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, ai} <> rest:
+      Gfx.sprite.marks(rest, n, Gfx.sprite.woken(kind, n, Gfx.sprite.chase(n, False{}, state, state, marks)))
 
 def Gfx.sprite.keep(kept: Bool, row: U32, rest: List<&2, U32>) -> List<&2, U32>:
   match kept:
