@@ -4,7 +4,7 @@
 
 **Blocked by:** milestone 7's 01 (The sim reports its sounds)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] `P_DamageMobj`'s player branch: armour absorption, the damage count, the attacker, thrust when there is an inflictor, and health as a signed quantity
 - [x] `P_PlayerInSpecialSector` for special 7, only while the player stands on the floor
@@ -12,7 +12,7 @@
 - [x] Pickups refuse a dead toucher
 - [x] The pain and death sounds start where vanilla's do
 - [x] Sim cases: nukage tics, green and blue armour absorbing, death in the nukage and the restart, with values worked from the source
-- [ ] Closed laws pin absorption at both armour types; replay composition still holds (written and filled, but `bend PROOF.bend` never got the machine's heavy lock, so no run says so)
+- [x] Closed laws pin absorption at both armour types; replay composition still holds
 - [x] A render case shows the dead view at zero differing pixels
 
 ## Comments
@@ -36,7 +36,7 @@
 | the view still falling, 20 | `630,0,0,0,0` | 0 |
 | the dead view at rest, 6 | `650,0,0,0,0` | 0 |
 
-The render test's new case is the last of these, and it was run again, with the frame dump built again, after milestone 6 and 7's work was merged in: still 0. Every other render case is unchanged; the whole file is at zero but for the three hashes that never had an oracle.
+The render test's new case is the last of these, and it was run again, with the frame dump built again, after each merge of the integration branch, the buttons byte and then the one traversal: still 0. Every other render case is unchanged; the whole file is at zero but for the three hashes that never had an oracle.
 
 **What was built.**
 
@@ -73,7 +73,7 @@ The render test's new case is the last of these, and it was run again, with the 
 - The press after the exit stays in the loop and the reborn comes from the sim, both reaching the one `Game.from`. Folding the exit's press into the sim would make the ended state watch the use button, which would cost the law that an ended tic changes nothing, and would drop Enter, which the game test pins. The intermission ticket owns that path and will delete the exit's branch.
 - The player's mobj state rows are appended, 62 to 70, and are marked in no sprite load, since the view never shows the player's own sprite. That keeps PLAY frames G to M out of the graphics.
 
-**What is left.** `bend PROOF.bend` and `nix flake check`. Both were queued on the machine's heavy lock behind other agents' flake checks for the whole session and never ran to the end; the one proof run that did finish is what found the `State` patterns and the freedom law's proof, both since written. Everything else was run: the sim, game and render tests natively on the merged tree, the load and route tests before the merge, and the three oracle cases, one of them again after the merge. The JS lane runs only inside the flake check, so it is unrun too. Whoever picks this up runs the two and ticks the law box.
+**What the proof cost.** Three runs found three things, each a shape this codebase's guide now carries. The `State` and `Player` patterns of every lemma above the tic had to grow their new fields. The freedom law then had to walk the blow: a lemma a function from the sector's special down, which is why `P_PlayerThink` is split in two, so the player the move is handed is a term the checker can follow rather than one buried inside `Sim.use`. And `tic_rest`, which quantifies over any level, leaves the nukage's flag stuck, so its filler splits on that flag and both sides compute; the blow it may deal writes the health, the wound and the momentum, never the place.
 
 **Surprises.**
 
@@ -81,3 +81,5 @@ The render test's new case is the last of these, and it was run again, with the 
 - `P_CalcHeight` still bobs a dead player. Only the view height's ramp is skipped, so a corpse sliding on its momentum bobs as it goes; the corpse slide case shows it.
 - A blow's thrust moved the corpse past its own attacker in the first draft of the literal-state case, which turned the view the other way round. The barrel was moved to 512 units away so the turn runs one way.
 - A big `+` let bound in the game test's `play` and handed to a frame failed the native build with "an arity over 255" and no location; the same expression as a def of its own passes. It is in `docs/bend.md`.
+
+Checks: `bend PROOF.bend` prints "All terms check." on the merged tree; `nix flake check` passes, which is every test on both lanes; the three oracle cases at 0, the last rerun after each merge; `git diff --check`.
