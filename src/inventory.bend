@@ -41,6 +41,24 @@ def Inventory.bonus(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
   bonus
 
+def Inventory.armour(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  armour
+
+def Inventory.weapons(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  weapons
+
+# The rounds of an ammo type and the cap on them, Doom's ammo[t] and
+# maxammo[t].
+def Inventory.rounds(+t: U32, inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  V.Vec.get(ammo, t)
+
+def Inventory.cap(+t: U32, inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus} = inv
+  V.Vec.get(caps, t)
+
 # The armour types.
 def Inventory.green_armour() -> U32:
   1
