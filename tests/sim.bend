@@ -172,8 +172,9 @@
 # and the door then opens, in one replay, as locked says.
 # Every run prints, before its own line, a line for each sound its tics
 # started or stopped, under the clock after the tic, and each case ends
-# with M_Random's index, 64 after the wipe and one more for each start
-# but the item pickup's (the shell box cases draw once for the closet
+# with M_Random's index, 64 after the wipe, one more for each tic, which
+# is ST_Ticker's own draw for the face, and one more for each start but
+# the item pickup's (the shell box cases draw once for the closet
 # door, opened before their first run). Which sound, from whom and on which tic is read
 # from where Chocolate Doom calls S_StartSound: EV_VerticalDoor's
 # sfx_doropn on the use, T_VerticalDoor's sfx_dorcls as the wait ends
@@ -226,6 +227,31 @@
 # next spawned is 293, not 292 again. P_TryMove relinks the player's
 # mobj first in its cell on its first move. The random index after a
 # tic is the lights' draws, a regression pin.
+# Then the face, a line for each tic ST_updateFaceWidget put a
+# different index up and one for the face each case ends on. Every index
+# is ST_calcPainOffset's offset (0 at 100 down to 80 health, 8 at 79
+# down to 60, 16, 24 and 32 for the twenties under those) plus what the
+# priority that chose it adds: nothing or 1 or 2 for the idle glance,
+# which is st_randomnumber % 3 of the tic's own M_Random draw, 3 for a
+# turn right, 4 for a turn left, 5 for the ouch face, 6 for the evil
+# grin, 7 for the rampage face, and 41 for ST_DEADFACE. Each line
+# carries the M_Random index the tic's draw left, so every glance below
+# is rndtable read in nushell at that index, remainder 3: 197 at 65 and
+# 92 at 99 give 2, 249 at 82 and 171 at 124 give 0, 145 at 101 and 61 at
+# 137 give 1. The nukage's first blow lands on the
+# tic the level begins, when the health ST_Ticker saw last is still -1,
+# so vanilla's ouch test, whose subtraction is the wrong way round,
+# reads a rise of 96 and puts the ouch face up; every later blow finds
+# the priority its own count still holds. The blows from the right and
+# the left are R_PointToAngle2 from the player at the origin facing
+# east: ANG270 to a barrel due south, whose difference passes ANG180 and
+# turns the face right, and ANG90-1 due north, which does not and turns
+# it left, while one due east is inside ANG45 and takes the rampage face
+# head on. The chainsaw is grinned at on the tic it is taken, since
+# P_TouchSpecialThing sets the pickup flash before ST_Ticker looks.
+# Held fire reaches ST_RAMPAGEDELAY on the 71st tic: the first sets
+# lastattackdown to 70 and each after it takes one off. Every case's
+# M_Random index counts the sights of that run beside its other sounds.
 # Last, A_Look. Six places held still, each with the monsters watched,
 # their state rows and tics, whether P_CheckSight has the player in
 # sight, and P_Random's index at the end; then REJECT's bit for ten
@@ -249,6 +275,7 @@ import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/vec.bend as V
 import ../src/sound.bend as Sn
+import ../src/message.bend as Msg
 
 def line(tag: String, s: S.State) -> String:
   +p = S.State.player(s)
@@ -339,6 +366,12 @@ def run(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, s: S.State) -> 
     IO.print(Run.log(r) ++ watch(tag, sectors, q))
     return q
 
+# The heads-up line: the message it shows, its string from d_englsh.h,
+# and the tics it has left there.
+def said(+s: S.State) -> String:
+  +n = S.State.message(s)
+  " message " ++ U32.show(n) ++ " \"" ++ Msg.Message.text(n) ++ "\" tics " ++ U32.show(S.State.msgtics(s))
+
 def idle() -> K.Cmd:
   K.Cmd.idle()
 
@@ -425,7 +458,7 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
   do IO<S.State>:
     IO.print(Run.log(r) ++ watch(tag, [71], q) ++ " key " ++ Bool.show(Maybe.is_some(&2, H.Thing, H.Things.get(S.State.things(q), id)))
       ++ " things " ++ Nat.show(List.length(&2, H.Thing, H.Things.list(S.State.things(q)))) ++ " cards "
-      ++ U32.show(I.Inventory.cards(inv)) ++ " flash " ++ U32.show(I.Inventory.bonus(inv)))
+      ++ U32.show(I.Inventory.cards(inv)) ++ " flash " ++ U32.show(I.Inventory.bonus(inv)) ++ said(q))
     return q
 
 # The state with the player holding an inventory.
@@ -445,7 +478,7 @@ def blue(+level: L.Level) -> IO(Unit):
     k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, 0), k1)
     k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, 0), k2)
     b0 : S.State <- keyed("blue walk with the skull", 87, 30n, forward(),
-      holding(I.Inventory.card(8, I.Inventory.start()), at(level, 832, 1400, 90)))
+      holding(I.Inventory.card(8, Msg.Message.none(), I.Inventory.start()), at(level, 832, 1400, 90)))
     b1 : S.State <- keyed("use", 87, 1n, use(), b0)
     b2 : S.State <- keyed("-", 87, 10n, idle(), b1)
     b3 : S.State <- keyed("-", 87, 51n, idle(), b2)
@@ -725,7 +758,9 @@ def locked(+placed: L.Level) -> IO(Unit):
     k10 : S.State <- keyed("-", 82, 15n, idle(), k9)
     k11 : S.State <- keyed("-", 82, 41n, idle(), k10)
     k12 : S.State <- keyed("-", 82, 1n, idle(), k11)
-    IO.print(drawn(k12))
+    k13 : S.State <- keyed("-", 82, 36n, idle(), k12)
+    k14 : S.State <- keyed("-", 82, 1n, idle(), k13)
+    IO.print(drawn(k14))
     IO.print("-")
 
 # The patched map's cases.
@@ -912,15 +947,15 @@ def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S
   do IO<S.State>:
     IO.print(Run.log(r) ++ line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
     IO.print("  " ++ I.Inventory.show(S.Player.inv(S.State.player(q)))
-      ++ H.Things.tally(H.Things.list(S.State.things(first)), S.State.things(q)))
+      ++ H.Things.tally(H.Things.list(S.State.things(first)), S.State.things(q)) ++ said(q))
     return q
 
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
 def stocked(health: U32, armour: U32, armourtype: U32, ammo: List<&2, U32>, inv: I.Inventory) -> I.Inventory:
-  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus} = inv
+  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, line} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(ammo, 4), caps, backpack, weapons, powers, items,
-    bonus}
+    bonus, line}
 
 # Walking forward from a place for some tics, then one more: the tic
 # before contact and the tic of it.
@@ -1267,6 +1302,64 @@ def damaged(+level: L.Level) -> IO(Unit):
     blows()
     corpses(level)
 
+def face.at(+s: S.State) -> U32:
+  S.Sim.Face.index(S.State.face(s))
+
+def faced.line(changed: Bool, log: String, +q: S.State) -> String:
+  match changed:
+    case False{}:
+      log
+    case True{}:
+      log ++ "face tic " ++ U32.show(S.State.clock(q)) ++ " index " ++ U32.show(face.at(q)) ++ " health "
+        ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " drew " ++ U32.show(S.State.mrnd(q))
+        ++ "\n"
+
+# A replay that logs each tic the face index changed to another, which
+# is every decision ST_updateFaceWidget made that the bar can show.
+def faced(script: List<&2, K.Cmd>, +was: U32, r: Run) -> Run:
+  match script r:
+    case [] _:
+      r
+    case cmd <> rest Run{log, s}:
+      +q = S.Sim.tic(cmd, s)
+      faced(rest, face.at(q), Run{faced.line(Bool.not(U32.is_eq(face.at(q), was)), log, q), q})
+
+# A run of one command, its face changes, and the face the run left with
+# its count and M_Random's index.
+def faces(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
+  +r = faced(List.replicate(K.Cmd, n, cmd), face.at(s), Run{"", s})
+  +q = Run.state(r)
+  do IO<S.State>:
+    IO.print(Run.log(r) ++ tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " index " ++ U32.show(face.at(q))
+      ++ " count " ++ U32.show(S.Sim.Face.count(S.State.face(q))) ++ " health "
+      ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " " ++ drawn(q))
+    return q
+
+# A blow of 20 from a barrel at a place, with a tic run first so that
+# the health ST_Ticker saw last is no longer -1 and the ouch test is
+# the one vanilla makes of a wound.
+def sided(tag: String, tx: U32, ty: U32) -> IO(S.State):
+  faces(tag, 3n, idle(), blown(20, S.Sim.tic(idle(), struck(100, 0, tx, ty, 0))))
+
+# Doom's face, ST_updateFaceWidget once a tic: the idle glance at the
+# start, the nukage's pain down the five health levels and the dead
+# face at the end of it, the wince toward a blow from either side and
+# from dead ahead, the grin on a weapon taken, and the grimace after
+# ST_RAMPAGEDELAY of held fire.
+def faces.cases(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    g0 : S.State <- faces("glance", 60n, idle(), S.State.start(level))
+    n0 : S.State <- faces("nukage", 200n, idle(), at(level, 1600, 1000, 90))
+    n1 : S.State <- faces("nukage until it kills", 460n, idle(), n0)
+    r0 : S.State <- sided("blow from the right", 0, 4294967232)
+    l0 : S.State <- sided("blow from the left", 0, 64)
+    a0 : S.State <- sided("blow from dead ahead", 64, 0)
+    w0 : S.State <- faces("chainsaw grin", 16n, K.Cmd.demo(0, 4294967272, 0, 0),
+      S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
+        [K.Cmd.demo(0, 0, 4294967280, 0)]), at(level, 3158, 2176, 180)))
+    f0 : S.State <- faces("held fire", 75n, fire(), S.State.start(level))
+    IO.print("-")
+
 # Everything the two walks do not cover, from the map as loaded and from
 # the map with three records rewritten.
 # A signed count as text, for a health that goes past zero and for a
@@ -1409,6 +1502,7 @@ def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
     fighting(level)
     pickups(level)
     damaged(level)
+    faces.cases(level)
     door(level)
     patched.cases(level, patched(W.Wad.dir(a)))
     relinks(level)
@@ -1584,7 +1678,7 @@ def main() -> IO(Unit):
 #|sound tic 75 DSITEMUP from nobody vol 64 sep 128
 #|sound tic 75 DSPOSIT1 from thing 176 vol 57 sep 64
 #|-:40 662.189941 256.402572 0.000 z -128.000000 floor -128.000000 eye 41.011581
-#|the walks: sounds drew to 70, sounds drew to 69
+#|the walks: sounds drew to 167, sounds drew to 174
 #|weapon tic 0 state Some(60) tics 1 at 0.000000 122.000000 flash None tics 0 at 0.000000 0.000000
 #|weapon tic 1 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000
 #|weapon tic 14 state Some(60) tics 1 at 0.000000 38.000000 flash None tics 0 at 0.000000 38.000000
@@ -1673,19 +1767,19 @@ def main() -> IO(Unit):
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
 #|sound tic 9 DSBGSIT2 from thing 82 vol 58 sep 192
 #|clip walk tic 9 644.340896 991.988937 180.000 z -128.000000 floor -128.000000 eye 42.770172
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 10 stop thing 140
 #|sound tic 10 DSITEMUP from nobody vol 64 sep 128
 #|- tic 10 639.121368 991.986862 180.000 z -128.000000 floor -128.000000 eye 42.064453
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 140
-#|sounds drew to 67
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 140 message 9 "Picked up a clip." tics 140
+#|sounds drew to 77
 #|shells walk tic 8 1082.761047 -223.991744 0.000 z 0.000000 floor 0.000000 eye 43.090270
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 9 stop thing 276
 #|sound tic 9 DSITEMUP from nobody vol 64 sep 128
 #|- tic 9 1087.658264 -223.989990 0.000 z 0.000000 floor 0.000000 eye 42.770034
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 276
-#|sounds drew to 64
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 276 message 13 "Picked up 4 shotgun shells." tics 140
+#|sounds drew to 73
 #|sound tic 11 DSPOSIT3 from thing 185 vol 47 sep 224
 #|sound tic 17 DSPOSIT2 from thing 182 vol 44 sep 203
 #|sound tic 17 DSPOSIT3 from thing 265 vol 64 sep 129
@@ -1694,148 +1788,148 @@ def main() -> IO(Unit):
 #|sound tic 26 stop thing 207
 #|sound tic 26 DSITEMUP from nobody vol 64 sep 128
 #|- tic 26 1202.337890 -223.948562 0.000 z 0.000000 floor 0.000000 eye 48.388656
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 12 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 206 taken 207 208 276
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 12 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 206 taken 207 208 276 message 13 "Picked up 4 shotgun shells." tics 140
 #|shells walk at the cap tic 8 1082.761047 -223.991744 0.000 z 0.000000 floor 0.000000 eye 43.090270
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 9 1087.658264 -223.989990 0.000 z 0.000000 floor 0.000000 eye 42.770034
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 64
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sounds drew to 73
 #|sound tic 11 DSPOSIT3 from thing 185 vol 47 sep 224
 #|sound tic 17 DSPOSIT2 from thing 182 vol 44 sep 203
 #|sound tic 17 DSPOSIT3 from thing 265 vol 64 sep 129
 #|- tic 26 1202.337890 -223.948562 0.000 z 0.000000 floor 0.000000 eye 48.388656
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|rocket walk tic 8 677.238296 -1000.009109 180.000 z 0.000000 floor 0.000000 eye 43.090423
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 9 stop thing 279
 #|sound tic 9 DSITEMUP from nobody vol 64 sep 128
 #|- tic 9 672.340896 -1000.011062 180.000 z 0.000000 floor 0.000000 eye 42.770172
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 1 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 279
-#|sounds drew to 64
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 1 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 279 message 11 "Picked up a rocket." tics 140
+#|sounds drew to 73
 #|rocket walk at the cap tic 8 677.238296 -1000.009109 180.000 z 0.000000 floor 0.000000 eye 43.090423
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 9 672.340896 -1000.011062 180.000 z 0.000000 floor 0.000000 eye 42.770172
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 64
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 50 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sounds drew to 73
 #|-
 #|shell box walk tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 52 stop thing 137
 #|sound tic 52 DSITEMUP from nobody vol 64 sep 128
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 20 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137
-#|sounds drew to 69
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 20 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137 message 14 "Picked up a box of shotgun shells." tics 140
+#|sounds drew to 121
 #|-
 #|shell box walk short of the cap tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 45 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 45 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 52 stop thing 137
 #|sound tic 52 DSITEMUP from nobody vol 64 sep 128
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137
-#|sounds drew to 69
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 137 message 14 "Picked up a box of shotgun shells." tics 140
+#|sounds drew to 121
 #|-
 #|shell box walk at the cap tic 51 509.810287 711.963989 180.000 z -128.000000 floor -128.000000 eye 41.140472
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 52 502.640411 711.961120 180.000 z -128.000000 floor -128.000000 eye 39.155944
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 69
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 50 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sounds drew to 121
 #|-
 #|chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 34 stop thing 2
 #|sound tic 34 DSWPNUP from nobody vol 64 sep 128
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 2
-#|sounds drew to 67
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 2 message 15 "A chainsaw!  Find some meat!" tics 140
+#|sounds drew to 101
 #|owned chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 15 "A chainsaw!  Find some meat!" tics 107
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 66
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 15 "A chainsaw!  Find some meat!" tics 106
+#|sounds drew to 100
 #|health bonus tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 268
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 476.164627 256.015945 0.000 z -128.000000 floor -128.000000 eye 39.730026
-#|  inventory health 101 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 268
-#|sounds drew to 64
+#|  inventory health 101 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 268 message 3 "Picked up a health bonus." tics 140
+#|sounds drew to 76
 #|health bonus at 200 tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
-#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 268
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 476.164627 256.015945 0.000 z -128.000000 floor -128.000000 eye 39.730026
-#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 268
-#|sounds drew to 64
+#|  inventory health 200 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 268 message 3 "Picked up a health bonus." tics 140
+#|sounds drew to 76
 #|stimpack at 100 tic 11 -32.015335 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 12 -32.017639 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 64
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sounds drew to 76
 #|- tic 22 -32.040420 495.976776 90.000 z 0.000000 floor 0.000000 eye 41.022888
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|stimpack at 60 tic 11 -32.015335 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 215
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 -32.017639 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 70 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 215
-#|sounds drew to 64
+#|  inventory health 70 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 215 message 5 "Picked up a stimpack." tics 140
+#|sounds drew to 76
 #|medikit at 100 tic 11 31.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 12 31.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 64
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sounds drew to 76
 #|medikit at 60 tic 11 31.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 259
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 31.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 259
-#|sounds drew to 64
+#|  inventory health 85 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 259 message 6 "Picked up a medikit." tics 140
+#|sounds drew to 76
 #|berserk at 100 tic 11 607.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 291
 #|sound tic 12 DSGETPOW from nobody vol 64 sep 128
 #|- tic 12 607.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 things 208 taken 291
-#|sounds drew to 65
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 things 208 taken 291 message 8 "Berserk!" tics 140
+#|sounds drew to 77
 #|- tic 22 607.968032 479.134338 90.000 z 0.000000 floor 0.000000 eye 41.174743
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 11 0 0 0 0 items 1 flash 0 things 208 taken 291
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 11 0 0 0 0 items 1 flash 0 things 208 taken 291 message 8 "Berserk!" tics 130
 #|berserk at 60 tic 11 607.984664 438.388839 90.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 60 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 291
 #|sound tic 12 DSGETPOW from nobody vol 64 sep 128
 #|- tic 12 607.982360 444.164627 90.000 z 0.000000 floor 0.000000 eye 39.730026
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 things 208 taken 291
-#|sounds drew to 65
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 things 208 taken 291 message 8 "Berserk!" tics 140
+#|sounds drew to 77
 #|sound tic 11 DSPOSIT3 from thing 185 vol 43 sep 34
 #|armour bonus tic 11 624.013870 -758.390090 270.000 z 0.000000 floor 0.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 204
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 624.015945 -764.166107 270.000 z 0.000000 floor 0.000000 eye 39.729934
-#|  inventory health 100 armour 1 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 204
-#|sounds drew to 65
+#|  inventory health 100 armour 1 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 1 flash 6 things 208 taken 204 message 4 "Picked up an armor bonus." tics 140
+#|sounds drew to 77
 #|sound tic 4 DSBGSIT1 from thing 85 vol 35 sep 217
 #|sound tic 6 DSPOSIT3 from thing 240 vol 30 sep 33
 #|sound tic 8 DSBGSIT1 from thing 81 vol 23 sep 33
 #|sound tic 9 DSBGSIT2 from thing 82 vol 20 sep 34
 #|green armour tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 6
 #|sound tic 12 DSITEMUP from nobody vol 64 sep 128
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
-#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 6
-#|sounds drew to 68
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 6 message 1 "Picked up the armor." tics 140
+#|sounds drew to 80
 #|sound tic 4 DSBGSIT1 from thing 85 vol 35 sep 217
 #|sound tic 6 DSPOSIT3 from thing 240 vol 30 sep 33
 #|sound tic 8 DSBGSIT1 from thing 81 vol 23 sep 33
 #|sound tic 9 DSBGSIT2 from thing 82 vol 20 sep 34
 #|green armour at 100 tic 11 1663.984664 1046.388839 90.000 z -144.000000 floor -144.000000 eye 41.015975
-#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|- tic 12 1663.982360 1052.164627 90.000 z -144.000000 floor -144.000000 eye 39.730026
-#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
-#|sounds drew to 68
+#|  inventory health 100 armour 100 type 1 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
+#|sounds drew to 80
 #|-
 #|nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 95 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 4 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
 #|sound tic 4 DSBGSIT1 from thing 85 vol 32 sep 219
@@ -1852,7 +1946,7 @@ def main() -> IO(Unit):
 #|green armour nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 96 armour 99 type 1 momentum 0.000000 0.000000 state 71/3 damage 3 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
 #|green armour worn out tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 96 armour 0 type 0 momentum 0.000000 0.000000 state 71/3 damage 3 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
 #|blue armour nukage tic 1 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 41.000000 health 97 armour 98 type 2 momentum 0.000000 0.000000 state 71/3 damage 2 attacker 4294967295 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 62 reborn False
-#|sounds drew to 71
+#|sounds drew to 108
 #|-
 #|sound tic 4 DSBGSIT1 from thing 85 vol 32 sep 219
 #|sound tic 4 DSPLPAIN from thing 4294967295 vol 64 sep 128
@@ -1888,7 +1982,7 @@ def main() -> IO(Unit):
 #|- tic 682 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn False
 #|use tic 683 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn True
 #|- tic 684 1600.000000 1000.000000 90.000 z -168.000000 floor -168.000000 eye 6.000000 health 0 armour 0 type 0 momentum 0.000000 0.000000 state 0/4294967295 damage 0 attacker 4294967295 state Some(69) tics 1 at 1.000000 128.000000 flash None tics 0 at 1.000000 128.000000 random 205 reborn True
-#|sounds drew to 89
+#|sounds drew to 5
 #|-
 #|blow from the south tic 0 0.000000 0.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000 health 80 armour 0 type 0 momentum 0.000946 2.499954 state 71/4 damage 20 attacker 0 state Some(60) tics 1 at 0.000000 122.000000 flash None tics 0 at 0.000000 0.000000 random 1 reborn False
 #|- tic 1 0.000946 2.499954 0.000 z 0.000000 floor 0.000000 eye 41.000289 health 80 armour 0 type 0 momentum 0.000854 2.265579 state 71/3 damage 19 attacker 0 state Some(60) tics 1 at 0.000000 116.000000 flash None tics 0 at 0.000000 116.000000 random 1 reborn False
@@ -1899,7 +1993,7 @@ def main() -> IO(Unit):
 #|- tic 18 -0.034469 -88.532135 270.000 z 0.000000 floor 0.000000 eye 22.642181 health 0 armour 0 type 0 momentum -0.000717 -1.700103 state 74/2 damage 20 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
 #|- tic 19 -0.035186 -90.232238 270.000 z 0.000000 floor 0.000000 eye 21.785339 health 0 armour 0 type 0 momentum -0.000656 -1.540725 state 74/1 damage 19 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
 #|- tic 20 -0.035842 -91.772964 270.000 z 0.000000 floor 0.000000 eye 20.905944 health 0 armour 0 type 0 momentum -0.000595 -1.396286 state 75/10 damage 18 attacker 0 state Some(69) tics 1 at 0.000000 128.000000 flash None tics 0 at 0.000000 128.000000 random 3 reborn False
-#|sounds drew to 65
+#|sounds drew to 85
 #|-
 #|sound tic 6 DSPOSIT2 from thing 240 vol 54 sep 148
 #|sound tic 8 DSBGSIT2 from thing 81 vol 61 sep 157
@@ -1907,7 +2001,7 @@ def main() -> IO(Unit):
 #|sound tic 10 DSPLDETH from thing 4294967295 vol 64 sep 128
 #|sound tic 14 DSBGSIT1 from thing 84 vol 12 sep 173
 #|corpse slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 20.976486
-#|  inventory health 0 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken
+#|  inventory health 0 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 6 DSPOSIT3 from thing 240 vol 54 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 61 sep 157
 #|sound tic 8 stop thing 140
@@ -1915,7 +2009,38 @@ def main() -> IO(Unit):
 #|sound tic 9 DSBGSIT2 from thing 82 vol 57 sep 191
 #|sound tic 14 DSBGSIT2 from thing 84 vol 12 sep 173
 #|live slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 40.976486
-#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 208 taken 140
+#|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 208 taken 140 message 9 "Picked up a clip." tics 128
+#|-
+#|face tic 1 index 2 health 100 drew 65
+#|face tic 18 index 0 health 100 drew 82
+#|face tic 35 index 2 health 100 drew 99
+#|glance tic 60 index 2 count 8 health 100 sounds drew to 124
+#|face tic 1 index 5 health 95 drew 65
+#|face tic 36 index 2 health 90 drew 107
+#|face tic 53 index 0 health 90 drew 124
+#|face tic 65 index 7 health 85 drew 136
+#|face tic 129 index 15 health 75 drew 202
+#|nukage tic 200 index 15 count 30 health 65 sounds drew to 20
+#|face tic 257 index 23 health 55 drew 78
+#|face tic 385 index 31 health 35 drew 210
+#|face tic 513 index 39 health 15 drew 86
+#|face tic 609 index 41 health 0 drew 185
+#|nukage until it kills tic 660 index 41 count 0 health 0 sounds drew to 237
+#|face tic 2 index 3 health 80 drew 66
+#|blow from the right tic 4 index 3 count 34 health 80 sounds drew to 68
+#|face tic 2 index 4 health 80 drew 66
+#|blow from the left tic 4 index 4 count 34 health 80 sounds drew to 68
+#|face tic 2 index 7 health 80 drew 66
+#|blow from dead ahead tic 4 index 7 count 34 health 80 sounds drew to 68
+#|face tic 34 index 6 health 100 drew 101
+#|chainsaw grin tic 37 index 6 count 66 health 100 sounds drew to 104
+#|face tic 1 index 2 health 100 drew 65
+#|face tic 18 index 0 health 100 drew 82
+#|face tic 35 index 1 health 100 drew 101
+#|face tic 52 index 2 health 100 drew 119
+#|face tic 69 index 1 health 100 drew 137
+#|face tic 71 index 7 health 100 drew 139
+#|held fire tic 75 index 7 count 0 health 100 sounds drew to 144
 #|-
 #|sound tic 5 DSPOSIT2 from thing 176 vol 64 sep 65
 #|door walk tic 40 871.974029 448.783554 90.000 z -128.000000 floor -128.000000 eye 38.394653 thinkers 9 sector 10 -128.000000 -128.000000
@@ -1937,7 +2062,7 @@ def main() -> IO(Unit):
 #|- tic 275 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
 #|- tic 279 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
 #|use tic 280 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -6.000000
-#|sounds drew to 70
+#|sounds drew to 94
 #|-
 #|sound tic 124 DSBGSIT2 from thing 84 vol 7 sep 183
 #|through walk tic 142 871.852340 750.246398 90.000 z -128.000000 floor -128.000000 eye 42.976440 thinkers 10 sector 10 -128.000000 -4.000000
@@ -1949,7 +2074,7 @@ def main() -> IO(Unit):
 #|- tic 288 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -72.000000
 #|- tic 289 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -70.000000
 #|- tic 323 871.931137 545.326477 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 72
+#|sounds drew to 139
 #|-
 #|sound tic 41 DSDOROPN from sector 10 vol 64 sep 85
 #|sound tic 46 DSPOSIT2 from thing 240 vol 37 sep 143
@@ -1958,33 +2083,33 @@ def main() -> IO(Unit):
 #|held use tic 140 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
 #|sound tic 253 DSDORCLS from sector 10 vol 64 sep 54
 #|use tic 340 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 10 -128.000000 -128.000000
-#|sounds drew to 70
+#|sounds drew to 154
 #|-
 #|sound tic 253 DSDORCLS from sector 10 vol 51 sep 33
 #|door on the left tic 253 832.000000 128.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|sound tic 253 DSDORCLS from sector 10 vol 51 sep 224
 #|door on the right tic 253 832.000000 128.000000 180.000 z 0.000000 floor 0.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|sound tic 253 DSDORCLS from sector 10 vol 51 sep 128
 #|door behind tic 253 832.000000 128.000000 270.000 z 0.000000 floor 0.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|sound tic 253 DSDORCLS from sector 10 vol 64 sep 129
 #|door 200 ahead tic 253 832.000000 328.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|sound tic 253 DSDORCLS from sector 10 vol 63 sep 129
 #|door 201 ahead tic 253 832.000000 327.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|sound tic 111 DSPOSIT2 from thing 185 vol 58 sep 224
 #|sound tic 253 DSDORCLS from sector 10 vol 1 sep 129
 #|door 1184 ahead tic 253 832.000000 -656.000000 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 71
+#|sounds drew to 68
 #|sound tic 111 DSPOSIT2 from thing 185 vol 58 sep 224
 #|door 1185 ahead tic 253 832.000000 -657.000000 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|sound tic 111 DSPOSIT2 from thing 185 vol 59 sep 224
 #|door 1201 ahead tic 253 832.000000 -673.000000 90.000 z -8.000000 floor -8.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 70
+#|sounds drew to 67
 #|-
 #|switch walk tic 30 2063.945510 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.024505 thinkers 9 sector 76 272.000000 272.000000 sector 126 264.000000 264.000000 sector 129 264.000000 264.000000
 #|sound tic 31 DSSWTCHN from nobody vol 64 sep 128
@@ -2048,7 +2173,7 @@ def main() -> IO(Unit):
 #|- tic 167 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
 #|sound tic 168 DSNOWAY from thing 4294967295 vol 64 sep 128
 #|use tic 168 2063.943267 -240.021331 90.000 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 76 136.000000 272.000000 sector 126 144.000000 264.000000 sector 129 136.000000 264.000000
-#|sounds drew to 117
+#|sounds drew to 29
 #|-
 #|sound tic 3 DSBGSIT1 from thing 243 vol 53 sep 218
 #|sound tic 4 DSBGSIT1 from thing 190 vol 44 sep 68
@@ -2060,7 +2185,7 @@ def main() -> IO(Unit):
 #|- tic 79 2101.079208 -449.951568 0.000 z 128.000000 floor 128.000000 eye 41.000000 thinkers 9 sector 145 136.000000 260.000000
 #|sound tic 115 DSBGSIT1 from thing 241 vol 50 sep 33
 #|back tic 119 1846.728271 -450.053344 0.000 z 136.000000 floor 136.000000 eye 28.955810 thinkers 9 sector 145 136.000000 260.000000
-#|sounds drew to 69
+#|sounds drew to 188
 #|-
 #|lift run tic 35 11.349639 256.160812 0.000 z 0.000000 floor 0.000000 eye 33.430175 thinkers 9 sector 98 12.000000 128.000000
 #|- tic 39 62.115066 256.179794 0.000 z 12.000000 floor 12.000000 eye 25.687744 thinkers 9 sector 98 12.000000 128.000000
@@ -2088,22 +2213,22 @@ def main() -> IO(Unit):
 #|- tic 185 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 9 sector 98 12.000000 128.000000
 #|sound tic 186 DSPSTART from sector 98 vol 64 sep 129
 #|use tic 186 208.160308 255.986602 180.000 z -124.000000 floor -124.000000 eye 41.000000 thinkers 10 sector 98 8.000000 128.000000
-#|sounds drew to 70
+#|sounds drew to 0
 #|-
-#|key turn tic 21 2246.000000 592.000000 157.500 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
-#|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
+#|key turn tic 21 2246.000000 592.000000 157.500 z 136.000000 floor 136.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 0 "" tics 0
+#|strafe tic 33 2229.789398 552.822265 157.500 z 136.000000 floor 136.000000 eye 38.785858 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 0 "" tics 0
 #|sound tic 34 stop thing 87
 #|sound tic 34 DSITEMUP from nobody vol 64 sep 128
-#|- tic 34 2227.581390 547.485961 157.500 z 136.000000 floor 136.000000 eye 37.663955 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 12
-#|- tic 44 2202.145187 486.011810 157.500 z 136.000000 floor 136.000000 eye 46.122497 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 2
-#|blue walk with the skull tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 8 flash 0
+#|- tic 34 2227.581390 547.485961 157.500 z 136.000000 floor 136.000000 eye 37.663955 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 12 message 7 "Picked up a blue keycard." tics 140
+#|- tic 44 2202.145187 486.011810 157.500 z 136.000000 floor 136.000000 eye 46.122497 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 2 message 7 "Picked up a blue keycard." tics 130
+#|blue walk with the skull tic 30 831.941818 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.024505 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
 #|sound tic 31 DSDOROPN from sector 71 vol 64 sep 129
-#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 209 cards 8 flash 0
+#|use tic 31 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -126.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
 #|sound tic 34 DSPOSIT2 from thing 94 vol 49 sep 144
 #|sound tic 40 DSPOSIT1 from thing 95 vol 57 sep 101
-#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 209 cards 8 flash 0
-#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 209 cards 8 flash 0
-#|sounds drew to 67
+#|- tic 41 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -106.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
+#|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
+#|sounds drew to 159
 #|-
 #|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
 #|sound tic 5 DSPOSIT2 from thing 289 vol 64 sep 33
@@ -2111,7 +2236,7 @@ def main() -> IO(Unit):
 #|sound tic 21 DSSWTCHN from nobody vol 64 sep 128
 #|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
 #|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
-#|sounds drew to 66
+#|sounds drew to 87
 #|-
 #|states tic 0 2:45/4294967295 6:6/2 87:24/1 24:10/3 121:18/1 144:12/2 172:51/5
 #|states tic 1 2:45/4294967295 6:6/1 87:25/10 24:10/2 121:19/6 144:12/1 172:51/4
@@ -2179,28 +2304,30 @@ def main() -> IO(Unit):
 #|- tic 296 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -84.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -84.000000 state 11 tics 1
 #|- tic 297 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -82.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -82.000000 state 10 tics 6
 #|- tic 301 871.954116 495.905426 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -74.000000 thing 35 type 2035 z -128.000000 floor -128.000000 ceiling -74.000000 state 10 tics 2
-#|sounds drew to 70
+#|sounds drew to 115
 #|-
 #|sound tic 21 DSOOF from nobody vol 64 sep 128
-#|blue door refused tic 21 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
-#|- tic 41 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
-#|turn tic 42 880.000000 1440.000000 247.500 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
-#|walk tic 55 860.814102 1393.630569 247.500 z -128.000000 floor -128.000000 eye 36.733230 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0
+#|blue door refused tic 21 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 17 "You need a blue key to open this door" tics 140
+#|- tic 41 880.000000 1440.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 17 "You need a blue key to open this door" tics 120
+#|turn tic 42 880.000000 1440.000000 247.500 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 17 "You need a blue key to open this door" tics 119
+#|walk tic 55 860.814102 1393.630569 247.500 z -128.000000 floor -128.000000 eye 36.733230 thinkers 9 sector 71 -128.000000 -128.000000 key True things 209 cards 0 flash 0 message 17 "You need a blue key to open this door" tics 106
 #|sound tic 56 stop thing 82
 #|sound tic 56 DSITEMUP from nobody vol 64 sep 128
-#|- tic 56 858.431030 1387.871063 247.500 z -128.000000 floor -128.000000 eye 36.145187 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 12
-#|- tic 76 838.610397 1339.968490 247.500 z -128.000000 floor -128.000000 eye 40.905364 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0
-#|turn tic 77 838.308792 1339.239654 90.000 z -128.000000 floor -128.000000 eye 40.925247 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0
-#|walk tic 96 835.806503 1423.465972 90.000 z -128.000000 floor -128.000000 eye 34.990249 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0
+#|- tic 56 858.431030 1387.871063 247.500 z -128.000000 floor -128.000000 eye 36.145187 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 12 message 7 "Picked up a blue keycard." tics 140
+#|- tic 76 838.610397 1339.968490 247.500 z -128.000000 floor -128.000000 eye 40.905364 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 120
+#|turn tic 77 838.308792 1339.239654 90.000 z -128.000000 floor -128.000000 eye 40.925247 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 119
+#|walk tic 96 835.806503 1423.465972 90.000 z -128.000000 floor -128.000000 eye 34.990249 thinkers 9 sector 71 -128.000000 -128.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 100
 #|sound tic 97 DSDOROPN from sector 71 vol 64 sep 123
-#|use tic 97 835.761825 1429.752563 90.000 z -128.000000 floor -128.000000 eye 36.239089 thinkers 10 sector 71 -128.000000 -126.000000 key False things 208 cards 1 flash 0
-#|- tic 102 835.593826 1453.375137 90.000 z -128.000000 floor -128.000000 eye 41.488937 thinkers 10 sector 71 -128.000000 -116.000000 key False things 208 cards 1 flash 0
+#|use tic 97 835.761825 1429.752563 90.000 z -128.000000 floor -128.000000 eye 36.239089 thinkers 10 sector 71 -128.000000 -126.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 99
+#|- tic 102 835.593826 1453.375137 90.000 z -128.000000 floor -128.000000 eye 41.488937 thinkers 10 sector 71 -128.000000 -116.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 94
 #|sound tic 104 DSPOSIT1 from thing 94 vol 49 sep 143
 #|sound tic 104 DSPOSIT2 from thing 95 vol 56 sep 100
-#|- tic 117 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -86.000000 key False things 208 cards 1 flash 0
-#|- tic 158 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0
-#|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0
-#|sounds drew to 68
+#|- tic 117 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -86.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 79
+#|- tic 158 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 38
+#|- tic 159 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 37
+#|- tic 195 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 1
+#|- tic 196 835.508346 1463.921813 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key False things 208 cards 1 flash 0 message 7 "Picked up a blue keycard." tics 0
+#|sounds drew to 8
 #|-
 #|start cell 2,11 58 cell 2,10 157 sector 160 58 sector 140 238 next 292 random 59 thing 58 type 18 at -400.000000 400.000000 z 16.000000 angle 270.000 sector 160 state 2 tics 4294967295 radius 20 height 16 flags 0
 #|  thinkers: 210 mobjs, about the player's 132 133 134 137 139, 9 specials, then mobjs
@@ -2220,19 +2347,19 @@ def main() -> IO(Unit):
 #|reject 17,17 False 36,36 False 17,5 False 36,87 False 36,56 False 5,66 True 181,178 True 181,179 True 181,180 True 181,181 False
 #|sound tic 7 DSSGTSIT from thing 92 vol 64 sep 129
 #|front and deaf tic 12 92:115/1 90:64/8 96:64/4 sight 92 True 90 True 96 False random 64
-#|sounds drew to 65
+#|sounds drew to 77
 #|sound tic 7 DSSGTSIT from thing 92 vol 49 sep 132
 #|behind tic 30 90:64/10 92:116/1 sight 90 True 92 True random 65
-#|sounds drew to 65
+#|sounds drew to 95
 #|sound tic 7 DSSGTSIT from thing 92 vol 49 sep 125
 #|sound tic 10 DSPOSIT3 from thing 90 vol 64 sep 224
 #|behind in reach tic 12 90:97/1 92:115/1 sight 90 True 92 True random 65
-#|sounds drew to 66
+#|sounds drew to 78
 #|sound tic 6 DSPOSIT2 from thing 96 vol 64 sep 33
 #|through the wall tic 20 96:101/1 sight 96 True random 70
-#|sounds drew to 65
+#|sounds drew to 85
 #|sound tic 15 DSPOSIT3 from thing 177 vol 57 sep 101
 #|over the pit tic 20 177:90/3 176:61/5 sight 177 True 176 False random 69
-#|sounds drew to 65
+#|sounds drew to 85
 #|off the pit tic 20 177:61/5 176:61/5 sight 177 False 176 False random 65
-#|sounds drew to 64
+#|sounds drew to 84

@@ -25,7 +25,9 @@
 # line's special before it looks for the exit's 11, so the click is
 # sfx_swtchn, and it comes from nobody, since no button runs. The index
 # is 64 after the wipe, one more for the route's door, one for the
-# click.
+# click, one for the sight of the shotgun guy the walk passes, and one
+# for each of the 42 tics of the route and the use, which is ST_Ticker's
+# draw for the face: 109.
 # Then the time of a few clocks, worked out by hand in milestone 4's
 # ticket 09. The door's height is the hand computation's (4 under
 # sector 68's ceiling of -56); the positions are regression pins.
@@ -167,7 +169,7 @@ def main() -> IO(Unit):
     start(world)
 #|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|beside tic 41 ended False at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 209 random 76
-#|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 67
+#|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 109
 #|dead space tic 7 ended False at 1600.000000 1000.000000 90.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
 #|reborn tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|Time 0:01
