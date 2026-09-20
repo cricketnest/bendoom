@@ -1,10 +1,12 @@
 # A measurement, not a test: the game's own loop in its window for 600
-# frames, the frames a second it made, and, with the music playing, on
-# how many of them the device's queue was empty before the write; the
-# first always is, since nothing has been written yet. WALK=1 holds the
-# run, up and left keys, so the player runs in circles some 135 units
-# across through the start room and the hall beyond its gate, sliding
-# along what it meets; without it the player stands at the start. SCRIPT
+# frames, the frames a second it made, and, with the song and the tics'
+# sounds mixed, on how many of them the device's queue was empty before
+# the write; the first always is, since nothing has been written yet.
+# The script below is the one that keeps channels busy: its door opens
+# and closes over the music. WALK=1 holds the run, up and left keys, so
+# the player runs in circles some 135 units across through the start
+# room and the hall beyond its gate, sliding along what it meets;
+# without it the player stands at the start. SCRIPT
 # is replayed before the first frame (tools/script.bend has its form);
 # the one below walks from the start to the first door and uses it, so
 # the frames watch it open, wait and close under the lights. The
@@ -24,7 +26,7 @@ import ../src/game.bend as M
 import ../tools/script.bend as T
 
 def Bench.input(+walk: Bool) -> K.Input:
-  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}}, 0}
+  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}, False{}, False{}, False{}, False{}}, 0}
 
 def Bench.rate(+t0: Nat, +t1: Nat) -> String:
   Nat.show(Nat.div(U32.to_nat(600000), Nat.sub(t1, t0))) ++ " frames a second (600 frames in "

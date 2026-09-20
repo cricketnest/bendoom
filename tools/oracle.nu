@@ -3,72 +3,43 @@
 # the same place. Writes a copy of the IWAD whose E1M1 has player 1
 # start at x, y facing angle, the records --things names rewritten and
 # its other things as they are, and the command script as a vanilla
-# demo: version 109, Hurt Me Plenty, no monsters, so none spawns, four
-# bytes a tic, then a tic whose buttons press pause, then a minute of
-# idle tics, then the end marker. Chocolate Doom plays the demo in real
-# time in a scratch directory, at screen size 10, on a headless X
-# server of its own; a paused game runs no playsim tic but keeps reading
-# the demo, so the tail holds the frame of the script's last tic for a
-# minute, and one paletted screenshot is taken inside it. A shot counts
-# once it shows the pause graphic. It is compared with the frame
-# tools/frame.bend dumps from the same copy after the same script,
-# outside the status bar rows, the pause graphic, and the pistol: at
-# rest where a script that never moves leaves it, widened by the bob's
-# 16 units to either side and below for one that moves. The pistol
-# rises for the level's first 16 tics, so a script is at least 18; the
-# default idles 20.
+# demo (tools/demo.nu), then a tic whose buttons press pause
+# (BT_SPECIAL with BTS_PAUSE), then a minute of idle tics. Chocolate
+# Doom plays the demo in real time in a scratch directory, at screen
+# size 10, on a headless X server of its own; a paused game runs no
+# playsim tic but keeps reading the demo, so the tail holds the frame of
+# the script's last tic for a minute, and one paletted screenshot is
+# taken inside it. A shot counts once it shows the pause graphic. It is
+# compared with the frame tools/frame.bend dumps from the same copy
+# after the same script, over all 200 rows but for the pause graphic and
+# the box the marine's face covers: the status bar's ticker runs on
+# while the playsim is paused, so the face keeps changing under the
+# screenshot. The report counts that box separately, as `face`, which is
+# 0 only where the face holds still under the pause, as the dead one
+# does. The default script idles 20 tics, past the pistol's rise.
+# Both games wake a monster that sees the player on the same tic, but
+# vanilla's chases from that tic and Bendoom's stands until milestone
+# 6's ticket 16, so a place compares the two only while no monster has
+# seen the player.
+#
+# The tint is outside the comparison. ST_doPaletteStuff leaves
+# I_VideoBuffer alone and only sets the hardware palette, and
+# V_ScreenShot hands WritePCXfile the start of the PLAYPAL lump, so a
+# screenshot's 768 bytes of palette are PLAYPAL's first whatever the
+# view is tinted with. The report says so as `shot_plain`, names the
+# palette the dump's first line carries as `palette`, and compares the
+# indices under it, which the tint never moves.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built. A script is runs a space apart, each
-# "count,forward,side,turn,use" in a demo's units:
+# "count,forward,side,turn,buttons" (tools/demo.nu):
 #
 #   bend tools/frame.bend -o frame
 #   tools/oracle.nu -416 256 0
 #   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 #   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
 
-source wad.nu
-
-# An integer's low bytes, little-endian.
-def le [width: int]: int -> binary {
-  $in | into binary | bytes at 0..<$width
-}
-
-# The IWAD with record i of E1M1's THINGS replaced in place by a thing
-# of a type at x, y facing angle on every skill, and every other byte
-# kept. A whole IWAD and not a PWAD, since Doom refuses -file with the
-# shareware one.
-def rewrite [i: int, x: int, y: int, angle: int, type: int]: binary -> binary {
-  let wad = $in
-  let at = ($wad | map-lump THINGS | get pos) + $i * 10
-  let record = [($x | le 2) ($y | le 2) ($angle | le 2) ($type | le 2) (7 | le 2)] | bytes collect
-  [($wad | bytes at 0..<$at) $record ($wad | bytes at ($at + 10)..)] | bytes collect
-}
-
-# A script's runs: how many tics, and the four bytes a demo keeps of the
-# tic's command (G_ReadDemoTiccmd: forward, side, the turn's high byte,
-# the buttons, where use is bit 1).
-def runs []: string -> table<tics: int, bytes: binary> {
-  $in | split row ' ' | each {|run|
-    let f = $run | split row ',' | into int
-    {tics: $f.0, bytes: ([($f.1 | le 1) ($f.2 | le 1) ($f.3 | le 1) ($f.4 * 2 | le 1)] | bytes collect)}
-  }
-}
-
-# The script as a version 109 demo: the 13-byte header (Hurt Me Plenty,
-# E1M1, no deathmatch, respawn or fast, no monsters, console player 0,
-# player 1 alone in the game), the tics, a tic pressing pause
-# (BT_SPECIAL with BTS_PAUSE), 2100 idle tics, and the 0x80 that ends a
-# demo.
-def demo []: table<tics: int, bytes: binary> -> binary {
-  let tics = $in | each {|run| 0..<$run.tics | each { $run.bytes } } | flatten
-  [0x[6d 02 01 01 00 00 00 01 00 01 00 00 00]]
-  | append $tics
-  | append 0x[00 00 00 81]
-  | append (0..<2100 | each { 0x[00 00 00 00] })
-  | append 0x[80]
-  | bytes collect
-}
+source demo.nu
 
 # The palette indices of a Chocolate Doom screenshot, row by row. It
 # writes every byte of 0xc0 and over as 0xc1 then the byte, and no other
@@ -81,47 +52,34 @@ def pcx-indices []: binary -> list<string> {
   | str trim | split row ' '
 }
 
-# The posts of the patch column whose first is at the offset piped in:
-# each one's first row in the patch, its length, and where its pixels
-# start, up to the column's 255.
-def posts [wad: binary]: int -> table<delta: int, length: int, pixels: int> {
-  let first = $in
-  generate {|at|
-    let delta = $wad | bytes at $at..$at | into int
-    if $delta != 255 {
-      let length = $wad | bytes at ($at + 1)..($at + 1) | into int
-      {out: {delta: $delta, length: $length, pixels: ($at + 3)}, next: ($at + $length + 4)}
+# The 768 bytes of palette a screenshot carries, after its 0x0c marker.
+def pcx-palette []: binary -> string {
+  let pcx = $in
+  $pcx | bytes at (($pcx | bytes length) - 768).. | encode hex | str lowercase
+}
+
+# Every frame pixel the marine's face can cover: the box around the
+# places ST_loadGraphics' 42 face patches take at the face widget's
+# ST_FACESX and ST_FACESY, each less its own offsets.
+def face-box [wad: binary]: nothing -> list<int> {
+  let names = ((0..4 | each {|i| [$"STFST($i)0", $"STFST($i)1", $"STFST($i)2", $"STFTR($i)0", $"STFTL($i)0",
+    $"STFOUCH($i)", $"STFEVL($i)", $"STFKILL($i)"] } | flatten) ++ ["STFGOD0", "STFDEAD0"])
+  let boxes = $names | each {|n|
+    let found = $wad | lumps | where name == $n
+    if ($found | is-empty) { null } else {
+      let patch = $found | last | get pos
+      let left = 143 - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
+      let top = 168 - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
+      {left: $left, top: $top
+       right: ($left + ($wad | bytes at $patch..($patch + 1) | into int --endian little) - 1)
+       bottom: ($top + ($wad | bytes at ($patch + 2)..($patch + 3) | into int --endian little) - 1)}
     }
-  } $first
-}
-
-# The pixels a patch covers when drawn at x, y, its offsets taken off as
-# V_DrawPatch takes them: each one's frame index and colour.
-def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<at: int, colour: string> {
-  let patch = $wad | lumps | where name == $name | last | get pos
-  let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
-  let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
-  let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
-  0..<$width | each {|c|
-    $patch + ($wad | bytes at ($patch + 8 + $c * 4)..($patch + 11 + $c * 4) | into int --endian little)
-    | posts $wad
-    | each {|post| 0..<$post.length | each {|k| {
-        at: (($top + $post.delta + $k) * 320 + $left + $c)
-        colour: ($wad | bytes at ($post.pixels + $k)..($post.pixels + $k) | encode hex | str lowercase)
-      } } }
-  } | flatten | flatten
-}
-
-# The pixels the pistol may cover, as frame indices. Doom draws a weapon
-# sprite at scale one, its left at column 1 and its top at row 32 of a
-# 200-row screen whose centre row 100.5 sits on the view's 84, so row
-# 15.5 of the view, first row drawn 16, less the sprite's offsets. The
-# bob moves it up to 16 columns either way and up to 16 rows down.
-def pistol-mask [wad: binary, bobbing: bool]: nothing -> list<int> {
-  let reach = if $bobbing { 16 } else { 0 }
-  patch-pixels $wad PISGA0 1 16 | get at | where $it < 168 * 320 | each {|at|
-    (0 - $reach)..$reach | each {|dx| 0..$reach | each {|dy| $at + $dy * 320 + $dx } }
-  } | flatten | flatten | uniq | where $it < 168 * 320
+  } | compact
+  let top = $boxes | get top | math min
+  let bottom = $boxes | get bottom | math max
+  let left = $boxes | get left | math min
+  let right = $boxes | get right | math max
+  $top..$bottom | each {|row| $left..$right | each {|col| $row * 320 + $col } } | flatten
 }
 
 # Chocolate Doom's frame after the demo's script, paused. It can only
@@ -133,18 +91,21 @@ def pistol-mask [wad: binary, bobbing: bool]: nothing -> list<int> {
 # pause graphic whole, which is the frame the pause froze. The config
 # sets screen size 10, the full 320 by 168 view over the status bar that
 # Bendoom draws (Doom's default 9 borders a 288 by 144 view), and turns
-# messages off.
-def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
+# messages off; the extra config binds F1, scancode 59, to the
+# screenshot, since -devparm, which binds it too, writes its frame-rate
+# dots over the bar's last row.
+def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table<at: int, colour: string>, dir: path]: nothing -> record<indices: list<string>, palette: string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
+  "key_menu_screenshot 59\n" | save --force ($dir | path join extra.cfg)
   let server = job spawn { ^Xvfb -displayfd 1 -screen 0 1024x768x24 o> ($dir | path join display) }
   sleep 1sec
   let display = $":(open --raw ($dir | path join display) | str trim)"
   let game = job spawn {
     cd $dir
     with-env {HOME: $dir, DISPLAY: $display} {
-      ^chocolate-doom -iwad $name -playdemo script -config default.cfg -devparm -window -nosound | ignore
+      ^chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig extra.cfg -window -nosound | ignore
     }
   }
   let shot = try { with-env {DISPLAY: $display} {
@@ -159,8 +120,11 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table
       ^xdotool keyup --window $target F1
       sleep 400ms
       let file = $dir | path join $"DOOM($n | fill --alignment right --character '0' --width 2).pcx"
-      if ($file | path exists) { open --raw $file | pcx-indices } else { [] }
-    } | where {|shot| ($shot | is-not-empty) and ($pause | all {|p| ($shot | get $p.at) == $p.colour }) } | first 1
+      if ($file | path exists) {
+        let pcx = open --raw $file
+        {indices: ($pcx | pcx-indices), palette: ($pcx | pcx-palette)}
+      } else { {indices: [], palette: ""} }
+    } | where {|shot| ($shot.indices | is-not-empty) and ($pause | all {|p| ($shot.indices | get $p.at) == $p.colour }) } | first 1
   } } finally {
     job kill $game
     job kill $server
@@ -173,7 +137,7 @@ def main [
   x: int                                   # the start's x, in map units
   y: int                                   # the start's y
   angle: int                               # its facing in degrees, a multiple of 45
-  script: string = "20,0,0,0,0"            # the commands, runs of "count,forward,side,turn,use"
+  script: string = "20,0,0,0,0"            # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
@@ -184,28 +148,30 @@ def main [
   let bytes = open --raw $wad
   let runs = $script | runs
   let tics = $runs | get tics | math sum
-  if $tics < 18 { error make {msg: "the pistol is still rising before tic 18"} }
   let pause = patch-pixels $bytes M_PAUSE 126 4
   let dir = mktemp --directory
-  let iwad = $things | split row ' ' | where $it != '' | reduce --fold ($bytes
-    | rewrite ($bytes | things | where type == 1 | first | get i) $x $y $angle 1) {|t, wad|
-    let f = $t | split row ',' | into int
-    $wad | rewrite $f.0 $f.2 $f.3 0 $f.1
-  }
   let name = $wad | path basename
-  let shot = vanilla $iwad $name ($runs | demo) $tics $pause $dir
-  let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
-    | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let moves = $runs | any {|run| ($run.bytes | bytes at 0..1) != 0x[00 00] }
-  let masked = pistol-mask $bytes $moves | append ($pause | get at)
-  let differing = 0..<(168 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
+  let paused = $runs | append [{tics: 1, bytes: 0x[00 00 00 81]} {tics: 2100, bytes: 0x[00 00 00 00]}] | demo
+  let shot = vanilla ($bytes | placed $x $y $angle $things) $name $paused $tics $pause $dir
+  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
+    | lines
+  let ours = $dump | skip 1
+    | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
+  let playpal = $bytes | lumps | where name == "PLAYPAL" | last | get pos
+  let box = face-box $bytes
+  let masked = ($pause | get at) ++ $box
+  let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
+  let differing = $off | where $it not-in $masked
   if not $keep { rm --recursive $dir }
   {
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
-    masked: ($masked | uniq | where $it < 168 * 320 | length)
-    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot | get $i), ours: ($ours | get $i)} })
+    face: ($off | where $it in $box | length)
+    masked: ($masked | uniq | where $it < 200 * 320 | length)
+    palette: ($"0x($dump | first)" | into int)
+    shot_plain: ($shot.palette == ($bytes | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
+    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })
   }
 }

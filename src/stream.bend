@@ -1,22 +1,26 @@
-# The song as the game hears it: the render in the directory named by
-# BENDOOM_MUSIC, streamed to the sound device a frame of the loop at a
-# time. first.raw plays once and second.raw for as long as the game
+# The mixer, the game's one writer to the sound device: the song of the
+# render in the directory named by BENDOOM_MUSIC with every playing
+# channel's sound over it, streamed to the device a frame of the loop at
+# a time. first.raw plays once and second.raw for as long as the game
 # runs, both raw 16-bit little-endian stereo at 44100 Hz, left then
-# right. The open file is the song's place, and nothing but the queue's
-# top-up is ever held.
+# right; a sound is one file of raw 16-bit little-endian mono, as the
+# sounds node writes it. The open files are the song's and each sound's
+# place, and nothing but the frames about to be written is ever held.
 import Base
 import ./bytes.bend as B
+import ./sound.bend as Sn
+import ./channel.bend as C
 
 # A pass being read: the open file and the path of second.raw, which
 # opens again at every pass's end.
 type Stream.Tape is Type:
   Tape{file: File, path: String}
 
-# The music being played: the device, the pass feeding it, and the
-# game frames whose top-up found the device's queue empty, which the
-# window bench reports.
+# The mixer: the device, the pass feeding it, the channels playing over
+# it, the directory their files come from, and the game frames whose
+# top-up found the device's queue empty, which the window bench reports.
 type Stream is Type:
-  Stream{audio: Audio, tape: Stream.Tape, dry: U32}
+  Stream{audio: Audio, tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>, dir: String, dry: U32}
 
 # A 16-bit sample as the device takes it: its sign bit flipped is its
 # value over 32768, offset by a half.
@@ -24,13 +28,53 @@ def Stream.sample(+x: U32) -> F32:
   +half = U32.to_f32(32768)
   ((U32.to_f32((x .^. 32768 : U32)) - half : F32) / half : F32)
 
-# The bytes of a read as the samples Audio.write takes, left then right.
-def Stream.samples(bytes: List<&2, U32>) -> List<&2, F32>:
+# A frame as the mix holds it: the left sample in the low half of a
+# word, the right in the high half, each 16 bits as its file holds them.
+def Stream.words(bytes: List<&2, U32>) -> List<&2, U32>:
   match bytes:
-    case lo <> hi <> rest:
-      Stream.sample(B.Bytes.le16(lo, hi)) <> Stream.samples(rest)
+    case l <> m <> r <> s <> rest:
+      (B.Bytes.le16(l, m) .|. (B.Bytes.le16(r, s) << 16n) : U32) <> Stream.words(rest)
     case _:
       []
+
+# The frames of the mix as Audio.write takes them, left then right.
+def Stream.samples(words: List<&2, U32>) -> List<&2, F32>:
+  match words:
+    case +w <> rest:
+      Stream.sample((w .&. 65535 : U32)) <> Stream.sample((w >> 16n : U32)) <> Stream.samples(rest)
+    case []:
+      []
+
+# SDL_mixer's _Eff_position_s16lsb on one side: (Sint16) ((float) sample
+# * (side / 255.0f)), whose cast truncates toward zero, so a negative
+# sample is scaled as its magnitude.
+def Stream.side(+s: U32, +side: U32) -> U32:
+  +neg = U32.is_ge(s, 32768)
+  +q = F32.to_u32((U32.to_f32(Bool.pick(U32, neg, (65536 - s : U32), s)) * (U32.to_f32(side) / 255.0 : F32) : F32))
+  (Bool.pick(U32, neg, (65536 - q : U32), q) .&. 65535 : U32)
+
+# SDL3's SDL_MixAudio at full volume, which SDL_mixer calls once a
+# channel: the two samples added and clipped to 16 bits. Each sign bit
+# flipped puts the sum in 0 to 131070, so it cannot run below zero.
+def Stream.add(+a: U32, +b: U32) -> U32:
+  ((U32.clamp(((a .^. 32768 : U32) + (b .^. 32768 : U32) : U32), 32768, 98303) - 32768 : U32) .^. 32768 : U32)
+
+# One frame of a channel over one frame of the mix: the sound's sample
+# scaled to each side and added there. Both sides of the expansion hold
+# the same sample, so the file is mono and the sides part here.
+def Stream.mix(+left: U32, +right: U32, +s: U32, +w: U32) -> U32:
+  (Stream.add(Stream.side(s, left), (w .&. 65535 : U32))
+    .|. (Stream.add(Stream.side(s, right), (w >> 16n : U32)) << 16n) : U32)
+
+# A channel's next frames added to what is mixed so far, as SDL_mixer
+# adds a channel to the music. The mix ends where the shorter of the two
+# does, and a channel whose file ran out is the shorter one.
+def Stream.over(+left: U32, +right: U32, mono: List<&2, U32>, words: List<&2, U32>) -> List<&2, U32>:
+  match mono words:
+    case lo <> hi <> rest w <> ws:
+      Stream.mix(left, right, B.Bytes.le16(lo, hi), w) <> Stream.over(left, right, rest, ws)
+    case _ ws:
+      ws
 
 # The file to read next: a read cut short is the pass's end, where the
 # open one closes and second.raw opens again, since Base cannot seek.
@@ -63,31 +107,124 @@ def Stream.pull(+want: U32, tape: Stream.Tape) -> IO(Stream.Tape & List<&2, U32>
   IO.bind(File & Result<&1, &1, U32 & String, List<&2, U32>>, Stream.Tape & List<&2, U32>,
     File.read_bytes(file, (want * 4 : U32)), p => Stream.got(want, path, p))
 
-# The frames the device holds between top-ups, of the ring's 4096: 69.7
+def Stream.song.got(p: Stream.Tape & List<&2, U32>) -> IO(Maybe<Stream.Tape> & List<&2, U32>):
+  (tape, bytes) = p
+  IO.pure(Maybe<Stream.Tape> & List<&2, U32>, (Some{tape}, Stream.words(bytes)))
+
+# The song's next frames, which are silence when the game has no render
+# to play and the sounds play alone.
+def Stream.song(+want: U32, tape: Maybe<Stream.Tape>) -> IO(Maybe<Stream.Tape> & List<&2, U32>):
+  match tape:
+    case None{}:
+      IO.pure(Maybe<Stream.Tape> & List<&2, U32>, (None{}, List.replicate(U32, U32.to_nat(want), 0)))
+    case Some{t}:
+      IO.bind(Stream.Tape & List<&2, U32>, Maybe<Stream.Tape> & List<&2, U32>, Stream.pull(want, t),
+        Stream.song.got)
+
+# A channel whose read came up short has played its sound out: its file
+# closes and the channel frees itself.
+def Stream.voice.kept(+short: Bool, file: File, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32,
+  words: List<&2, U32>) -> IO(Maybe<C.Channel> & List<&2, U32>):
+  match short:
+    case True{}:
+      do IO<Maybe<C.Channel> & List<&2, U32>>:
+        File.close(file)
+        return (None{}, words)
+    case False{}:
+      IO.pure(Maybe<C.Channel> & List<&2, U32>, (Some{C.Chan{file, sfx, source, left, right}}, words))
+
+def Stream.voice.got(+want: U32, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32,
+  words: List<&2, U32>, p: File & Result<&1, &1, U32 & String, List<&2, U32>>) ->
+  IO(Maybe<C.Channel> & List<&2, U32>):
+  (file, got) = p
+  +bytes = Result.default(&1, &1, U32 & String, List<&2, U32>, got, [])
+  Stream.voice.kept(U32.is_lt(U32.from_nat(List.length(&2, U32, bytes)), (want * 2 : U32)), file, sfx, source,
+    left, right, Stream.over(left, right, bytes, words))
+
+# One channel mixed into the frames about to be written: its own next
+# frames, read from where its file stands.
+def Stream.voice(+want: U32, c: Maybe<C.Channel>, words: List<&2, U32>) ->
+  IO(Maybe<C.Channel> & List<&2, U32>):
+  match c:
+    case None{}:
+      IO.pure(Maybe<C.Channel> & List<&2, U32>, (None{}, words))
+    case Some{C.Chan{file, sfx, source, left, right}}:
+      IO.bind(File & Result<&1, &1, U32 & String, List<&2, U32>>, Maybe<C.Channel> & List<&2, U32>,
+        File.read_bytes(file, (want * 2 : U32)), p => Stream.voice.got(want, sfx, source, left, right, words, p))
+
+def Stream.voices.cons(c: Maybe<C.Channel>, q: List<Maybe<C.Channel>> & List<&2, U32>) ->
+  IO(List<Maybe<C.Channel>> & List<&2, U32>):
+  (cs, words) = q
+  IO.pure(List<Maybe<C.Channel>> & List<&2, U32>, (c <> cs, words))
+
+def Stream.voices.on(p: Maybe<C.Channel> & List<&2, U32>,
+  rest: List<&2, U32> -> IO(List<Maybe<C.Channel>> & List<&2, U32>)) ->
+  IO(List<Maybe<C.Channel>> & List<&2, U32>):
+  (c, words) = p
+  IO.bind(List<Maybe<C.Channel>> & List<&2, U32>, List<Maybe<C.Channel>> & List<&2, U32>, rest(words),
+    q => Stream.voices.cons(c, q))
+
+# Every channel mixed in, in the order SDL_mixer takes them, since the
+# clipping of one addition is what the next adds to.
+def Stream.voices(+want: U32, chans: List<Maybe<C.Channel>>, words: List<&2, U32>) ->
+  IO(List<Maybe<C.Channel>> & List<&2, U32>):
+  match chans:
+    case []:
+      IO.pure(List<Maybe<C.Channel>> & List<&2, U32>, ([], words))
+    case c <> rest:
+      IO.bind(Maybe<C.Channel> & List<&2, U32>, List<Maybe<C.Channel>> & List<&2, U32>,
+        Stream.voice(want, c, words), p => Stream.voices.on(p, ws => Stream.voices(want, rest, ws)))
+
+def Stream.window.done(tape: Maybe<Stream.Tape>, q: List<Maybe<C.Channel>> & List<&2, U32>) ->
+  IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
+  (chans, words) = q
+  IO.pure(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, (tape, chans, words))
+
+def Stream.window.mixed(chans: List<Maybe<C.Channel>>, p: Maybe<Stream.Tape> & List<&2, U32>) ->
+  IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
+  (tape, +words) = p
+  IO.bind(List<Maybe<C.Channel>> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
+    Stream.voices(U32.from_nat(List.length(&2, U32, words)), chans, words), q => Stream.window.done(tape, q))
+
+# The frames the device gets next: the song's, with every playing
+# channel over them. The channels are asked for as many frames as the
+# song gave, so that a pass's last short read costs a sound nothing.
+def Stream.window(+want: U32, tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>) ->
+  IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
+  IO.bind(Maybe<Stream.Tape> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
+    Stream.song(want, tape), p => Stream.window.mixed(chans, p))
+
+# The frames the device holds between top-ups, of the ring's 4096: 46.4
 # ms at 44100 Hz, so a game frame longer than that lets the ring run
-# dry.
+# dry. The window bench found no such frame at 55 frames a second, and
+# the delay a sound waits is that much against Chocolate Doom's 23.2.
 def Stream.top() -> U32:
-  3072
+  2048
 
-def Stream.wrote(tape: Stream.Tape, dry: U32, p: Audio & U32) -> IO(Stream):
+def Stream.wrote(tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>, dir: String, dry: U32,
+  p: Audio & U32) -> IO(Stream):
   (audio, queued) = p
-  IO.pure(Stream, Stream{audio, tape, dry})
+  IO.pure(Stream, Stream{audio, tape, chans, dir, dry})
 
-def Stream.filled(audio: Audio, dry: U32, p: Stream.Tape & List<&2, U32>) -> IO(Stream):
-  (tape, frames) = p
-  IO.bind(Audio & U32, Stream, Audio.write(audio, Stream.samples(frames)), q => Stream.wrote(tape, dry, q))
+def Stream.filled(audio: Audio, dir: String, dry: U32,
+  r: Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>) -> IO(Stream):
+  (tape, chans, words) = r
+  IO.bind(Audio & U32, Stream, Audio.write(audio, Stream.samples(words)),
+    q => Stream.wrote(tape, chans, dir, dry, q))
 
-def Stream.topped(tape: Stream.Tape, +dry: U32, p: Audio & U32) -> IO(Stream):
+def Stream.topped(tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>, dir: String, +dry: U32,
+  p: Audio & U32) -> IO(Stream):
   (audio, +queued) = p
-  IO.bind(Stream.Tape & List<&2, U32>, Stream, Stream.pull((Stream.top() - queued : U32), tape),
-    r => Stream.filled(audio, (dry + Bool.to_u32(U32.is_zero(queued)) : U32), r))
+  IO.bind(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, Stream,
+    Stream.window((Stream.top() - queued : U32), tape, chans),
+    r => Stream.filled(audio, dir, (dry + Bool.to_u32(U32.is_zero(queued)) : U32), r))
 
-# A frame of music: a write of no samples reads the queue, and the
-# frames that bring it back to the top follow it. The song's place
-# therefore follows the device's clock, not the tic clock.
+# A frame of the mix: a write of no samples reads the queue, and the
+# frames that bring it back to the top follow it. The song's place and
+# each sound's therefore follow the device's clock, not the tic clock.
 def Stream.frame(m: Stream) -> IO(Stream):
-  Stream{audio, tape, dry} = m
-  IO.bind(Audio & U32, Stream, Audio.write(audio, []), p => Stream.topped(tape, dry, p))
+  Stream{audio, tape, chans, dir, dry} = m
+  IO.bind(Audio & U32, Stream, Audio.write(audio, []), p => Stream.topped(tape, chans, dir, dry, p))
 
 def Stream.play(m: Maybe<Stream>) -> IO(Maybe<Stream>):
   match m:
@@ -96,11 +233,30 @@ def Stream.play(m: Maybe<Stream>) -> IO(Maybe<Stream>):
     case Some{s}:
       IO.bind(Stream, Maybe<Stream>, Stream.frame(s), kept => IO.pure(Maybe<Stream>, Some{kept}))
 
-# A game with no music says so once and plays on in silence.
-def Stream.silent(why: String) -> IO(Maybe<Stream>):
-  do IO<Maybe<Stream>>:
-    IO.print_err("bendoom: " ++ why ++ "; playing silent")
-    return None{}
+def Stream.heard(audio: Audio, tape: Maybe<Stream.Tape>, dir: String, dry: U32,
+  chans: List<Maybe<C.Channel>>) -> IO(Maybe<Stream>):
+  IO.pure(Maybe<Stream>, Some{Stream{audio, tape, chans, dir, dry}})
+
+# The sounds a frame's tics reported, given to the channels before the
+# frame's write, so that a sound is in the write that follows its tic.
+def Stream.hear(events: List<&2, Sn.Sound.Event>, m: Maybe<Stream>) -> IO(Maybe<Stream>):
+  match m:
+    case None{}:
+      IO.pure(Maybe<Stream>, None{})
+    case Some{Stream{audio, tape, chans, +dir, dry}}:
+      IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.hear(dir, events, chans),
+        cs => Stream.heard(audio, tape, dir, dry, cs))
+
+# The sounds directory the launcher names, or none, which is one line
+# and a game with the music alone.
+def Stream.sounds(dir: Result<&1, &1, U32 & String, String>) -> IO(String):
+  match dir:
+    case Fail{e}:
+      do IO<String>:
+        IO.print_err("bendoom: BENDOOM_SOUNDS names no sounds; playing the music alone")
+        return ""
+    case Done{d}:
+      IO.pure(String, d)
 
 def Stream.rolled(+dir: String, file: Result<&1, &1, U32 & String, File>) -> Maybe<Stream.Tape>:
   match file:
@@ -125,42 +281,74 @@ def Stream.tape(+dir: String) -> IO(Maybe<Stream.Tape>):
   IO.bind(Result<&1, &1, U32 & String, File>, Maybe<Stream.Tape>, File.open(dir ++ "/second.raw", "r"),
     s => Stream.probed(dir, s))
 
-def Stream.first(audio: Audio, tape: Maybe<Stream.Tape>) -> IO(Maybe<Stream>):
-  match tape:
-    case None{}:
+def Stream.render(render: Result<&1, &1, U32 & String, String>) -> IO(Maybe<Stream.Tape>):
+  match render:
+    case Fail{e}:
+      IO.pure(Maybe<Stream.Tape>, None{})
+    case Done{d}:
+      Stream.tape(d)
+
+# No render: the line is said, and the device is let go unless there are
+# sounds to play over the silence.
+def Stream.songless(+mute: Bool, audio: Audio, +dir: String) -> IO(Maybe<Stream>):
+  match mute:
+    case True{}:
       do IO<Maybe<Stream>>:
         Audio.close(audio)
-        Stream.silent("BENDOOM_MUSIC holds no first.raw and second.raw")
-    case Some{t}:
-      IO.pure(Maybe<Stream>, Some{Stream{audio, t, 0}})
+        IO.print_err("bendoom: BENDOOM_MUSIC names no render; playing silent")
+        return None{}
+    case False{}:
+      do IO<Maybe<Stream>>:
+        IO.print_err("bendoom: BENDOOM_MUSIC names no render; playing the sounds alone")
+        return Some{Stream{audio, None{}, C.Channel.none(), dir, 0}}
 
-def Stream.device(dir: String, audio: Result<&1, &1, U32 & String, Audio>) -> IO(Maybe<Stream>):
+def Stream.first(audio: Audio, +dir: String, tape: Maybe<Stream.Tape>) -> IO(Maybe<Stream>):
+  match tape:
+    case None{}:
+      Stream.songless(String.is_empty(dir), audio, dir)
+    case Some{t}:
+      IO.pure(Maybe<Stream>, Some{Stream{audio, Some{t}, C.Channel.none(), dir, 0}})
+
+# A game with no sound device says so once and plays on in silence.
+def Stream.silent() -> IO(Maybe<Stream>):
+  do IO<Maybe<Stream>>:
+    IO.print_err("bendoom: no sound device; playing silent")
+    return None{}
+
+def Stream.device(dir: String, render: Result<&1, &1, U32 & String, String>,
+  audio: Result<&1, &1, U32 & String, Audio>) -> IO(Maybe<Stream>):
   match audio:
     case Fail{e}:
-      Stream.silent("no sound device")
+      Stream.silent()
     case Done{a}:
-      IO.bind(Maybe<Stream.Tape>, Maybe<Stream>, Stream.tape(dir), t => Stream.first(a, t))
+      IO.bind(Maybe<Stream.Tape>, Maybe<Stream>, Stream.render(render), t => Stream.first(a, dir, t))
 
-def Stream.start(dir: Result<&1, &1, U32 & String, String>) -> IO(Maybe<Stream>):
-  match dir:
-    case Fail{e}:
-      Stream.silent("BENDOOM_MUSIC names no render")
-    case Done{d}:
-      IO.bind(Result<&1, &1, U32 & String, Audio>, Maybe<Stream>, Audio.open(44100),
-        a => Stream.device(d, a))
-
-# The device at 44100 Hz and the first pass open, or silence.
+# The device at 44100 Hz, the song's first pass open if there is a
+# render, and the directory the sounds are read from, or silence.
 def Stream.open() -> IO(Maybe<Stream>):
-  IO.bind(Result<&1, &1, U32 & String, String>, Maybe<Stream>, IO.get_env("BENDOOM_MUSIC"), Stream.start)
+  do IO<Maybe<Stream>>:
+    sounds : Result<&1, &1, U32 & String, String> <- IO.get_env("BENDOOM_SOUNDS")
+    dir : String <- Stream.sounds(sounds)
+    render : Result<&1, &1, U32 & String, String> <- IO.get_env("BENDOOM_MUSIC")
+    audio : Result<&1, &1, U32 & String, Audio> <- Audio.open(44100)
+    Stream.device(dir, render, audio)
 
-# The device and the file closed; the frames that found the queue
-# empty, if the music played.
+def Stream.shut(tape: Maybe<Stream.Tape>) -> IO(Unit):
+  match tape:
+    case None{}:
+      IO.pure(Unit, Unit{})
+    case Some{Tape{file, path}}:
+      File.close(file)
+
+# The device, the song and every playing sound let go; the frames that
+# found the queue empty, if the mixer ran.
 def Stream.stop(m: Maybe<Stream>) -> IO(Maybe<U32>):
   match m:
     case None{}:
       IO.pure(Maybe<U32>, None{})
-    case Some{Stream{audio, Tape{file, path}, dry}}:
+    case Some{Stream{audio, tape, chans, dir, dry}}:
       do IO<Maybe<U32>>:
         Audio.close(audio)
-        File.close(file)
+        Stream.shut(tape)
+        C.Channel.stop(chans)
         return Some{dry}

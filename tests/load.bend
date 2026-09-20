@@ -25,8 +25,16 @@
 # starts at row 1, 17 long, its column offsets being 216 and 659. The
 # twitching impaled body's second state, S_LIVESTICK2, is reached only by
 # animation; its POL6B0 is 28 wide with offsets 15 and 62, where POL6A0's
-# left offset is 14. Of info.c's frames, S_ARM1A's is full-bright and
-# the sergeant's is not. Then sprite definitions built from the sprite
+# left offset is 14. The pistol's ready and raise states, rows 59 and
+# 60, no thing's, load PISGA0, 82 wide with offsets -125 and -97. Of
+# info.c's frames, S_ARM1A's is full-bright and the sergeant's is not.
+# The status bar's patches are loaded by name, none of them a sprite's
+# or a texture's: STTNUM0 and STTNUM1 are both 13 by 16 in Freedoom (the
+# shareware WAD's STTNUM1 is 11 wide with a left offset, which is why
+# STlib_drawNum steps by the zero's width), STYSNUM0 is 4 by 6, STTPRCNT
+# 13 by 16, STKEYS0 7 by 5 and STKEYS3 7 by 7, STGNUM2 4 by 6, STARMS 38
+# by 32 and STBAR 320 by 32.
+# Then sprite definitions built from the sprite
 # namespace by the rules of R_InitSpriteDefs and R_InstallSpriteLump,
 # each rotation's lump and 1 if mirrored, rotation 1 first. No spawn
 # state of milestone 5 has a rotated frame, so they are read here:
@@ -129,6 +137,12 @@ def animated(+gfx: G.Gfx) -> String:
 def at(gfx: G.Gfx, +level: L.Level, clock: U32) -> G.Gfx:
   G.Gfx.of_state(gfx, L.Level.sidetex(level), clock)
 
+# Where a status bar patch's width and height sit in the array, the
+# first two words of its header.
+def bar(+gfx: G.Gfx, k: U32) -> List<&2, U32>:
+  +p = G.Gfx.bar(gfx, k)
+  [p, (p + 2 : U32)]
+
 def moving(+gfx: G.Gfx) -> List<&2, U32>:
   [G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 23)), (G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 23)) + 2077 : U32),
     G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 36)), (G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 36)) + 2077 : U32)]
@@ -189,7 +203,7 @@ def test(names: List<&2, String>) -> List<&2, W.Wad.Lump>:
 
 # A row of a sprite's frame; the definition reads nothing else of it.
 def row(sprite: String, frame: U32) -> H.Thing.Row:
-  H.Row{sprite, frame, False{}, 0, 0}
+  H.Row{sprite, frame, False{}, 0, 0, H.Null{}, 0}
 
 def defs(p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
   (bytes, lumps) = p
@@ -210,6 +224,12 @@ def blocks(b: L.Level.Box) -> String:
   "top " ++ U32.show(top) ++ " bottom " ++ U32.show(bottom) ++ " left " ++ U32.show(left) ++ " right "
     ++ U32.show(right)
 
+def peeked(tag: String, p: Array<U32> & List<&2, U32>) -> IO(Array<U32>):
+  (mem, xs) = p
+  do IO<Array<U32>>:
+    IO.print(tag ++ " " ++ show(xs))
+    return mem
+
 def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   do IO<Unit>:
@@ -229,6 +249,8 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(thing(42, L.Level.thing(level, 42)))
     IO.print(sprite.head(gfx, 3))
     IO.print(sprite.head(gfx, 52))
+    IO.print(sprite.head(gfx, 59))
+    IO.print(sprite.head(gfx, 60))
     IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
       ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
@@ -244,9 +266,12 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       L.Level.switch(level, L.Level.switch(level, G.Gfx.mid(gfx, 1166))), L.Level.switch(level, G.Gfx.mid(gfx, 1386))]))
     IO.print("animations " ++ String.join([animated(at(gfx, level, 0)), animated(at(gfx, level, 1)),
       animated(at(gfx, level, 8)), animated(at(gfx, level, 9)), animated(at(gfx, level, 41))], ", "))
-    IO.print("palette colormap flats texels " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
+    read : Array<U32> <- peeked("palette colormap flats texels",
       B.Bytes.each(~U32, ~B.Bytes.at, List.concat(&2, U32, [peeks(gfx), texels(gfx), moving(at(gfx, level, 0)),
-        moving(at(gfx, level, 1)), sprite(gfx)]), mem))))
+        moving(at(gfx, level, 1)), sprite(gfx)]), mem))
+    IO.print("bar patches " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
+      B.Bytes.each(~U32, ~B.Bytes.u16, List.concat(&2, U32, [bar(gfx, 0), bar(gfx, 1), bar(gfx, 10),
+        bar(gfx, 20), bar(gfx, 21), bar(gfx, 24), bar(gfx, 27), bar(gfx, 33), bar(gfx, 34)]), read))))
 
 def report(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -276,6 +301,8 @@ def main() -> IO(Unit):
 #|thing 42 at -160.000000 1328.000000 angle 225 type 2048 options 23
 #|sprite of state 3 width 52.000000 offset 26.000000 top 20.000000
 #|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
+#|sprite of state 59 width 82.000000 offset -125.000000 top -97.000000
+#|sprite of state 60 width 82.000000 offset -125.000000 top -97.000000
 #|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
@@ -288,6 +315,7 @@ def main() -> IO(Unit):
 #|switches 105 121 105 0
 #|animations 0 3 1 5, 2 4 3 7, 2 4 3 7, 0 5 4 8, 1 5 4 8
 #|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207 16 1 64 255 1 17 8
+#|bar patches 13 16 13 16 4 6 13 16 7 5 7 7 4 6 38 32 320 32
 #|PLAY A PLAYA1 0 PLAYA2A8 0 PLAYA3A7 0 PLAYA4A6 0 PLAYA5 0 PLAYA4A6 1 PLAYA3A7 1 PLAYA2A8 1
 #|POSS A POSSA1 0 POSSA2 0 POSSA3 0 POSSA4 0 POSSA5 0 POSSA6 0 POSSA7 0 POSSA8 0
 #|SPOS L SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0 SPOSL0 0
