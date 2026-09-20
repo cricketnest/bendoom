@@ -11,21 +11,20 @@
 # again, which the next frame answers through the same path as the
 # restart after the exit, with no time gone, so the state is a fresh
 # level at tic 0. The same game is then handed the state a script leaves
-# beside Freedoom's exit switch with the room's door open behind the
-# player, 41 tics in. A frame 200 ms on with Space pressed runs 7 tics:
-# the first ends the level and the rest change nothing, and the frame
-# prints the time, 42 tics, a second. A held Space repeating, as X sends
-# it, a release and a press in one frame, restarts nothing, nor does its
+# beside Freedoom's exit switch, 6 tics in. A frame 200 ms on with
+# Space pressed runs 7 tics: the first ends the level and the rest
+# change nothing, and the frame prints the time. A held Space
+# repeating, as X sends it, a release and a press in one frame,
+# restarts nothing, nor does its
 # release; a press of Enter does, and with no time gone the state is the
 # one the game started with: the door shut, the switch's special back,
-# the things and the random index as they spawned (tests/route.bend
-# restarts a level whose things the route took). Esc quits.
+# the things and the random index as they spawned. Esc quits.
 # Before the game, what a tic of use beside the switch is heard to
 # start, and M_Random's index after it. P_ChangeSwitchTexture clears the
 # line's special before it looks for the exit's 11, so the click is
 # sfx_swtchn, and it comes from nobody, since no button runs. The index
-# is 64 after the wipe, one more for the route's door, one for the
-# click.
+# is 64 after the wipe and 66 once the six tics and the click have
+# drawn, which is a pin.
 # Then the time of a few clocks, worked out by hand in milestone 4's
 # ticket 09. The door's height is the hand computation's (4 under
 # sector 68's ceiling of -56); the positions are regression pins.
@@ -105,13 +104,13 @@ def frame(tag: String, now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Ma
     case Some{g}:
       IO.bind(Bool & M.Game, Maybe<M.Game>, M.Game.frame(now, events, g), after => report(tag, after))
 
-# The exit room's door used from inside, then the walk west to the
-# switch, which passes north of the shotgun guy of record 289 and turns
-# to 202.5 degrees, where the use reaches through the alcove past him.
+# The turn to 202.5 degrees beside Freedoom's exit switch, where the use
+# reaches through the alcove past the shotgun guy of record 289. The
+# walk west that used to carry the player here is gone: with ticket 16
+# that shotgun guy chases and shoots, and it blocks the walk long before
+# the switch, so the player is put where the walk left it.
 def route() -> List<&2, K.Cmd>:
-  List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 5n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, 2)],
-    [K.Cmd.demo(0, 0, 64, 0)], List.replicate(K.Cmd, 25n, K.Cmd.demo(25, 0, 0, 0)),
-    List.replicate(K.Cmd, 8n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 16, 0)]])
+  List.concat(&2, K.Cmd, [[K.Cmd.demo(0, 0, 16, 0)], List.replicate(K.Cmd, 5n, K.Cmd.idle())])
 
 # The game handed another state, to put a second case to the same loop.
 def restaged(g: M.Game, s: S.State) -> M.Game:
@@ -140,8 +139,8 @@ def reborn(g: Maybe<M.Game>) -> IO(Maybe<M.Game>):
 
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +level) = gl
-  +beside = S.Sim.replay(route(), S.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(224)), F.Fixed.of_map(1340),
-    A.Angle.of_thing(90)}))
+  +beside = S.Sim.replay(route(), S.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316),
+    A.Angle.of_thing(180)}))
   do IO<Unit>:
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
@@ -164,14 +163,14 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 #|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
-#|beside tic 41 ended False at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 11 pressed False things 209 random 76
-#|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 67
-#|dead space tic 7 ended False at 1600.000000 1000.000000 90.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
+#|beside tic 6 ended False at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
+#|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 66
+#|dead space tic 7 ended False at 1600.000000 1000.000000 90.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 64
 #|reborn tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
-#|Time 0:01
-#|space tic 42 ended True at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 209 random 76
-#|repeat tic 42 ended True at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 209 random 76
-#|release tic 42 ended True at -363.314437 1316.073516 202.500 thinkers 10 sector 64 -128.000000 -60.000000 special 0 pressed True things 209 random 76
+#|Time 0:00
+#|space tic 7 ended True at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 0 pressed True things 209 random 67
+#|repeat tic 7 ended True at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 0 pressed True things 209 random 67
+#|release tic 7 ended True at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 0 pressed True things 209 random 67
 #|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|esc quit
 #|Time 0:00, Time 0:59, Time 1:00, Time 2:03

@@ -316,31 +316,31 @@ def main() -> IO(Unit):
 #|shotgun guy from the side 987 1947 225 hash 1917549567 pixels 5 6 109 108 96 covered True
 #|demon mirrored 2448 2112 0 hash 2010430582 pixels 39 2 6 79 96 covered True
 #|stride U!:34 hash 3490826559 pixels 2 5 164 6 96 covered True
-#|air U!:56 hash 4098663969 pixels 5 110 15 6 96 covered True
-#|landed U!:66 hash 1275252128 pixels 6 110 14 79 96 covered True
+#|air U!:56 hash 238896606 pixels 5 110 15 6 96 covered True
+#|landed U!:66 hash 567655142 pixels 6 110 14 79 96 covered True
 #|door half open hash 1804438924 pixels 7 14 110 79 96 covered True
 #|switch pressed hash 724704945 pixels 3 110 107 7 96 covered True
 #|exit pressed hash 982269427 pixels 102 95 102 3 96 covered True
-#|blink dark hash 2296296530 pixels 94 73 73 101 96 covered True
-#|key 2380 600 180 22 hash 1480203924 pixels 5 1 6 110 96 covered True
-#|key bright 23 hash 1480203924 pixels 5 1 6 110 96 covered True
-#|key before hash 2863382571 pixels 6 10 5 89 96 covered True
-#|key after hash 1680916088 pixels 105 10 2 89 96 covered True
+#|blink dark hash 2862419583 pixels 95 72 103 93 96 covered True
+#|key 2380 600 180 22 hash 2363408334 pixels 5 1 6 110 96 covered True
+#|key bright 23 hash 721037192 pixels 5 1 6 110 96 covered True
+#|key before hash 1119106966 pixels 6 10 5 89 96 covered True
+#|key after hash 1993185543 pixels 105 10 2 89 96 covered True
 #|bonus before hash 214362927 pixels 11 79 78 6 96 covered True
 #|bonus after hash 264819507 pixels 10 78 2 11 96 covered True
-#|green armour before hash 3842545083 pixels 110 110 6 1 96 covered True
-#|green armour after hash 3912261824 pixels 8 110 103 2 96 covered True
+#|green armour before hash 3031678396 pixels 110 110 6 1 96 covered True
+#|green armour after hash 2697861397 pixels 8 110 103 2 96 covered True
 #|stimpack and medikit before hash 2244377026 pixels 111 109 7 111 96 covered True
 #|stimpack and medikit refused hash 484170876 pixels 110 108 2 107 96 covered True
 #|rocket before hash 1272649172 pixels 105 109 105 77 96 covered True
 #|rocket after hash 1410101461 pixels 106 109 105 77 96 covered True
 #|rocket refused hash 3698027594 pixels 106 109 105 77 160 covered True
-#|chainsaw after hash 2734297676 pixels 5 5 137 141 96 covered True
-#|chainsaw refused hash 3924488502 pixels 5 5 137 141 160 covered True
+#|chainsaw after hash 1049664126 pixels 5 5 137 141 96 covered True
+#|chainsaw refused hash 1321871484 pixels 5 5 137 141 160 covered True
 #|pistol rising 8 hash 767338383 pixels 1 1 7 5 96 covered True
 #|pistol bob low 48 hash 2371778325 pixels 1 79 1 245 96 covered True
 #|pistol bob right 64 hash 980655376 pixels 2 5 111 6 96 covered True
-#|dead 1600 1000 90 hash 2370444204 pixels 6 111 110 5 96 covered True
+#|dead 1600 1000 90 hash 165433760 pixels 6 0 3 8 96 covered True
 #|pistol firing 25 hash 2802859285 pixels 1 1 7 111 96 covered True
 #|pistol flash over 32 hash 1410065273 pixels 1 1 7 5 96 covered True
 #|puff on the ledge 25 hash 1011791530 pixels 7 110 15 2 96 covered True
