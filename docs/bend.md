@@ -21,6 +21,8 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 - **No def named `exit`.** The native runtime has one of its own, and a build that gives the def a function of its own fails with "two names mangle to FID_EXIT"; whether it does depends on what the compiler inlines, so the name can pass for a while.
 - **`type` and `def` are keywords,** refused as a field, parameter or pattern name; a thing's DoomEd type is its `kind`.
 - **A type may take a type:** `type Tree<-A: Data> is Data`, and each def over it takes `-A: Data` first and is called with the type spelled out (`V.Tree.get(H.Thing, tree, i)`). A self-call that rebuilds its scrutinee (growing a path under an empty leaf) is refused as not decreasing.
+- **A record has a width budget the whole program shares:** with milestone 6's sim, a sixteenth field on the player builds if it is a `U32` and fails with "an arity over 255" if it is a record (which costs its width) or if three more are added, anywhere, the inventory included. Four counts that will not fit go in a `V.Vec`, as the powers do (`Sim.Hurt`).
+- **A big `+` let inside a function with a `do` block is inlined at its use:** binding a whole scripted state beside another one and handing each to a frame fails the native build with "an arity over 255", with no location. The same expression as a def of its own passes, so a state a case needs is built by a def (`tests/game.bend`'s `killed`).
 - **Recursion depth on the JS lane** is about 20000 on bun and 5000 on node; native has no stack. Tests run the JS lane on bun. Base's `List.length` recurses once an element, so it may not measure a WAD lump there; `List.drop` is a loop.
 
 ## Proofs
