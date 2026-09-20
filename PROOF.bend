@@ -1397,77 +1397,63 @@ def LE(a: Nat, b: Nat) -> Type:
 def LT(a: Nat, b: Nat) -> Type:
   {True{} == Nat.is_lt(a, b) : Bool}
 
-def le_trans(a: Nat, b: Nat, c: Nat, h1: LE(a, b), h2: LE(b, c)) -> LE(a, c):
-  match a b c:
-    case 0n _ 0n:
+def zero_le(n: Nat) -> LE(0n, n):
+  match n:
+    case 0n:
       {==}
-    case 0n _ 1n+r:
+    case 1n+p:
       {==}
+
+def le_max(lo: Nat, hi: Nat, other: Nat, h: LE(lo, hi)) -> LE(lo, Nat.max(hi, other)):
+  match lo hi other:
+    case 0n _ _:
+      zero_le(Nat.max(hi, other))
     case 1n+p 0n _:
-      %h1 : BD(_, Unit, LE(1n+p, c))
+      %h : BD(_, Unit, LE(1n+p, Nat.max(0n, other)))
       Unit{}
     case 1n+p 1n+q 0n:
-      %h2 : BD(_, Unit, LE(1n+p, 0n))
-      Unit{}
-    case 1n+p 1n+q 1n+r:
-      le_trans(p, q, r, h1, h2)
-
-def le_lt_le(a: Nat, b: Nat, c: Nat, h1: LE(a, b), h2: LT(b, c)) -> LE(a, c):
-  match a b c:
-    case 0n _ 0n:
-      {==}
-    case 0n _ 1n+r:
-      {==}
-    case 1n+p 0n _:
-      %h1 : BD(_, Unit, LE(1n+p, c))
-      Unit{}
-    case 1n+p 1n+q 0n:
-      %h2 : BD(_, Unit, LE(1n+p, 0n))
-      Unit{}
-    case 1n+p 1n+q 1n+r:
-      le_lt_le(p, q, r, h1, h2)
-
-def not_lt_le(a: Nat, b: Nat, h: {False{} == Nat.is_lt(a, b) : Bool}) -> LE(b, a):
-  match a b:
-    case 0n 0n:
-      {==}
-    case 0n 1n+q:
-      %h : BD(_, LE(1n+q, 0n), Unit)
-      Unit{}
-    case 1n+p 0n:
-      {==}
-    case 1n+p 1n+q:
-      not_lt_le(p, q, h)
-
-# The larger of hi and another is no less than what hi is no less than;
-# the flag is the comparison Nat.max picks by.
-def le_max(lo: Nat, hi: Nat, other: Nat, c: Bool, e: {c == Nat.is_lt(hi, other) : Bool},
-  h: LE(lo, hi)) -> LE(lo, Bool.pick(Nat, c, other, hi)):
-  match c:
-    case True{}:
-      le_lt_le(lo, hi, other, h, e)
-    case False{}:
       h
+    case 1n+p 1n+q 1n+r:
+      le_max(p, q, r, h)
+
+def min_le(a: Nat, b: Nat, hi: Nat, h: LE(a, hi)) -> LE(Nat.min(a, b), hi):
+  match a b hi:
+    case 0n _ _:
+      h
+    case 1n+p 0n 0n:
+      {==}
+    case 1n+p 0n 1n+r:
+      {==}
+    case 1n+p 1n+q 0n:
+      %h : BD(_, Unit, LE(Nat.min(1n+p, 1n+q), 0n))
+      Unit{}
+    case 1n+p 1n+q 1n+r:
+      min_le(p, q, r, h)
 
 # The smaller of first and rf is no more than the larger of last and rl
 # when first is no more than last.
-def min_le_max(+first: Nat, +last: Nat, +rf: Nat, +rl: Nat, c: Bool,
-  e: {c == Nat.is_lt(first, rf) : Bool}, h: LE(first, last)) ->
-  LE(Bool.pick(Nat, c, first, rf), Nat.max(last, rl)):
-  match c:
-    case True{}:
-      le_max(first, last, rl, Nat.is_lt(last, rl), {==}, h)
-    case False{}:
-      le_max(rf, last, rl, Nat.is_lt(last, rl), {==},
-        le_trans(rf, first, last, not_lt_le(first, rf, e), h))
+def min_le_max(+first: Nat, +last: Nat, +rf: Nat, rl: Nat, h: LE(first, last)) ->
+  LE(Nat.min(first, rf), Nat.max(last, rl)):
+  le_max(Nat.min(first, rf), last, rl, min_le(first, rf, last, h))
 
-def lt_pick(x: Nat, b: Nat, c: Nat, flag: Bool, hb: LT(x, b), hc: LT(x, c)) ->
-  LT(x, Bool.pick(Nat, flag, b, c)):
-  match flag:
-    case True{}:
-      hb
-    case False{}:
-      hc
+def lt_min(x: Nat, b: Nat, c: Nat, hb: LT(x, b), hc: LT(x, c)) -> LT(x, Nat.min(b, c)):
+  match x b c:
+    case 0n 0n _:
+      %hb : BD(_, Unit, LT(0n, Nat.min(0n, c)))
+      Unit{}
+    case 0n 1n+q 0n:
+      %hc : BD(_, Unit, LT(0n, Nat.min(1n+q, 0n)))
+      Unit{}
+    case 0n 1n+q 1n+r:
+      {==}
+    case 1n+p 0n _:
+      %hb : BD(_, Unit, LT(1n+p, Nat.min(0n, c)))
+      Unit{}
+    case 1n+p 1n+q 0n:
+      %hc : BD(_, Unit, LT(1n+p, Nat.min(1n+q, 0n)))
+      Unit{}
+    case 1n+p 1n+q 1n+r:
+      lt_min(p, q, r, hb, hc)
 
 # Three true conjuncts make the sorted conjunction of a head range.
 def and3(a: Bool, b: Bool, c: Bool, ha: {True{} == a : Bool}, hb: {True{} == b : Bool},
@@ -1503,7 +1489,7 @@ def absorb_sorted(rs: List<&2, C.Clip.Range>, ahead: Bool, +lo: Nat, +hi: Nat,
       and3(Nat.is_le(lo, hi), Nat.is_lt(1n+hi, rf), C.Clip.sorted(C.Range{rf, rl} <> rest), ho, e, hs)
     case C.Range{+rf, +rl} <> +rest False{}:
       absorb_sorted(rest, C.Clip.ahead(rest, Nat.max(hi, rl)), lo, Nat.max(hi, rl), {==},
-        le_max(lo, hi, rl, Nat.is_lt(hi, rl), {==}, ho),
+        le_max(lo, hi, rl, ho),
         and_true_right(C.Clip.apart(rest, rl), C.Clip.sorted(rest),
           and_true_right(Nat.is_le(rf, rl), Bool.and(C.Clip.apart(rest, rl), C.Clip.sorted(rest)), hs)))
 
@@ -1529,7 +1515,7 @@ def add_head(rs: List<&2, C.Clip.Range>, behind: Bool, ahead: Bool, +first: Nat,
       hf
     case C.Range{+rf, +rl} <> +rest False{} False{}:
       absorb_head(rest, C.Clip.ahead(rest, Nat.max(last, rl)), Nat.min(first, rf), Nat.max(last, rl), x,
-        lt_pick(1n+x, first, rf, Nat.is_lt(first, rf), hf, hr))
+        lt_min(1n+x, first, rf, hf, hr))
 
 # A proof is used once, so the three conjuncts of a sorted list come
 # out of its one hypothesis together.
@@ -1588,7 +1574,7 @@ def add_sorted(rs: List<&2, C.Clip.Range>, behind: Bool, ahead: Bool, +first: Na
       and3(Nat.is_le(first, last), Nat.is_lt(1n+last, rf), C.Clip.sorted(C.Range{rf, rl} <> rest), ho, ea, hs)
     case C.Range{+rf, +rl} <> +rest False{} False{}:
       absorb_sorted(rest, C.Clip.ahead(rest, Nat.max(last, rl)), Nat.min(first, rf), Nat.max(last, rl),
-        {==}, min_le_max(first, last, rf, rl, Nat.is_lt(first, rf), {==}, ho),
+        {==}, min_le_max(first, last, rf, rl, ho),
         and_true_right(C.Clip.apart(rest, rl), C.Clip.sorted(rest),
           and_true_right(Nat.is_le(rf, rl), Bool.and(C.Clip.apart(rest, rl), C.Clip.sorted(rest)), hs)))
 
