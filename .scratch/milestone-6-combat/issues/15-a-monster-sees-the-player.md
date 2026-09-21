@@ -1,10 +1,10 @@
 # 15: A monster sees the player
 
-**What to build:** A monster notices the player by sight. `A_Look` tests the player within the monster's field of view and its line of sight, which reads the REJECT lump first and then walks the BSP with vanilla's slopes. A monster that sees the player makes its sight sound, chosen by a random draw among its variants, and enters its chase state on vanilla's tic. It does not move yet.
+**What to build:** A monster notices the player by sight. `A_Look` tests the player within the monster's field of view and its line of sight, which reads the REJECT lump first and then walks the BSP with vanilla's slopes. A monster that sees the player makes its sight sound, chosen by a random draw among its variants, and enters its chase state on vanilla's tic.
 
 **Blocked by:** 08 (Monsters stand where the map puts them); milestone 7's 01 (The sim reports its sounds)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] The loader keeps REJECT; `P_CheckSight` follows `P_CrossBSPNode` and `P_CrossSubsector`
 - [x] `A_Look` and `P_LookForPlayers` for one player: the field of view, the close-range exception, and the ambush flag's effect on sight
@@ -21,7 +21,7 @@
 - `src/level.bend` keeps REJECT. `Level.rejected(level, s1, s2)` is the test at the head of `P_CheckSight`: the bit for row `s1` and column `s2` of a square of `nsectors`. The lump is read a byte at a time, because its length is `ceil(nsectors^2 / 8)` and Freedoom's E1M1 makes that odd (182 sectors, 4141 bytes), so a loader that read it as whole words would lose the last byte and with it the four pairs from (181, 178) to (181, 181), three of which are set.
 - `src/sim.bend` gains a Sight section. `Sim.sight(level, m, t)` is `P_CheckSight` over two `Sim.Body` values: REJECT first, then `P_CrossBSPNode` as a stack of nodes left to cross rather than a recursion, the near child of each node before the far one, and `P_CrossSubsector` on each leaf. `Sim.sight.side` is `P_DivlineSide`, with its whole-unit products and the horizontal case that compares the point's x with the line's y where it means its y. The slopes are `Sim.Sight{top, bottom, open}`, narrowed at every opening the trace crosses.
 - `Sim.look` is `A_Look` and `P_LookForPlayers(actor, false)` for the one player in the game: the player has to be in sight, and then either inside the half turn the monster faces or within `MELEERANGE`, 64 units, which excuses the rest. A monster that sees the player sounds its sight call and enters its chase state.
-- `Sim.thing.act`, `Sim.thing.entered` and `Sim.thing.set` are the mobj action dispatch and `P_SetMobjState`: a state is entered for its tics and the state's action runs, which may set another. `Sim.thing.step` is `P_MobjThinker`'s state half around it, and `Sim.thing.moved` runs it after ticket 11's vertical half, now `H.Thing.risen`. `H.Thing.tic` and `H.Thing.tic.step` are gone; `H.Thing.lasting`, `H.Thing.over`, `H.Thing.spent` and `H.Thing.entering` are what is left of them.
+- `Sim.thing.act`, `Sim.thing.entered` and `Sim.thing.set` are the mobj action dispatch and `P_SetMobjState`: a state is entered for its tics and the state's action runs, which may set another. `Sim.thing.step` is `P_MobjThinker`'s state half around it, and `Sim.thing.moved` runs it after ticket 11's vertical half, now guarded by `Sim.thing.vertical`. `H.Thing.tic` and `H.Thing.tic.step` are gone; `H.Thing.lasting`, `H.Thing.over`, `H.Thing.spent` and `H.Thing.entering` are what is left of them.
 - The idle rows 61 to 68 run `Look{}`, and the 32 run rows, 89 to 120, run `Chase{}`.
 - `src/sound.bend` gains the six sight calls, `sfx_posit1` to `sfx_sgtsit`, numbers 36 to 41, lump `DS` and the name, priority 98, all from `sounds.c`.
 
@@ -53,22 +53,22 @@
 
 ### The ten pinned oracle frames
 
-At this sight-only checkpoint none returned to zero. The reason is in `P_SetMobjState`: it runs the state's action on entry, so vanilla's `A_Chase` runs on the very tic `A_Look` sets the chase state. That first `A_Chase` snaps the monster's angle to a multiple of 45 degrees and turns it, calls `P_NewChaseDir` and `P_Move`, and draws a `P_Random` for the active sound. So a frame is a fidelity case only up to the tic before the first monster wakes in it, and all ten have a monster waking inside their script. Their remaining difference was chase movement, implemented in ticket 16. Their counts fell by a third to a half, which is the waking itself now matching:
+All ten inherited cases now return zero against Chocolate Doom 3.1.1 with chase, attacks and pickups active. The 2026-09-21 reports are in `/tmp/m6-routes/combat-qa.json`, `/tmp/m6-routes/last-moving.json` and `/tmp/m6-palette/oracles.json`.
 
-| case | place | script | before | now |
-| --- | --- | --- | --- | --- |
-| air | -416 256 0 | `56,50,0,0,0` | 148 | 109 |
-| landed | -416 256 0 | `66,50,0,0,0` | 773 | 443 |
-| blink dark | 640 712 180 | `66,0,0,0,0` | 41680 | 42058 |
-| key 22 | 2380 600 180 | `22,0,0,0,0` | 43 | 22 |
-| key bright 23 | 2380 600 180 | `23,0,0,0,0` | 43 | 22 |
-| key before | 2246 592 180 | `20,0,0,0,0 1,0,0,-16,0 12,0,-24,0,0` | 18 | 12 |
-| key after | 2246 592 180 | `20,0,0,0,0 1,0,0,-16,0 13,0,-24,0,0` | 67 | 41 |
-| green armour before | 1631 1008 90 | `20,0,0,0,0 11,25,0,0,0` | 541 | 360 |
-| green armour after | 1631 1008 90 | `20,0,0,0,0 12,25,0,0,0` | 607 | 407 |
-| chainsaw after | 3158 2176 180 | `20,0,0,0,0 1,0,0,-16,0 13,0,-24,0,0` | 575 | 379 |
+| case | place | script | differing |
+| --- | --- | --- | --- |
+| air | -416 256 0 | `56,50,0,0,0` | 0 |
+| landed | -416 256 0 | `66,50,0,0,0` | 0 |
+| blink dark | 640 712 180 | `66,0,0,0,0` | 0 |
+| key 22 | 2380 600 180 | `22,0,0,0,0` | 0 |
+| key bright 23 | 2380 600 180 | `23,0,0,0,0` | 0 |
+| key before | 2246 592 180 | `20,0,0,0,0 1,0,0,-16,0 12,0,-24,0,0` | 0 |
+| key after | 2246 592 180 | `20,0,0,0,0 1,0,0,-16,0 13,0,-24,0,0` | 0 |
+| green armour before | 1631 1008 90 | `20,0,0,0,0 11,25,0,0,0` | 0 |
+| green armour after | 1631 1008 90 | `20,0,0,0,0 12,25,0,0,0` | 0 |
+| chainsaw after | 3158 2176 180 | `20,0,0,0,0 1,0,0,-16,0 13,0,-24,0,0` | 0 |
 
-Five frames that were at zero were rerun and are still at zero: the start, the demon head on, the pit, the shotgun guy from behind and the stride. Every other comparable frame's hash is unchanged, so its pixels are the ones the oracle already called right.
+The complete 20-pose rest sweep also returns zero.
 
 ### Trade-offs
 
@@ -76,7 +76,6 @@ Five frames that were at zero were rerun and are still at zero: the start, the d
 - **Vanilla's `validcount` over the lines is not here.** It is an economy, not a rule: the narrowing takes the higher floor and the lower ceiling whichever side is called the front, so a line answered twice gives the same answer twice. Keeping a seen list would cost more than it saves.
 - **`P_CheckSight` is called once where vanilla calls it up to three times.** With one player in the game `P_LookForPlayers` walks the loop until `c` reaches 2, testing the same player each turn; the test is a pure function, so one call is the whole answer.
 - **A record's width is a budget the whole program shares** (`docs/bend.md`). After tickets 09 and 11 there was no room for a 20th field on the geometry, so REJECT's bytes live after the sector tags in the store those already use, and a type's seestate and seesound are read by kind (`H.Thing.see`, `H.Thing.seesound`) instead of sitting in its definition. Both are recorded in the code's comments. The one field that was worth keeping is the thing's `lastlook`, the thirteenth on `Thing` after ticket 11's `momz`.
-- **The run rows carry a named no-op.** `Chase{}` is in the table because info.c puts `A_Chase` there; the dispatch's catch-all makes it do nothing, so a woken monster runs its chase frames where it stands.
 
 ### Surprises
 

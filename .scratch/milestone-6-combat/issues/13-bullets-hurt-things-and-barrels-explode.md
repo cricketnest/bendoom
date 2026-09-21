@@ -4,14 +4,14 @@
 
 **Blocked by:** 09 (The nukage hurts and the player dies), 11 (Ctrl fires the pistol)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] `P_DamageMobj` and `P_KillMobj` for any shootable thing, with the thrust and the random death tics; a thing pushed by damage moves through the general movement
 - [x] Blood and puffs spawn as `P_SpawnBlood` and `P_SpawnPuff` do
 - [x] The barrel's death rows, `A_Explode`, and `P_RadiusAttack` with vanilla's blockmap box, distance measure and sight test
 - [x] The explosion's credit passes to whoever shot the barrel
 - [x] Sim cases: a barrel shot to death, a chain of two, the player hurt by one through armour, with health, places and the random index from a replay of the source
-- [ ] Render cases: a barrel mid-explosion and blood on a hit, at zero differing pixels
+- [x] Render cases: a barrel mid-explosion and blood on a hit, at zero differing pixels
 
 ## Comments
 
@@ -35,22 +35,19 @@
 
 ### Evidence
 
-- `bend PROOF.bend`: `All terms check.`
-- Every `tests/*.bend` passes native and on bun, before and after the merge of `milestone-6-7`.
-- The oracle, `nu tools/oracle.nu x y degrees script --frame`, Freedoom, `masked` 1595 in every report, the frame dump built from this tree after the last merge of `milestone-6-7`, which carries the sight ticket, the sound pass, the width refactor, the face and the heads-up line:
+The integrated combat build was compared with Chocolate Doom 3.1.1 on 2026-09-21. Each report masks only the pause graphic and face (1595 pixels).
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
-| the barrel room at rest | 992 704 270 | `20,0,0,0,0` | 0 |
-| a stalagmite over a tree | 2752 960 0 | `20,0,0,0,0` | 0 |
-| the bars, sprites behind masked textures | 1024 200 0 | `20,0,0,0,0` | 0 |
-| ticket 11's firing frame, the room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-| one shot into a barrel | 992 704 270 | `20,0,0,0,0 6,0,0,0,2` | 573 |
-| the barrel mid-explosion | 992 704 270 | `20,0,0,0,0 21,0,0,0,2` | 37596 |
+| blood on a hit | 1024 -224 180 | `20,0,0,0,0 6,0,0,0,2` | 0 |
+| one shot into a barrel | 992 704 270 | `20,0,0,0,0 6,0,0,0,2` | 0 |
+| barrel mid-explosion | 992 704 270 | `20,0,0,0,0 21,0,0,0,2` | 0 |
+
+All 20 rest poses and 33 firing, blood, barrel, movement and pickup frames return zero. Reports: `/tmp/m6-routes/rest-oracles.json` and `/tmp/m6-routes/combat-qa.json`.
 
 ### What surprised me
 
-- `P_SetMobjState` cannot be one function here. `A_Explode` deals damage and damage enters a state, so the two would be a circle Bend refuses. It is not one in practice either: no pain or death row of any type either map spawns carries an action on entry, so a blow's own setter runs none, and the thinker's general one runs them all.
+- `A_Explode` deals damage and damage enters a state, which would form a definition cycle Bend refuses. The runtime now passes the common state-entry function through hitscan, melee, missiles and radius damage, so every path runs the entry action immediately.
 - The damage section had to move above the firing that calls it, which cost `P_DropWeapon` the general `P_SetPsprite` loop. Writing that one step out is exact, since the down state lasts a tic.
 - A barrel's target is set only when it survives the hit, so a barrel killed outright by another barrel's blast credits its own kills to nobody, as vanilla's does.
 
@@ -60,6 +57,4 @@
 
 The loader test reads all four monsters' pain entry headers and the three available gib entry headers. Expected widths and offsets came from Freedoom's POSSG1, POSSM0, SPOSG1, SPOSM0, TROOH1, TROON0 and SARGH1 headers read in nushell; the state-to-frame mapping is `info.c`.
 
-The actual pain case at `1024 -224 180`, script `20,0,0,0,0 6,0,0,0,2`, improves from 2680 differing pixels to 392. The remaining blood/impact mismatch is still open, so this is not a zero-frame claim and does not close this ticket.
-
-Validation on the restored loader: full `PROOF.bend --check-only` prints `All terms check.`; all 14 tests pass natively and on Bun, including the seven independently read sprite headers. Logs and oracle reports are under `/tmp/fix-monster-sprites/`.
+The later combat integration also resolves the remaining blood/impact mismatch; the zero-frame results above supersede the loader-only checkpoint. The loader test retains seven independently read sprite headers.

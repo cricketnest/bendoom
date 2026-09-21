@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (The tic command carries fire and weapon change), 02 (One traversal finds what a ray meets), 03 (Things move, relink and spawn in play), 07 (The pistol rises, bobs and shows); milestone 7's 01 (The sim reports its sounds)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] `A_WeaponReady`'s fire check, `P_FireWeapon`, `A_FirePistol`, `A_ReFire` and the light actions, with the refire count; `A_GunFlash` and the attack-down flag are not here, see the Comments
 - [x] `P_AimLineAttack` and `P_LineAttack` as visitors of the traversal, with vanilla's slopes and its retries to either side; no line in either map fires on a gunshot, so `P_ShootSpecialLine` is left out
@@ -12,7 +12,7 @@
 - [x] The extra light reaches the renderer, and flash frames draw full bright
 - [x] The pistol's sound starts where vanilla's does
 - [x] Sim cases: one shot, held fire, the last bullet, a shot at a wall and at a ledge above, with the random index after each
-- [ ] Render cases: the firing frames with the room lit and a puff on a wall, at zero differing pixels (one of the three is at zero after the merge; see Deferred)
+- [x] Render cases: the firing frames with the room lit and a puff on a wall, at zero differing pixels
 - [x] A closed law pins one bullet a shot and no shot at zero
 
 ## Comments
@@ -39,22 +39,16 @@
 
 `nu tools/oracle.nu x y degrees script --frame`, the dump built from this tree, Freedoom.
 
-Before combat integration, `masked` 665 in each, which was the pause graphic alone:
+The final combat integration was checked against Chocolate Doom 3.1.1 with monsters active and all 200 rows compared. Only the pause graphic and face are masked (1595 pixels).
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
-| firing, the room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-| the flash over, the light out | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 11,0,0,0,0` | 0 |
-| the puff on the ledge out of the pit | 704 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-| rest, unchanged | -416 256 0 | `20,0,0,0,0` | 0 |
+| firing, room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
+| flash over, light out | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 11,0,0,0,0` | 0 |
+| puff on the ledge | 704 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
+| sky leaves no puff | -640 256 180 | `20,0,0,0,0 5,0,0,0,2` | 0 |
 
-After the merge, with monsters in the map and all 200 rows compared, `masked` 1595:
-
-| case | place | script | differing |
-| --- | --- | --- | --- |
-| firing, the room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-
-That case is a fidelity case with monsters on: the start room holds none on Hurt Me Plenty, and the five tics between the press and the frame are fewer than a monster woken by vanilla's `P_NoiseAlert` needs to reach the view. The other two were checkpoint measurements before combat integration; the final milestone oracle sweep supersedes them.
+All 20 rest poses and the same poses five tics into a shot also return zero. The oracle reports from 2026-09-21 are in `/tmp/m6-routes/rest-oracles.json` and `/tmp/m6-routes/combat-qa.json`.
 
 ### What surprised me
 
