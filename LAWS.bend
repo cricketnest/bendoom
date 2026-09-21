@@ -1199,9 +1199,10 @@ law soul_sphere:
 law berserk:
   {[Closed.offer(Closed.inv([Health{1}]), 2023), Closed.offer(I.Inventory.start(), 2023),
     Closed.offer(Closed.inv([Health{150}]), 2023), Closed.offer(Closed.inv([Strength{40}]), 2023)]
-    == [Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])},
-      Got{[], Closed.inv([Health{150}, Strength{1}, Items{1}, Flash{6}])},
-      Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])}] : List<&2, Closed.Got>}
+    == [Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}, Selection{1, 0}])},
+      Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}, Selection{1, 0}])},
+      Got{[], Closed.inv([Health{150}, Strength{1}, Items{1}, Flash{6}, Selection{1, 0}])},
+      Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}, Selection{1, 0}])}] : List<&2, Closed.Got>}
 
 # LAW: the armour bonus is always taken and counted: no armour makes 1
 # point of green armour's type, 199 points of blue make 200 and stay
@@ -1248,8 +1249,9 @@ law bonus_counted_once:
 law strength_counts:
   {[Closed.walk(1n, 524288, I.Inventory.start(), 2023), Closed.walk(2n, 524288, I.Inventory.start(), 2023),
     Closed.walk(3n, 524288, I.Inventory.start(), 2023)]
-    == [Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}])}, Got{[], Closed.inv([Strength{2}, Items{1}, Flash{5}])},
-      Got{[], Closed.inv([Strength{3}, Items{1}, Flash{4}])}] : List<&2, Closed.Got>}
+    == [Got{[], Closed.inv([Strength{1}, Items{1}, Flash{6}, Selection{1, 0}])},
+      Got{[], Closed.inv([Strength{2}, Items{1}, Flash{5}, Selection{1, 0}])},
+      Got{[], Closed.inv([Strength{3}, Items{1}, Flash{4}, Selection{1, 0}])}] : List<&2, Closed.Got>}
 
 # LAW: P_GiveAmmo's clipammo on Hurt Me Plenty, which doubles nothing,
 # from G_PlayerReborn's inventory: a clip gives 10 bullets, shells 4, a
