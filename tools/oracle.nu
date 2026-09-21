@@ -56,37 +56,6 @@ def pcx-palette []: binary -> string {
   $pcx | bytes at (($pcx | bytes length) - 768).. | encode hex | str lowercase
 }
 
-# The posts of the patch column whose first is at the offset piped in:
-# each one's first row in the patch, its length, and where its pixels
-# start, up to the column's 255.
-def posts [wad: binary]: int -> table<delta: int, length: int, pixels: int> {
-  let first = $in
-  generate {|at|
-    let delta = $wad | bytes at $at..$at | into int
-    if $delta != 255 {
-      let length = $wad | bytes at ($at + 1)..($at + 1) | into int
-      {out: {delta: $delta, length: $length, pixels: ($at + 3)}, next: ($at + $length + 4)}
-    }
-  } $first
-}
-
-# The pixels a patch covers when drawn at x, y, its offsets taken off as
-# V_DrawPatch takes them: each one's frame index and colour.
-def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<at: int, colour: string> {
-  let patch = $wad | lumps | where name == $name | last | get pos
-  let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
-  let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
-  let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
-  0..<$width | each {|c|
-    $patch + ($wad | bytes at ($patch + 8 + $c * 4)..($patch + 11 + $c * 4) | into int --endian little)
-    | posts $wad
-    | each {|post| 0..<$post.length | each {|k| {
-        at: (($top + $post.delta + $k) * 320 + $left + $c)
-        colour: ($wad | bytes at ($post.pixels + $k)..($post.pixels + $k) | encode hex | str lowercase)
-      } } }
-  } | flatten | flatten
-}
-
 # A patch's size and where its offsets put it when drawn at x, y.
 def patch-box [wad: binary, name: string, x: int, y: int]: nothing -> list<int> {
   let patch = $wad | lumps | where name == $name | last | get pos
@@ -220,7 +189,8 @@ def main [
   let shot = vanilla ($bytes | placed $x $y $angle $things) $name ($runs | append $tail | demo) $tics $told $dir
   let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame } | lines
   let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let masked = if $tally { anim-boxes $bytes } else { ($told | get at) ++ (face-box $bytes) }
+  let face = face-box $bytes
+  let masked = if $tally { anim-boxes $bytes } else { ($told | get at) ++ $face }
   let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
   let differing = $off | where $it not-in $masked
   let playpal = $bytes | lumps | where name == "PLAYPAL" | last | get pos
@@ -229,7 +199,7 @@ def main [
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
-    face: ($off | where $it in (face-box $bytes) | length)
+    face: ($off | where $it in $face | length)
     masked: ($masked | uniq | where $it < 200 * 320 | length)
     palette: ($"0x($dump | first)" | into int)
     shot_plain: ($shot.palette == ($bytes | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))

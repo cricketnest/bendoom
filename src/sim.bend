@@ -80,6 +80,9 @@ type Sim.Body is Data:
 type Sim.Met is Data:
   Met{before: List<&2, U32>, hit: Maybe<&2, U32>}
 
+type Sim.Sky is Data:
+  Sky{checking: Bool, ceil: U32, found: Bool}
+
 # What Doom's P_CheckPosition answers for a mobj's box: whether no thing
 # stops it and no line does, the floor and ceiling there, and the lowest
 # floor beyond an opening it crosses, vanilla's tmdropoffz, which is the
@@ -4232,35 +4235,68 @@ def Sim.missile.result(go: Bool, sky: Bool, met: Sim.Met, fit: Sim.Fit, +id: U32
     case False{}:
       Sim.missile.blocked(sky, Sim.Met.hit(met), id, source, s)
 
-def Sim.missile.sky.line.back(none: Bool, +line: L.Level.Line, +level: L.Level, +x: U32, +y: U32, +r: U32,
-  +ceil: U32, +back: U32) -> Bool:
-  match none:
+def Sim.missile.sky.lower(lower: Bool, +level: L.Level, +back: U32, +top: U32, +ceil: U32,
+  found: Bool) -> Sim.Sky:
+  match lower:
     case True{}:
-      False{}
+      Sky{True{}, top, L.Level.sky(level, back)}
     case False{}:
-      Bool.and(Sim.box_touches(x, y, r, line), Bool.and(Sim.box_crosses(x, y, r, line),
-        Bool.and(U32.is_eq(Sim.open_top(level, line), ceil), L.Level.sky(level, back))))
+      Sky{True{}, ceil, found}
 
-def Sim.missile.sky.line(+line: L.Level.Line, +level: L.Level, +x: U32, +y: U32, +r: U32, +ceil: U32) ->
-  Bool:
-  L.Line{x1, y1, x2, y2, flags, front, +back} = line
-  Sim.missile.sky.line.back(U32.is_eq(back, L.Level.none()), line, level, x, y, r, ceil, back)
+def Sim.missile.sky.cross(crossed: Bool, +line: L.Level.Line, +level: L.Level, +ceil: U32, found: Bool) ->
+  Sim.Sky:
+  match crossed:
+    case False{}:
+      Sky{True{}, ceil, found}
+    case True{}:
+      L.Line{x1, y1, x2, y2, flags, front, +back} = line
+      +top = Sim.open_top(level, line)
+      Sim.missile.sky.lower(F.Fixed.lt(top, ceil), level, back, top, ceil, found)
 
-def Sim.missile.sky.go(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +ceil: U32) -> Bool:
+def Sim.missile.sky.clear(ok: Bool, +line: L.Level.Line, +level: L.Level, +x: U32, +y: U32, +r: U32,
+  +ceil: U32, found: Bool) -> Sim.Sky:
+  match ok:
+    case False{}:
+      Sky{False{}, ceil, found}
+    case True{}:
+      L.Line{x1, y1, x2, y2, flags, front, +back} = line
+      Sim.missile.sky.cross(Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
+        Bool.and(Sim.box_touches(x, y, r, line), Sim.box_crosses(x, y, r, line))), line, level, ceil, found)
+
+def Sim.missile.sky.step.line(ok: Bool, +line: L.Level.Line, +level: L.Level, +x: U32, +y: U32, +r: U32,
+  sky: Sim.Sky) -> Sim.Sky:
+  Sky{checking, ceil, found} = sky
+  match checking:
+    case False{}:
+      Sky{False{}, ceil, found}
+    case True{}:
+      Sim.missile.sky.clear(ok, line, level, x, y, r, ceil, found)
+
+def Sim.missile.sky.found(sky: Sim.Sky) -> Bool:
+  Sky{checking, ceil, found} = sky
+  found
+
+def Sim.missile.sky.step(+i: U32, +level: L.Level, +x: U32, +y: U32, +r: U32, sky: Sim.Sky) -> Sim.Sky:
+  Sim.missile.sky.step.line(Sim.line_ok(level, x, y, r, 0, i), L.Level.line(level, i), level, x, y, r, sky)
+
+def Sim.missile.sky.go(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, sky: Sim.Sky) -> Bool:
   match lines:
     case []:
-      False{}
+      Sim.missile.sky.found(sky)
     case i <> rest:
-      Bool.or(Sim.missile.sky.line(L.Level.line(level, i), level, x, y, r, ceil),
-        Sim.missile.sky.go(rest, level, x, y, r, ceil))
+      Sim.missile.sky.go(rest, level, x, y, r, Sim.missile.sky.step(i, level, x, y, r, sky))
+
+def Sim.missile.sky.start(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32) -> Bool:
+  +sector = L.Level.sector_at(level, x, y)
+  Sim.missile.sky.go(lines, level, x, y, r, Sky{True{}, L.Level.ceil(level, sector), False{}})
 
 def Sim.missile.sky(clear: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32) -> Bool:
   match clear:
     case False{}:
       False{}
     case True{}:
-      Sim.missile.sky.go(Sim.lines(level, (x - r : U32), (y - r : U32), (x + r : U32), (y + r : U32)),
-        level, x, y, r, L.Level.ceil(level, L.Level.sector_at(level, x, y)))
+      Sim.missile.sky.start(Sim.lines(level, (x - r : U32), (y - r : U32), (x + r : U32), (y + r : U32)),
+        level, x, y, r)
 
 def Sim.missile.checked(+met: Sim.Met, fit: Sim.Fit, +id: U32, +source: U32, +th: H.Thing, +x: U32, +y: U32,
   +s: State) -> State:

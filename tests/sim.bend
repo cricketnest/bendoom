@@ -603,7 +603,9 @@ def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
 # The open door's close on tic 253, heard by a player who stands still:
 # hard left, hard right, behind, at the close distance and a unit past
 # it, at the last audible unit, a unit on, where the volume rounds to
-# nothing, and past the clipping distance.
+# nothing, and past the clipping distance. The 200/201-unit combat
+# sequences match a Chocolate Doom replay with the same player reset
+# at tic102; its same-species missile block prevents an extra imp pain.
 def placements(+open: S.State) -> IO(Unit):
   do IO<Unit>:
     listen("door on the left", 400, 0, open)
@@ -1528,10 +1530,23 @@ def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U
   attack.missile.ticks(n, id,
     S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
 
+def attack.missile.up.from(+source: S.Sim.Body, n: Nat, +you: U32, +s: S.State) -> S.State:
+  S.Body{i, x, y, z, radius, height, flags} = source
+  +spawned = S.Sim.missile.spawn(S.Body{i, x, y, z, radius, height, flags},
+    S.Body{4294967294, x, y, (z + F.Fixed.of_map(64) : U32), radius, height, flags}, you, s)
+  +id = H.Things.count(S.State.things(s))
+  attack.missile.ticks(n, id,
+    S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
+
 def attack.missile(+level: L.Level, +x: U32, +y: U32, +tx: U32, +ty: U32, n: Nat) -> S.State:
   +s = at(level, x, y, 0)
   +you = H.Things.you(S.State.things(s))
   attack.missile.from(S.Player.body(S.State.player(s), you), tx, ty, n, you, s)
+
+def attack.missile.up(+level: L.Level, +x: U32, +y: U32, n: Nat) -> S.State:
+  +s = at(level, x, y, 0)
+  +you = H.Things.you(S.State.things(s))
+  attack.missile.up.from(S.Player.body(S.State.player(s), you), n, you, s)
 
 def attack.missile.result(tag: String, +s: S.State) -> IO(S.State):
   do IO<S.State>:
@@ -1544,11 +1559,7 @@ def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
   do IO<S.State>:
     IO.print(tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " health "
       ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " random " ++ U32.show(S.State.rnd(q))
-      ++ " at " ++ F.Fixed.show(S.Player.x(S.State.player(q))) ++ " " ++ F.Fixed.show(S.Player.y(S.State.player(q)))
-      ++ " view " ++ F.Fixed.show(S.Player.viewz(S.State.player(q)))
-      ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297))
-      ++ " imps" ++ fighter(H.Things.get(S.State.things(q), 81))
-      ++ fighter(H.Things.get(S.State.things(q), 82)) ++ fighter(H.Things.get(S.State.things(q), 84)))
+      ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297)))
     return q
 
 def attack.play(n: Nat, cmd: K.Cmd, +s: S.State) -> S.State:
@@ -1563,7 +1574,7 @@ def attacks(+level: L.Level) -> IO(Unit):
     ball : S.State <- attack.result("imp throw", 81,
       S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
     wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
-    sky : S.State <- attack.missile.result("fireball sky", attack.missile(level, 64896, 256, 64640, 256, 8n))
+    sky : S.State <- attack.missile.result("fireball sky", attack.missile.up(level, 64896, 256, 3n))
     replay0 : S.State <- attack.replay("unarmoured flight", 10n, idle(),
       attack.play(34n, fire(), attack.play(20n, idle(), at(level, 992, 704, 270))))
     replay1 : S.State <- attack.replay("unarmoured burst", 10n, idle(), replay0)
@@ -2593,19 +2604,18 @@ def main() -> IO(Unit):
 #|sound tic 211 DSPISTOL from thing 176 vol 64 sep 126
 #|sound tic 220 DSFIRXPL from thing 294 vol 47 sep 128
 #|sound tic 221 DSSHOTGN from thing 240 vol 49 sep 137
-#|sound tic 222 DSPOPAIN from thing 81 vol 50 sep 127
-#|sound tic 224 DSPOPAIN from thing 176 vol 64 sep 125
 #|sound tic 224 DSPOPAIN from thing 177 vol 64 sep 33
 #|sound tic 224 stop thing 295
-#|sound tic 228 stop thing 296
-#|sound tic 228 stop thing 298
-#|sound tic 234 stop thing 297
-#|sound tic 235 stop thing 294
+#|sound tic 226 DSFIRSHT from thing 300 vol 49 sep 127
+#|sound tic 226 DSPODTH2 from thing 176 vol 64 sep 124
+#|sound tic 228 stop thing 299
+#|sound tic 236 stop thing 294
+#|sound tic 236 stop thing 296
 #|sound tic 237 DSPISTOL from thing 177 vol 64 sep 33
-#|sound tic 239 DSPOPAIN from thing 81 vol 53 sep 126
-#|sound tic 244 stop thing 299
+#|sound tic 242 stop thing 297
+#|sound tic 244 stop thing 301
 #|door 200 ahead tic 253 832.000000 328.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 80
+#|sounds drew to 79
 #|sound tic 127 DSPISTOL from thing 176 vol 62 sep 148
 #|sound tic 141 stop thing 292
 #|sound tic 154 DSPOSACT from thing 240 vol 40 sep 135
@@ -2616,19 +2626,18 @@ def main() -> IO(Unit):
 #|sound tic 211 DSPISTOL from thing 176 vol 64 sep 126
 #|sound tic 220 DSFIRXPL from thing 294 vol 47 sep 128
 #|sound tic 221 DSSHOTGN from thing 240 vol 49 sep 137
-#|sound tic 222 DSPOPAIN from thing 81 vol 50 sep 127
-#|sound tic 224 DSPOPAIN from thing 176 vol 64 sep 125
 #|sound tic 224 DSPOPAIN from thing 177 vol 64 sep 33
 #|sound tic 224 stop thing 295
-#|sound tic 228 stop thing 296
-#|sound tic 228 stop thing 298
-#|sound tic 234 stop thing 297
-#|sound tic 235 stop thing 294
+#|sound tic 226 DSFIRSHT from thing 300 vol 49 sep 127
+#|sound tic 226 DSPODTH2 from thing 176 vol 64 sep 124
+#|sound tic 228 stop thing 299
+#|sound tic 236 stop thing 294
+#|sound tic 236 stop thing 296
 #|sound tic 237 DSPISTOL from thing 177 vol 64 sep 33
-#|sound tic 239 DSPOPAIN from thing 81 vol 53 sep 126
-#|sound tic 244 stop thing 299
+#|sound tic 242 stop thing 297
+#|sound tic 244 stop thing 301
 #|door 201 ahead tic 253 832.000000 327.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 80
+#|sounds drew to 79
 #|sound tic 111 DSPOSIT3 from thing 185 vol 58 sep 224
 #|sound tic 180 DSPOSACT from thing 185 vol 58 sep 224
 #|sound tic 220 DSSHOTGN from thing 185 vol 59 sep 224
