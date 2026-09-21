@@ -1474,7 +1474,8 @@ law thing_move_is_checked:
   for +ts: H.Things
   for +p: S.Player
   for s: S.State
-  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y, ts, p, s)) : Bool}
+  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y,
+    S.Sim.met(level, ts, p, S.Sim.Body.at(m, x, y)), s)) : Bool}
   {True{} == S.Sim.Fit.ok(S.Sim.check(level, ts, p, S.Sim.Body.at(m, x, y), 3)) : Bool}
 
 # LAW: clear is pinned to the mobjs: when nothing stops a box, every
