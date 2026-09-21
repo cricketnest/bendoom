@@ -58,9 +58,8 @@ jobs:
           sudo apt-get install -y bubblewrap xvfb xdotool pulseaudio pulseaudio-utils
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           pulseaudio --start --exit-idle-time=-1
-          for archive in artifacts/*.tar.gz; do
-            BENDOOM_SMOKE_AUDIO=pulse bash tools/portable-smoke.sh "$archive"
-          done
+          nix shell --inputs-from . nixpkgs#nushell --command \
+            nu tools/portable-smoke.nu --audio pulse artifacts/*.tar.gz
       - name: Check macOS runtime dependencies
         if: runner.os == 'macOS'
         run: |
