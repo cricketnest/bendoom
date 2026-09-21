@@ -48,7 +48,7 @@ def Film.audio(words: List<&2, U32>, file: File) -> IO(File):
 def Film.channels(play: I.Play, chans: List<Maybe<C.Channel>>) -> IO(List<Maybe<C.Channel>>):
   match play:
     case I.Playing{+state}:
-      C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(s, source)), state, chans)
+      C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
     case I.Showing{wi}:
       IO.pure(List<Maybe<C.Channel>>, chans)
 
