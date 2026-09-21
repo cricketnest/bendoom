@@ -206,6 +206,7 @@ type Thing.Action is Data:
   Raise{}
   WeaponReady{}
   FirePistol{}
+  FireShotgun{}
   ReFire{}
   Lower{}
   Pain{}
@@ -348,7 +349,14 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"SARG", 6, False{}, 8, 113, SargAttack{}, 0},
     Row{"BAL1", 0, True{}, 4, 197, Null{}, 0}, Row{"BAL1", 1, True{}, 4, 196, Null{}, 0},
     Row{"BAL1", 2, True{}, 6, 199, Null{}, 0}, Row{"BAL1", 3, True{}, 6, 200, Null{}, 0},
-    Row{"BAL1", 4, True{}, 6, 4294967295, Null{}, 0}]
+    Row{"BAL1", 4, True{}, 6, 4294967295, Null{}, 0},
+    Row{"SHTG", 0, False{}, 1, 201, WeaponReady{}, 0}, Row{"SHTG", 0, False{}, 1, 202, Lower{}, 0},
+    Row{"SHTG", 0, False{}, 1, 203, Raise{}, 0}, Row{"SHTG", 0, False{}, 3, 205, Null{}, 0},
+    Row{"SHTG", 0, False{}, 7, 206, FireShotgun{}, 0}, Row{"SHTG", 1, False{}, 5, 207, Null{}, 0},
+    Row{"SHTG", 2, False{}, 5, 208, Null{}, 0}, Row{"SHTG", 3, False{}, 4, 209, Null{}, 0},
+    Row{"SHTG", 2, False{}, 5, 210, Null{}, 0}, Row{"SHTG", 1, False{}, 5, 211, Null{}, 0},
+    Row{"SHTG", 0, False{}, 3, 212, Null{}, 0}, Row{"SHTG", 0, False{}, 7, 201, ReFire{}, 0},
+    Row{"SHTF", 0, True{}, 4, 214, Null{}, 1}, Row{"SHTF", 1, True{}, 3, 84, Null{}, 2}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -387,9 +395,23 @@ type Thing.Weapon is Data:
 def Thing.pistol() -> Thing.Weapon:
   Weapon{60, 59, 69, 0, 79, 83}
 
+def Thing.shotgun() -> Thing.Weapon:
+  Weapon{203, 201, 202, 1, 204, 213}
+
+def Thing.weapon(+weapon: U32) -> Thing.Weapon:
+  match weapon:
+    case 2:
+      Thing.shotgun()
+    case _:
+      Thing.pistol()
+
 def Thing.Weapon.down(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   down
+
+def Thing.Weapon.up(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  up
 
 def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w

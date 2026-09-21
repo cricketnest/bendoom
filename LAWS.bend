@@ -394,14 +394,21 @@ def Closed.weapon(s: S.State) -> Maybe<&2, U32>:
 # from the ready state, A_WeaponReady enters S_PISTOL1 on the first tic,
 # its 4 tics run out on tic 5 and A_FirePistol spends a bullet as
 # S_PISTOL2 is entered; A_ReFire fires again 14 tics later, on tic 19.
-# With an empty clip P_CheckAmmo refuses, so no bullet is spent and the
-# weapon stays in its ready state, row 59, where vanilla would lower it
-# for the weapon P_CheckAmmo picked instead (sanity).
+# With an empty clip P_CheckAmmo spends nothing and lowers the weapon.
 law pistol_spends:
   {(Closed.bullets(Closed.firing(4n, 50)), Closed.bullets(Closed.firing(5n, 50)),
     Closed.bullets(Closed.firing(19n, 50)), Closed.bullets(Closed.firing(19n, 0)),
     Closed.weapon(Closed.firing(5n, 0)))
-    == (50, 49, 48, 0, Some{59}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
+    == (50, 49, 48, 0, Some{69}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
+
+def Closed.shotgun.empty() -> I.Inventory:
+  I.Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
+    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, kills, secrets}
+
+# LAW: P_CheckAmmo's preference chooses the pistol when the ready
+# shotgun has spent its last shell and bullets remain.
+law empty_shotgun_picks_pistol:
+  {S.Sim.ammo.pick(Closed.shotgun.empty()) == 1 : U32}
 
 # The damage laws are p_inter.c's P_DamageMobj by hand.
 
@@ -1032,7 +1039,7 @@ def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
       bonus, line, kills, secrets} Said{n, tics}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-        ((n << 8n) .|. tics : U32), kills, secrets}
+        ((line .&. 4294901760 : U32) .|. (n << 8n : U32) .|. tics : U32), kills, secrets}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -1054,8 +1061,8 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
 # about the grants, and pickup_messages about the line.
 def Closed.hushed(inv: I.Inventory) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, 0,
-    kills, secrets}
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
+    (line .&. 4294901760 : U32), kills, secrets}
 
 def Closed.kept(+s: S.State) -> Closed.Got:
   Got{Closed.ids(H.Things.list(S.State.things(s))), Closed.hushed(S.Player.inv(S.State.player(s)))}

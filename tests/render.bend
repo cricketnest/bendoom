@@ -347,7 +347,13 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       S.State.start(level)), w4)
     w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
       at(level, east(704), east(256), 0)), w5)
-    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w6)
+    w7 : Array<U32> <- frame("shotgun lowering", tables, gfx, after([idle(20n), walk(5n), idle(8n)],
+      at(level, east(824), east(896), 0)), w6)
+    w8 : Array<U32> <- frame("shotgun at rest", tables, gfx, after([idle(20n), walk(5n), idle(40n)],
+      at(level, east(824), east(896), 0)), w7)
+    w9 : Array<U32> <- frame("shotgun firing", tables, gfx, after([idle(20n), walk(5n), idle(40n), fired(3n)],
+      at(level, east(824), east(896), 0)), w8)
+    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w9)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
       at(level, east(1631), east(1008), 90)), g1)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
@@ -404,9 +410,9 @@ def main() -> IO(Unit):
 #|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True palette 0
 #|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True palette 0
 #|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True palette 10
-#|rocket refused hash 3744069241 pixels 106 109 105 77 160 72 covered True palette 0
+#|rocket refused hash 1341841577 pixels 106 109 105 77 160 72 covered True palette 0
 #|chainsaw after hash 1752609615 pixels 5 5 137 141 96 79 covered True palette 10
-#|chainsaw refused hash 1360841628 pixels 5 5 137 141 160 64 covered True palette 0
+#|chainsaw refused hash 2891739476 pixels 5 5 137 141 160 64 covered True palette 0
 #|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True palette 0
 #|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True palette 0
 #|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True palette 0
@@ -415,6 +421,9 @@ def main() -> IO(Unit):
 #|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True palette 0
 #|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True palette 0
 #|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True palette 0
+#|shotgun lowering hash 68118957 pixels 158 79 79 93 96 64 covered True palette 0
+#|shotgun at rest hash 4025498722 pixels 151 127 79 93 96 56 covered True palette 6
+#|shotgun firing hash 3949973150 pixels 157 79 79 93 96 56 covered True palette 5
 #|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45

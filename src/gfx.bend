@@ -898,6 +898,7 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
   +marks = V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1)
   +marks = Gfx.sprite.weapon(H.Thing.pistol(), n, marks)
+  +marks = Gfx.sprite.weapon(H.Thing.shotgun(), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.fireball()), n, marks)
