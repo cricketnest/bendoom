@@ -249,6 +249,9 @@ def back(n: Nat) -> List<&2, K.Cmd>:
 def fired(n: Nat) -> List<&2, K.Cmd>:
   List.append(&2, K.Cmd, [K.Cmd.demo(0, 0, 0, 1)], idle(n))
 
+def first() -> List<&2, K.Cmd>:
+  [K.Cmd.demo(0, 0, 0, 4)]
+
 # A pickup strafed past: the idle tics, a turn, then strafing left.
 def strafed(turn: U32, n: Nat, s: S.State) -> S.State:
   after([idle(20n), [K.Cmd.demo(0, 0, turn, 0)], strafe(n)], s)
@@ -353,7 +356,15 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(824), east(896), 0)), w7)
     w9 : Array<U32> <- frame("shotgun firing", tables, gfx, after([idle(20n), walk(5n), idle(40n), fired(3n)],
       at(level, east(824), east(896), 0)), w8)
-    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w9)
+    w10 : Array<U32> <- frame("fist at rest", tables, gfx, after([idle(20n), first(), idle(40n)],
+      S.State.start(level)), w9)
+    w11 : Array<U32> <- frame("fist attacking", tables, gfx, after([idle(20n), first(), idle(40n), fired(4n)],
+      S.State.start(level)), w10)
+    w12 : Array<U32> <- frame("saw at rest", tables, gfx, after([idle(40n)], strafed(4294967280, 13n,
+      at(level, east(3158), east(2176), 180))), w11)
+    w13 : Array<U32> <- frame("saw attacking", tables, gfx, after([idle(40n), fired(4n)], strafed(4294967280, 13n,
+      at(level, east(3158), east(2176), 180))), w12)
+    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w13)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
       at(level, east(1631), east(1008), 90)), g1)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
@@ -424,6 +435,10 @@ def main() -> IO(Unit):
 #|shotgun lowering hash 68118957 pixels 158 79 79 93 96 64 covered True palette 0
 #|shotgun at rest hash 4025498722 pixels 151 127 79 93 96 56 covered True palette 6
 #|shotgun firing hash 3949973150 pixels 157 79 79 93 96 56 covered True palette 5
+#|fist at rest hash 3224378688 pixels 1 1 7 5 96 59 covered True palette 0
+#|fist attacking hash 1112766053 pixels 1 1 7 5 96 59 covered True palette 0
+#|saw at rest hash 526584844 pixels 5 5 106 104 96 79 covered True palette 0
+#|saw attacking hash 1344905693 pixels 5 5 107 104 96 79 covered True palette 0
 #|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45

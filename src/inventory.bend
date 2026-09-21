@@ -416,7 +416,7 @@ def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inve
     case 2019:
       Inventory.suit(Inventory.blue_armour(), Msg.Message.gotmega(), inv)
     case 2023:
-      Some{Inventory.saying(Msg.Message.gotberserk(), Inventory.strong(Inventory.heal(100, 100, inv)))}
+      Some{Inventory.want(0, Inventory.saying(Msg.Message.gotberserk(), Inventory.strong(Inventory.heal(100, 100, inv))))}
     case 2046:
       Inventory.ammo(Inventory.am_misl(), 5, Msg.Message.none(), inv)
     case 2047:

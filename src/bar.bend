@@ -215,11 +215,18 @@ def Bar.keys.go(n: Nat, +i: U32, +cards: U32, +gfx: G.Gfx, mem: Array<U32>) -> A
 
 # ST_drawWidgets' numbers: the ready weapon's ammo, the four counts with
 # their caps, then health and armour behind their percent signs.
+def Bar.ready.ammo(noammo: Bool, +inv: I.Inventory, +ammo: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+  match noammo:
+    case True{}:
+      mem
+    case False{}:
+      Bar.num(3n, I.Inventory.rounds(ammo, inv), 44, 171, Bar.tall(), gfx, mem)
+
 def Bar.numbers(+inv: I.Inventory, +ammo: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   Bar.percent(I.Inventory.armour(inv), 221, 171, gfx,
     Bar.percent(I.Inventory.health(inv), 90, 171, gfx,
       Bar.ammo.go(4n, 0, Bar.ammo.rows(), inv, gfx,
-        Bar.num(3n, I.Inventory.rounds(ammo, inv), 44, 171, Bar.tall(), gfx, mem))))
+        Bar.ready.ammo(U32.is_eq(ammo, 4), inv, ammo, gfx, mem))))
 
 # ST_drawWidgets' icons: the arms panel with its six weapon numbers, the
 # face the sim chose at ST_FACESX, ST_FACESY, and the key slot of each

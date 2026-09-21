@@ -18,6 +18,18 @@ def Sound.shotgn() -> U32:
 def Sound.sgcock() -> U32:
   3
 
+def Sound.sawup() -> U32:
+  10
+
+def Sound.sawidl() -> U32:
+  11
+
+def Sound.sawful() -> U32:
+  12
+
+def Sound.sawhit() -> U32:
+  13
+
 def Sound.firsht() -> U32:
   16
 
@@ -97,6 +109,9 @@ def Sound.sgtdth() -> U32:
 def Sound.barexp() -> U32:
   82
 
+def Sound.punch() -> U32:
+  83
+
 def Sound.noway() -> U32:
   81
 
@@ -115,7 +130,8 @@ type Sound.Sfx is Data:
   Sfx{id: U32, lump: String, priority: U32}
 
 def Sound.table() -> List<&2, Sound.Sfx>:
-  [Sfx{1, "DSPISTOL", 64}, Sfx{3, "DSSGCOCK", 64}, Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100},
+  [Sfx{1, "DSPISTOL", 64}, Sfx{3, "DSSGCOCK", 64}, Sfx{10, "DSSAWUP", 64}, Sfx{11, "DSSAWIDL", 118},
+    Sfx{12, "DSSAWFUL", 64}, Sfx{13, "DSSAWHIT", 64}, Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100},
     Sfx{21, "DSDORCLS", 100}, Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{25, "DSPLPAIN", 96},
     Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78}, Sfx{34, "DSOOF", 96}, Sfx{57, "DSPLDETH", 32},
     Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100}, Sfx{93, "DSGETPOW", 60},
@@ -123,7 +139,7 @@ def Sound.table() -> List<&2, Sound.Sfx>:
     Sfx{37, "DSPOSIT2", 98}, Sfx{38, "DSPOSIT3", 98}, Sfx{39, "DSBGSIT1", 98}, Sfx{40, "DSBGSIT2", 98},
     Sfx{41, "DSSGTSIT", 98}, Sfx{59, "DSPODTH1", 70}, Sfx{60, "DSPODTH2", 70}, Sfx{61, "DSPODTH3", 70},
     Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
-    Sfx{2, "DSSHOTGN", 64}, Sfx{16, "DSFIRSHT", 70}, Sfx{17, "DSFIRXPL", 70}, Sfx{55, "DSCLAW", 70},
+    Sfx{2, "DSSHOTGN", 64}, Sfx{16, "DSFIRSHT", 70}, Sfx{17, "DSFIRXPL", 70}, Sfx{55, "DSCLAW", 70}, Sfx{83, "DSPUNCH", 64},
     Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
