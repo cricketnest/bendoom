@@ -28,6 +28,7 @@ import ./src/player.bend as Pl
 import ./src/song.bend as Sg
 import ./src/sfx.bend as X
 import ./src/bar.bend as Y
+import ./src/channel.bend as Ch
 
 # Bytes and the WAD
 # -----------------
@@ -2347,6 +2348,29 @@ law quiet_offs:
 
 # Sound lumps
 # -----------
+
+# LAW: the default table has exactly eight slots, and starting a sound
+# preserves the size of every table.
+law channels_capacity:
+  for priority: Nat
+  for slots: List<&2, Maybe<&2, Ch.Channel.Voice>>
+  {(Ch.Channel.model.size(Ch.Channel.model.start(priority, slots)),
+    Ch.Channel.model.size(Ch.Channel.model.none()))
+    == (Ch.Channel.model.size(slots), 8n) : Nat & Nat}
+
+# LAW: after any start, its source occurs in at most one slot.
+law channels_unique_source:
+  for priority: Nat
+  for slots: List<&2, Maybe<&2, Ch.Channel.Voice>>
+  {True{} == Ch.Channel.model.one(Ch.Channel.model.start(priority, slots), False{}) : Bool}
+
+# LAW: a full table whose sounds are all more important refuses the new
+# sound: the shared allocator returns the table size, its drop sentinel.
+law channels_priority:
+  for priority: Nat
+  for slots: List<&2, Maybe<&2, Nat>>
+  for protected: {True{} == Ch.Channel.model.protected(priority, slots) : Bool}
+  {Ch.Channel.model.size.keys(slots) == Ch.Channel.choice(priority, slots) : Nat}
 
 # LAW: CacheSFX's refusals, on a 57-byte lump unless said: a lump under
 # its 8-byte header, a format other than 3, a length of 48, and a length
