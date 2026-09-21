@@ -1528,10 +1528,23 @@ def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U
   attack.missile.ticks(n, id,
     S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
 
+def attack.missile.up.from(+source: S.Sim.Body, n: Nat, +you: U32, +s: S.State) -> S.State:
+  S.Body{i, x, y, z, radius, height, flags} = source
+  +spawned = S.Sim.missile.spawn(S.Body{i, x, y, z, radius, height, flags},
+    S.Body{4294967294, x, y, (z + F.Fixed.of_map(64) : U32), radius, height, flags}, you, s)
+  +id = H.Things.count(S.State.things(s))
+  attack.missile.ticks(n, id,
+    S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
+
 def attack.missile(+level: L.Level, +x: U32, +y: U32, +tx: U32, +ty: U32, n: Nat) -> S.State:
   +s = at(level, x, y, 0)
   +you = H.Things.you(S.State.things(s))
   attack.missile.from(S.Player.body(S.State.player(s), you), tx, ty, n, you, s)
+
+def attack.missile.up(+level: L.Level, +x: U32, +y: U32, n: Nat) -> S.State:
+  +s = at(level, x, y, 0)
+  +you = H.Things.you(S.State.things(s))
+  attack.missile.up.from(S.Player.body(S.State.player(s), you), n, you, s)
 
 def attack.missile.result(tag: String, +s: S.State) -> IO(S.State):
   do IO<S.State>:
@@ -1544,11 +1557,7 @@ def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
   do IO<S.State>:
     IO.print(tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " health "
       ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " random " ++ U32.show(S.State.rnd(q))
-      ++ " at " ++ F.Fixed.show(S.Player.x(S.State.player(q))) ++ " " ++ F.Fixed.show(S.Player.y(S.State.player(q)))
-      ++ " view " ++ F.Fixed.show(S.Player.viewz(S.State.player(q)))
-      ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297))
-      ++ " imps" ++ fighter(H.Things.get(S.State.things(q), 81))
-      ++ fighter(H.Things.get(S.State.things(q), 82)) ++ fighter(H.Things.get(S.State.things(q), 84)))
+      ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297)))
     return q
 
 def attack.play(n: Nat, cmd: K.Cmd, +s: S.State) -> S.State:
@@ -1563,7 +1572,7 @@ def attacks(+level: L.Level) -> IO(Unit):
     ball : S.State <- attack.result("imp throw", 81,
       S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
     wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
-    sky : S.State <- attack.missile.result("fireball sky", attack.missile(level, 64896, 256, 64640, 256, 8n))
+    sky : S.State <- attack.missile.result("fireball sky", attack.missile.up(level, 64896, 256, 3n))
     replay0 : S.State <- attack.replay("unarmoured flight", 10n, idle(),
       attack.play(34n, fire(), attack.play(20n, idle(), at(level, 992, 704, 270))))
     replay1 : S.State <- attack.replay("unarmoured burst", 10n, idle(), replay0)
