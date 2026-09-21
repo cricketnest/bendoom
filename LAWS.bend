@@ -463,6 +463,12 @@ def Closed.blow(damage: U32) -> U32 & U32:
 law damage_count:
   {(Closed.blow(20), Closed.blow(120)) == ((80, 20), (0, 100)) : (U32 & U32) & (U32 & U32)}
 
+# LAW: P_KillMobj picks an extreme death only below the negation of the
+# type's spawn health, and only for a type with an extreme-death state.
+law gib_threshold:
+  {(S.Sim.kill.thing.gibs(4294967236, 3001), S.Sim.kill.thing.gibs(4294967235, 3001),
+    S.Sim.kill.thing.gibs(4294966295, 2035)) == (False{}, True{}, False{}) : Bool & Bool & Bool}
+
 # LAW: ST_calcPainOffset steps the face's row by eight at each edge of
 # the five pain levels, which C's truncating (100 - health) * 5 / 101
 # puts at 80, 60, 40 and 20 health, and health over 100 reads as 100.

@@ -545,6 +545,9 @@ def Laws.armour_absorbs():
 def Laws.damage_count():
   {==}
 
+def Laws.gib_threshold():
+  {==}
+
 def Laws.pain_offset():
   {==}
 

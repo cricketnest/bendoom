@@ -2746,6 +2746,10 @@ def Sim.kill.thing.count(counts: Bool, +s: State) -> State:
     case True{}:
       State.player.put(s, Player.holding(State.player(s), I.Inventory.killed(Player.inv(State.player(s)))))
 
+def Sim.kill.thing.gibs(+health: U32, +kind: U32) -> Bool:
+  Bool.and(F.Fixed.lt(health, F.Fixed.neg(H.Thing.spawnhealth(kind))),
+    Bool.not(U32.is_eq(H.Thing.xdeathstate(kind), H.Thing.null())))
+
 def Sim.loot.spawn(d: H.Thing.Def, x: U32, y: U32, s: State) -> State:
   H.Def{kind, state, radius, height, flags} = d
   Sim.spawn(H.Def{kind, state, radius, height, (flags .|. 131072 : U32)}, x, y, H.Thing.onfloor(), s)
@@ -2768,8 +2772,7 @@ def Sim.kill.thing.at(m: Maybe<&2, H.Thing>, +target: U32, s: State) -> State:
       +kind = H.Thing.kind(th)
       Sim.kill.thing.count(H.Thing.flagged(th, 4194304),
         Sim.loot(kind, H.Thing.x(th), H.Thing.y(th), Sim.kill.thing.tics(target,
-          Sim.kill.thing.state(Bool.and(F.Fixed.lt(H.Thing.health(th),
-            F.Fixed.neg(H.Thing.spawnhealth(kind))), Bool.not(U32.is_eq(H.Thing.xdeathstate(kind), H.Thing.null()))),
+          Sim.kill.thing.state(Sim.kill.thing.gibs(H.Thing.health(th), kind),
           target, Sim.kill.thing.dead(th), kind, s))))
 
 def Sim.kill.thing(+target: U32, +s: State) -> State:
