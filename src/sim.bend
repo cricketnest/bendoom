@@ -259,8 +259,9 @@ def Player.onground(+p: Player) -> Bool:
 # (docs/bend.md): the index of the face w_faces draws, the tics that
 # face has left, the priority of whatever put it there, the health
 # ST_Ticker saw on the tic before, the count of tics fire has been held,
-# and the weapons owned when the grin last looked. The two counts that
-# start below zero hold the word C's -1 is, so its arithmetic carries
+# the weapons owned when the grin last looked, and A_WeaponReady's
+# attackdown. The two counts that start below zero hold the word C's
+# -1 is, so their arithmetic carries
 # over unchanged. M_Random's index shares the vector rather than a field
 # of its own, for the same budget: the state has no word to spare, and
 # ST_Ticker draws from it for the face's glance.
@@ -285,12 +286,15 @@ def Sim.face.weapons() -> U32:
 def Sim.face.mrnd() -> U32:
   6
 
+def Sim.face.attackdown() -> U32:
+  7
+
 # ST_initData at a fresh game, with M_Random's index where the caller
 # says: the face index, its count and the priority are what the program
-# started with, the health seen last is -1, and the weapons owned are
-# the ones G_PlayerReborn hands out.
+# started with, the health seen last is -1, the weapons owned are the
+# ones G_PlayerReborn hands out, and attackdown starts true there.
 def Sim.Face.start(+mrnd: U32) -> V.Vec:
-  V.Vec.of_list([0, 0, 0, 4294967295, 4294967295, I.Inventory.weapons(I.Inventory.start()), mrnd], 7)
+  V.Vec.of_list([0, 0, 0, 4294967295, 4294967295, I.Inventory.weapons(I.Inventory.start()), mrnd, 1], 8)
 
 def Sim.Face.index(+f: V.Vec) -> U32:
   V.Vec.get(f, Sim.face.index())
@@ -300,6 +304,9 @@ def Sim.Face.count(+f: V.Vec) -> U32:
 
 def Sim.Face.mrnd(+f: V.Vec) -> U32:
   V.Vec.get(f, Sim.face.mrnd())
+
+def Sim.Face.attackdown(+f: V.Vec) -> Bool:
+  Bool.not(U32.is_zero(V.Vec.get(f, Sim.face.attackdown())))
 
 # The vector once a sound has drawn its pitch from M_Random, and as it
 # was where that sound drew none.
@@ -506,9 +513,9 @@ def Sim.face.widget(+attack: Bool, +level: L.Level, +things: H.Things, +p: Playe
 # The rest of ST_Ticker once M_Random has been drawn: the face widget
 # over the number that draw left, then the health the next tic's ouch
 # test looks back at.
-def Sim.face.tic(+attack: Bool, +level: L.Level, +things: H.Things, +p: Player, +f: V.Vec) -> V.Vec:
+def Sim.face.tic(+level: L.Level, +things: H.Things, +p: Player, +f: V.Vec) -> V.Vec:
   Sim.face.seen(I.Inventory.health(Player.inv(p)),
-    Sim.face.widget(attack, level, things, p, M.Random.at(Sim.Face.mrnd(f)),
+    Sim.face.widget(Sim.Face.attackdown(f), level, things, p, M.Random.at(Sim.Face.mrnd(f)),
       I.Inventory.health(Player.inv(p)), V.Vec.get(f, Sim.face.oldhealth()), f))
 
 # The weapon's rows
@@ -2215,6 +2222,11 @@ def State.face(s: State) -> V.Vec:
 def State.mrnd(s: State) -> U32:
   Sim.Face.mrnd(State.face(s))
 
+def State.attacking(+attack: Bool, s: State) -> State:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
+    V.Vec.set(mrnd, Sim.face.attackdown(), Bool.to_u32(attack)), reborn, secrets}
+
 def State.reborn(s: State) -> Bool:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   reborn
@@ -3620,9 +3632,9 @@ def Sim.ready.fire(change: Bool, attack: Bool, psp: Psprite, weapon: H.Thing.Wea
     case True{} _:
       Entering{Some{H.Thing.Weapon.down(weapon)}, None{}, psp, s}
     case False{} True{}:
-      Sim.fire(psp, weapon, s)
+      Sim.fire(psp, weapon, State.attacking(attack, s))
     case False{} False{}:
-      Sim.ready.bob(psp, sine, clock, bob, s)
+      Sim.ready.bob(psp, sine, clock, bob, State.attacking(attack, s))
 
 def Sim.ready.saw(state: Maybe<&2, U32>) -> Bool:
   match state:
@@ -6219,19 +6231,18 @@ def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +x: U32, +y: U32, 
 # Doom's ST_Ticker, which G_Ticker runs after P_Ticker, so its draw
 # comes after every sound that tic started: a number from M_Random for
 # the tic, the face widget over it, and the health the next tic looks
-# back at. Held fire is read from the tic command, since A_WeaponReady's
-# attackdown has no field of its own (ticket 11).
-def Sim.st.ticker(attack: Bool, s: State) -> State:
+# back at. A_WeaponReady's attackdown stays set while an attack sequence
+# keeps that action from seeing a released command.
+def Sim.st.ticker(s: State) -> State:
   State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    Sim.face.tic(attack, level, things, player, Sim.Face.drew(True{}, mrnd)), reborn, secrets}
+    Sim.face.tic(level, things, player, Sim.Face.drew(True{}, mrnd)), reborn, secrets}
 
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: State) -> State:
   +x = Player.x(State.player(before))
   +y = Player.y(State.player(before))
-  +attack = K.Cmd.attack(cmd)
-  Sim.st.ticker(attack, Sim.tic.done(cmd, geo, clock, x, y,
+  Sim.st.ticker(Sim.tic.done(cmd, geo, clock, x, y,
     Sim.use(Bool.and(Bool.not(dead), Sim.pressed(cmd, usedown)), Sim.player(dead, cmd, level, clock, before))))
 
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:

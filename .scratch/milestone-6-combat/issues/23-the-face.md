@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (The status bar shows the inventory), 09 (The nukage hurts and the player dies), 12 (Weapons switch and the shotgun fires), 17 (Zombiemen and shotgun guys shoot); milestone 7's 01 (The sim reports its sounds)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Every priority of `ST_updateFaceWidget` that the two maps can reach, with its count, including vanilla's ouch-face bug as it stands
 - [x] The second random index starts at 64 and counts as milestone 7's ticket 01 left it; that ticket found that under `-playdemo` one or two tics run before the melt's draws, so check from the source which table entries `ST_Ticker`'s first draws read
@@ -22,7 +22,7 @@
 
 - `src/sim.bend`, "The face": `Sim.face.pain` is `ST_calcPainOffset`, whose static cache answers the same offset for the same health and so keeps no state. `Sim.face.dead`, `.grin`, `.hit`, `.own`, `.rampage` and `.glance` are `ST_updateFaceWidget`'s priorities in its order, each a function of the face vector it is handed; `Sim.face.ticked` is the `st_facecount--` that ends it and `Sim.face.widget` the chain. `Sim.face.wince` and `Sim.face.turn` are the turn, `R_PointToAngle2` to the attacker against the player's facing with vanilla's comment's own confusion kept. `Sim.face.ouch` is vanilla's ouch test with the subtraction the wrong way round, which is the bug as it stands.
 - `Sim.st.ticker` is `ST_Ticker`, which `G_Ticker` runs after `P_Ticker`: it draws from M_Random, runs the widget over that number, and then writes the health the next tic looks back at. It is the last step of `Sim.tic.live`, so it sees the damage count already faded by `P_PlayerThink`'s counters and comes after every sound that tic started, which is where vanilla's draw falls.
-- `State`'s `mrnd` field is now a `V.Vec`: `Sim.Face` lays it out as the face index, the tics that face has left, the priority, the health seen last, the count of tics fire has been held, the weapons owned when the grin last looked, and M_Random's index. `State.mrnd` reads the last slot and `State.face` the whole vector, so no caller changed. The reason is the width cap: the state had no word to spare, see Trade-offs.
+- `State`'s `mrnd` field is a `V.Vec`: `Sim.Face` lays it out as the face index, the tics that face has left, the priority, the health seen last, the count of tics fire has been held, the weapons owned when the grin last looked, M_Random's index, and `attackdown`. `State.mrnd` reads its slot and `State.face` the whole vector. The reason is the width cap: the state had no word to spare, see Trade-offs.
 - `src/gfx.bend`: `Gfx.bar.faces` is `ST_loadUnloadGraphics`' face states in its order, eight a pain level then `STFGOD0` and `STFDEAD0`; `Gfx.bar.names()` gained the 42, which `Gfx.bar` numbers from 35.
 - `src/bar.bend`: `Bar.face()` is slot 35, and `Bar.icons` draws `Gfx.bar(gfx, 35 + index)` at `ST_FACESX`, `ST_FACESY`, between the arms numbers and the key slots, which is `ST_drawWidgets`' order. `Bar.draw` takes the index.
 - `src/render.bend` passes `Sim.Face.index(State.face(s))`.
@@ -61,17 +61,18 @@ At this ticket's checkpoint the dead view differed by 48983 pixels because chase
 
 The face's pixels were then compared with the patches themselves, `tools/oracle.nu`'s `patch-pixels` over Freedoom against our own frame dump: all 578 pixels of `STFST00` in the rested start's frame and all 591 of `STFDEAD0` in the dead one, none differing. Against the wrong lump, `STFST01`, the start's frame differs in 64 pixels, so the check has teeth.
 
-### Deferred to the later pass
+### Verification pass
 
-- The shareware re-run. Every value here is Freedoom's.
-- Weapon switching and the monsters' attacks, which the ticket lists as blockers: the grin is shown on the chainsaw, which changes the weapons owned though the pistol stays in hand, and the wince on a literal-state blow, as ticket 09's own cases do, since nothing on the map attacks yet.
-- Vanilla's `attackdown` is `A_WeaponReady`'s, not the command's bit, and ticket 11 keeps no field for it; this reads the bit. The two differ only for a release inside a firing sequence, which resets the rampage count here and would not in vanilla, and only where fire has been held near 70 tics.
-- The god face, `ST_GODFACE`. Neither cheat nor invulnerability exists in this game, so vanilla's test there is never true; the lump is loaded and the stage is left out.
-- An attacker removed from the population between the blow and the tic: vanilla winces at the pointer it still holds; removal falls back to the plain pain face.
+- The face now keeps `player->attackdown` in the existing face vector. `G_PlayerReborn` starts it true, `A_WeaponReady` writes the command's attack bit, and `ST_Ticker` reads the kept value. It no longer reads the command directly. A one-tic release during the pistol's firing rows therefore leaves the rampage countdown running.
+- Chocolate Doom was traced in GDB at `ST_updateFaceWidget` from the Freedoom start. Continuous fire and 69 tics of fire followed by a release on tic 70 both leave `attackdown` true. Both have `lastattackdown` 2 on tic 69, 1 on tic 70, and show face 7 on tic 71. The sim test now replays both paths through the whole state and gets the same transition and count.
+- The shotgun guy at record 96 now supplies a real map attack for the wince case. Its first shot on tic 61 takes the player to 73 health, and the face turns left at pain level 1, index 15, with 34 tics left after `ST_Ticker` decrements it. The chainsaw pickup case already walks over the real map weapon and shows index 6, so the grin no longer depends on a constructed inventory.
+- The maintainer played both the Freedoom and shareware packages to the intermission with sound and accepted the face. The face state machine does not read WAD-specific data; each package supplies its own 42 patches through the same table.
+- A removed attacker cannot reach the fallback in these maps. Hitscan and melee damage record the attacking monster, whose corpse remains. Missile damage records the missile's source, not the missile. A barrel remains through its explosion states while the hit is handled. The only things removed immediately are pickups and crushed dropped items, and neither can damage the player. The fallback remains defensive behavior outside the maps' reachable cases.
+- `ST_GODFACE` remains unreachable. Neither cheat input nor an invulnerability pickup exists in these maps, so the lump stays loaded without a face-selection stage.
 
 ### Trade-offs
 
-- The face's counters share the state's `mrnd` field, now a `V.Vec`, rather than taking a field of their own. A field costs three words of `Sim.turn`'s budget and the native build refuses a segment over 255: a thirteenth field on `State` failed with "an arity over 255" where the JS lane built the same program, and the same vector holding both passes. The accessors `State.mrnd` and `State.face` hide it, so no caller and no pattern in the sim, the laws or the tests changed; the field's name still names its first reader, and its comment says the rest.
+- The face's counters and `attackdown` share the state's `mrnd` field as a `V.Vec`, rather than taking fields of their own. A field costs three words of `Sim.turn`'s budget and the native build refuses a segment over 255: a thirteenth field on `State` failed with "an arity over 255" where the JS lane built the same program. The accessors hide the vector, so the state record stays within the native compiler's width limit.
 - The face is on the state, not the player. Vanilla's are `st_stuff.c` statics and `ST_Ticker` runs outside `P_Ticker`; putting them on the player would also have broken every law that pins a whole player after a tic, since the face steps every tic.
 - `Sim.face.pain` is called again in each stage rather than once. Vanilla's static cache does the same work; the call is two multiplications and a divide.
 

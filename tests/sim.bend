@@ -1349,6 +1349,9 @@ def faces(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
 def sided(tag: String, tx: U32, ty: U32) -> IO(S.State):
   faces(tag, 3n, idle(), blown(20, S.Sim.tic(idle(), struck(100, 0, tx, ty, 0))))
 
+def face.chased(n: Nat, s: S.State) -> S.State:
+  Run.state(ran(n, idle(), s))
+
 # Doom's face, ST_updateFaceWidget once a tic: the idle glance at the
 # start, the nukage's pain down the five health levels and the dead
 # face at the end of it, the wince toward a blow from either side and
@@ -1362,10 +1365,15 @@ def faces.cases(+level: L.Level) -> IO(Unit):
     r0 : S.State <- sided("blow from the right", 0, 4294967232)
     l0 : S.State <- sided("blow from the left", 0, 64)
     a0 : S.State <- sided("blow from dead ahead", 64, 0)
+    m0 : S.State <- faces("shotgun guy hit", 0n, idle(),
+      face.chased(61n, at(level, 144, 1888, 0)))
     w0 : S.State <- faces("chainsaw grin", 16n, K.Cmd.demo(0, 4294967272, 0, 0),
       S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
         [K.Cmd.demo(0, 0, 4294967280, 0)]), at(level, 3158, 2176, 180)))
-    f0 : S.State <- faces("held fire", 75n, fire(), S.State.start(level))
+    f0 : S.State <- faces("held fire", 90n, fire(), S.State.start(level))
+    f1 : S.State <- faces("held before release", 69n, fire(), S.State.start(level))
+    f2 : S.State <- faces("release during firing", 1n, idle(), f1)
+    f3 : S.State <- faces("held after release", 20n, fire(), f2)
     IO.print("-")
 
 # Everything the two walks do not cover, from the map as loaded and from
@@ -2522,6 +2530,7 @@ def main() -> IO(Unit):
 #|blow from the left tic 4 index 4 count 34 health 80 sounds drew to 68
 #|face tic 2 index 7 health 80 drew 66
 #|blow from dead ahead tic 4 index 7 count 34 health 80 sounds drew to 68
+#|shotgun guy hit tic 61 index 15 count 34 health 73 sounds drew to 128
 #|face tic 34 index 6 health 100 drew 102
 #|chainsaw grin tic 37 index 6 count 66 health 100 sounds drew to 105
 #|face tic 1 index 2 health 100 drew 65
@@ -2530,7 +2539,16 @@ def main() -> IO(Unit):
 #|face tic 52 index 2 health 100 drew 119
 #|face tic 69 index 1 health 100 drew 137
 #|face tic 71 index 7 health 100 drew 139
-#|held fire tic 75 index 7 count 0 health 100 sounds drew to 144
+#|held fire tic 90 index 7 count 0 health 100 sounds drew to 160
+#|face tic 1 index 2 health 100 drew 65
+#|face tic 18 index 0 health 100 drew 82
+#|face tic 35 index 1 health 100 drew 101
+#|face tic 52 index 2 health 100 drew 119
+#|face tic 69 index 1 health 100 drew 137
+#|held before release tic 69 index 1 count 16 health 100 sounds drew to 137
+#|release during firing tic 70 index 1 count 15 health 100 sounds drew to 138
+#|face tic 71 index 7 health 100 drew 139
+#|held after release tic 90 index 7 count 0 health 100 sounds drew to 160
 #|-
 #|sound tic 5 DSPOSIT2 from thing 176 vol 64 sep 65
 #|sound tic 37 DSPOSACT from thing 176 vol 64 sep 126
