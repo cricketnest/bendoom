@@ -1629,7 +1629,9 @@ def weapon.melee(tag: String, +id: U32, +s: S.State) -> IO(S.State):
     IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " health "
       ++ U32.show(weapon.health(H.Things.get(S.State.things(s), id))) ++ " random " ++ U32.show(S.State.rnd(s))
       ++ " angle " ++ A.Angle.show(S.Player.angle(p)) ++ " at " ++ F.Fixed.show(S.Player.x(p)) ++ " "
-      ++ F.Fixed.show(S.Player.y(p)))
+      ++ F.Fixed.show(S.Player.y(p)) ++ " momentum " ++ F.Fixed.show(S.Player.momx(p)) ++ " "
+      ++ F.Fixed.show(S.Player.momy(p)) ++ " pull "
+      ++ U32.show(V.Vec.get(S.Player.hurt(p), S.Sim.hurt.justattacked())))
     return s
 
 def weapons(+level: L.Level) -> IO(Unit):
@@ -3264,13 +3266,13 @@ def main() -> IO(Unit):
 #|last blast tic 4 ready 2 pending 255 shells 0 state Some(205) tics 7 at 1.000000 32.000000 flash Some(213) tics 3 at 1.000000 32.000000 random 110
 #|switch away tic 74 ready 0 pending 255 shells 0 state Some(215) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 119
 #|sound tic 5 DSPUNCH from thing 4294967295 vol 64 sep 128
-#|punch health 16 random 75 angle 270.000 at 992.000000 660.000000
+#|punch health 16 random 75 angle 270.000 at 992.000000 660.000000 momentum 0.000000 0.000000 pull 0
 #|sound tic 5 DSPUNCH from thing 4294967295 vol 64 sep 128
-#|berserk punch health 4294967276 random 75 angle 270.000 at 992.000000 660.000000
+#|berserk punch health 4294967276 random 75 angle 270.000 at 992.000000 660.000000 momentum 0.000000 0.000000 pull 0
 #|sound tic 5 DSSAWHIT from thing 4294967295 vol 64 sep 128
-#|saw hit health 6 random 84 angle 270.000 at 992.000000 660.000000
+#|saw hit health 6 random 84 angle 270.000 at 992.000000 660.000000 momentum 0.165481 -2.101348 pull 1
 #|sound tic 6 DSPOSIT2 from thing 240 vol 50 sep 136
-#|saw pull health 6 random 90 angle 270.000 at 992.000000 660.000000
+#|saw pull health 6 random 90 angle 270.000 at 992.000000 660.000000 momentum 0.151031 -4.736343 pull 0
 #|key 1 saw tic 1 ready 1 pending 7 shells 0 state Some(69) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
 #|key 1 berserk tic 1 ready 7 pending 0 shells 0 state Some(225) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
 #|-
