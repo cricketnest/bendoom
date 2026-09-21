@@ -57,8 +57,8 @@
 # bobbing: 8 tics into its rise, 74 down the screen, and on a walk east
 # from the start at the bob's lowest, tic 48, and at its farthest right,
 # tic 64; the stride has it far left. Then the dead view: 650 tics stood
-# in the nukage of sector 173, which kills on the tic the clock reads
-# 608, leave the eye 6 units over the floor, the pistol off the bottom
+# in the nukage of sector 173 while monsters attack leave the eye
+# 6 units over the floor, the pistol off the bottom
 # of the screen and the bar at no health. Every frame holds the things
 # E1M1 spawns on Hurt Me Plenty, monsters among them, each in its state
 # on that tic.
@@ -392,8 +392,8 @@ def main() -> IO(Unit):
 #|blink dark hash 2817285794 pixels 95 72 103 93 96 65 covered True palette 0
 #|key 2380 600 180 22 hash 3985974813 pixels 5 1 6 110 96 72 covered True palette 0
 #|key bright 23 hash 4138847691 pixels 5 1 6 110 96 72 covered True palette 0
-#|key before hash 2059559509 pixels 6 10 5 89 96 72 covered True palette 0
-#|key after hash 3772851500 pixels 105 10 2 89 96 72 covered True palette 11
+#|key before hash 1404948097 pixels 6 10 5 89 96 72 covered True palette 0
+#|key after hash 3335266453 pixels 105 10 2 89 96 72 covered True palette 11
 #|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True palette 0
 #|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True palette 10
 #|green armour before hash 123771255 pixels 110 110 6 1 96 72 covered True palette 0
@@ -408,7 +408,7 @@ def main() -> IO(Unit):
 #|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True palette 0
 #|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True palette 0
 #|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True palette 0
-#|dead 1600 1000 90 hash 1289269632 pixels 189 1 103 1 96 44 covered True palette 2
+#|dead 1600 1000 90 hash 170486482 pixels 78 7 122 2 96 8 covered True palette 0
 #|nukage 1600 1000 90 hash 3477668975 pixels 11 2 107 1 96 77 covered True palette 2
 #|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True palette 0
 #|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True palette 0
