@@ -254,6 +254,8 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(sprite.head(gfx, 52))
     IO.print(sprite.head(gfx, 59))
     IO.print(sprite.head(gfx, 60))
+    IO.print(sprite.head(gfx, 35))
+    IO.print(sprite.head(gfx, 48))
     IO.print(sprite.head(gfx, 121))
     IO.print(sprite.head(gfx, 128))
     IO.print(sprite.head(gfx, 137))
@@ -261,8 +263,12 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(sprite.head(gfx, 153))
     IO.print(sprite.head(gfx, 160))
     IO.print(sprite.head(gfx, 168))
+    IO.print(sprite.head(gfx, 196))
+    IO.print(sprite.head(gfx, 198))
     IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
       ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
+    IO.print("bright of fireball states 196 and 198 " ++ U32.show(G.Gfx.sprite(gfx, 196, 0, 5)) ++ " "
+      ++ U32.show(G.Gfx.sprite(gfx, 198, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -313,6 +319,8 @@ def main() -> IO(Unit):
 #|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
 #|sprite of state 59 width 82.000000 offset -125.000000 top -97.000000
 #|sprite of state 60 width 82.000000 offset -125.000000 top -97.000000
+#|sprite of state 35 width 7.000000 offset 4.000000 top 12.000000
+#|sprite of state 48 width 38.000000 offset 21.000000 top 13.000000
 #|sprite of state 121 width 39.000000 offset 19.000000 top 51.000000
 #|sprite of state 128 width 44.000000 offset 22.000000 top 57.000000
 #|sprite of state 137 width 32.000000 offset 16.000000 top 50.000000
@@ -320,7 +328,10 @@ def main() -> IO(Unit):
 #|sprite of state 153 width 49.000000 offset 26.000000 top 59.000000
 #|sprite of state 160 width 49.000000 offset 25.000000 top 59.000000
 #|sprite of state 168 width 33.000000 offset 15.000000 top 47.000000
+#|sprite of state 196 width 15.000000 offset 8.000000 top 11.000000
+#|sprite of state 198 width 34.000000 offset 17.000000 top 21.000000
 #|bright of states 3 and 7 0 1
+#|bright of fireball states 196 and 198 1 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127

@@ -27,13 +27,13 @@ type Thing is Data:
     tics: U32, momz: U32, hurt: V.Vec}
 
 # The rest of Doom's mobj_t, which the definition answers for until a
-# blow, a death or a look changes it, eleven counts in one vector as
+# blow, a death or a look changes it, twelve counts in one vector as
 # the player's wound is: its health, the thing it is after (its own
 # name for none), its reaction time, the threshold that keeps it on that
 # target, the horizontal momentum a blow gave it, its flags, which
 # P_KillMobj and A_Fall clear bits of, its height, which a death
 # quarters, the player A_Look last looked at, the eight-way direction
-# A_Chase walks it, and the tics it keeps that direction.
+# A_Chase walks it, the tics it keeps that direction, and its radius.
 def Thing.hurt.health() -> U32:
   0
 
@@ -67,6 +67,9 @@ def Thing.hurt.movedir() -> U32:
 def Thing.hurt.movecount() -> U32:
   10
 
+def Thing.hurt.radius() -> U32:
+  11
+
 # Doom's DI_NODIR, the ninth direction, which is none of the eight.
 def Thing.nodir() -> U32:
   8
@@ -92,16 +95,6 @@ def Thing.target(th: Thing) -> U32:
 def Thing.threshold(th: Thing) -> U32:
   V.Vec.get(Thing.hurt(th), Thing.hurt.threshold())
 
-# Doom's mobj->movedir, one of the eight directions A_Chase walks, or
-# DI_NODIR where it can walk none.
-def Thing.movedir(th: Thing) -> U32:
-  V.Vec.get(Thing.hurt(th), Thing.hurt.movedir())
-
-# Doom's mobj->movecount, signed: the tics left before A_Chase picks
-# another direction.
-def Thing.movecount(th: Thing) -> U32:
-  V.Vec.get(Thing.hurt(th), Thing.hurt.movecount())
-
 # One of the counts written back.
 def Thing.counted(+th: Thing, +slot: U32, value: U32) -> Thing:
   Thing.hurting(th, V.Vec.set(Thing.hurt(th), slot, value))
@@ -112,8 +105,7 @@ def Thing.momx(th: Thing) -> U32:
 def Thing.momy(th: Thing) -> U32:
   V.Vec.get(Thing.hurt(th), Thing.hurt.momy())
 
-# Doom's mobj->flags, the definition's until P_KillMobj and A_Fall clear
-# bits of them.
+# The mobj's live flags.
 def Thing.flags(th: Thing) -> U32:
   V.Vec.get(Thing.hurt(th), Thing.hurt.flags())
 
@@ -125,6 +117,9 @@ def Thing.height(th: Thing) -> U32:
 # Whether a flag of the mask is set on the thing.
 def Thing.flagged(th: Thing, +mask: U32) -> Bool:
   Bool.not(U32.is_zero((Thing.flags(th) .&. mask : U32)))
+
+def Thing.ambush(th: Thing) -> Bool:
+  Thing.flagged(th, 32)
 
 def Thing.id(th: Thing) -> U32:
   Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
@@ -149,6 +144,10 @@ def Thing.z(th: Thing) -> U32:
 def Thing.floorz(th: Thing) -> U32:
   Thing{id, kind, x, y, z, +floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   floorz
+
+def Thing.momz(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, +momz, hurt} = th
+  momz
 
 def Thing.tics(th: Thing) -> U32:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt} = th
@@ -197,6 +196,9 @@ type Thing.Action is Data:
   Raise{}
   WeaponReady{}
   FirePistol{}
+  FireShotgun{}
+  Punch{}
+  Saw{}
   ReFire{}
   Lower{}
   Pain{}
@@ -209,6 +211,8 @@ type Thing.Action is Data:
   Face{}
   PosAttack{}
   SPosAttack{}
+  TroopAttack{}
+  SargAttack{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -330,7 +334,29 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"POSS", 4, False{}, 10, 185, Face{}, 0}, Row{"POSS", 5, False{}, 8, 186, PosAttack{}, 0},
     Row{"POSS", 4, False{}, 8, 89, Null{}, 0},
     Row{"SPOS", 4, False{}, 10, 188, Face{}, 0}, Row{"SPOS", 5, True{}, 10, 189, SPosAttack{}, 0},
-    Row{"SPOS", 4, False{}, 10, 97, Null{}, 0}]
+    Row{"SPOS", 4, False{}, 10, 97, Null{}, 0},
+    Row{"TROO", 4, False{}, 8, 191, Face{}, 0}, Row{"TROO", 5, False{}, 8, 192, Face{}, 0},
+    Row{"TROO", 6, False{}, 6, 105, TroopAttack{}, 0},
+    Row{"SARG", 4, False{}, 8, 194, Face{}, 0}, Row{"SARG", 5, False{}, 8, 195, Face{}, 0},
+    Row{"SARG", 6, False{}, 8, 113, SargAttack{}, 0},
+    Row{"BAL1", 0, True{}, 4, 197, Null{}, 0}, Row{"BAL1", 1, True{}, 4, 196, Null{}, 0},
+    Row{"BAL1", 2, True{}, 6, 199, Null{}, 0}, Row{"BAL1", 3, True{}, 6, 200, Null{}, 0},
+    Row{"BAL1", 4, True{}, 6, 4294967295, Null{}, 0},
+    Row{"SHTG", 0, False{}, 1, 201, WeaponReady{}, 0}, Row{"SHTG", 0, False{}, 1, 202, Lower{}, 0},
+    Row{"SHTG", 0, False{}, 1, 203, Raise{}, 0}, Row{"SHTG", 0, False{}, 3, 205, Null{}, 0},
+    Row{"SHTG", 0, False{}, 7, 206, FireShotgun{}, 0}, Row{"SHTG", 1, False{}, 5, 207, Null{}, 0},
+    Row{"SHTG", 2, False{}, 5, 208, Null{}, 0}, Row{"SHTG", 3, False{}, 4, 209, Null{}, 0},
+    Row{"SHTG", 2, False{}, 5, 210, Null{}, 0}, Row{"SHTG", 1, False{}, 5, 211, Null{}, 0},
+    Row{"SHTG", 0, False{}, 3, 212, Null{}, 0}, Row{"SHTG", 0, False{}, 7, 201, ReFire{}, 0},
+    Row{"SHTF", 0, True{}, 4, 214, Null{}, 1}, Row{"SHTF", 1, True{}, 3, 84, Null{}, 2},
+    Row{"PUNG", 0, False{}, 1, 215, WeaponReady{}, 0}, Row{"PUNG", 0, False{}, 1, 216, Lower{}, 0},
+    Row{"PUNG", 0, False{}, 1, 217, Raise{}, 0}, Row{"PUNG", 1, False{}, 4, 219, Null{}, 0},
+    Row{"PUNG", 2, False{}, 4, 220, Punch{}, 0}, Row{"PUNG", 3, False{}, 5, 221, Null{}, 0},
+    Row{"PUNG", 2, False{}, 4, 222, Null{}, 0}, Row{"PUNG", 1, False{}, 5, 215, ReFire{}, 0},
+    Row{"SAWG", 2, False{}, 4, 224, WeaponReady{}, 0}, Row{"SAWG", 3, False{}, 4, 223, WeaponReady{}, 0},
+    Row{"SAWG", 2, False{}, 1, 225, Lower{}, 0}, Row{"SAWG", 2, False{}, 1, 226, Raise{}, 0},
+    Row{"SAWG", 0, False{}, 4, 228, Saw{}, 0}, Row{"SAWG", 1, False{}, 4, 229, Saw{}, 0},
+    Row{"SAWG", 1, False{}, 0, 223, ReFire{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -369,13 +395,45 @@ type Thing.Weapon is Data:
 def Thing.pistol() -> Thing.Weapon:
   Weapon{60, 59, 69, 0, 79, 83}
 
+def Thing.shotgun() -> Thing.Weapon:
+  Weapon{203, 201, 202, 1, 204, 213}
+
+def Thing.fist() -> Thing.Weapon:
+  Weapon{217, 215, 216, 4, 218, 0}
+
+def Thing.saw() -> Thing.Weapon:
+  Weapon{226, 223, 225, 4, 227, 0}
+
+def Thing.weapon(+weapon: U32) -> Thing.Weapon:
+  match weapon:
+    case 0:
+      Thing.fist()
+    case 2:
+      Thing.shotgun()
+    case 7:
+      Thing.saw()
+    case _:
+      Thing.pistol()
+
 def Thing.Weapon.down(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   down
 
+def Thing.Weapon.up(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  up
+
+def Thing.Weapon.ready(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  ready
+
 def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   ammo
+
+def Thing.Weapon.atk(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  atk
 
 # The player mobj's rows in Doom's mobjinfo: the state it stands in,
 # the one it flinches in and the one its death begins with. Its spawn
@@ -448,7 +506,7 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
     Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
     Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}, Def{4294967295, 85, 20, 16, 528},
-    Def{4294967294, 181, 20, 16, 16}]
+    Def{4294967294, 181, 20, 16, 16}, Def{4294967293, 196, 6, 8, 328208}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -460,6 +518,9 @@ def Thing.puff() -> U32:
 # bullet in flesh spawns it.
 def Thing.blood() -> U32:
   4294967294
+
+def Thing.fireball() -> U32:
+  4294967293
 
 def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
@@ -523,10 +584,11 @@ def Thing.attacksound(+kind: U32) -> U32:
 # demon's are ticket 18's: until it gives them their rows both answer 0
 # here, which is the guard that keeps their A_Chase from ever attacking.
 def Thing.melee(+kind: U32) -> U32:
-  0
+  Bool.pick(U32, U32.is_eq(kind, 3001), 190, Bool.pick(U32, U32.is_eq(kind, 3002), 193, 0))
 
 def Thing.missile(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187, 0))
+  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187,
+    Bool.pick(U32, U32.is_eq(kind, 3001), 190, 0)))
 
 # The rest of Doom's mobjinfo for the types a blow reaches, read by kind
 # for the same reason: the spawn health, the pain chance, the rows of
@@ -541,7 +603,9 @@ def Thing.fight(+kind: U32) -> V.Vec:
       Bool.pick(List<&2, U32>, U32.is_eq(kind, 3001), [60, 200, 153, 155, 160, 100, 27, 62],
         Bool.pick(List<&2, U32>, U32.is_eq(kind, 3002), [150, 180, 168, 170, 4294967295, 400, 26, 64],
           Bool.pick(List<&2, U32>, U32.is_eq(kind, 2035), [20, 0, 4294967295, 176, 4294967295, 100, 0, 82],
-            [1000, 0, 4294967295, 4294967295, 4294967295, 100, 0, 0]))))))
+            Bool.pick(List<&2, U32>, U32.is_eq(kind, 4294967293),
+              [1000, 0, 4294967295, 198, 4294967295, 100, 0, 17],
+              [1000, 0, 4294967295, 4294967295, 4294967295, 100, 0, 0])))))))
 
 def Thing.spawnhealth(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 0)
@@ -574,8 +638,8 @@ def Thing.deathsound(+kind: U32) -> U32:
 # on it: P_SpawnMobj clears the whole mobj and DI_EAST is the zero of
 # dirtype_t, so a thing's first A_Chase snaps its facing to the eight
 # directions and turns it, where DI_NODIR would leave it alone.
-def Thing.Hurt.start(+kind: U32, flags: U32, height: U32, lastlook: U32) -> V.Vec:
-  V.Vec.of([Thing.spawnhealth(kind), Thing.you(), 8, 0, 0, 0, flags, height, lastlook, 0, 0])
+def Thing.Hurt.start(+kind: U32, flags: U32, height: U32, radius: U32, lastlook: U32) -> V.Vec:
+  V.Vec.of([Thing.spawnhealth(kind), Thing.you(), 8, 0, 0, 0, flags, height, lastlook, 0, 0, radius])
 
 def Thing.def.put(d: Thing.Def, found: Maybe<&2, Thing.Def>, hit: Bool) -> Maybe<&2, Thing.Def>:
   match hit:
@@ -604,7 +668,7 @@ def Thing.info(+kind: U32) -> Thing.Def:
 # caller that has the type and not its definition in hand.
 def Thing.Hurt.of(+kind: U32) -> V.Vec:
   Thing.Hurt.start(kind, Thing.Def.flags(Thing.info(kind)),
-    F.Fixed.of_map(Thing.Def.height(Thing.info(kind))), 0)
+    F.Fixed.of_map(Thing.Def.height(Thing.info(kind))), Thing.Def.radius(Thing.info(kind)), 0)
 
 # Doom's P_ZMovement's clip, under the ceiling: a rising mobj that meets
 # it stops there.
@@ -647,23 +711,6 @@ def Thing.zmove(thing: Thing) -> Thing:
   Thing.zmove.put(Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
     Thing.zmove.floor(F.Fixed.le((z + momz : U32), floorz), falls, (z + momz : U32), momz, floorz, ceilz, height))
 
-# The vertical half of Doom's P_MobjThinker, run for a mobj off its
-# floor or with momentum, as vanilla runs P_ZMovement. A thing that
-# stands still never asks for its type, which is a search.
-def Thing.tic.z(moves: Bool, thing: Thing) -> Thing:
-  match moves:
-    case False{}:
-      thing
-    case True{}:
-      Thing.zmove(thing)
-
-# The vertical half of a thing's tic, run before the state half, which
-# is the sim's because a state's action is.
-def Thing.risen(thing: Thing) -> Thing:
-  Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, +momz, hurt} = thing
-  Thing.tic.z(Bool.or(Bool.not(U32.is_eq(z, floorz)), Bool.not(U32.is_zero(momz))),
-    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt})
-
 # Whether a thing has entered S_NULL and so removed itself.
 def Thing.gone(thing: Thing) -> Bool:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, hurt} = thing
@@ -690,7 +737,7 @@ def Thing.mobj(d: Thing.Def, +level: L.Level, id: U32, +x: U32, +y: U32, +z: U32
   Thing{id, kind, x, y, Bool.pick(U32, U32.is_eq(z, Thing.onfloor()), floor,
       Bool.pick(U32, U32.is_eq(z, Thing.onceiling()), (ceil - F.Fixed.of_map(height) : U32), z)), floor, ceil, 0,
     sector, state, Thing.Row.tics(Thing.row(state)), 0,
-    Thing.Hurt.start(kind, flags, F.Fixed.of_map(height), lastlook)}
+    Thing.Hurt.start(kind, flags, F.Fixed.of_map(height), F.Fixed.of_map(radius), lastlook)}
 
 # The thing with its centre at another place, in the sector under it.
 def Thing.at(th: Thing, level: L.Level, +x: U32, +y: U32) -> Thing:
@@ -726,13 +773,14 @@ def Thing.spawn.mobj(+d: Thing.Def, +level: L.Level, id: U32, x: U32, y: U32, an
     Bool.pick(U32, runs, (M.Random.at(after) % tics + 1 : U32), tics)) <> things, after, you}
 
 def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level: L.Level, +id: U32, +x: U32,
-  +y: U32, angle: U32, s: Thing.Spawn) -> Thing.Spawn:
+  +y: U32, angle: U32, options: U32, s: Thing.Spawn) -> Thing.Spawn:
   match player skill info:
     case True{} _ _:
       Spawn{things, rnd, +you} = s
       Spawn{things, M.Random.next(rnd), Bool.pick(U32, U32.is_lt(id, you), id, you)}
-    case False{} True{} Some{d}:
-      Thing.spawn.mobj(d, level, id, x, y, angle, s)
+    case False{} True{} Some{Def{kind, state, radius, height, flags}}:
+      Thing.spawn.mobj(Def{kind, state, radius, height, (flags .|. ((options .&. 8) << 2n) : U32)},
+        level, id, x, y, angle, s)
     case _ _ _:
       s
 
@@ -745,7 +793,7 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
 def Thing.spawn.one(+level: L.Level, id: U32, record: L.Level.Thing, s: Thing.Spawn) -> Thing.Spawn:
   L.Thing{x, y, angle, +kind, +options} = record
   Thing.spawn.if(U32.is_eq(kind, 1), Bool.and(Bool.not(U32.is_zero((options .&. 2 : U32))),
-    U32.is_zero((options .&. 16 : U32))), Thing.def(kind), level, id, x, y, angle, s)
+    U32.is_zero((options .&. 16 : U32))), Thing.def(kind), level, id, x, y, angle, options, s)
 
 def Thing.spawn.go(n: Nat, +level: L.Level, +i: U32, s: Thing.Spawn) -> Thing.Spawn:
   match n:
@@ -763,16 +811,30 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
 def Thing.spawn(+level: L.Level) -> Thing.Spawn:
   Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
 
-def Thing.ambush.of(record: L.Level.Thing, mapped: Bool) -> Bool:
-  L.Thing{x, y, angle, kind, options} = record
-  Bool.and(mapped, Bool.not(U32.is_zero((options .&. 8 : U32))))
+def Thing.Spawn.things(s: Thing.Spawn) -> List<&2, Thing>:
+  Spawn{things, rnd, you} = s
+  things
 
-# Doom's MF_AMBUSH, which P_SpawnMapThing sets from bit 8 of the record's
-# options: a map thing's id is its record's index, so the record keeps
-# the flag, and a thing spawned in play, its id past the records, has
-# none.
-def Thing.ambush(+level: L.Level, +id: U32) -> Bool:
-  Thing.ambush.of(L.Level.thing(level, id), U32.is_lt(id, L.Level.nthings(level)))
+type Thing.Totals is Data:
+  Totals{kills: U32, items: U32}
+
+def Thing.totals.flagged(+flags: U32, +bit: U32) -> U32:
+  Bool.to_u32(Bool.not(U32.is_zero((flags .&. bit : U32))))
+
+def Thing.totals.one(+flags: U32, t: Thing.Totals) -> Thing.Totals:
+  Totals{+kills, +items} = t
+  Totals{(kills + Thing.totals.flagged(flags, 4194304) : U32),
+    (items + Thing.totals.flagged(flags, 8388608) : U32)}
+
+def Thing.totals.go(things: List<&2, Thing>, t: Thing.Totals) -> Thing.Totals:
+  match things:
+    case []:
+      t
+    case Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
+      Thing.totals.go(rest, Thing.totals.one(Thing.Def.flags(Thing.info(kind)), t))
+
+def Thing.totals(+level: L.Level) -> Thing.Totals:
+  Thing.totals.go(Thing.Spawn.things(Thing.spawn(level)), Totals{0, 0})
 
 # The population
 # --------------

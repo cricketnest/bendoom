@@ -175,31 +175,40 @@ def Stream.voices(+want: U32, chans: List<Maybe<C.Channel>>, words: List<&2, U32
       IO.bind(Maybe<C.Channel> & List<&2, U32>, List<Maybe<C.Channel>> & List<&2, U32>,
         Stream.voice(want, c, words), p => Stream.voices.on(p, ws => Stream.voices(want, rest, ws)))
 
-def Stream.window.done(tape: Maybe<Stream.Tape>, q: List<Maybe<C.Channel>> & List<&2, U32>) ->
+def Stream.post(song: List<&2, U32>, words: List<&2, U32>) -> List<&2, U32>:
+  match song words:
+    case +s <> ss +w <> ws:
+      (Stream.add((w .&. 65535 : U32), (s .&. 65535 : U32))
+        .|. (Stream.add((w >> 16n : U32), (s >> 16n : U32)) << 16n) : U32) <> Stream.post(ss, ws)
+    case _ ws:
+      ws
+
+def Stream.window.done(tape: Maybe<Stream.Tape>, song: List<&2, U32>, q: List<Maybe<C.Channel>> & List<&2, U32>) ->
   IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
   (chans, words) = q
-  IO.pure(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, (tape, chans, words))
+  IO.pure(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, (tape, chans, Stream.post(song, words)))
 
 def Stream.window.mixed(chans: List<Maybe<C.Channel>>, p: Maybe<Stream.Tape> & List<&2, U32>) ->
   IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
   (tape, +words) = p
+  +count = List.length(&2, U32, words)
   IO.bind(List<Maybe<C.Channel>> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
-    Stream.voices(U32.from_nat(List.length(&2, U32, words)), chans, words), q => Stream.window.done(tape, q))
+    Stream.voices(U32.from_nat(count), chans, List.replicate(U32, count, 0)), q => Stream.window.done(tape, words, q))
 
-# The frames the device gets next: the song's, with every playing
-# channel over them. The channels are asked for as many frames as the
-# song gave, so that a pass's last short read costs a sound nothing.
+# Chocolate Doom registers OPL_Mix_Callback as MIX_CHANNEL_POST, so the
+# song is added after the sound channels have clipped. Each channel reads
+# as many frames as the song gave, so its last short read costs no sound.
 def Stream.window(+want: U32, tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>) ->
   IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
   IO.bind(Maybe<Stream.Tape> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
     Stream.song(want, tape), p => Stream.window.mixed(chans, p))
 
-# The frames the device holds between top-ups, of the ring's 4096: 46.4
-# ms at 44100 Hz, so a game frame longer than that lets the ring run
-# dry. The window bench found no such frame at 55 frames a second, and
-# the delay a sound waits is that much against Chocolate Doom's 23.2.
+# The frames the device holds between top-ups, of the ring's 4096: 52.2
+# ms at 44100 Hz, against Chocolate Doom's 1024 frames and 23.2 ms.
+# The fight bench found 2048 dry on its cold run, 1536 intermittently
+# dry and 1024 routinely dry.
 def Stream.top() -> U32:
-  2048
+  2304
 
 def Stream.wrote(tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>, dir: String, dry: U32,
   p: Audio & U32) -> IO(Stream):
@@ -245,6 +254,15 @@ def Stream.hear(events: List<&2, Sn.Sound.Event>, m: Maybe<Stream>) -> IO(Maybe<
       IO.pure(Maybe<Stream>, None{})
     case Some{Stream{audio, tape, chans, +dir, dry}}:
       IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.hear(dir, events, chans),
+        cs => Stream.heard(audio, tape, dir, dry, cs))
+
+def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  m: Maybe<Stream>) -> IO(Maybe<Stream>):
+  match m:
+    case None{}:
+      IO.pure(Maybe<Stream>, None{})
+    case Some{Stream{audio, tape, chans, dir, dry}}:
+      IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.update(~Ctx, ~params, ctx, chans),
         cs => Stream.heard(audio, tape, dir, dry, cs))
 
 # The sounds directory the launcher names, or none, which is one line

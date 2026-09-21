@@ -95,30 +95,166 @@ def Channel.put(chans: List<Maybe<Channel>>, n: Nat, new: Channel) -> IO(List<Ma
         cs : List<Maybe<Channel>> <- Channel.put(rest, m, new)
         return c <> cs
 
-def Channel.slot.busy(+take: Bool, c: Channel, p: List<Maybe<Channel>> & U32 & U32) ->
-  List<Maybe<Channel>> & U32 & U32:
-  (rest, free, victim) = p
-  (Some{c} <> rest, (free + 1 : U32), Bool.pick(U32, take, 0, (victim + 1 : U32)))
+type Channel.Pick is Data:
+  Pick{free: Nat, victim: Nat, size: Nat}
 
-def Channel.slot(+pri: U32, c: Maybe<Channel>, p: List<Maybe<Channel>> & U32 & U32) ->
-  List<Maybe<Channel>> & U32 & U32:
+type Channel.Voice is Data:
+  Voice{mine: Bool, priority: Nat}
+
+def Channel.model.none() -> List<&2, Maybe<&2, Channel.Voice>>:
+  [None{}, None{}, None{}, None{}, None{}, None{}, None{}, None{}]
+
+def Channel.pick.busy(+take: Bool, p: Channel.Pick) -> Channel.Pick:
+  Pick{free, victim, size} = p
+  Pick{1n+free, Bool.pick(Nat, take, 0n, 1n+victim), 1n+size}
+
+def Channel.pick.slot(+pri: Nat, c: Maybe<&2, Nat>, p: Channel.Pick) -> Channel.Pick:
   match c:
     case None{}:
-      (rest, free, victim) = p
-      (None{} <> rest, 0, (victim + 1 : U32))
-    case Some{Chan{file, +sfx, source, left, right}}:
-      Channel.slot.busy(U32.is_ge(Sn.Sound.priority(Sn.Sound.table(), sfx), pri),
-        Chan{file, sfx, source, left, right}, p)
+      Pick{free, victim, size} = p
+      Pick{0n, 1n+victim, 1n+size}
+    case Some{old}:
+      Channel.pick.busy(Nat.is_le(pri, old), p)
 
-# S_GetChannel's two searches, in one walk of the table: the first free
-# channel, and the first playing a sound no more important than this
-# one, each counted from the front and eight for none.
-def Channel.slots(+pri: U32, chans: List<Maybe<Channel>>) -> List<Maybe<Channel>> & U32 & U32:
+# S_GetChannel's two searches, independent of the files they allot: the
+# first free slot and the first sound no more important than the new one.
+def Channel.pick(+pri: Nat, slots: List<&2, Maybe<&2, Nat>>) -> Channel.Pick:
+  match slots:
+    case []:
+      Pick{0n, 0n, 0n}
+    case c <> rest:
+      Channel.pick.slot(pri, c, Channel.pick(pri, rest))
+
+def Channel.choice.free(p: Channel.Pick) -> Nat:
+  Pick{+free, victim, size} = p
+  Bool.pick(Nat, Nat.is_lt(free, size), free, victim)
+
+def Channel.choice(+pri: Nat, slots: List<&2, Maybe<&2, Nat>>) -> Nat:
+  Channel.choice.free(Channel.pick(pri, slots))
+
+def Channel.model.keys.none(
+  p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>) ->
+  List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>:
+  (slots, keys) = p
+  (None{} <> slots, None{} <> keys)
+
+def Channel.model.keys.some(+mine: Bool, +priority: Nat,
+  p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>) ->
+  List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>:
+  (slots, keys) = p
+  (Some{Voice{mine, priority}} <> slots,
+    Bool.pick(Maybe<&2, Nat>, mine, None{}, Some{priority}) <> keys)
+
+def Channel.model.keys.cons(c: Maybe<&2, Channel.Voice>,
+  p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>) ->
+  List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>:
+  match c:
+    case None{}:
+      Channel.model.keys.none(p)
+    case Some{Voice{mine, +priority}}:
+      Channel.model.keys.some(mine, priority, p)
+
+def Channel.model.keys(slots: List<&2, Maybe<&2, Channel.Voice>>) ->
+  List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>:
+  match slots:
+    case []:
+      ([], [])
+    case c <> rest:
+      Channel.model.keys.cons(c, Channel.model.keys(rest))
+
+def Channel.model.table(p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>) ->
+  List<&2, Maybe<&2, Channel.Voice>>:
+  (slots, keys) = p
+  slots
+
+def Channel.model.clear(c: Maybe<&2, Channel.Voice>) -> Maybe<&2, Channel.Voice>:
+  match c:
+    case None{}:
+      None{}
+    case Some{Voice{mine, priority}}:
+      Some{Voice{False{}, priority}}
+
+def Channel.model.clear.all(slots: List<&2, Maybe<&2, Channel.Voice>>) ->
+  List<&2, Maybe<&2, Channel.Voice>>:
+  match slots:
+    case []:
+      []
+    case c <> rest:
+      Channel.model.clear(c) <> Channel.model.clear.all(rest)
+
+def Channel.model.replace(slots: List<&2, Maybe<&2, Channel.Voice>>, +n: Nat, +priority: Nat) ->
+  List<&2, Maybe<&2, Channel.Voice>>:
+  match slots n:
+    case [] _:
+      []
+    case c <> rest 0n:
+      Some{Voice{True{}, priority}} <> Channel.model.clear.all(rest)
+    case c <> rest 1n+m:
+      Channel.model.clear(c) <> Channel.model.replace(rest, m, priority)
+
+def Channel.model.start.hushed(+priority: Nat,
+  p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>) ->
+  List<&2, Maybe<&2, Channel.Voice>>:
+  (slots, keys) = p
+  Channel.model.replace(slots, Channel.choice(priority, keys), priority)
+
+def Channel.model.start(+priority: Nat, slots: List<&2, Maybe<&2, Channel.Voice>>) ->
+  List<&2, Maybe<&2, Channel.Voice>>:
+  Channel.model.start.hushed(priority, Channel.model.keys(slots))
+
+def Channel.model.size(slots: List<&2, Maybe<&2, Channel.Voice>>) -> Nat:
+  match slots:
+    case []:
+      0n
+    case c <> rest:
+      1n+Channel.model.size(rest)
+
+def Channel.model.size.keys(slots: List<&2, Maybe<&2, Nat>>) -> Nat:
+  match slots:
+    case []:
+      0n
+    case c <> rest:
+      1n+Channel.model.size.keys(rest)
+
+def Channel.model.one(slots: List<&2, Maybe<&2, Channel.Voice>>, +seen: Bool) -> Bool:
+  match slots:
+    case []:
+      True{}
+    case None{} <> rest:
+      Channel.model.one(rest, seen)
+    case Some{Voice{+mine, priority}} <> rest:
+      Bool.and(Bool.not(Bool.and(seen, mine)),
+        Channel.model.one(rest, Bool.or(seen, mine)))
+
+def Channel.model.protected(+priority: Nat, slots: List<&2, Maybe<&2, Nat>>) -> Bool:
+  match slots:
+    case []:
+      True{}
+    case None{} <> rest:
+      False{}
+    case Some{old} <> rest:
+      Bool.and(Bool.not(Nat.is_le(priority, old)), Channel.model.protected(priority, rest))
+
+def Channel.keys.slot(c: Maybe<Channel>) -> Maybe<Channel> & Maybe<&2, Nat>:
+  match c:
+    case None{}:
+      (None{}, None{})
+    case Some{Chan{file, +sfx, source, left, right}}:
+      (Some{Chan{file, sfx, source, left, right}},
+        Some{U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx))})
+
+def Channel.keys.cons(p: Maybe<Channel> & Maybe<&2, Nat>,
+  q: List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>) -> List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>:
+  (kept, key) = p
+  (cs, keys) = q
+  (kept <> cs, key <> keys)
+
+def Channel.keys(chans: List<Maybe<Channel>>) -> List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>:
   match chans:
     case []:
-      ([], 0, 0)
+      ([], [])
     case c <> rest:
-      Channel.slot(pri, c, Channel.slots(pri, rest))
+      Channel.keys.cons(Channel.keys.slot(c), Channel.keys(rest))
 
 def Channel.opened(+sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32, chans: List<Maybe<Channel>>,
   n: Nat, r: Result<&1, &1, U32 & String, File>) -> IO(List<Maybe<Channel>>):
@@ -133,11 +269,11 @@ def Channel.opened(+sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32, 
 # more important the sound is dropped. A sound whose file will not open
 # is dropped too, which is the game with no sounds directory.
 def Channel.start(+dir: String, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32,
-  p: List<Maybe<Channel>> & U32 & U32) -> IO(List<Maybe<Channel>>):
-  (chans, +free, victim) = p
+  p: List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>) -> IO(List<Maybe<Channel>>):
+  (chans, keys) = p
   IO.bind(Result<&1, &1, U32 & String, File>, List<Maybe<Channel>>, File.open(Channel.path(dir, sfx), "r"),
     r => Channel.opened(sfx, source, left, right, chans,
-      U32.to_nat(Bool.pick(U32, U32.is_lt(free, 8), free, victim)), r))
+      Channel.choice(U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx)), keys), r))
 
 # What the sim reported, played: S_StartSound's tail after the
 # audibility test, where the source's old sound is stopped and the new
@@ -149,7 +285,7 @@ def Channel.event(+dir: String, e: Sn.Sound.Event, chans: List<Maybe<Channel>>) 
       do IO<List<Maybe<Channel>>>:
         hushed : List<Maybe<Channel>> <- Channel.hush(source, chans)
         Channel.start(dir, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep),
-          Channel.slots(Sn.Sound.priority(Sn.Sound.table(), sfx), hushed))
+          Channel.keys(hushed))
     case Sn.Stop{source}:
       Channel.hush(source, chans)
 
@@ -164,6 +300,31 @@ def Channel.hear(+dir: String, events: List<&2, Sn.Sound.Event>, chans: List<May
       do IO<List<Maybe<Channel>>>:
         cs : List<Maybe<Channel>> <- Channel.event(dir, e, chans)
         Channel.hear(dir, rest, cs)
+
+def Channel.moved(c: Channel, p: U32 & U32) -> IO(Maybe<Channel>):
+  Chan{file, sfx, source, left, right} = c
+  (+vol, +sep) = p
+  Channel.hush.gone(U32.is_zero(vol), file, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep))
+
+def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  c: Maybe<Channel>) -> IO(Maybe<Channel>):
+  match c:
+    case None{}:
+      IO.pure(Maybe<Channel>, None{})
+    case Some{Chan{file, sfx, +source, left, right}}:
+      Channel.moved(Chan{file, sfx, source, left, right}, params(ctx, source))
+
+# S_UpdateSounds follows the current listener and source positions.
+def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  chans: List<Maybe<Channel>>) -> IO(List<Maybe<Channel>>):
+  match chans:
+    case []:
+      IO.pure(List<Maybe<Channel>>, [])
+    case c <> rest:
+      do IO<List<Maybe<Channel>>>:
+        moved : Maybe<Channel> <- Channel.update.slot(~Ctx, ~params, ctx, c)
+        cs : List<Maybe<Channel>> <- Channel.update(~Ctx, ~params, ctx, rest)
+        return moved <> cs
 
 # Every channel's file closed, when the game lets the device go.
 def Channel.stop(chans: List<Maybe<Channel>>) -> IO(Unit):

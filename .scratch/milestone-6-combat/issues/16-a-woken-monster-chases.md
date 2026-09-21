@@ -4,14 +4,14 @@
 
 **Blocked by:** 03 (Things move, relink and spawn in play), 15 (A monster sees the player)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] `A_Chase`'s movement half, `P_NewChaseDir`, `P_TryWalk`, `P_Move` and `A_FaceTarget`, with every random draw in place, the active sound's among them
 - [x] `P_TryMove`'s dropoff test: ticket 03's `Sim.check` does not gather `tmdropoffz`, so this ticket adds it to what the check answers
 - [x] A blocked move uses the special lines it hit, which opens manual doors
 - [x] Each monster moves at its speed on its move tics and relinks as it goes
 - [x] The freedom law grows from the player to every thing that moved
-- [ ] Sim cases: a chase across a room, around a corner, through a door, and one stopped at a ledge, with places per tic and the random index from a replay of the source
+- [x] Sim cases: a chase across a room, around a corner, through a door, and one stopped at a ledge, with places per tic and the random index from a replay of the source
 - [x] The rest of ticket 08's ten pinned frames return to zero, or the ticket says which wait for an attack
 - [x] tests/route.bend and tests/game.bend were routed around standing monsters by ticket 08; with monsters chasing, the route is derived again, and it may now have to wait for tickets 11 to 19 to fight its way through: if no route can reach the exit without fighting, say so and leave the route to ticket 25
 - [x] A render case shows walking frames mid-chase at zero differing pixels, from a script that ends before any attack would start
@@ -38,44 +38,16 @@
 - **A thing spawns with movedir DI_EAST, not DI_NODIR.** `P_SpawnMobj` clears the whole mobj and DI_EAST is the zero of `dirtype_t`, so a thing's first `A_Chase` snaps its facing to the eight directions and turns it, and `P_NewChaseDir` starts with a turnaround of DI_WEST. With DI_NODIR the first chase tic leaves the facing alone and the oracle reads 263 differing pixels where it should read none.
 - **The sprite loader followed a type's spawn chain alone.** No run or attack frame was ever copied, so a monster that left its idle rows drew nothing at all, which is most of what ticket 15's ten pinned frames were measuring. `Gfx.sprite.woken` follows the chase, melee and missile rows beside the death rows the damage pass marks.
 
-### The ten pinned oracle frames
+### Integrated verification
 
-Eight of ticket 08's ten are back to zero, and so is every frame that was at zero before:
+All ten inherited moving frames and all 20 rest poses now match Chocolate Doom 3.1.1 with zero differing pixels. The two blue-key impact frames and the demon's bite at tic 20 are included. Reports from 2026-09-21 are in `/tmp/m6-routes/{combat-qa,last-moving,rest-oracles}.json` and `/tmp/m6-palette/oracles.json`.
 
-| case | place | script | ticket 15 | now |
-| --- | --- | --- | --- | --- |
-| air | -416 256 0 | `56,50,0,0,0` | 109 | **0** |
-| landed | -416 256 0 | `66,50,0,0,0` | 443 | **0** |
-| blink dark | 640 712 180 | `66,0,0,0,0` | 42058 | **0** |
-| key 22 | 2380 600 180 | `22,0,0,0,0` | 22 | **0** |
-| key bright 23 | 2380 600 180 | `23,0,0,0,0` | 22 | **0** |
-| key before | 2246 592 180 | `20,0,0,0,0 1,0,0,-16,0 12,0,-24,0,0` | 12 | 8 |
-| key after | 2246 592 180 | `20,0,0,0,0 1,0,0,-16,0 13,0,-24,0,0` | 41 | 11 |
-| green armour before | 1631 1008 90 | `20,0,0,0,0 11,25,0,0,0` | 360 | **0** |
-| green armour after | 1631 1008 90 | `20,0,0,0,0 12,25,0,0,0` | 407 | **0** |
-| chainsaw after | 3158 2176 180 | `20,0,0,0,0 1,0,0,-16,0 13,0,-24,0,0` | 379 | **0** |
-| start | -416 256 0 | `20,0,0,0,0` | 0 | **0** |
-| the pit | 488 256 0 | `20,0,0,0,0` | 0 | **0** |
-| shotgun guy from behind | 368 1632 0 | `20,0,0,0,0` | 0 | **0** |
-| a monster mid-chase | 488 256 0 | `24,0,0,0,0` | | **0** |
-| demon head on | 48 1616 180 | `9,0,0,0,0` | | **0** |
-| demon head on | 48 1616 180 | `12,0,0,0,0` | | **0** |
-| demon head on | 48 1616 180 | `20,0,0,0,0` | 0 | 14965 |
+The four short chase cases were checked against the actual Chocolate Doom engine through GDB. Every tic agrees on monster x/y, angle, move direction, remaining state tics, player health and `P_Random` index: head-on 12 tics, room 24, corner 24, ledge 40. The traces and comparison are in `/tmp/m6-chase/`. These values are no longer regression pins.
 
-`key before` and `key after` keep 8 and 11 pixels, in a box three wide and five tall at the middle of the view, and both frames carry palette 11, a damage flash: a monster's bullet reaches the player there and something of what that bullet leaves is not right yet. The demon head on at 20 tics is ticket 18's: vanilla's demon is inside `P_CheckMeleeRange` by tic 13 and bites, and Bendoom's cannot.
+The manual-door case in `tests/drops.bend` starts one zombieman at 448,2128 in S_POSS_RUN1 with the player as its target across shut door 80. The player sends only idle commands. Chocolate Doom opens the door on tic 7; its ceiling is -126 on tic 8 and -4 by tic 100. At tic 100 the monster is at fixed-point coordinates 29211840,136463168 with zero momentum and random index 73. The Bend replay prints those same values. The independently captured trace is `/tmp/m6-chase/door/trace.log`.
 
-### The routes
-
-`tests/route.bend` now stops at the blue key, tic 717. Past it the route only walks, and the monsters it wakes chase it and shoot it down: health falls to 58 by the lift, 19 on the way back, and 0 in the pit at about tic 1300, after which the player is dead and every later leg prints a corpse standing still. No route that cannot shoot back survives those legs, so the exit and the restart it used to check are left to ticket 25. `tests/game.bend` keeps the exit and the restart, but its walk to the exit switch is gone for the same reason: the shotgun guy of record 289 chases and blocks it, so the player is put where the walk left it, at (-363, 1316) facing 180, and turns to 202.5 degrees.
+The complete Freedoom route now reaches the exit at tic 2060, alive with 25 health and 82 armour, and its final intermission frame matches Chocolate Doom. `tests/route.bend` retains the full demo; ticket 25 records the route acceptance.
 
 ### Laws
 
 - `thing_move_is_checked` is `move_is_checked`'s twin: a thing's move is taken only where its box passed the check with mask 3, for all bodies, things, levels and places. `walks_taken` is the lemma that `Sim.walks` ands the shared rules with the ledge.
-
-### Deferred to the later pass
-
-- **The sim cases' numbers are regression pins, not a replay.** The first move of the chase across the room is worked by hand above, and the ledge comes from the WAD; every later tic and every random index in `chases` is a pin. The nushell replay of `A_Chase`, `P_NewChaseDir` and `P_Move` that would check the rest was not written.
-- **`key before` and `key after` keep 8 and 11 pixels.** Both are frames where a monster's bullet reaches the player. Not diagnosed.
-- **The chase through a manual door has no sim case.** The code is there and `Sim.thing.uses` is reached by the door in the route, but no case holds a monster against a shut door and watches it open.
-- **The shareware WAD was not run.** Only Freedoom.
-- **`tools/oracle.nu`'s long-fight case** from the milestone's spec is still not written.

@@ -33,8 +33,8 @@ So 29 monsters spawn in Freedoom and 6 in the shareware map, and the spectre sta
 What was built:
 
 - `src/things.bend` gains eight state rows, `S_POSS_STND` to `S_SARG_STND2`, each 10 tics and each leading to the other, and four definitions: 3004, 9 and 3001 at radius 20, height 56, and 3002 at radius 30, all with `MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL`, 4194310. Nothing else changed in the spawn: monsters spawned because they now have definitions.
-- The idle rows' action is `Null{}`, not a named `Look{}`. Vanilla's `A_Look` belongs there and the table's comment says so, but the only dispatch over `Thing.Action` today is the weapon sprite's, where a `Look{}` case could only be a branch that never runs. Ticket 15 adds the mobj dispatch and turns those eight `Null{}`s into `Look{}` in the same diff.
-- `Thing.ambush` is `P_SpawnMapThing`'s `MF_AMBUSH`: a map thing's id is its record's index, so the flag is read back from the record's options rather than stored on the thing, and a thing spawned in play, whose id is past the records, has none. That keeps this ticket out of ticket 03's `Thing` record.
+- At this ticket's checkpoint the idle rows used `Null{}`; ticket 15 replaced them with the `Look{}` action and mobj dispatch.
+- `P_SpawnMapThing` copies options bit 8 into the thing's `MF_AMBUSH` flag. Ticket 21 keeps it in the live flags, because `A_FaceTarget` clears it.
 - The oracle's demo header carries 0 in the no-monsters byte (`src/demo.bend`, `tools/demo.nu`, `tests/demo.bend`), so Chocolate Doom now spawns the map's monsters in every oracle case, film and sound capture.
 
 The random index after spawn, from the replay, and what Bendoom prints:
@@ -87,7 +87,7 @@ The oracle, Freedoom, every case of `tests/render.bend` (20 idle tics unless a s
 | bob low 48 | -416 256 0 | `20,0,0,0,0 28,25,0,0,0` | 0 |
 | bob right 64 | -416 256 0 | `20,0,0,0,0 44,25,0,0,0` | 0 |
 
-The frames a monster's waking spoils, which are regression pins until ticket 15 gives Bendoom `A_Look` and tickets 14 to 16 the chase, with the count each reports today:
+Checkpoint counts for frames affected by later sight and chase work:
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ The four monster frames show their monster. Rendering each place from a copy of 
 
 Laws: `monsters_block` says every type the tally counts as a kill is solid and shootable, so a monster stops the player as `clear_pins_things`'s solids do; `states_exist` says every definition's spawn state and every row's next state is a row of the table, which is what keeps the eight new rows honest. `radius_within` and `solid_stays` are folds over `H.Thing.defs()`, so they cover the four new types with no change.
 
-What was deleted: the no-monsters byte from the demo header and every comment that spoke of it (`src/demo.bend`, `tools/demo.nu`, `tools/oracle.nu`), `src/things.bend`'s "less the monsters", the sim test's "no monsters" and its note that record 3 is a monster that does not spawn, and the render test's claim that the oracle finds no pixel off vanilla's in every frame but three.
+What was deleted: the old demo-header spawn toggle and its source comments, plus the render test's claim that the oracle finds no pixel off vanilla's in every frame but three.
 
 Trade-offs:
 
