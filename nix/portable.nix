@@ -57,5 +57,5 @@ runCommand "${name}.tar.gz" {
   cat ${./portable.sh} ${./launch.sh} > bundle/bendoom
   chmod +x bundle/bendoom
   mkdir -p $out
-  tar --sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner -czf $out/${name}.tar.gz -C bundle .
+  tar --sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner --mode=u+w -czf $out/${name}.tar.gz -C bundle .
 ''
