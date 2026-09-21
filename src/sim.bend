@@ -6029,9 +6029,11 @@ def Sim.player.live(+cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State) -> Sta
 # attacker, and use asks for the level again.
 def Sim.player.dead(+level: L.Level, +clock: U32, use: Bool, +s: State) -> State:
   +asked = Sim.death.asked(use, s)
+  +attacker = Sim.Hurt.attacker(Player.hurt(State.player(asked)))
   State.player.put(asked, Sim.death(level, clock,
-    Sim.blamed(State.things(asked), State.player(asked),
-      Sim.Hurt.attacker(Player.hurt(State.player(asked)))), asked))
+    Sim.blamed.if(Bool.or(U32.is_eq(attacker, H.Thing.you()),
+      U32.is_eq(attacker, H.Things.you(State.things(asked)))), State.things(asked), State.player(asked), attacker),
+    asked))
 
 # Doom's P_PlayerThink: a dead player thinks of dying alone. Neither
 # think moves the player, which the mobj's own turn does, so the tic

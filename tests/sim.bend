@@ -1558,7 +1558,8 @@ def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
   +q = Run.state(play(List.replicate(K.Cmd, n, cmd), Run{"", s}))
   do IO<S.State>:
     IO.print(tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " health "
-      ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " random " ++ U32.show(S.State.rnd(q))
+      ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " facing "
+      ++ A.Angle.show(S.Player.angle(S.State.player(q))) ++ " random " ++ U32.show(S.State.rnd(q))
       ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297)))
     return q
 
@@ -2082,9 +2083,9 @@ def main() -> IO(Unit):
 #|fireball wall random 62 mobj 292 type -3 at 748.999313 256.017166 -96.000000 state 199/6
 #|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
 #|fireball sky random 61
-#|unarmoured flight tic 64 health 0 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
-#|unarmoured burst tic 74 health 0 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
-#|unarmoured gone tic 94 health 0 random 195 fireball gone
+#|unarmoured flight tic 64 health 0 facing 270.000 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
+#|unarmoured burst tic 74 health 0 facing 270.000 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
+#|unarmoured gone tic 94 health 0 facing 270.000 random 195 fireball gone
 #|dead player idle target 157 threshold 0 81 hp 60 state 65/6 at 928.322265 975.677734 -128.000000 after 157 target 157 threshold 0 82 hp 60 state 66/10 at 911.110351 1104.889648 -128.000000 after 157
 #|imp retaliates target 240 threshold 100 81 hp 33 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 83
 #|threshold holds target 240 threshold 100 81 hp 29 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 84
