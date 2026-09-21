@@ -55,6 +55,9 @@ def Sim.hurt.attacker() -> U32:
 def Sim.hurt.refire() -> U32:
   4
 
+def Sim.hurt.justattacked() -> U32:
+  5
+
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
 # height and its delta, the eye's height, the special lines this tic's
@@ -128,7 +131,7 @@ def Sim.maxbob() -> U32:
 # The player's mobj at rest and unhurt, as P_SpawnPlayer and
 # G_PlayerReborn leave it: its standing state, which lasts.
 def Sim.Hurt.start() -> V.Vec:
-  V.Vec.of_list([H.Thing.play(), H.Thing.Row.tics(H.Thing.row(H.Thing.play())), 0, H.Thing.you(), 0], 5)
+  V.Vec.of_list([H.Thing.play(), H.Thing.Row.tics(H.Thing.row(H.Thing.play())), 0, H.Thing.you(), 0, 0], 6)
 
 def Sim.Hurt.state(+h: V.Vec) -> U32:
   V.Vec.get(h, Sim.hurt.state())
@@ -231,6 +234,13 @@ def Player.refire(+p: Player) -> U32:
 # The player with another count of shots taken.
 def Player.firing(+p: Player, shots: U32) -> Player:
   Player.hurting(p, V.Vec.set(Player.hurt(p), Sim.hurt.refire(), shots))
+
+def Player.pulled(+p: Player, pulled: Bool) -> Player:
+  Player.hurting(p, V.Vec.set(Player.hurt(p), Sim.hurt.justattacked(), Bool.to_u32(pulled)))
+
+def Player.facing(p: Player, +angle: U32) -> Player:
+  Player{x, y, z, was, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}
 
 # The player holding an inventory.
 def Player.holding(p: Player, held: I.Inventory) -> Player:
@@ -1962,12 +1972,23 @@ def Sim.push(+level: L.Level, +p: Player, +angle: U32, +move: U32) -> Player:
     Sim.thrust(level, p, angle, (move * 2048 : U32)))
 
 # Doom's P_MovePlayer: turn, then thrust forward and sideways.
-def Sim.move(+level: L.Level, +cmd: K.Cmd, p: Player) -> Player:
+def Sim.move.cmd(+level: L.Level, cmd: K.Cmd, p: Player) -> Player:
   K.Cmd{forward, side, turn, buttons} = cmd
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   +a = (angle + (turn << 16n) : U32)
   Sim.push(level, Sim.push(level, Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight,
     deltaview, viewz, crossed, inv, psprites, hurt}, a, forward), (a - A.Angle.ang90() : U32), side)
+
+def Sim.move.go(pulled: Bool, +level: L.Level, cmd: K.Cmd, p: Player) -> Player:
+  match pulled:
+    case True{}:
+      Sim.move.cmd(level, K.Cmd.demo(100, 0, 0, 0), Player.pulled(p, False{}))
+    case False{}:
+      Sim.move.cmd(level, cmd, p)
+
+def Sim.move(+level: L.Level, +cmd: K.Cmd, +p: Player) -> Player:
+  +pulled = Bool.not(U32.is_zero(V.Vec.get(Player.hurt(p), Sim.hurt.justattacked())))
+  Sim.move.go(pulled, level, cmd, p)
 
 # The eye
 # -------
@@ -3468,14 +3489,72 @@ def Sim.fire.shotgun(psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Ent
   Entering{None{}, Some{flash}, psp, Sim.fire.pellets(7n, slope,
     Sim.spent(ammo, Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s)))}
 
+def Sim.melee.range() -> U32:
+  4194304
+
+def Sim.melee.target.thing(m: Maybe<&2, H.Thing>, +p: Player, +tanto: V.Vec) -> Maybe<&2, U32>:
+  match m:
+    case None{}:
+      None{}
+    case Some{+th}:
+      Some{A.Angle.of(tanto, (H.Thing.x(th) - Player.x(p) : U32), (H.Thing.y(th) - Player.y(p) : U32))}
+
+def Sim.melee.target(m: Maybe<&2, U32>, +ts: H.Things, +p: Player, +tanto: V.Vec) -> Maybe<&2, U32>:
+  match m:
+    case None{}:
+      None{}
+    case Some{+id}:
+      Sim.melee.target.thing(H.Things.get(ts, id), p, tanto)
+
+def Sim.melee.saw.angle(+now: U32, +target: U32) -> U32:
+  +delta = (target - now : U32)
+  +step = (A.Angle.ang90() / 20 : U32)
+  +near = (A.Angle.ang90() / 21 : U32)
+  Bool.pick(U32, U32.is_lt(A.Angle.ang180(), delta),
+    Bool.pick(U32, F.Fixed.lt(delta, F.Fixed.neg(step)), (target + near : U32), (now - step : U32)),
+    Bool.pick(U32, U32.is_lt(step, delta), (target - near : U32), (now + step : U32)))
+
+def Sim.melee.turn(+saw: Bool, target: Maybe<&2, U32>, +s: State) -> State:
+  match target:
+    case None{}:
+      s
+    case Some{+angle}:
+      +p = State.player(s)
+      +facing = Bool.pick(U32, saw, Sim.melee.saw.angle(Player.angle(p), angle), angle)
+      State.player.put(s, Player.pulled(Player.facing(p, facing), saw))
+
+def Sim.melee.sound(+saw: Bool, +hit: Bool, +s: State) -> State:
+  Bool.pick(State, saw, Sim.sound(Bool.pick(U32, hit, Sn.Sound.sawhit(), Sn.Sound.sawful()), Sn.Thing{H.Thing.you()}, s),
+    Bool.pick(State, hit, Sim.sound(Sn.Sound.punch(), Sn.Thing{H.Thing.you()}, s), s))
+
+def Sim.melee.hit(+saw: Bool, +psp: Psprite, +s: State) -> Sim.Entering:
+  State{+player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  +damage = M.Random.next(rnd)
+  +left = M.Random.next(damage)
+  +right = M.Random.next(left)
+  +angle = (Player.angle(player) + ((M.Random.at(left) - M.Random.at(right) : U32) << 18n) : U32)
+  +range = (Sim.melee.range() + Bool.to_u32(saw) : U32)
+  +aim = Sim.aim(level, things, player, Player.x(player), Player.y(player),
+    Sim.shootz(Player.z(player), Sim.height()), H.Things.you(things), angle, range)
+  +target = Sim.melee.target(Sim.Aim.target(aim), things, player, L.Level.tanto(level))
+  +hurt = Sim.attack(level, things, player, Player.x(player), Player.y(player), Sim.shootz(Player.z(player), Sim.height()),
+    H.Things.you(things), angle, range, Sim.Aim.slope(aim),
+    (2 * ((M.Random.at(damage) % 10 : U32) + 1 : U32) * Bool.pick(U32, saw, 1,
+      Bool.pick(U32, U32.is_zero(I.Inventory.strength(Player.inv(player))), 1, 10)) : U32),
+    State{player, level, things, sidetex, thinkers, right, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+  Entering{None{}, None{}, psp, Sim.melee.turn(saw, target,
+    Sim.melee.sound(saw, Bool.not(Maybe.is_none(&2, U32, target)), hurt))}
+
 # Whether the ready weapon has a shot left. Doom's P_CheckAmmo also
 # picks another weapon where it has none, which is the switching
 # ticket's, so a dry pistol stays up instead of being lowered.
 def Sim.ammo.enough(+weapon: H.Thing.Weapon, +s: State) -> Bool:
-  U32.is_lt(0, I.Inventory.rounds(H.Thing.Weapon.ammo(weapon), Player.inv(State.player(s))))
+  Bool.or(U32.is_eq(H.Thing.Weapon.ammo(weapon), 4),
+    U32.is_lt(0, I.Inventory.rounds(H.Thing.Weapon.ammo(weapon), Player.inv(State.player(s)))))
 
 def Sim.ammo.pick(+inv: I.Inventory) -> U32:
-  Bool.pick(U32, Bool.and(I.Inventory.owns(2, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_shell(), inv))), 2, 1)
+  Bool.pick(U32, Bool.and(I.Inventory.owns(2, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_shell(), inv))), 2,
+    Bool.pick(U32, I.Inventory.owns(7, inv), 7, 0))
 
 def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   match enough:
@@ -3508,6 +3587,19 @@ def Sim.ready.fire(change: Bool, attack: Bool, psp: Psprite, weapon: H.Thing.Wea
       Sim.fire(psp, weapon, s)
     case False{} False{}:
       Sim.ready.bob(psp, sine, clock, bob, s)
+
+def Sim.ready.saw(state: Maybe<&2, U32>) -> Bool:
+  match state:
+    case None{}:
+      False{}
+    case Some{+row}:
+      U32.is_eq(row, H.Thing.Weapon.ready(H.Thing.saw()))
+
+def Sim.ready.sound(+psp: Psprite, +s: State) -> State:
+  Psprite{+state, tics, sx, sy} = psp
+  +saw = Bool.and(U32.is_eq(I.Inventory.ready(Player.inv(State.player(s))), 7),
+    Sim.ready.saw(state))
+  Bool.pick(State, saw, Sim.sound(Sn.Sound.sawidl(), Sn.Thing{H.Thing.you()}, s), s)
 
 # Doom's A_ReFire: the attack still held and the player alive takes
 # another shot and counts it; anything else puts the count back, where
@@ -3545,8 +3637,9 @@ def Sim.lower.done(dead: Bool, done: Bool, psp: Psprite, +s: State) -> Sim.Enter
       +p = State.player(s)
       +inv = Player.inv(p)
       +next = I.Inventory.pending(inv)
+      +changed = State.player.put(s, Player.holding(p, I.Inventory.weaponstate(next, 255, inv)))
       Entering{Some{H.Thing.Weapon.up(H.Thing.weapon(next))}, None{}, psp,
-        State.player.put(s, Player.holding(p, I.Inventory.weaponstate(next, 255, inv)))}
+        Bool.pick(State, U32.is_eq(next, 7), Sim.sound(Sn.Sound.sawup(), Sn.Thing{H.Thing.you()}, changed), changed)}
 
 def Sim.lower(psp: Psprite, +s: State) -> Sim.Entering:
   Psprite{state, tics, sx, +sy} = psp
@@ -3555,7 +3648,7 @@ def Sim.lower(psp: Psprite, +s: State) -> Sim.Entering:
   Sim.lower.done(Player.dead(State.player(s)), done,
     Psprite{state, tics, sx, F.Fixed.min(sunk, Sim.weaponbottom())}, s)
 
-def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) ->
+def Sim.psprite.act(action: H.Thing.Action, +psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) ->
   Sim.Entering:
   match action:
     case H.Null{}:
@@ -3565,11 +3658,15 @@ def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, cmd: K.Cmd, weapon: H.
     case H.WeaponReady{}:
       Sim.ready.fire(Bool.not(U32.is_eq(I.Inventory.pending(Player.inv(State.player(s))), 255)), K.Cmd.attack(cmd), psp,
         weapon, L.Level.sine(State.level(s)), State.clock(s),
-        Sim.bob(Player.momx(State.player(s)), Player.momy(State.player(s))), s)
+        Sim.bob(Player.momx(State.player(s)), Player.momy(State.player(s))), Sim.ready.sound(psp, s))
     case H.FirePistol{}:
       Sim.fire.pistol(psp, weapon, s)
     case H.FireShotgun{}:
       Sim.fire.shotgun(psp, weapon, s)
+    case H.Punch{}:
+      Sim.melee.hit(False{}, psp, s)
+    case H.Saw{}:
+      Sim.melee.hit(True{}, psp, s)
     case H.ReFire{}:
       Sim.refire(psp, cmd, weapon, s)
     case H.Lower{}:
@@ -5977,9 +6074,12 @@ def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: Player) -> Player:
       p
     case Some{+weapon}:
       +inv = Player.inv(p)
-      +valid = Bool.and(Bool.or(U32.is_eq(weapon, 1), U32.is_eq(weapon, 2)),
-        Bool.and(I.Inventory.owns(weapon, inv), Bool.not(U32.is_eq(weapon, I.Inventory.ready(inv)))))
-      Player.holding(p, Bool.pick(I.Inventory, valid, I.Inventory.want(weapon, inv), inv))
+      +chosen = Bool.pick(U32, Bool.and(U32.is_zero(weapon), Bool.and(I.Inventory.owns(7, inv),
+        Bool.not(Bool.and(U32.is_eq(I.Inventory.ready(inv), 7), Bool.not(U32.is_zero(I.Inventory.strength(inv))))))), 7, weapon)
+      +valid = Bool.and(Bool.or(U32.is_eq(chosen, 0), Bool.or(U32.is_eq(chosen, 1),
+        Bool.or(U32.is_eq(chosen, 2), U32.is_eq(chosen, 7)))),
+        Bool.and(I.Inventory.owns(chosen, inv), Bool.not(U32.is_eq(chosen, I.Inventory.ready(inv)))))
+      Player.holding(p, Bool.pick(I.Inventory, valid, I.Inventory.want(chosen, inv), inv))
 
 def Sim.weapon.select(+cmd: K.Cmd, +s: State) -> State:
   State.player.put(s, Sim.weapon.selected(K.Cmd.weapon(cmd), State.player(s)))
