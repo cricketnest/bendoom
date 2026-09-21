@@ -261,6 +261,8 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(sprite.head(gfx, 153))
     IO.print(sprite.head(gfx, 160))
     IO.print(sprite.head(gfx, 168))
+    IO.print(sprite.head(gfx, 196))
+    IO.print(sprite.head(gfx, 198))
     IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
       ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
@@ -320,6 +322,8 @@ def main() -> IO(Unit):
 #|sprite of state 153 width 49.000000 offset 26.000000 top 59.000000
 #|sprite of state 160 width 49.000000 offset 25.000000 top 59.000000
 #|sprite of state 168 width 33.000000 offset 15.000000 top 47.000000
+#|sprite of state 196 width 15.000000 offset 8.000000 top 11.000000
+#|sprite of state 198 width 34.000000 offset 17.000000 top 21.000000
 #|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7

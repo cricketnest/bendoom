@@ -885,22 +885,25 @@ def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
     Gfx.sprite.chase(n, False{}, down, down,
       Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks)))))
 
-# A type spawned in play alone, whose rows no THINGS record reaches: the
-# bullet puff's.
+# A type spawned in play alone, whose rows no THINGS record reaches.
 def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
   H.Def{kind, +state, radius, height, flags} = d
   Gfx.sprite.chase(n, False{}, state, state, marks)
 
 # The state rows the level's things spawn in, the rows their deaths lead
-# to, the pistol's, the puff's, the blood's, and those they lead to,
+# to, the pistol's, the puff's, the blood's, the fireball's, and those they lead to,
 # each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
-  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n,
-    Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n,
-      Gfx.sprite.weapon(H.Thing.shotgun(), n,
-        Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1)))))))
+  +marks = V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1)
+  +marks = Gfx.sprite.weapon(H.Thing.pistol(), n, marks)
+  +marks = Gfx.sprite.weapon(H.Thing.shotgun(), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.fireball()), n, marks)
+  +marks = Gfx.sprite.hurt(H.Thing.fireball(), n, marks)
+  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, marks))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
   match views:
