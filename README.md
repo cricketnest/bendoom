@@ -56,8 +56,8 @@ is filmed with `film-freedoom`, which carries Freedoom's song and sounds.
     RECORD=run.lmp nix run github:eliesgalvira/bendoom
     nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
 
-Bend itself is built from its source in the flake, pinned to one commit,
-with no self-updating launcher and no telemetry.
+Bend is built from a pinned, unmodified [source snapshot](https://github.com/eliesgalvira/bendoom/releases/tag/bend-2.0.22-source)
+hosted in our release assets, with no self-updating launcher or telemetry.
 
 Tests are `.bend` files under `tests/` whose trailing `#|` lines are the
 expected output, run natively and on the JS lane. `tools/oracle.nu`
