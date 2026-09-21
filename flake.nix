@@ -56,7 +56,7 @@
             paths = map (p: "${p}/lib/alsa-lib") [ pkgs.alsa-plugins pkgs.pipewire ];
           };
           bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music sounds alsa-plugins; iwad = shareware; };
-          film = pkgs.callPackage ./nix/film.nix { inherit bend music; iwad = shareware; };
+          film = pkgs.callPackage ./nix/film.nix { inherit bend music sounds; iwad = shareware; };
         in {
           packages = {
             inherit bend bendoom film;
