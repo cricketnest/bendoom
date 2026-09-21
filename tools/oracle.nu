@@ -100,7 +100,8 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, pause: table
   let display = $":(open --raw ($dir | path join display) | str trim)"
   let game = job spawn {
     cd $dir
-    with-env {HOME: $dir, DISPLAY: $display} {
+    hide-env --ignore-errors WAYLAND_DISPLAY
+    with-env {HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy} {
       ^chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig extra.cfg -window -nosound | ignore
     }
   }
