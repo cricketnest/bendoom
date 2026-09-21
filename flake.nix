@@ -76,6 +76,7 @@
           };
 
           checks = {
+            launchers = pkgs.callPackage ./nix/launchers.nix { };
             proof = pkgs.callPackage ./nix/proof.nix { inherit bend; };
             tests = pkgs.callPackage ./nix/tests.nix {
               inherit bend;
@@ -93,6 +94,7 @@
             packages = [
               bend
               pkgs.bun
+              pkgs.nushell
               pkgs.llvmPackages_19.clang
               pkgs.jujutsu
               # tools/oracle.nu diffs our frames against Chocolate Doom's,

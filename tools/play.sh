@@ -24,7 +24,9 @@ scratch=$(mktemp -d)
 unpack=
 cleanup() {
   [ ! -d "$scratch" ] || rm -r -- "$scratch"
-  [ ! -d "$unpack" ] || rm -r -- "$unpack"
+  [ ! -d "$unpack" ] ||
+    [ "$(readlink "${dest-}" 2>/dev/null)" = "$(basename "$unpack")" ] ||
+    rm -r -- "$unpack"
 }
 trap cleanup EXIT
 trap 'exit 129' HUP
@@ -46,9 +48,10 @@ if [ ! -x "$dest/bendoom" ]; then
   fi
   [ "${actual%% *}" = "$digest" ] || { echo 'Release checksum mismatch.' >&2; exit 1; }
   mkdir -p "$cache"
-  unpack=$(mktemp -d "$cache/.download.XXXXXX")
+  unpack=$(mktemp -d "$cache/.bundle.XXXXXX")
   tar -xzf "$scratch/$asset" -C "$unpack"
-  mv "$unpack" "$dest"
+  test -x "$unpack/bendoom"
+  ln -sn "$(basename "$unpack")" "$dest" 2>/dev/null || test -x "$dest/bendoom"
 fi
 cleanup
 trap - EXIT HUP INT TERM

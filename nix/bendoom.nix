@@ -7,8 +7,7 @@
 # along. On Linux, ALSA_PLUGIN_DIR names the plugins the host's ALSA
 # default may need; without them the device will not open and the game
 # plays silent. The game records a
-# demo as hex text, so under RECORD it writes a file beside the demo,
-# which becomes the demo once the game is over, Ctrl+C included.
+# demo as hex text, converted and installed after a successful exit.
 { lib, stdenv, callPackage, writeShellApplication, coreutils, bend, libx11, alsa-lib, alsa-plugins, iwad
 , music, sounds }:
 

@@ -89,8 +89,8 @@ env RECORD=run.lmp nix run --accept-flake-config github:eliesgalvira/bendoom
 ```
 
 Play, then **quit with Esc or close the window**. Recording also ends when
-you finish the level. Avoid Ctrl+C in the terminal: it leaves the demo without
-its end marker. Wait until the game exits and your terminal prompt returns
+you finish the level. Ctrl+C aborts the recording; an existing demo is preserved.
+Wait until the game exits and your terminal prompt returns
 before exporting.
 
 ### 2. Export the saved demo
