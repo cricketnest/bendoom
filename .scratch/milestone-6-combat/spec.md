@@ -4,7 +4,10 @@ Status: ready-for-agent
 
 ## Problem Statement
 
-Bendoom's E1M1 has its doors, its lift and its items, and nothing in it can hurt the player or be hurt. The map's zombiemen, shotgun guys, imps and demons never spawn. Ctrl does nothing, no weapon shows at the bottom of the view, barrels are furniture, and the nukage is safe to stand in. Under the view sits a black band 32 rows high where Doom shows health, armour, ammo, keys and the marine's face. The player cannot see what a pickup gave them, and the exit prints a time to the terminal where Doom shows its tally. The oracle hides all of this behind masks over the status bar and the pistol, so none of it is checked.
+Milestone 5 ended at world interaction and pickups. Combat, player weapons,
+damage feedback, the status bar and the intermission were the next coherent
+slice because they share the simulation state, renderer and Chocolate Doom
+oracle. This milestone implements and checks that slice over both E1M1s.
 
 ## Solution
 
@@ -94,7 +97,7 @@ The monsters of both E1M1s spawn on Hurt Me Plenty and behave as vanilla's: they
 - The game stays single-player on Hurt Me Plenty. The monsters are the ones the two E1M1s spawn there: zombieman and imp in both, shotgun guy and demon in Freedoom alone. The shareware map's shotgun guys are for the harder skill, and the spectre appears in Freedoom's map on another skill only, so it gets no row and no fuzz column. The thing tables gain those monsters' states and actions, the imp's fireball, the bullet puff, blood, the dropped clip and shotgun, the gibs pool and the barrel's explosion. Nothing else.
 - The weapons are the ones the maps can give: fist, chainsaw, pistol, shotgun. Freedoom's map holds the chainsaw and the berserk pack, the shareware map a shotgun, and Freedoom's shotgun guys drop theirs. The chaingun, launcher, plasma rifle and BFG have no state rows, and their number keys select nothing, since the player can never own them. Rockets and cells stay inventory numbers.
 - The tic command gains vanilla's attack bit and its weapon-change bits, laid out as the demo's buttons byte. Ctrl fires. The keys 1 to 3 select as `G_BuildTiccmd` does. The demo recorder writes the byte and the demo reader returns it, so the film and Chocolate Doom both replay a fight.
-- The sim reports the sounds it starts and carries vanilla's second random index. That is the first ticket of milestone 7's spec and the one ticket both milestones wait for. Each action here starts its sounds where vanilla's calls `S_StartSound`. The draws that pick a sound variant are `P_Random` draws and happen whether or not anything plays them.
+- The sim reports the sounds it starts and carries vanilla's second random index. Each action starts its sounds where vanilla calls `S_StartSound`. The draws that pick a sound variant are `P_Random` draws and happen whether or not anything plays them.
 - The player's weapon is vanilla's two player sprites, weapon and flash, each with a state, tics and a position. `P_MovePsprites` runs in the player's think. The actions are `A_WeaponReady`, `A_ReFire`, `A_CheckReload`, `A_Lower`, `A_Raise`, `A_Punch`, `A_Saw`, `A_FirePistol`, `A_FireShotgun`, `A_GunFlash` and the three light actions. The pending weapon, the refire count, the attack-down flag and the extra light join the player. Milestone 5's two deliberate gaps close: a picked-up weapon becomes pending, and the berserk pack brings up the fist. `P_GiveAmmo`'s switch to a better weapon comes with them.
 - One traversal replaces the use key's private line search. It follows `P_PathTraverse`: it gathers the lines and the things a ray meets through the blockmap, sorts them by distance, and hands them to a visitor. The use key, `P_AimLineAttack` and `P_LineAttack` are three visitors. Autoaim keeps vanilla's slopes and its two retries to either side. No line in either map fires on a gunshot, so `P_ShootSpecialLine` is left out.
 - Damage is `P_DamageMobj`: thrust from the blow, the chainsaw's exemption, armour absorbing by type, the player's damage count and attacker, pain chance, reaction time, the threshold that keeps a monster on its target, and the switch of target that makes infighting. Death is `P_KillMobj`: flags, the kill count, the gib test against spawn health, the death tics shortened by a random draw, and the drop. Health becomes a signed quantity wherever it is compared.
@@ -135,8 +138,7 @@ Sound effects themselves (milestone 7). The chaingun, launcher, plasma rifle and
 
 ## Further Notes
 
-- Milestones 6 and 7 run in parallel as one ticket graph. Milestone 7's first ticket (the sim reports its sounds) blocks every ticket here that ports an action with a sound. The other shared ground is the sim's file, where both milestones add to the state and the tic, so merges between worktrees will conflict there as they did in milestone 5.
-- Inside this milestone four strands share only the root tickets and can proceed side by side: weapons and hitscan, monsters, the status bar with messages and palettes, and the intermission. Damage sits between the first two. The player sprites and the status bar touch different rows of the frame.
-- Sync is the risky part. Milestones 4 and 5 had a few dozen random draws per test. A fight has thousands, spread over sight checks, chase turns, attack rolls, pain, puffs and death tics, and the order of the thinker list decides who draws first. The long-fight oracle case exists to catch that, and it should be written early and kept failing until it passes.
+- Milestones 6 and 7 share the sim's sound events and random stream. Actions record sounds where vanilla starts them, and the mixer consumes those events without changing simulation order.
+- Combat sync is the main fidelity risk. A fight has thousands of random draws spread over sight checks, chase turns, attack rolls, pain, puffs and death tics, and the thinker order decides who draws first. Long-fight oracle cases expose a misplaced draw.
 - The status bar is the quieter risk. It was never checked, because the oracle masked it. The face cannot be pinned by a paused screenshot, which is why its check moves to a replay of vanilla's source.
 - The Bend constraints that shape the implementation remain in the project's Bend guide.

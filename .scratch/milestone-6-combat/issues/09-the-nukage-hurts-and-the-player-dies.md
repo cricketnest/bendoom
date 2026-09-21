@@ -39,7 +39,7 @@
 
 The render test's new case is the last of these. It was run again, with the frame dump built again, after each merge of the integration branch: the buttons byte, the one traversal, and then the one position check with the status bar, where it is 0 over all 200 rows, the bar showing no health, with the pause graphic and the face box masked.
 
-Ticket 08 then turned the oracle's monsters on, and that place cannot be compared any more: vanilla's imps in the yard see a player who stands 650 tics there and wake, and Bendoom's cannot move yet, so the frames part company from about the twentieth tic (117 and 329 differing pixels at two places at 20 tics, 48988 at 650). The case stays as a regression pin, beside the ones ticket 08 pinned for the same reason, until the monsters think. Every other render case is unchanged.
+At this ticket's checkpoint the dead-view case became a regression pin because sight had landed before chase; ticket 16 later supplied the missing movement. Every other render case was unchanged.
 
 **What was built.**
 
@@ -58,7 +58,7 @@ Ticket 08 then turned the oracle's monsters on, and that place cannot be compare
 
 **Left for later tickets, by design.**
 
-- `mo->health` below zero. Vanilla keeps both it and `player->health`, which clamps at 0; the only place they differ is `P_KillMobj`'s gib test against the spawn health, and nothing here can deal 200 points. One clamped health is the whole of this ticket, and ticket 13 adds the signed mobj health when a barrel can overkill.
+- `mo->health` below zero. Vanilla keeps both it and `player->health`, which clamps at 0; the only place they differ is `P_KillMobj`'s gib test against the spawn health, and nothing here can deal 200 points. This ticket kept the player value clamped; ticket 13 added signed mobj health for overkill.
 - The flags `P_KillMobj` clears and the quartered height. A dead player takes no more damage, since `P_DamageMobj` asks its health; no mover in either map crushes; and the player's own sprite is never drawn. Ticket 13's blast and any crusher would need them.
 - The chainsaw's exemption from the thrust, which needs a ready weapon to read (ticket 12).
 - `P_DamageMobj`'s monster half: pain chance per type, reaction time, threshold and the switch of target (tickets 12 to 18 call the same `Sim.damage` shape for things once things can be hurt).

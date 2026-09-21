@@ -185,10 +185,6 @@ def Player.floorz(+p: Player) -> U32:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   floorz
 
-def Player.ceilz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
-  ceilz
-
 def Player.crossed(+p: Player) -> List<&2, U32>:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   crossed
@@ -786,10 +782,6 @@ def Sim.near(+level: L.Level, things: H.Things, +x: U32, +y: U32, +r: U32) -> Li
 # ledges and to pick things up.
 def Player.body(+p: Player, id: U32) -> Sim.Body:
   Body{id, Player.x(p), Player.y(p), Player.z(p), Sim.radius(), Sim.height(), 33557510}
-
-def Sim.body.def(d: H.Thing.Def, id: U32, x: U32, y: U32, z: U32) -> Sim.Body:
-  H.Def{kind, state, radius, height, flags} = d
-  Body{id, x, y, z, F.Fixed.of_map(radius), F.Fixed.of_map(height), flags}
 
 # A thing's live body, including the dimensions a crushed corpse loses.
 def Sim.body.of(th: H.Thing) -> Sim.Body:
@@ -2646,8 +2638,7 @@ def Sim.damage.if(dead: Bool, +damage: U32, +inflictor: U32, +source: U32, +s: S
 # P_DamageMobj's player branch, the whole of it: a blow with an
 # inflictor thrusts the player away from it; the armour then takes its
 # share of the damage and the player takes the rest. A player already
-# dead takes none. The chainsaw's exemption from the thrust waits for a
-# ready weapon to read.
+# dead takes none. A chainsaw blow is exempt from thrust.
 def Sim.damage.you(damage: U32, inflictor: U32, source: U32, +s: State) -> State:
   Sim.damage.if(Player.dead(State.player(s)), damage, inflictor, source, s)
 
@@ -3669,9 +3660,8 @@ def Sim.refire(psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) -> S
     U32.is_eq(I.Inventory.pending(Player.inv(State.player(s))), 255),
     Bool.not(U32.is_zero(I.Inventory.health(Player.inv(State.player(s))))))), psp, weapon, s)
 
-# Doom's A_Lower for a dead player: the sprite sinks 6 a tic and stays
-# at the bottom of the screen. Death is the only thing that lowers a
-# weapon here, so the branch that brings the next one up has no caller.
+# Doom's A_Lower: the sprite sinks 6 a tic, stays at the bottom for a
+# dead player, and brings the pending weapon up otherwise.
 def Sim.lower.done(dead: Bool, done: Bool, psp: Psprite, +s: State) -> Sim.Entering:
   match dead done:
     case True{} _:
@@ -3828,11 +3818,6 @@ def Sim.psprites.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @
 
 def Sim.psprites.idle(+s: State) -> State:
   Sim.psprites.with(~Sim.damage.enter, K.Cmd.idle(), s)
-
-# The weapon put away, the flash as it was.
-def Sim.psprites.lowered(flash: Psprite, e: Sim.Entering) -> State:
-  Entering{next, sets, psp, s} = e
-  State.showing(Psprites{psp, flash}, s)
 
 def Sim.psprites.raised(e: Sim.Entering) -> State:
   Entering{next, sets, psp, s} = e

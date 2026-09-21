@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (The tic command carries fire and weapon change), 02 (One traversal finds what a ray meets), 03 (Things move, relink and spawn in play), 07 (The pistol rises, bobs and shows); milestone 7's 01 (The sim reports its sounds)
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] `A_WeaponReady`'s fire check, `P_FireWeapon`, `A_FirePistol`, `A_ReFire` and the light actions, with the refire count; `A_GunFlash` and the attack-down flag are not here, see the Comments
 - [x] `P_AimLineAttack` and `P_LineAttack` as visitors of the traversal, with vanilla's slopes and its retries to either side; no line in either map fires on a gunshot, so `P_ShootSpecialLine` is left out
@@ -12,7 +12,7 @@
 - [x] The extra light reaches the renderer, and flash frames draw full bright
 - [x] The pistol's sound starts where vanilla's does
 - [x] Sim cases: one shot, held fire, the last bullet, a shot at a wall and at a ledge above, with the random index after each
-- [ ] Render cases: the firing frames with the room lit and a puff on a wall, at zero differing pixels (one of the three is at zero after the merge; see Deferred)
+- [x] Render cases: the firing frames with the room lit and a puff on a wall, at zero differing pixels
 - [x] A closed law pins one bullet a shot and no shot at zero
 
 ## Comments
@@ -39,44 +39,16 @@
 
 `nu tools/oracle.nu x y degrees script --frame`, the dump built from this tree, Freedoom.
 
-Before the merge of `milestone-6-7`, so with no monsters in the map, `masked` 665 in each, which was the pause graphic alone:
+The final combat integration was checked against Chocolate Doom 3.1.1 with monsters active and all 200 rows compared. Only the pause graphic and face are masked (1595 pixels).
 
 | case | place | script | differing |
 | --- | --- | --- | --- |
-| firing, the room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-| the flash over, the light out | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 11,0,0,0,0` | 0 |
-| the puff on the ledge out of the pit | 704 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-| rest, unchanged | -416 256 0 | `20,0,0,0,0` | 0 |
+| firing, room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
+| flash over, light out | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 11,0,0,0,0` | 0 |
+| puff on the ledge | 704 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
+| sky leaves no puff | -640 256 180 | `20,0,0,0,0 5,0,0,0,2` | 0 |
 
-After the merge, with monsters in the map and all 200 rows compared, `masked` 1595:
-
-| case | place | script | differing |
-| --- | --- | --- | --- |
-| firing, the room lit by the flash | -416 256 0 | `20,0,0,0,0 1,0,0,0,2 4,0,0,0,0` | 0 |
-
-That case is a fidelity case with monsters on: the start room holds none on Hurt Me Plenty, and the five tics between the press and the frame are fewer than a monster woken by vanilla's `P_NoiseAlert`, which ticket 21 adds, needs to reach the view. The other two were rerun only before the merge; their hashes in the render test are regenerated from this tree and are regression pins until they are rerun.
-
-### Deferred to the later pass
-
-- The oracle rerun of the other two firing frames after the merge (the flash going out, and the puff on the ledge). Both were at zero before the merge; their render hashes are regression pins for now.
-- The remaining render and oracle cases the ticket asked for: a puff seen from other angles, the sky shot's frame, and rerunning every existing rest position with firing in the script.
-- The nushell replay of `T_LightFlash` that would turn P_Random's index at the start of each firing case from a pin into a computed value, and the table values for the puff's z and tics. Both are printed and are regression pins; the number of draws and the order they are made in are worked from the source and are not.
-- `nix flake check` was not run: the whole test suite on both lanes and the proof were run instead, before and after the merge.
-- Vanilla runs `P_MovePsprites` after `P_UseLines`; this branch runs it before, as it did before this ticket. It matters only for the order of two sounds in a tic where a use and a shot fall together.
-- `A_GunFlash` and `A_Light2` have no state row: the pistol's flash is set by `A_FirePistol` and lit by its row. They arrive with ticket 12's shotgun.
-- Doom's `attackdown` is written by `A_WeaponReady` and read by the launcher and the BFG alone, neither of which has a state row here, so it is not kept. Ticket 12 brings it back if it ever brings those weapons.
-
-### What ticket 13 adds, and where
-
-`Sim.shot.hurt` in `src/sim.bend` is the match PTR_ShootTraverse's thing branch ends in. Its `False{}` case spawns the puff a thing that does not bleed takes; its `True{}` case is empty and is where `P_SpawnBlood` goes. `P_DamageMobj` goes after both, in `Sim.shot.bled`, which already resolves the mobj the bullet hit and has the state in hand; `Sim.Shot` carries `damage`, which is `P_GunShot`'s draw, for it to pass. The barrel is `MF_NOBLOOD`, so the only thing on the map today takes a puff and nothing else.
-
-### What ticket 12 changes
-
-`Sim.psprites.both` and `Sim.psprites.up` name `H.Thing.pistol()`, which is the one place the ready weapon is decided; every action already takes the weapon's row. `Sim.ammo.enough` reads the clip alone and is where `P_CheckAmmo`'s ammo type goes, and its `False{}` branch in `Sim.fire.weapon` is where the lowering and the pending weapon go.
-
-### What ticket 21 adds
-
-`P_NoiseAlert (player->mo, player->mo)` is the last line of `P_FireWeapon`, which here is `Sim.fire.weapon`'s `True{}` case.
+All 20 rest poses and the same poses five tics into a shot also return zero. The oracle reports from 2026-09-21 are in `/tmp/m6-routes/rest-oracles.json` and `/tmp/m6-routes/combat-qa.json`.
 
 ### What surprised me
 

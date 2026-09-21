@@ -731,8 +731,8 @@ type Play is Data:
 type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
 
-# The level as loaded, at its start: Doom's G_DoLoadLevel, which a
-# player's death will want too.
+# The level as loaded, at its start: Doom's G_DoLoadLevel, shared by
+# death and intermission restarts.
 def Play.start(+level: L.Level) -> Play:
   Playing{S.State.start(level)}
 
@@ -761,13 +761,6 @@ def Play.ended(ended: Bool, +after: S.State) -> Play:
 
 def Play.after(+after: S.State) -> Play:
   Play.ended(S.State.ended(after), after)
-
-def Play.showing(over: Bool, +level: L.Level, cmd: K.Cmd, press: Bool, wi: Inter) -> Play:
-  match over:
-    case True{}:
-      Play.after(S.Sim.tic(cmd, S.State.start(level)))
-    case False{}:
-      Showing{Inter.tic(press, wi)}
 
 # Whether the tally is accelerated this tic: WI_checkForAccelerate reads
 # attack and use from the command, and the game's window adds Enter,
@@ -822,15 +815,6 @@ def Play.tics(script: List<&2, K.Cmd>, +held: Bool, +level: L.Level, play: Play)
 # as a demo's tics drive the tally.
 def Play.replay(script: List<&2, K.Cmd>, +level: L.Level, play: Play) -> Play:
   Play.tics(script, False{}, level, play)
-
-# Which mode the play is in and how far the tally has come, for the
-# tests.
-def Play.show(play: Play) -> String:
-  match play:
-    case Playing{+state}:
-      "level tic " ++ U32.show(S.State.clock(state))
-    case Showing{+wi}:
-      "tally " ++ Inter.show(wi)
 
 # Whether the level is still running, which the demo is recorded for.
 def Play.playing(play: Play) -> Bool:
