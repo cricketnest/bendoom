@@ -840,13 +840,12 @@ def Sim.met.if(stops: Bool, id: U32, later: Sim.Met) -> Sim.Met:
       Met{before, hit} = later
       Met{id <> before, hit}
 
-def Sim.met.go(ids: List<&2, U32>, +skip: U32, +things: H.Things, +p: Player, +m: Sim.Body) -> Sim.Met:
+def Sim.met.go(ids: List<&2, U32>, +things: H.Things, +p: Player, +m: Sim.Body) -> Sim.Met:
   match ids:
     case []:
       Met{[], None{}}
     case +id <> rest:
-      Sim.met.if(Bool.and(Bool.not(U32.is_eq(id, skip)), Sim.stops.at(things, p, m, id)), id,
-        Sim.met.go(rest, skip, things, p, m))
+      Sim.met.if(Sim.stops.at(things, p, m, id), id, Sim.met.go(rest, things, p, m))
 
 # The mobjs near a mobj's box.
 def Sim.nearby(+level: L.Level, things: H.Things, m: Sim.Body) -> List<&2, U32>:
@@ -855,14 +854,12 @@ def Sim.nearby(+level: L.Level, things: H.Things, m: Sim.Body) -> List<&2, U32>:
 
 # The thing half of Doom's P_CheckPosition for a mobj's box.
 def Sim.met(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body) -> Sim.Met:
-  Body{+id, +x, +y, +z, +radius, +height, +flags} = m
-  +ids = Sim.near(level, things, x, y, radius)
-  Sim.met.go(ids, id, things, p, Body{id, x, y, z, radius, height, flags})
+  Sim.met.go(Sim.nearby(level, things, m), things, p, m)
 
 def Sim.met.missile(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body, +source: U32) -> Sim.Met:
   Body{+id, +x, +y, +z, +radius, +height, +flags} = m
   +ids = Sim.near(level, things, x, y, radius)
-  Sim.met.go(ids, source, things, p, Body{id, x, y, z, radius, height, flags})
+  Sim.met.go(H.Things.without(ids, source), things, p, Body{id, x, y, z, radius, height, flags})
 
 def Sim.Met.hit(t: Sim.Met) -> Maybe<&2, U32>:
   Met{before, hit} = t
@@ -4041,19 +4038,60 @@ def Sim.missile.hurt(hit: Maybe<&2, U32>, +id: U32, +source: U32, +s: State) -> 
       Sim.missile.burst(id, Sim.damage(target,
         (3 * ((M.Random.at(State.rnd(after)) % 8 : U32) + 1 : U32) : U32), id, source, after))
 
-def Sim.missile.result(go: Bool, met: Sim.Met, fit: Sim.Fit, +id: U32, +source: U32, +th: H.Thing, +x: U32,
-  +y: U32, +s: State) -> State:
+def Sim.missile.blocked(sky: Bool, hit: Maybe<&2, U32>, +id: U32, +source: U32, +s: State) -> State:
+  match sky:
+    case True{}:
+      Sim.remove(id, s)
+    case False{}:
+      Sim.missile.hurt(hit, id, source, s)
+
+def Sim.missile.result(go: Bool, sky: Bool, met: Sim.Met, fit: Sim.Fit, +id: U32, +source: U32, +th: H.Thing,
+  +x: U32, +y: U32, +s: State) -> State:
   match go:
     case True{}:
       Sim.thing.relink(id, th, H.Thing.at(th, State.level(s), x, y), fit, s)
     case False{}:
-      Sim.missile.hurt(Sim.Met.hit(met), id, source, s)
+      Sim.missile.blocked(sky, Sim.Met.hit(met), id, source, s)
 
-def Sim.missile.checked(met: Sim.Met, fit: Sim.Fit, +id: U32, +source: U32, +th: H.Thing, +x: U32, +y: U32,
+def Sim.missile.sky.line.back(none: Bool, +line: L.Level.Line, +level: L.Level, +x: U32, +y: U32, +r: U32,
+  +ceil: U32, +back: U32) -> Bool:
+  match none:
+    case True{}:
+      False{}
+    case False{}:
+      Bool.and(Sim.box_touches(x, y, r, line), Bool.and(Sim.box_crosses(x, y, r, line),
+        Bool.and(U32.is_eq(Sim.open_top(level, line), ceil), L.Level.sky(level, back))))
+
+def Sim.missile.sky.line(+line: L.Level.Line, +level: L.Level, +x: U32, +y: U32, +r: U32, +ceil: U32) ->
+  Bool:
+  L.Line{x1, y1, x2, y2, flags, front, +back} = line
+  Sim.missile.sky.line.back(U32.is_eq(back, L.Level.none()), line, level, x, y, r, ceil, back)
+
+def Sim.missile.sky.go(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +r: U32, +ceil: U32) -> Bool:
+  match lines:
+    case []:
+      False{}
+    case i <> rest:
+      Bool.or(Sim.missile.sky.line(L.Level.line(level, i), level, x, y, r, ceil),
+        Sim.missile.sky.go(rest, level, x, y, r, ceil))
+
+def Sim.missile.sky(clear: Bool, +level: L.Level, +x: U32, +y: U32, +r: U32) -> Bool:
+  match clear:
+    case False{}:
+      False{}
+    case True{}:
+      Sim.missile.sky.go(Sim.lines(level, (x - r : U32), (y - r : U32), (x + r : U32), (y + r : U32)),
+        level, x, y, r, L.Level.ceil(level, L.Level.sector_at(level, x, y)))
+
+def Sim.missile.checked(+met: Sim.Met, fit: Sim.Fit, +id: U32, +source: U32, +th: H.Thing, +x: U32, +y: U32,
   +s: State) -> State:
   Fit{+ok, +floor, +ceil, drop} = fit
+  +level = State.level(s)
+  +clear = Maybe.is_none(&2, U32, Sim.Met.hit(met))
   Sim.missile.result(Bool.and(ok, Bool.and(F.Fixed.ge((ceil - H.Thing.z(th) : U32), H.Thing.height(th)),
-      F.Fixed.le(floor, H.Thing.z(th)))), met, Fit{ok, floor, ceil, drop}, id, source, th, x, y, s)
+      F.Fixed.le(floor, H.Thing.z(th)))), Sim.missile.sky(clear, level, x, y,
+      V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.radius())), met,
+    Fit{ok, floor, ceil, drop}, id, source, th, x, y, s)
 
 def Sim.missile.fit(+id: U32, +source: U32, +th: H.Thing, +x: U32, +y: U32, +s: State) -> State:
   +m = Sim.Body.at(Sim.body.of(th), x, y)
@@ -5324,9 +5362,8 @@ def Sim.chase.on(+id: U32, +s: State) -> Sim.Acted:
 # and its range let it, and otherwise walks, picking a new direction when
 # its count runs out or its move is blocked, and calling out on a draw
 # under 3. The netgame branch that looks for a nearer player is left
-# out with the other players. Ticket 18 adds the melee branch, between
-# the just-attacked test and the missile one, when it gives the imp and
-# the demon the rows H.Thing.melee answers 0 for here.
+# out with the other players. The melee branch sits between the
+# just-attacked test and the missile one.
 def Sim.chase(+id: U32, +s: State) -> Sim.Acted:
   Sim.chase.on(id, Sim.chase.tick(id, s))
 
