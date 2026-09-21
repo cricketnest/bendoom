@@ -3,89 +3,165 @@
 > [!WARNING]
 > SLOP WARNING: There has been no adult supervision of the code.
 
-Doom, written in [Bend 2](https://bend-lang.com).
+Doom's first level, E1M1, written in [Bend 2](https://bend-lang.com).
+Play through the level with monsters, weapons, doors, pickups, sound effects,
+OPL music and the intermission screen. Record a demo and export it as a video.
 
-The game reads a Doom WAD at runtime, so it plays id's shareware
-`DOOM1.WAD` (free to pass on, not to sell), which the flake fetches from
-the idgames archive, or [Freedoom](https://freedoom.github.io) (BSD
-licensed, from nixpkgs). The sim is
-integer fixed point, as the original was, and the rules that must hold
-about it are stated in `LAWS.bend` and proven in `PROOF.bend`; `nix flake
-check` refuses a build with an open or broken law.
+Choose the original Doom shareware assets or [Freedoom](https://freedoom.github.io).
+Both versions include their game data; you do not need to supply a WAD.
 
-    nix run github:eliesgalvira/bendoom
-    nix run github:eliesgalvira/bendoom#bendoom-freedoom
+## Play
 
-If flakes aren't enabled on your system, put this after `nix`:
+Available for Linux x86-64, Linux ARM64 and Apple Silicon macOS.
+Linux requires X11 or Xwayland. CI checks all three platforms; macOS gameplay
+and audio still need a hardware test.
 
-    --extra-experimental-features 'nix-command flakes'
+### Without Nix
 
-Builds are available for x86_64 Linux, aarch64 Linux and Apple Silicon
-macOS. CI checks all three; gameplay and audio on macOS still need a
-hardware test.
+Run the shareware version:
 
-Without Nix, download and run the portable release:
+```sh
+curl -fsSL https://github.com/eliesgalvira/bendoom/releases/latest/download/play.sh | sh
+```
 
-    curl -fsSL https://github.com/eliesgalvira/bendoom/releases/latest/download/play.sh | sh
+Or choose Freedoom:
 
-For Freedoom, end the command with `sh -s -- --freedoom`. The launcher
-checks the archive's SHA-256 and keeps it in `~/.cache/bendoom`, or under
-`XDG_CACHE_HOME`. Linux needs an X11 display or Xwayland; the archive
-includes its loader and libraries. The macOS build is for Apple Silicon.
-You can also extract a release tarball and run `./bendoom` directly.
+```sh
+curl -fsSL https://github.com/eliesgalvira/bendoom/releases/latest/download/play.sh | sh -s -- --freedoom
+```
 
-Nix can download our builds from `bendoom.cachix.org`. Accept the flake's
-cache settings when prompted, or configure it once with `cachix use bendoom`.
+The launcher downloads the release for your platform, verifies its SHA-256
+checksum and starts the game. Run the same command next time; it reuses the
+download in `~/.cache/bendoom`, or under `XDG_CACHE_HOME` if set.
 
-The up and down arrows or W and S walk, the left and right arrows turn,
-A and D strafe, Shift runs, Space opens doors and presses switches, Ctrl
-fires, Esc quits. After dying, Space starts the level again.
+For a manual download, extract your platform's archive from
+[GitHub Releases](https://github.com/eliesgalvira/bendoom/releases/latest),
+then run `./bendoom` inside the extracted directory. Neither Nix nor Nushell
+is needed to play these releases.
 
-To record a game and make a video of it, first play with `RECORD` naming
-the demo to write, and quit with Esc or by closing the window; the demo
-also ends with the level. Ctrl+C in the terminal leaves it without its
-end marker. Then `film` encodes the demo as a 1600 by 1200 MP4 at Doom's
-35 tics a second, and leaves an existing video alone. Its audio is the
-same eight-channel mix of the WAD's song and sound effects that the game
-plays, with every sound beginning on its tic. When the demo completes the
-level, the video includes the intermission count-up and holds the final
-scores for three seconds. The demo is vanilla's .lmp,
-which Chocolate Doom plays too. A demo recorded with `bendoom-freedoom`
-is filmed with `film-freedoom`, which carries Freedoom's song and sounds.
+### With Nix
 
-    RECORD=run.lmp nix run github:eliesgalvira/bendoom
-    nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
+Accept the flake's cache settings when prompted to download prebuilt packages
+from `bendoom.cachix.org`.
 
-Bend is built from a pinned, unmodified [source snapshot](https://github.com/eliesgalvira/bendoom/releases/tag/bend-2.0.22-source)
-hosted in our release assets, with no self-updating launcher or telemetry.
+Run the shareware version:
 
-Tests are `.bend` files under `tests/` whose trailing `#|` lines are the
-expected output, run natively and on the JS lane. `tools/oracle.nu`
-plays a command script as a vanilla demo in Chocolate Doom and diffs its
-frame against ours after the same commands. Specs live under
-`.scratch/`; the Bend constraints the code lives by are in `docs/bend.md`.
+```sh
+nix run github:eliesgalvira/bendoom
+```
 
-## Milestones
+Or choose Freedoom:
 
-Each is a spec under `.scratch/`, cut into tickets, then implemented.
-The reference for how anything looks or behaves is vanilla Doom: the
-1997 linuxdoom-1.10 source and Chocolate Doom, which reproduces it bug
-for bug.
+```sh
+nix run github:eliesgalvira/bendoom#bendoom-freedoom
+```
 
-1. WAD loads, directory parses, a window opens. Done.
-2. Playsim: fixed point, E1M1 loaded, movement and collision, the wall law. Done.
-3. Walls, floors, ceilings and the sky: vanilla's renderer, its frames Chocolate Doom's pixel for pixel. Done.
-4. Doors, the lift, switches, the exit, blinking and glowing lights, animated flats and textures, scrolling walls: E1M1 completable through its world geometry, its frames Chocolate Doom's tic for tic. Done.
-5. Decorations, items, pickups and sprites: the two E1M1s' noncombat things spawned on Hurt Me Plenty and drawn as vanilla's sprites behind walls, ledges and grates, animated on its tics; health, armour, ammo, weapons and the blue key taken as vanilla takes them; solid things in the way. Its frames Chocolate Doom's tic for tic. Done.
-6. Monsters, weapons, damage, the status bar and intermission on both E1M1s. Recorded fights and complete routes agree with Chocolate Doom; the maintainer played both maps to the intermission. Combat, render, route, proof and performance checks are recorded under `.scratch/milestone-6-combat/`. Done.
-7. Sound effects. Doors, the lift, switches, pickups, weapons, monsters, the player and the intermission sound from the WAD's own lumps, expanded and mixed over the music on vanilla's eight moving channels. The film carries the same mix. Done.
-8. E1M1's music: the song and the instruments of the package's WAD played in Bend as Chocolate Doom's OPL music plays them, sample for sample, rendered while the flake builds and streamed by the game on repeat, so each package plays the song of the WAD it was built with. Done.
-9. Hellbent: the game as one λ-expression.
+If your Nix installation does not enable flakes, add
+`--extra-experimental-features 'nix-command flakes'` after `nix`.
+
+## Controls
+
+| Action | Keys |
+| --- | --- |
+| Walk forward / backward | Up / Down, or W / S |
+| Turn left / right | Left / Right |
+| Strafe left / right | A / D |
+| Run | Hold Shift |
+| Fire | Ctrl |
+| Open doors / press switches | Space |
+| Select fist / pistol / shotgun | 1 / 2 / 3, if owned |
+| Restart after dying | Space |
+| Quit | Esc, or close the window |
+
+## Record and export a video
+
+Recording saves a Doom `.lmp` demo. Exporting replays that demo to produce
+an MP4; these are two separate steps. The video exporter requires Nix.
+
+### 1. Record your game
+
+For shareware:
+
+```sh
+env RECORD=run.lmp nix run github:eliesgalvira/bendoom
+```
+
+Play, then **quit with Esc or close the window**. Recording also ends when
+you finish the level. Avoid Ctrl+C in the terminal: it leaves the demo without
+its end marker. Wait until the game exits and your terminal prompt returns
+before exporting.
+
+### 2. Export the saved demo
+
+From the same directory:
+
+```sh
+nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
+```
+
+The video is 1600 × 1200 at 35 frames per second, with music and sound effects.
+A completed level includes the intermission count-up and a three-second hold
+on the final scores. The exporter refuses to overwrite an existing video;
+choose another output filename to export again.
+
+### Recording Freedoom
+
+Use the matching game and exporter. First record:
+
+```sh
+env RECORD=freedoom.lmp nix run github:eliesgalvira/bendoom#bendoom-freedoom
+```
+
+After the game exits, export:
+
+```sh
+nix run github:eliesgalvira/bendoom#film-freedoom -- freedoom.lmp freedoom.mp4
+```
+
+You can also record from an extracted portable release with
+`env RECORD=run.lmp ./bendoom`, then export through Nix using the matching
+shareware or Freedoom exporter. The `.lmp` files can also be played by
+Chocolate Doom with the matching WAD.
+
+## Development
+
+From a checkout, enter the development environment:
+
+```sh
+nix develop
+```
+
+To check the proofs and run the tests:
+
+```sh
+nix flake check -L
+```
+
+The simulation uses fixed-point integers. [LAWS.bend](LAWS.bend) states its
+invariants and [PROOF.bend](PROOF.bend) proves them; an open or broken law fails
+the check. Tests in [tests/](tests/) run on both the native and JavaScript
+backends against the expected output in their trailing `#|` lines.
+
+Vanilla Doom is the reference for gameplay and rendering.
+[tools/oracle.nu](tools/oracle.nu) compares frames against Chocolate Doom on
+a headless display. Its usage and prerequisites are documented in the script.
+Read [docs/bend.md](docs/bend.md) before changing Bend code or proofs.
+
+The compiler uses a pinned, unmodified
+[Bend source snapshot](https://github.com/eliesgalvira/bendoom/releases/tag/bend-2.0.22-source),
+with platform patches maintained under [nix/](nix/).
+
+## Project status
+
+The E1M1 milestones through combat, sound effects and music are complete.
+Specs, tickets and verification notes live under [.scratch/](.scratch/).
+The next milestone is **Hellbent**: the game as a single λ-expression.
 
 ## License
 
-GPL-2.0-or-later, in `LICENSE`. `src/tables.bend` and
-`src/opl_tables.bend` are generated from Chocolate Doom's source, which
-is GPL-2.0-or-later too. `src/sfx_taps.bend` is the filter of SDL's
-resampler, computed by `tools/gen_sfx_taps.nu` as SDL's source computes
-it; SDL is under the zlib license.
+The code is [GPL-2.0-or-later](LICENSE). Doom's shareware assets and Freedoom's
+BSD-licensed assets remain under their respective licenses.
+
+`src/tables.bend` and `src/opl_tables.bend` are generated from Chocolate Doom's
+GPL-2.0-or-later source. `src/sfx_taps.bend` is generated by
+`tools/gen_sfx_taps.nu` from SDL's resampler filter; SDL is under the zlib license.
