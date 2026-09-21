@@ -1554,6 +1554,32 @@ def attack.missile.result(tag: String, +s: S.State) -> IO(S.State):
       ++ spawned.all(292, S.State.things(s)))
     return s
 
+def attack.missile.vertical(+th: H.Thing, +z: U32, +floorz: U32, +momz: U32) -> H.Thing:
+  H.Thing{id, kind, x, y, wasz, wasfloor, ceilz, angle, sector, state, tics, wasmom, hurt} = th
+  H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}
+
+def attack.missile.floor.some(+th: H.Thing, +id: U32, +s: S.State) -> IO(Unit):
+  +floor = H.Thing.floorz(th)
+  +resting = S.Sim.thing(id, S.State.thing.put(id, attack.missile.vertical(th, floor, floor, 0), s))
+  +crossing = S.Sim.thing(id, S.State.thing.put(id, attack.missile.vertical(th, floor, floor, 4294967295), s))
+  do IO<Unit>:
+    IO.print("fireball resting random " ++ U32.show(S.State.rnd(resting))
+      ++ spawned.all(id, S.State.things(resting)))
+    IO.print("fireball crossing floor random " ++ U32.show(S.State.rnd(crossing))
+      ++ spawned.all(id, S.State.things(crossing)))
+
+def attack.missile.floor.found(m: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> IO(Unit):
+  match m:
+    case None{}:
+      IO.print("fireball missing")
+    case Some{th}:
+      attack.missile.floor.some(th, id, s)
+
+def attack.missile.floor(+level: L.Level) -> IO(Unit):
+  +s = attack.missile(level, 704, 256, 900, 256, 0n)
+  +id = (H.Things.count(S.State.things(s)) - 1 : U32)
+  attack.missile.floor.found(H.Things.get(S.State.things(s), id), id, s)
+
 def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
   +q = Run.state(play(List.replicate(K.Cmd, n, cmd), Run{"", s}))
   do IO<S.State>:
@@ -1622,6 +1648,7 @@ def attacks(+level: L.Level) -> IO(Unit):
       S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
     wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
     sky : S.State <- attack.missile.result("fireball sky", attack.missile.up(level, 64896, 256, 3n))
+    attack.missile.floor(level)
     replay0 : S.State <- attack.replay("unarmoured flight", 10n, idle(),
       attack.play(34n, fire(), attack.play(20n, idle(), at(level, 992, 704, 270))))
     replay1 : S.State <- attack.replay("unarmoured burst", 10n, idle(), replay0)
@@ -2144,6 +2171,8 @@ def main() -> IO(Unit):
 #|fireball wall random 62 mobj 292 type -3 at 748.999313 256.017166 -96.000000 state 199/6
 #|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
 #|fireball sky random 61
+#|fireball resting random 61 mobj 292 type -3 at 718.999771 256.005722 -128.000000 state 196/1
+#|fireball crossing floor random 62 mobj 292 type -3 at 718.999771 256.005722 -128.000000 state 198/4
 #|unarmoured flight tic 64 health 0 facing 270.000 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
 #|unarmoured burst tic 74 health 0 facing 270.000 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
 #|unarmoured gone tic 94 health 0 facing 270.000 random 195 fireball gone
