@@ -4028,14 +4028,32 @@ def Sim.missile.burst.some(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
 def Sim.missile.burst(+id: U32, +s: State) -> State:
   Sim.missile.burst.some(H.Things.get(State.things(s), id), id, s)
 
+def Sim.missile.damage.same(mt: Maybe<&2, H.Thing>, ms: Maybe<&2, H.Thing>) -> Bool:
+  match mt ms:
+    case Some{t} Some{source}:
+      U32.is_ne(H.Thing.kind(t), H.Thing.kind(source))
+    case _ _:
+      True{}
+
+def Sim.missile.damage(+target: U32, +source: U32, +things: H.Things) -> Bool:
+  Bool.or(U32.is_eq(target, H.Things.you(things)),
+    Sim.missile.damage.same(H.Things.get(things, target), H.Things.get(things, source)))
+
+def Sim.missile.hit(damage: Bool, +target: U32, +id: U32, +source: U32, +s: State) -> State:
+  match damage:
+    case False{}:
+      Sim.missile.burst(id, s)
+    case True{}:
+      +after = Sim.drawn(s)
+      Sim.missile.burst(id, Sim.damage(target,
+        (3 * ((M.Random.at(State.rnd(after)) % 8 : U32) + 1 : U32) : U32), id, source, after))
+
 def Sim.missile.hurt(hit: Maybe<&2, U32>, +id: U32, +source: U32, +s: State) -> State:
   match hit:
     case None{}:
       Sim.missile.burst(id, s)
-    case Some{target}:
-      +after = Sim.drawn(s)
-      Sim.missile.burst(id, Sim.damage(target,
-        (3 * ((M.Random.at(State.rnd(after)) % 8 : U32) + 1 : U32) : U32), id, source, after))
+    case Some{+target}:
+      Sim.missile.hit(Sim.missile.damage(target, source, State.things(s)), target, id, source, s)
 
 def Sim.missile.blocked(sky: Bool, hit: Maybe<&2, U32>, +id: U32, +source: U32, +s: State) -> State:
   match sky:
