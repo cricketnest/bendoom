@@ -1030,7 +1030,7 @@ def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
       bonus, line} Said{n, tics}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-        ((n << 8n) .|. tics : U32)}
+        ((line .&. 4294901760 : U32) .|. (n << 8n : U32) .|. tics : U32)}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
