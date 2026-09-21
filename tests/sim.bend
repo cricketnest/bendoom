@@ -1607,36 +1607,54 @@ def attack.ticked(m: Maybe<&2, H.Thing>, +id: U32, +tics: U32, s: S.State) -> S.
     case Some{th}:
       S.State.thing.put(id, H.Thing.ticking(th, tics), s)
 
-# Freedoom records 240 and 81 stand 112 units apart in one room. A
-# Chocolate Doom call to A_SPosAttack followed by 60 idle tics gives
-# random indices 83 and 132 and the same health, states, targets,
-# thresholds and fixed-point positions printed below.
-def attack.retaliation(+level: L.Level) -> IO(Unit):
+def attack.retaliation.hit(+level: L.Level) -> IO(Unit):
   +s = S.State.start(level)
   +aimed = S.Sim.thing.counted(240, H.Thing.hurt.target(), 81, s)
   +first = S.Sim.sposattack(240, aimed)
   +held = S.Sim.damage(81, 4, 82, 82, first)
-  +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
-  +fight = attack.play(60n, idle(), first)
-  +moved = S.State.thing.moved(24, F.Fixed.of_map(832), F.Fixed.of_map(1056), s)
-  +credited = S.Sim.thing.counted(24, H.Thing.hurt.target(), H.Things.you(S.State.things(moved)), moved)
-  +entered = S.Sim.damage.entered(24, S.State.thing(24, credited), 178, credited)
-  +ready = attack.ticked(S.State.thing(24, entered), 24, 1, entered)
-  +blast = attack.play(1n, idle(), ready)
   do IO<Unit>:
     IO.print("imp retaliates" ++ attack.combatant(H.Things.get(S.State.things(first), 81))
       ++ " random " ++ U32.show(S.State.rnd(first)))
     IO.print("threshold holds" ++ attack.combatant(H.Things.get(S.State.things(held), 81))
       ++ " random " ++ U32.show(S.State.rnd(held)))
-    IO.print("barrel credits player" ++ attack.combatant(H.Things.get(S.State.things(barrel), 81))
-      ++ " random " ++ U32.show(S.State.rnd(barrel)))
-    IO.print("shotgun imp fight" ++ attack.combatant(H.Things.get(S.State.things(fight), 81))
-      ++ attack.combatant(H.Things.get(S.State.things(fight), 240)) ++ " random " ++ U32.show(S.State.rnd(fight)))
-    IO.print("player barrel blast" ++ attack.combatant(H.Things.get(S.State.things(blast), 81))
-      ++ attack.combatant(H.Things.get(S.State.things(blast), 240))
-      ++ attack.combatant(H.Things.get(S.State.things(blast), 82))
-      ++ attack.combatant(H.Things.get(S.State.things(blast), 83))
-      ++ fighter(H.Things.get(S.State.things(blast), 24)) ++ " random " ++ U32.show(S.State.rnd(blast)))
+
+def attack.retaliation.barrel(+level: L.Level) -> IO(Unit):
+  +s = S.State.start(level)
+  +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
+  IO.print("barrel credits player" ++ attack.combatant(H.Things.get(S.State.things(barrel), 81))
+    ++ " random " ++ U32.show(S.State.rnd(barrel)))
+
+def attack.retaliation.fight(+level: L.Level) -> IO(Unit):
+  +s = S.State.start(level)
+  +aimed = S.Sim.thing.counted(240, H.Thing.hurt.target(), 81, s)
+  +first = S.Sim.sposattack(240, aimed)
+  +fight = attack.play(60n, idle(), first)
+  IO.print("shotgun imp fight" ++ attack.combatant(H.Things.get(S.State.things(fight), 81))
+    ++ attack.combatant(H.Things.get(S.State.things(fight), 240)) ++ " random " ++ U32.show(S.State.rnd(fight)))
+
+def attack.retaliation.blast(+level: L.Level) -> IO(Unit):
+  +s = S.State.start(level)
+  +moved = S.State.thing.moved(24, F.Fixed.of_map(832), F.Fixed.of_map(1056), s)
+  +credited = S.Sim.thing.counted(24, H.Thing.hurt.target(), H.Things.you(S.State.things(moved)), moved)
+  +entered = S.Sim.damage.entered(24, S.State.thing(24, credited), 178, credited)
+  +ready = attack.ticked(S.State.thing(24, entered), 24, 1, entered)
+  +blast = attack.play(1n, idle(), ready)
+  IO.print("player barrel blast" ++ attack.combatant(H.Things.get(S.State.things(blast), 81))
+    ++ attack.combatant(H.Things.get(S.State.things(blast), 240))
+    ++ attack.combatant(H.Things.get(S.State.things(blast), 82))
+    ++ attack.combatant(H.Things.get(S.State.things(blast), 83))
+    ++ fighter(H.Things.get(S.State.things(blast), 24)) ++ " random " ++ U32.show(S.State.rnd(blast)))
+
+# Freedoom records 240 and 81 stand 112 units apart in one room. A
+# Chocolate Doom call to A_SPosAttack followed by 60 idle tics gives
+# random indices 83 and 132 and the same health, states, targets,
+# thresholds and fixed-point positions printed below.
+def attack.retaliation(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    attack.retaliation.hit(level)
+    attack.retaliation.barrel(level)
+    attack.retaliation.fight(level)
+    attack.retaliation.blast(level)
 
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
