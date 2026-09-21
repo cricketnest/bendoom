@@ -214,6 +214,8 @@ def main() -> IO(Unit):
     grunt : List<Maybe<C.Channel>> <- C.Channel.hear(dir, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}],
       C.Channel.none())
     Test.played(dir, render, grunt)
+    IO.print("postmix " ++ Test.frame(A.Stream.post([(35536 << 16n : U32)],
+      [A.Stream.mix(0, 255, 30000, A.Stream.mix(0, 255, 30000, 0))]), 0))
 #|01 DSSTNMOV/sector 1/63,64 - - - - - - -
 #|02 DSSTNMOV/sector 1/63,64 DSDOROPN/sector 2/20,81 - - - - - -
 #|03 DSSTNMOV/sector 1/63,64 DSDOROPN/sector 2/20,81 DSDORCLS/sector 3/62,65 - - - - -
@@ -236,3 +238,4 @@ def main() -> IO(Unit):
 #|after - - - - - - - -
 #|song 2975658234 0 -20 -81 1 -22 -91 2155 -484 -1330 2156 -970 -1188 2157 -624 -1543 15480 2454 6999
 #|playing DSDOROPN/sector 2/20,81 DSNOWAY/nobody/63,64 - - - - - -
+#|postmix 0 0 2767
