@@ -1571,11 +1571,17 @@ def attack.combatant(m: Maybe<&2, H.Thing>) -> String:
       " target " ++ U32.show(H.Thing.target(th)) ++ " threshold " ++ U32.show(H.Thing.threshold(th))
         ++ fighter(Some{th})
 
+# Freedoom records 240 and 81 stand 112 units apart in one room. A
+# Chocolate Doom call to A_SPosAttack followed by 60 idle tics gives
+# random indices 83 and 132 and the same health, states, targets,
+# thresholds and fixed-point positions printed below.
 def attack.retaliation(+level: L.Level) -> IO(Unit):
   +s = S.State.start(level)
-  +first = S.Sim.damage(81, 4, 240, 240, s)
+  +aimed = S.Sim.thing.counted(240, H.Thing.hurt.target(), 81, s)
+  +first = S.Sim.sposattack(240, aimed)
   +held = S.Sim.damage(81, 4, 82, 82, first)
   +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
+  +fight = attack.play(60n, idle(), first)
   do IO<Unit>:
     IO.print("imp retaliates" ++ attack.combatant(H.Things.get(S.State.things(first), 81))
       ++ " random " ++ U32.show(S.State.rnd(first)))
@@ -1583,6 +1589,8 @@ def attack.retaliation(+level: L.Level) -> IO(Unit):
       ++ " random " ++ U32.show(S.State.rnd(held)))
     IO.print("barrel credits player" ++ attack.combatant(H.Things.get(S.State.things(barrel), 81))
       ++ " random " ++ U32.show(S.State.rnd(barrel)))
+    IO.print("shotgun imp fight" ++ attack.combatant(H.Things.get(S.State.things(fight), 81))
+      ++ attack.combatant(H.Things.get(S.State.things(fight), 240)) ++ " random " ++ U32.show(S.State.rnd(fight)))
 
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -2076,9 +2084,10 @@ def main() -> IO(Unit):
 #|unarmoured burst tic 74 health 0 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
 #|unarmoured gone tic 94 health 0 random 195 fireball gone
 #|dead player idle target 157 threshold 0 81 hp 60 state 65/6 at 928.322265 975.677734 -128.000000 after 157 target 157 threshold 0 82 hp 60 state 66/10 at 911.110351 1104.889648 -128.000000 after 157
-#|imp retaliates target 240 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 240 random 60
-#|threshold holds target 240 threshold 100 81 hp 52 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 61
+#|imp retaliates target 240 threshold 100 81 hp 33 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 83
+#|threshold holds target 240 threshold 100 81 hp 29 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 84
 #|barrel credits player target 157 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 157 random 60
+#|shotgun imp fight target 240 threshold 87 81 hp 15 state 108/3 at 891.248580 1056.017028 -128.000000 after 240 target 81 threshold 99 240 hp 12 state 189/7 at 982.616607 1055.972488 -128.000000 after 81 random 132
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
