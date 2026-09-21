@@ -211,7 +211,7 @@ def Player.dead(+p: Player) -> Bool:
 # hands, which the status bar counts ammo for. The pistol until a weapon
 # can be chosen.
 def Player.ready(+p: Player) -> H.Thing.Weapon:
-  H.Thing.pistol()
+  H.Thing.weapon(I.Inventory.ready(Player.inv(p)))
 
 # The player carrying another wound.
 def Player.hurting(p: Player, hurt: V.Vec) -> Player:
@@ -2446,7 +2446,7 @@ def Sim.drop.sunk(ps: Psprites, +down: U32, s: State) -> State:
 # the general loop runs the firing actions, which damage things, and a
 # damage that reached it would be a circle.
 def Sim.drop(+s: State) -> State:
-  Sim.drop.sunk(Player.psprites(State.player(s)), H.Thing.Weapon.down(H.Thing.pistol()), s)
+  Sim.drop.sunk(Player.psprites(State.player(s)), H.Thing.Weapon.down(Player.ready(State.player(s))), s)
 
 # The death state's tics, less the random 0 to 3 P_KillMobj takes off.
 # Its 10 never reach vanilla's floor of 1.
@@ -3364,10 +3364,10 @@ def State.firing(+refire: U32, s: State) -> State:
   State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   State{Player.firing(player, refire), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
 
-# One bullet spent, Doom's DecreaseAmmo for the pistol.
-def Sim.spent(s: State) -> State:
+# One round spent, Doom's DecreaseAmmo.
+def Sim.spent(+ammo: U32, s: State) -> State:
   State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  State{Player.holding(player, I.Inventory.spend(I.Inventory.am_clip(), 1, Player.inv(player))), level, things,
+  State{Player.holding(player, I.Inventory.spend(ammo, 1, Player.inv(player))), level, things,
     sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
 
 def Sim.fire.shot(+s: State) -> State:
@@ -3384,61 +3384,110 @@ def Sim.fire.shot(+s: State) -> State:
 def Sim.fire.pistol(psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
   Entering{None{}, Some{flash}, psp,
-    Sim.fire.shot(Sim.spent(Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)))}
+    Sim.fire.shot(Sim.spent(ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)))}
+
+def Sim.fire.pellets(fuel: Nat, +slope: U32, s: State) -> State:
+  match fuel:
+    case 0n:
+      s
+    case 1n+n:
+      Sim.fire.pellets(n, slope, Sim.gunshot(False{}, slope, s))
+
+def Sim.fire.shotgun(psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+  H.Weapon{up, ready, down, ammo, atk, flash} = weapon
+  +p = State.player(s)
+  +ts = State.things(s)
+  +slope = Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
+    H.Things.you(ts), Player.angle(p))
+  Entering{None{}, Some{flash}, psp, Sim.fire.pellets(7n, slope,
+    Sim.spent(ammo, Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s)))}
 
 # Whether the ready weapon has a shot left. Doom's P_CheckAmmo also
 # picks another weapon where it has none, which is the switching
 # ticket's, so a dry pistol stays up instead of being lowered.
-def Sim.ammo.enough(+s: State) -> Bool:
-  U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_clip(), Player.inv(State.player(s))))
+def Sim.ammo.enough(+weapon: H.Thing.Weapon, +s: State) -> Bool:
+  U32.is_lt(0, I.Inventory.rounds(H.Thing.Weapon.ammo(weapon), Player.inv(State.player(s))))
 
-# Doom's P_FireWeapon: with a shot left the weapon enters its attack
-# state.
-def Sim.fire.weapon(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+def Sim.ammo.pick(+inv: I.Inventory) -> U32:
+  Bool.pick(U32, Bool.and(I.Inventory.owns(2, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_shell(), inv))), 2, 1)
+
+def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   match enough:
-    case False{}:
-      Entering{None{}, None{}, psp, s}
     case True{}:
       H.Weapon{up, ready, down, ammo, atk, flash} = weapon
       Entering{Some{atk}, None{}, psp, s}
+    case False{}:
+      +p = State.player(s)
+      +inv = Player.inv(p)
+      +next = Sim.ammo.pick(inv)
+      +changed = State.player.put(s, Player.holding(p, I.Inventory.want(next, inv)))
+      Entering{Some{H.Thing.Weapon.down(weapon)}, None{}, psp, changed}
 
-def Sim.fire(psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
-  Sim.fire.weapon(Sim.ammo.enough(s), psp, weapon, s)
+# Doom's P_FireWeapon: with a shot left the weapon enters its attack
+# state.
+def Sim.fire(psp: Psprite, +weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+  Sim.ammo.checked(Sim.ammo.enough(weapon, s), psp, weapon, s)
 
 # Doom's A_WeaponReady's fire check: the attack held fires and leaves
 # the sprite where it is, and a released attack lets the weapon bob.
 # Vanilla also writes attackdown here, which only the launcher and the
 # BFG read. The pending weapon and the dead player's lowering are the
 # switching ticket's.
-def Sim.ready.fire(attack: Bool, psp: Psprite, weapon: H.Thing.Weapon, +sine: V.Vec, +clock: U32, +bob: U32,
+def Sim.ready.fire(change: Bool, attack: Bool, psp: Psprite, weapon: H.Thing.Weapon, +sine: V.Vec, +clock: U32, +bob: U32,
   s: State) -> Sim.Entering:
-  match attack:
-    case True{}:
+  match change attack:
+    case True{} _:
+      Entering{Some{H.Thing.Weapon.down(weapon)}, None{}, psp, s}
+    case False{} True{}:
       Sim.fire(psp, weapon, s)
-    case False{}:
+    case False{} False{}:
       Sim.ready.bob(psp, sine, clock, bob, s)
 
 # Doom's A_ReFire: the attack still held and the player alive takes
 # another shot and counts it; anything else puts the count back, where
 # vanilla also runs P_CheckAmmo.
-def Sim.refire.again(again: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+def Sim.refire.done(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+  match enough:
+    case True{}:
+      Entering{None{}, None{}, psp, s}
+    case False{}:
+      Sim.ammo.checked(False{}, psp, weapon, s)
+
+def Sim.refire.again(again: Bool, psp: Psprite, +weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   match again:
     case True{}:
       Sim.fire(psp, weapon, State.firing((Player.refire(State.player(s)) + 1 : U32), s))
     case False{}:
-      Entering{None{}, None{}, psp, State.firing(0, s)}
+      +reset = State.firing(0, s)
+      Sim.refire.done(Sim.ammo.enough(weapon, reset), psp, weapon, reset)
 
 def Sim.refire(psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
-  Sim.refire.again(Bool.and(K.Cmd.attack(cmd),
-    Bool.not(U32.is_zero(I.Inventory.health(Player.inv(State.player(s)))))), psp, weapon, s)
+  Sim.refire.again(Bool.and(K.Cmd.attack(cmd), Bool.and(
+    U32.is_eq(I.Inventory.pending(Player.inv(State.player(s))), 255),
+    Bool.not(U32.is_zero(I.Inventory.health(Player.inv(State.player(s))))))), psp, weapon, s)
 
 # Doom's A_Lower for a dead player: the sprite sinks 6 a tic and stays
 # at the bottom of the screen. Death is the only thing that lowers a
 # weapon here, so the branch that brings the next one up has no caller.
-def Sim.lower(psp: Psprite, s: State) -> Sim.Entering:
+def Sim.lower.done(dead: Bool, done: Bool, psp: Psprite, +s: State) -> Sim.Entering:
+  match dead done:
+    case True{} _:
+      Entering{None{}, None{}, psp, s}
+    case False{} False{}:
+      Entering{None{}, None{}, psp, s}
+    case False{} True{}:
+      +p = State.player(s)
+      +inv = Player.inv(p)
+      +next = I.Inventory.pending(inv)
+      Entering{Some{H.Thing.Weapon.up(H.Thing.weapon(next))}, None{}, psp,
+        State.player.put(s, Player.holding(p, I.Inventory.weaponstate(next, 255, inv)))}
+
+def Sim.lower(psp: Psprite, +s: State) -> Sim.Entering:
   Psprite{state, tics, sx, +sy} = psp
-  Entering{None{}, None{}, Psprite{state, tics, sx, F.Fixed.min((sy + Sim.lowerspeed() : U32),
-    Sim.weaponbottom())}, s}
+  +sunk = (sy + Sim.lowerspeed() : U32)
+  +done = F.Fixed.ge(sunk, Sim.weaponbottom())
+  Sim.lower.done(Player.dead(State.player(s)), done,
+    Psprite{state, tics, sx, F.Fixed.min(sunk, Sim.weaponbottom())}, s)
 
 def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) ->
   Sim.Entering:
@@ -3448,10 +3497,13 @@ def Sim.psprite.act(action: H.Thing.Action, psp: Psprite, cmd: K.Cmd, weapon: H.
     case H.Raise{}:
       Sim.raise(psp, weapon, s)
     case H.WeaponReady{}:
-      Sim.ready.fire(K.Cmd.attack(cmd), psp, weapon, L.Level.sine(State.level(s)), State.clock(s),
+      Sim.ready.fire(Bool.not(U32.is_eq(I.Inventory.pending(Player.inv(State.player(s))), 255)), K.Cmd.attack(cmd), psp,
+        weapon, L.Level.sine(State.level(s)), State.clock(s),
         Sim.bob(Player.momx(State.player(s)), Player.momy(State.player(s))), s)
     case H.FirePistol{}:
       Sim.fire.pistol(psp, weapon, s)
+    case H.FireShotgun{}:
+      Sim.fire.shotgun(psp, weapon, s)
     case H.ReFire{}:
       Sim.refire(psp, cmd, weapon, s)
     case H.Lower{}:
@@ -3486,11 +3538,11 @@ def Sim.psprite.entered(e: Sim.Entering, +row: H.Thing.Row, had: Maybe<&2, U32>)
 # One turn of P_SetPsprite: the sprite takes the state's row and tics,
 # and the row's action runs.
 def Sim.psprite.enter(+state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd, +weapon: H.Thing.Weapon,
-  s: State) -> Sim.Entering:
+  +s: State) -> Sim.Entering:
   Psprite{was, tics, sx, sy} = psp
   +row = H.Thing.row(state)
   Sim.psprite.entered(Sim.psprite.act(H.Thing.Row.action(row),
-    Psprite{Some{state}, H.Thing.Row.tics(row), sx, sy}, cmd, weapon, s), row, had)
+    Psprite{Some{state}, H.Thing.Row.tics(row), sx, sy}, cmd, Player.ready(State.player(s)), s), row, had)
 
 # Entering S_NULL stops the sprite showing, as a state number of 0 does
 # in vanilla.
@@ -3555,7 +3607,7 @@ def Sim.psprites.both(ps: Psprites, +cmd: K.Cmd, +winfo: H.Thing.Weapon, s: Stat
 # may set the flash's state; then the flash's steps, on the state the
 # weapon left it in.
 def Sim.psprites(+cmd: K.Cmd, +s: State) -> State:
-  Sim.psprites.both(Player.psprites(State.player(s)), cmd, H.Thing.pistol(), s)
+  Sim.psprites.both(Player.psprites(State.player(s)), cmd, Player.ready(State.player(s)), s)
 
 # The weapon put away, the flash as it was.
 def Sim.psprites.lowered(flash: Psprite, e: Sim.Entering) -> State:
@@ -3575,8 +3627,8 @@ def Sim.psprites.up(+weapon: H.Thing.Weapon, s: State) -> State:
   Sim.psprites.raised(Sim.psprite.set(8n, Entering{Some{up}, None{}, Psprite{None{}, 0, 0, Sim.weaponbottom()}, s},
     K.Cmd.idle(), weapon))
 
-def Sim.psprites.start(s: State) -> State:
-  Sim.psprites.up(H.Thing.pistol(), s)
+def Sim.psprites.start(+s: State) -> State:
+  Sim.psprites.up(Player.ready(State.player(s)), s)
 
 # Lights
 # ------
@@ -5535,10 +5587,23 @@ def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: State) -> Stat
 def Sim.player.counted(+s: State) -> State:
   State.player.put(s, Sim.counters(State.player(s)))
 
+def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: Player) -> Player:
+  match chosen:
+    case None{}:
+      p
+    case Some{+weapon}:
+      +inv = Player.inv(p)
+      +valid = Bool.and(Bool.or(U32.is_eq(weapon, 1), U32.is_eq(weapon, 2)),
+        Bool.and(I.Inventory.owns(weapon, inv), Bool.not(U32.is_eq(weapon, I.Inventory.ready(inv)))))
+      Player.holding(p, Bool.pick(I.Inventory, valid, I.Inventory.want(weapon, inv), inv))
+
+def Sim.weapon.select(+cmd: K.Cmd, +s: State) -> State:
+  State.player.put(s, Sim.weapon.selected(K.Cmd.weapon(cmd), State.player(s)))
+
 def Sim.player.live(+cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State) -> State:
   +hurt = Sim.sector(level, clock,
     State.player.put(s, Sim.eye(level, clock, Sim.move(level, cmd, State.player(s)))))
-  Sim.player.counted(Sim.psprites(cmd, hurt))
+  Sim.player.counted(Sim.psprites(cmd, Sim.weapon.select(cmd, hurt)))
 
 # Doom's P_DeathThink: the sprites move, the view sinks and turns to the
 # attacker, and use asks for the level again.

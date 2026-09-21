@@ -15,7 +15,8 @@ import ./message.bend as Msg
 # powers' counters in powertype_t order; the items the tally counts;
 # the pickup flash's count, Doom's bonuscount; and the heads-up line,
 # the number of the message it shows in its high bits over the tics it
-# has left there in its low eight, both under 256. The player carries
+# has left there in its low eight, both under 256. The next two bytes
+# hold readyweapon and pendingweapon; 255 is wp_nochange.
 # the line because vanilla's own message is a player_t field and
 # Bendoom keeps no state beside the player's for hu_stuff.c's two
 # statics; the two are one word because the native lane has no room for
@@ -27,12 +28,12 @@ type Inventory is Data:
 # 100 health, the fist and the pistol, fifty bullets, maxammo's caps.
 def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
-    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 0}
+    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278255616}
 
 # Every count as text, for the tests and the tools. The message line is
 # printed where a test is about it.
 def Inventory.show(inv: Inventory) -> String:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line} = inv
   "inventory health " ++ U32.show(health) ++ " armour " ++ U32.show(armour) ++ " type " ++ U32.show(armourtype)
     ++ " cards " ++ U32.show(cards) ++ " ammo" ++ V.Vec.show(ammo, 4n, 0) ++ " caps" ++ V.Vec.show(caps, 4n, 0)
     ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers"
@@ -66,6 +67,37 @@ def Inventory.bonus(inv: Inventory) -> U32:
 def Inventory.weapons(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
   weapons
+
+def Inventory.ready(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  ((line >> 16n : U32) .&. 255 : U32)
+
+def Inventory.pending(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  (line >> 24n : U32)
+
+def Inventory.weaponstate(+ready: U32, +pending: U32, inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
+    ((line .&. 65535 : U32) .|. (ready << 16n : U32) .|. (pending << 24n : U32) : U32)}
+
+def Inventory.weaponbit(+weapon: U32) -> U32:
+  match weapon:
+    case 0: 1
+    case 1: 2
+    case 2: 4
+    case 3: 8
+    case 4: 16
+    case 5: 32
+    case 6: 64
+    case 7: 128
+    case _: 0
+
+def Inventory.owns(+weapon: U32, inv: Inventory) -> Bool:
+  Bool.not(U32.is_zero((Inventory.weapons(inv) .&. Inventory.weaponbit(weapon) : U32)))
+
+def Inventory.want(+weapon: U32, +inv: Inventory) -> Inventory:
+  Inventory.weaponstate(Inventory.ready(inv), weapon, inv)
 
 # The rounds of an ammo type and the cap on them, Doom's ammo[t] and
 # maxammo[t].
@@ -169,7 +201,7 @@ def Inventory.line(inv: Inventory) -> U32:
 
 # The message the heads-up line shows, and the tics it has left there.
 def Inventory.message(+inv: Inventory) -> U32:
-  (Inventory.line(inv) >> 8n : U32)
+  ((Inventory.line(inv) >> 8n : U32) .&. 255 : U32)
 
 def Inventory.msgtics(+inv: Inventory) -> U32:
   (Inventory.line(inv) .&. 255 : U32)
@@ -182,9 +214,10 @@ def Inventory.msgtics(+inv: Inventory) -> U32:
 # does, and no message leaves the line as it was, since vanilla's code
 # sets one or returns.
 def Inventory.saying(+msg: U32, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-    Bool.pick(U32, U32.is_zero(msg), line, ((msg << 8n) .|. Msg.Message.timeout() : U32))}
+    Bool.pick(U32, U32.is_zero(msg), line,
+      ((line .&. 4294901760 : U32) .|. (msg << 8n : U32) .|. Msg.Message.timeout() : U32))}
 
 # Doom's P_GiveCard, with the message p_inter.c sets on the same test
 # just before it: a card not owned yet sets the flash to 6 and names
@@ -260,13 +293,27 @@ def Inventory.room(+t: U32, inv: Inventory) -> Bool:
   Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line} = inv
   Bool.not(U32.is_eq(V.Vec.get(ammo, t), V.Vec.get(caps, t)))
 
+def Inventory.ammo.switch(empty: Bool, t: U32, +inv: Inventory) -> Inventory:
+  match empty t:
+    case False{} _:
+      inv
+    case True{} 0:
+      Bool.pick(Inventory, U32.is_eq(Inventory.ready(inv), 0), Inventory.want(1, inv), inv)
+    case True{} 1:
+      Bool.pick(Inventory, Bool.and(Bool.or(U32.is_eq(Inventory.ready(inv), 0), U32.is_eq(Inventory.ready(inv), 1)),
+        Inventory.owns(2, inv)), Inventory.want(2, inv), inv)
+    case True{} _:
+      inv
+
 # P_GiveAmmo's rounds: clips of an ammo type, up to its cap. Only the
 # easiest and hardest skills double them, never Hurt Me Plenty.
 def Inventory.give(+t: U32, clips: U32, inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line} = inv
-  Inventory{health, armour, armourtype, cards,
-    V.Vec.set(ammo, t, Inventory.upto(V.Vec.get(ammo, t), (clips * Inventory.clip(t) : U32), V.Vec.get(caps, t))),
-    caps, backpack, weapons, powers, items, bonus, line}
+  +old = V.Vec.get(ammo, t)
+  +given = {Inventory{health, armour, armourtype, cards,
+    V.Vec.set(ammo, t, Inventory.upto(old, (clips * Inventory.clip(t) : U32), V.Vec.get(caps, t))),
+    caps, backpack, weapons, powers, items, bonus, line} : Inventory}
+  Inventory.ammo.switch(U32.is_zero(old), t, given)
 
 # An ammo pickup: P_GiveAmmo, refused at the cap.
 def Inventory.ammo(+t: U32, clips: U32, msg: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
@@ -276,14 +323,15 @@ def Inventory.ammo(+t: U32, clips: U32, msg: U32, +inv: Inventory) -> Maybe<&2, 
 # ammo left: the weapon is owned after, and it is taken when the ammo
 # was given or the weapon was not owned before. Doom also makes it the
 # pending weapon, which Bendoom has none of yet.
-def Inventory.weapon(+bit: U32, gave: Bool, msg: U32, inv: Inventory) -> Maybe<&2, Inventory>:
+def Inventory.weapon(+bit: U32, +weapon: U32, gave: Bool, msg: U32, inv: Inventory) -> Maybe<&2, Inventory>:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, +weapons, powers, items, bonus, line} = inv
-  Inventory.taken(Bool.or(gave, U32.is_zero((weapons .&. bit : U32))), msg,
-    Inventory{health, armour, armourtype, cards, ammo, caps, backpack, (weapons .|. bit : U32), powers, items, bonus, line})
+  +new = U32.is_zero((weapons .&. bit : U32))
+  +got = {Inventory{health, armour, armourtype, cards, ammo, caps, backpack, (weapons .|. bit : U32), powers, items, bonus, line} : Inventory}
+  Inventory.taken(Bool.or(gave, new), msg, Bool.pick(Inventory, new, Inventory.want(weapon, got), got))
 
 # A weapon found with ammo of a type: two clips of it.
-def Inventory.armed(bit: U32, +t: U32, msg: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
-  Inventory.weapon(bit, Inventory.room(t, inv), msg, Inventory.give(t, 2, inv))
+def Inventory.armed(bit: U32, weapon: U32, +t: U32, msg: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
+  Inventory.weapon(bit, weapon, Inventory.room(t, inv), msg, Inventory.give(t, 2, inv))
 
 # The caps once a backpack is taken: the first doubles each.
 def Inventory.bag(had: Bool, caps: V.Vec) -> V.Vec:
@@ -319,15 +367,15 @@ def Inventory.grant(kind: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
     case 17:
       Inventory.ammo(Inventory.am_cell(), 5, Msg.Message.none(), inv)
     case 2001:
-      Inventory.armed(Inventory.shotgun(), Inventory.am_shell(), Msg.Message.gotshotgun(), inv)
+      Inventory.armed(Inventory.shotgun(), 2, Inventory.am_shell(), Msg.Message.gotshotgun(), inv)
     case 2002:
-      Inventory.armed(Inventory.chaingun(), Inventory.am_clip(), Msg.Message.none(), inv)
+      Inventory.armed(Inventory.chaingun(), 3, Inventory.am_clip(), Msg.Message.none(), inv)
     case 2003:
-      Inventory.armed(Inventory.launcher(), Inventory.am_misl(), Msg.Message.none(), inv)
+      Inventory.armed(Inventory.launcher(), 4, Inventory.am_misl(), Msg.Message.none(), inv)
     case 2004:
-      Inventory.armed(Inventory.plasma(), Inventory.am_cell(), Msg.Message.none(), inv)
+      Inventory.armed(Inventory.plasma(), 5, Inventory.am_cell(), Msg.Message.none(), inv)
     case 2005:
-      Inventory.weapon(Inventory.chainsaw(), False{}, Msg.Message.gotchainsaw(), inv)
+      Inventory.weapon(Inventory.chainsaw(), 7, False{}, Msg.Message.gotchainsaw(), inv)
     case 2007:
       Inventory.ammo(Inventory.am_clip(), 1, Msg.Message.gotclip(), inv)
     case 2008:

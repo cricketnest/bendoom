@@ -355,9 +355,10 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +
 # it may deal writes the health, the wound and the momentum, never the
 # place.
 def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
+  +hurt = S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y))
+  +selected = S.Sim.weapon.select(K.Cmd.idle(), hurt)
   S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
-    S.Sim.player.counted(S.Sim.psprites(K.Cmd.idle(),
-      S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y)))))
+    S.Sim.player.counted(S.Sim.psprites(K.Cmd.idle(), selected)))
 
 def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
@@ -416,6 +417,9 @@ def Laws.pistol_bobs():
   {==}
 
 def Laws.pistol_spends():
+  {==}
+
+def Laws.empty_shotgun_picks_pistol():
   {==}
 
 def Laws.armour_absorbs():

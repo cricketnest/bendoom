@@ -1495,6 +1495,53 @@ def fighting(+level: L.Level) -> IO(Unit):
     b7 : S.State <- fight("over", 40n, idle(), [24, 25, 26], b6)
     IO.print("-")
 
+def weapon.inv(+ready: U32, +shells: U32, inv: I.Inventory) -> I.Inventory:
+  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory.weaponstate(ready, 255, I.Inventory{health, armour, armourtype, cards,
+    V.Vec.set(ammo, I.Inventory.am_shell(), shells), caps, backpack, (weapons .|. I.Inventory.shotgun() : U32),
+    powers, items, bonus, line})
+
+def weapon.state(+ready: U32, +row: U32, +shells: U32, +s: S.State) -> S.State:
+  +p = S.State.player(s)
+  +shown = {S.Psprites{S.Psprite{Some{row}, 1, 65536, S.Sim.weapontop()},
+    S.Psprite{None{}, 0, 65536, S.Sim.weapontop()}} : S.Psprites}
+  S.State.player.put(s, S.Player.showing(S.Player.holding(p, weapon.inv(ready, shells, S.Player.inv(p))), shown))
+
+def weapon.line(tag: String, +s: S.State) -> IO(S.State):
+  +p = S.State.player(s)
+  +inv = S.Player.inv(p)
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " tic " ++ U32.show(S.State.clock(s))
+      ++ " ready " ++ U32.show(I.Inventory.ready(inv)) ++ " pending " ++ U32.show(I.Inventory.pending(inv))
+      ++ " shells " ++ U32.show(I.Inventory.rounds(I.Inventory.am_shell(), inv))
+      ++ psprites(S.Player.psprites(p)) ++ " random " ++ U32.show(S.State.rnd(s)))
+    return s
+
+def weapon.run(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
+  weapon.line(tag, S.Sim.replay(List.replicate(K.Cmd, n, cmd), s))
+
+def weapon.pick(m: Maybe<&2, I.Inventory>) -> String:
+  match m:
+    case None{}:
+      "none"
+    case Some{+inv}:
+      "ready " ++ U32.show(I.Inventory.ready(inv)) ++ " pending " ++ U32.show(I.Inventory.pending(inv))
+        ++ " shells " ++ U32.show(I.Inventory.rounds(I.Inventory.am_shell(), inv))
+
+def weapons(+level: L.Level) -> IO(Unit):
+  +base = weapon.state(1, 59, 4, S.State.start(level))
+  do IO<Unit>:
+    IO.print("shotgun pickup " ++ weapon.pick(I.Inventory.grant(2001, I.Inventory.start())))
+    k0 : S.State <- weapon.run("key", 1n, K.Cmd.demo(0, 0, 0, 20), base)
+    k1 : S.State <- weapon.run("mid switch", 8n, idle(), k0)
+    k2 : S.State <- weapon.run("shotgun ready", 24n, idle(), k1)
+    b0 : S.State <- weapon.run("trigger", 1n, fire(), k2)
+    b1 : S.State <- weapon.run("blast", 3n, idle(), b0)
+    l0 : S.State <- weapon.run("last trigger", 1n, fire(), weapon.state(2, 190, 1, S.State.start(level)))
+    l1 : S.State <- weapon.run("last blast", 3n, idle(), l0)
+    l2 : S.State <- weapon.run("switch away", 70n, idle(), l1)
+    IO.print("-")
+
 def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
   do IO<Unit>:
     weapon(level)
@@ -1686,6 +1733,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     cases(a, level)
     sights(level)
     chases(level)
+    weapons(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -1833,7 +1881,7 @@ def main() -> IO(Unit):
 #|sound tic 25 DSPISTOL from thing 4294967295 vol 64 sep 128
 #|last tic 25 state Some(80) tics 6 at 1.000000 32.000000 flash Some(83) tics 6 at 1.000000 32.000000 light 1 bullets 0 rnd 70 mobj 292 type -1 at 1323.973449 256.663757 35.437500 state 85/2
 #|sound tic 39 stop thing 292
-#|dry tic 44 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 0 rnd 70
+#|dry tic 44 state Some(69) tics 1 at 1.000000 92.000000 flash None tics 0 at 1.000000 92.000000 light 0 bullets 0 rnd 70
 #|sound tic 5 DSPOSIT2 from thing 176 vol 60 sep 46
 #|sound tic 15 DSPOSIT2 from thing 177 vol 64 sep 46
 #|ledge tic 20 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 light 0 bullets 50 rnd 75
@@ -2987,3 +3035,15 @@ def main() -> IO(Unit):
 #|tic 69 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/2 health 73 random 129
 #|tic 70 96 at 240.000000 1928.000000 facing 202.609 dir 0 row 188/1 health 73 random 130
 #|sounds drew to 138
+#|shotgun pickup ready 1 pending 2 shells 8
+#|key tic 1 ready 1 pending 2 shells 4 state Some(69) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
+#|mid switch tic 9 ready 1 pending 2 shells 4 state Some(69) tics 1 at 1.000000 86.000000 flash None tics 0 at 1.000000 86.000000 random 64
+#|shotgun ready tic 33 ready 2 pending 255 shells 4 state Some(190) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 65
+#|trigger tic 34 ready 2 pending 255 shells 4 state Some(193) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 65
+#|sound tic 37 DSSHOTGN from thing 4294967295 vol 64 sep 128
+#|blast tic 37 ready 2 pending 255 shells 3 state Some(194) tics 7 at 1.000000 32.000000 flash Some(202) tics 3 at 1.000000 32.000000 random 114
+#|last trigger tic 1 ready 2 pending 255 shells 1 state Some(193) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 61
+#|sound tic 4 DSSHOTGN from thing 4294967295 vol 64 sep 128
+#|last blast tic 4 ready 2 pending 255 shells 0 state Some(194) tics 7 at 1.000000 32.000000 flash Some(202) tics 3 at 1.000000 32.000000 random 110
+#|switch away tic 74 ready 1 pending 255 shells 0 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 119
+#|-

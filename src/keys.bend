@@ -29,6 +29,10 @@ def Cmd.attack(cmd: Cmd) -> Bool:
   Cmd{forward, side, turn, buttons} = cmd
   U32.is_eq((buttons .&. 1 : U32), 1)
 
+def Cmd.weapon(cmd: Cmd) -> Maybe<&2, U32>:
+  Cmd{forward, side, turn, +buttons} = cmd
+  Bool.pick(Maybe<&2, U32>, U32.is_eq((buttons .&. 4 : U32), 4), Some{((buttons >> 3n : U32) .&. 7 : U32)}, None{})
+
 # A command in a demo file's units: the moves and the buttons as they
 # are, the turn in steps of 256, the byte a demo keeps of it.
 def Cmd.demo(forward: U32, side: U32, turn: U32, buttons: U32) -> Cmd:
