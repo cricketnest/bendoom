@@ -57,7 +57,7 @@ def corridor(base: L.Level, first: U32, second: U32) -> L.Level:
     V.Vec.of([0, 8388608, 160, 0, 8388608, 160, 0, 8388608, 160]), specials, V.Vec.of_list([], 3)}
 
 def closed(s: S.State) -> S.State:
-  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{player, L.Level.plane.put(level, 100, True{}, 0), things, sidetex, thinkers, rnd, clock, ended,
     usedown, sounds, mrnd, reborn}
 

@@ -216,14 +216,14 @@ def Closed.unarmed() -> S.Psprites:
 # over every level can compute.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
   S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], [S.Mobj{H.Thing.you()}]}, 0, clock, False{}, False{},
-    [], S.Sim.Face.start(0), False{}}
+    [], S.Sim.Face.start(0), False{}, V.Leaf{0}}
 
 # A state with the player as given and some thinkers, among things named
 # under 128, all of them entered: linked where they stand, their mobjs
 # thinking.
 def Closed.at(p: S.Player, level: L.Level, ts: List<&2, S.Thinker>, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], ts}, 0, 0, False{},
-    False{}, [], S.Sim.Face.start(0), False{}})
+    False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
 
 # The thinkers running that are no mobj's.
 def Closed.running.go(ts: List<&2, S.Thinker>) -> List<&2, S.Thinker>:
@@ -258,9 +258,9 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   {(S.State.clock(S.Sim.tic(cmd, Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}}))
+    S.Sim.tic(cmd, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
     == ((clock + 1 : U32),
-      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}})
+      S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
     : U32 & S.State}
 
 # The closed laws below stand on Level.room: one sector, no lines, the
@@ -364,9 +364,9 @@ law pistol_bobs:
 
 # An inventory with so many bullets in the clip.
 def Closed.clip.of(inv: I.Inventory, +rounds: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.set(ammo, I.Inventory.am_clip(), rounds), caps, backpack,
-    weapons, powers, items, bonus, line}
+    weapons, powers, items, bonus, line, kills, secrets}
 
 # The pistol at rest, the state A_Raise leaves it in.
 def Closed.ready() -> S.Psprites:
@@ -403,7 +403,7 @@ law pistol_spends:
 
 def Closed.shotgun.empty() -> I.Inventory:
   I.Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
-    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152}
+    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, kills, secrets}
 
 # LAW: P_CheckAmmo's preference chooses the pistol when the ready
 # shotgun has spent its last shell and bullets remain.
@@ -413,8 +413,8 @@ law empty_shotgun_picks_pistol:
 # The damage laws are p_inter.c's P_DamageMobj by hand.
 
 def Closed.armoured.of(inv: I.Inventory, kind: U32, points: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
-  I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
+  I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets}
 
 # The starting inventory wearing armour of a type, 0 for none, with some
 # points.
@@ -700,7 +700,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}})
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -791,9 +791,10 @@ law use_fires_once:
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: V.Vec
   for reborn: Bool
+  for secrets: V.Vec
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
   {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn, secrets}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -813,7 +814,7 @@ def Closed.exit() -> L.Level:
 def Closed.exited() -> S.State:
   S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Closed.player(2097152, 4194304, 0, 8388608), Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()),
-      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}}))
+      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -828,7 +829,7 @@ law exit_ends:
 
 # What a listener d units south of a source hears, facing an angle.
 def Closed.heard(d: U32, facing: U32) -> U32 & U32:
-  Sn.Sound.adjust(L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
+  Sn.Sound.adjust(True{}, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
     F.Fixed.neg(F.Fixed.of_map(d)), facing, 0, 0)
 
 # LAW: S_AdjustSoundParams, by hand from s_sound.c and tables.c. The
@@ -846,6 +847,14 @@ law sound_places:
     Closed.heard(1185, 1073741824), Closed.heard(1201, 1073741824))
     == ((51, 33), (51, 224), (51, 128), (64, 129), (63, 129), (1, 129), (0, 129), (0, 129))
     : (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32)}
+
+def Closed.coincident(starting: Bool) -> U32 & U32:
+  Sn.Sound.adjust(starting, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)),
+    0, 0, 1073741824, 0, 0)
+
+law sound_coincident:
+  {(Closed.coincident(True{}), Closed.coincident(False{})) == ((64, 128), (64, 224))
+    : (U32 & U32) & (U32 & U32)}
 
 # LAW: the manual door's sounds, where T_VerticalDoor and EV_VerticalDoor
 # start them: sfx_doropn, 20, on the tic of the use, nothing on the next,
@@ -893,7 +902,7 @@ law random_table:
 def Closed.lit(special: U32, west: U32) -> S.State:
   S.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, False{}, False{},
-    [], S.Sim.Face.start(0), False{}}))
+    [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -998,39 +1007,39 @@ type Closed.Edit is Data:
 def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
   match inv e:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Health{n}:
-      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
+      bonus, line, kills, secrets} Health{n}:
+      I.Inventory{n, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Armour{points, kind}:
-      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line}
+      bonus, line, kills, secrets} Armour{points, kind}:
+      I.Inventory{health, points, kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Cards{bits}:
-      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, line}
+      bonus, line, kills, secrets} Cards{bits}:
+      I.Inventory{health, armour, armourtype, bits, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Ammo{rounds}:
+      bonus, line, kills, secrets} Ammo{rounds}:
       I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(rounds, 4), caps, backpack, weapons, powers, items,
-        bonus, line}
+        bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Backpack{}:
+      bonus, line, kills, secrets} Backpack{}:
       I.Inventory{health, armour, armourtype, cards, ammo, V.Vec.of_list([400, 100, 600, 100], 4), True{}, weapons,
-        powers, items, bonus, line}
+        powers, items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Weapons{bits}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, line}
+      bonus, line, kills, secrets} Weapons{bits}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Strength{n}:
+      bonus, line, kills, secrets} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, line}
+        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Items{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, line}
+      bonus, line, kills, secrets} Items{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Flash{n}:
-      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, line}
+      bonus, line, kills, secrets} Flash{n}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, n, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line} Said{n, tics}:
+      bonus, line, kills, secrets} Said{n, tics}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-        ((line .&. 4294901760 : U32) .|. (n << 8n : U32) .|. tics : U32)}
+        ((line .&. 4294901760 : U32) .|. (n << 8n : U32) .|. tics : U32), kills, secrets}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -1051,9 +1060,9 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
 # The inventory with the heads-up line taken off it: the laws below are
 # about the grants, and pickup_messages about the line.
 def Closed.hushed(inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-    (line .&. 4294901760 : U32)}
+    (line .&. 4294901760 : U32), kills, secrets}
 
 def Closed.kept(+s: S.State) -> Closed.Got:
   Got{Closed.ids(H.Things.list(S.State.things(s))), Closed.hushed(S.Player.inv(S.State.player(s)))}
@@ -1612,7 +1621,7 @@ def Closed.ranked(you: U32, x: U32, momx: U32) -> S.State:
   S.State.populated([Closed.thing(2, 15, 2097152, 2097152, 0), Closed.thing(5, 15, 2097152, 2097152, 0),
     Closed.thing(9, 15, 2097152, 2097152, 0)], 128, S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976,
       0, 2686976, [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}, Closed.doors(), H.Things.none(0, you, 0, 0), V.Leaf{0},
-    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}})
+    S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
 
 # The mobjs the one cell lists.
 def Closed.cell(s: S.State) -> List<&2, U32>:

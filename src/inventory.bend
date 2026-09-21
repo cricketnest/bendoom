@@ -6,41 +6,58 @@ import ./fixed.bend as F
 import ./sound.bend as Sn
 import ./message.bend as Msg
 
-# Health; armour points and type (0 none, 1 green, 2 blue); the cards,
-# a bit each in card_t order (blue, yellow and red card, then blue,
-# yellow and red skull); the ammo and its caps in ammotype_t order
-# (bullets, shells, cells, rockets); the backpack; the weapons owned, a
-# bit each in weapontype_t order (fist, pistol, shotgun, chaingun,
-# rocket launcher, plasma rifle, BFG, chainsaw, super shotgun); the six
-# powers' counters in powertype_t order; the items the tally counts;
-# the pickup flash's count, Doom's bonuscount; and the heads-up line,
-# the number of the message it shows in its high bits over the tics it
-# has left there in its low eight, both under 256. The next two bytes
-# hold readyweapon and pendingweapon; 255 is wp_nochange.
-# the line because vanilla's own message is a player_t field and
-# Bendoom keeps no state beside the player's for hu_stuff.c's two
-# statics; the two are one word because the native lane has no room for
-# another field (docs/bend.md).
+# Health and armour; key bits; ammo and caps; backpack and weapon bits;
+# power timers; item, kill and secret counts; and pickup flash. The line
+# packs message tics, message id, readyweapon and pendingweapon into
+# four bytes. Pending 255 means wp_nochange. Packing keeps the native
+# lane within its record-width budget (docs/bend.md).
 type Inventory is Data:
   Inventory{health: U32, armour: U32, armourtype: U32, cards: U32, ammo: V.Vec, caps: V.Vec, backpack: Bool,
-    weapons: U32, powers: V.Vec, items: U32, bonus: U32, line: U32}
+    weapons: U32, powers: V.Vec, items: U32, bonus: U32, line: U32, kills: U32, secrets: U32}
 
 # 100 health, the fist and the pistol, fifty bullets, maxammo's caps.
 def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
-    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278255616}
+    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278255616, 0, 0}
+
+def Inventory.items(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    kills, secrets} = inv
+  items
+
+def Inventory.kills(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    kills, secrets} = inv
+  kills
+
+def Inventory.secrets(inv: Inventory) -> U32:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    kills, secrets} = inv
+  secrets
+
+def Inventory.killed(inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    +kills, secrets} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    (kills + 1 : U32), secrets}
+
+def Inventory.secret(inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    kills, +secrets} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
+    kills, (secrets + 1 : U32)}
 
 # Every count as text, for the tests and the tools. The message line is
 # printed where a test is about it.
 def Inventory.show(inv: Inventory) -> String:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line, kills, secrets} = inv
   "inventory health " ++ U32.show(health) ++ " armour " ++ U32.show(armour) ++ " type " ++ U32.show(armourtype)
     ++ " cards " ++ U32.show(cards) ++ " ammo" ++ V.Vec.show(ammo, 4n, 0) ++ " caps" ++ V.Vec.show(caps, 4n, 0)
     ++ " backpack " ++ Bool.show(backpack) ++ " weapons " ++ U32.show(weapons) ++ " powers"
     ++ V.Vec.show(powers, 6n, 0) ++ " items " ++ U32.show(items) ++ " flash " ++ U32.show(bonus)
 
 def Inventory.health(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   health
 
 # Doom's PST_DEAD: the health P_DamageMobj holds at 0 has run out.
@@ -49,37 +66,37 @@ def Inventory.dead(+inv: Inventory) -> Bool:
   F.Fixed.le(Inventory.health(inv), 0)
 
 def Inventory.armour(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   armour
 
 def Inventory.armourtype(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   armourtype
 
 def Inventory.cards(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   cards
 
 def Inventory.bonus(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   bonus
 
 def Inventory.weapons(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   weapons
 
 def Inventory.ready(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   ((line >> 16n : U32) .&. 255 : U32)
 
 def Inventory.pending(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   (line >> 24n : U32)
 
 def Inventory.weaponstate(+ready: U32, +pending: U32, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line, kills, secrets} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-    ((line .&. 65535 : U32) .|. (ready << 16n : U32) .|. (pending << 24n : U32) : U32)}
+    ((line .&. 65535 : U32) .|. (ready << 16n : U32) .|. (pending << 24n : U32) : U32), kills, secrets}
 
 def Inventory.weaponbit(+weapon: U32) -> U32:
   match weapon:
@@ -102,11 +119,11 @@ def Inventory.want(+weapon: U32, +inv: Inventory) -> Inventory:
 # The rounds of an ammo type and the cap on them, Doom's ammo[t] and
 # maxammo[t].
 def Inventory.rounds(+t: U32, inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   V.Vec.get(ammo, t)
 
 def Inventory.cap(+t: U32, inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   V.Vec.get(caps, t)
 
 # The armour types.
@@ -158,7 +175,7 @@ def Inventory.pw_strength() -> U32:
 
 # The berserk power's counter, which counts up from 1 while it is on.
 def Inventory.strength(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   V.Vec.get(powers, Inventory.pw_strength())
 
 # Whether the blue card or the blue skull is owned.
@@ -177,11 +194,11 @@ def Inventory.saved(worn: Bool, +armourtype: U32, +armour: U32, +damage: U32) ->
         (damage / 2 : U32)))
 
 def Inventory.hurt.fin(+saved: U32, inv: Inventory, +damage: U32) -> Inventory & U32:
-  Inventory{+health, +armour, +armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{+health, +armour, +armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   +left = (damage - saved : U32)
   (Inventory{F.Fixed.max((health - left : U32), 0), (armour - saved : U32),
     Bool.pick(U32, U32.is_eq(armour, saved), 0, armourtype), cards, ammo, caps, backpack, weapons, powers, items,
-    bonus, line}, left)
+    bonus, line, kills, secrets}, left)
 
 # P_DamageMobj's blow on the inventory: the armour absorbs its share and
 # loses its type where the share used it up, and the health takes the
@@ -196,7 +213,7 @@ def Inventory.on(+n: U32) -> U32:
   Bool.to_u32(Bool.not(U32.is_zero(n)))
 
 def Inventory.line(inv: Inventory) -> U32:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   line
 
 # The message the heads-up line shows, and the tics it has left there.
@@ -214,20 +231,20 @@ def Inventory.msgtics(+inv: Inventory) -> U32:
 # does, and no message leaves the line as it was, since vanilla's code
 # sets one or returns.
 def Inventory.saying(+msg: U32, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, +line, kills, secrets} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
     Bool.pick(U32, U32.is_zero(msg), line,
-      ((line .&. 4294901760 : U32) .|. (msg << 8n : U32) .|. Msg.Message.timeout() : U32))}
+      ((line .&. 4294901760 : U32) .|. (msg << 8n : U32) .|. Msg.Message.timeout() : U32)), kills, secrets}
 
 # Doom's P_GiveCard, with the message p_inter.c sets on the same test
 # just before it: a card not owned yet sets the flash to 6 and names
 # itself, and one already owned leaves the line as it was.
 def Inventory.card(+bit: U32, +msg: U32, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, +cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, +cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   +fresh = U32.is_zero((cards .&. bit : U32))
   Inventory.saying(Bool.pick(U32, fresh, msg, Msg.Message.none()),
     Inventory{health, armour, armourtype, (cards .|. bit : U32), ammo, caps, backpack, weapons, powers, items,
-      Bool.pick(U32, fresh, 6, bonus), line})
+      Bool.pick(U32, fresh, 6, bonus), line, kills, secrets})
 
 # A grant's answer: the inventory saying its message when the thing is
 # taken, none when it stays, as each of p_inter.c's cases returns before
@@ -246,9 +263,9 @@ def Inventory.upto(+v: U32, +amount: U32, +cap: U32) -> U32:
 
 # Health healed by an amount up to a cap.
 def Inventory.heal(+amount: U32, +cap: U32, inv: Inventory) -> Inventory:
-  Inventory{+health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{+health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory{Inventory.upto(health, amount, cap), armour, armourtype, cards, ammo, caps, backpack, weapons, powers,
-    items, bonus, line}
+    items, bonus, line, kills, secrets}
 
 # Doom's P_GiveBody: under 100 health, heal by an amount up to 100; at
 # 100 or more the thing stays.
@@ -257,23 +274,23 @@ def Inventory.body(+amount: U32, msg: U32, +inv: Inventory) -> Maybe<&2, Invento
 
 # The strength power on, its counter at 1.
 def Inventory.strong(inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-    V.Vec.set(powers, Inventory.pw_strength(), 1), items, bonus, line}
+    V.Vec.set(powers, Inventory.pw_strength(), 1), items, bonus, line, kills, secrets}
 
 # The armour bonus: a point more up to 200, and green armour's type if
 # none is worn.
 def Inventory.helmet(inv: Inventory) -> Inventory:
-  Inventory{health, +armour, +armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, +armour, +armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory{health, Inventory.upto(armour, 1, 200), U32.max(armourtype, Inventory.green_armour()), cards, ammo,
-    caps, backpack, weapons, powers, items, bonus, line}
+    caps, backpack, weapons, powers, items, bonus, line, kills, secrets}
 
 # Doom's P_GiveArmor: a type's 100 points each, and the type, over fewer
 # points of any type; with as many or more the thing stays.
 def Inventory.suit(+kind: U32, msg: U32, inv: Inventory) -> Maybe<&2, Inventory>:
-  Inventory{health, +armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, +armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory.taken(U32.is_lt(armour, (kind * 100 : U32)), msg,
-    Inventory{health, (kind * 100 : U32), kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line})
+    Inventory{health, (kind * 100 : U32), kind, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets})
 
 # Doom's clipammo: the rounds in a clip of each ammo type.
 def Inventory.clip(+t: U32) -> U32:
@@ -283,14 +300,14 @@ def Inventory.clip(+t: U32) -> U32:
 # weapon Bendoom carries has an ammo type past the four, so vanilla's
 # overflow into the caps has no caller.
 def Inventory.spend(+t: U32, +amount: U32, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory{health, armour, armourtype, cards, V.Vec.set(ammo, t, (V.Vec.get(ammo, t) - amount : U32)), caps,
-    backpack, weapons, powers, items, bonus, line}
+    backpack, weapons, powers, items, bonus, line, kills, secrets}
 
 # Whether an ammo type is short of its cap: P_GiveAmmo gives nothing
 # otherwise.
 def Inventory.room(+t: U32, inv: Inventory) -> Bool:
-  Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Bool.not(U32.is_eq(V.Vec.get(ammo, t), V.Vec.get(caps, t)))
 
 def Inventory.ammo.switch(empty: Bool, t: U32, +inv: Inventory) -> Inventory:
@@ -308,13 +325,13 @@ def Inventory.ammo.switch(empty: Bool, t: U32, +inv: Inventory) -> Inventory:
 # P_GiveAmmo's rounds: clips of an ammo type, up to its cap. Only the
 # easiest and hardest skills double them, never Hurt Me Plenty.
 def Inventory.give(+t: U32, +clips: U32, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   +old = V.Vec.get(ammo, t)
   +given = {Inventory{health, armour, armourtype, cards,
     V.Vec.set(ammo, t, Inventory.upto(old,
       Bool.pick(U32, U32.is_zero(clips), (Inventory.clip(t) / 2 : U32), (clips * Inventory.clip(t) : U32)),
       V.Vec.get(caps, t))),
-    caps, backpack, weapons, powers, items, bonus, line} : Inventory}
+    caps, backpack, weapons, powers, items, bonus, line, kills, secrets} : Inventory}
   Inventory.ammo.switch(U32.is_zero(old), t, given)
 
 # An ammo pickup: P_GiveAmmo, refused at the cap.
@@ -322,13 +339,12 @@ def Inventory.ammo(+t: U32, clips: U32, msg: U32, +inv: Inventory) -> Maybe<&2, 
   Inventory.taken(Inventory.room(t, inv), msg, Inventory.give(t, clips, inv))
 
 # P_GiveWeapon for a weapon found on the map, from the inventory its
-# ammo left: the weapon is owned after, and it is taken when the ammo
-# was given or the weapon was not owned before. Doom also makes it the
-# pending weapon, which Bendoom has none of yet.
+# ammo left: it is taken when ammo was given or the weapon was not
+# owned before. A newly owned weapon becomes pending.
 def Inventory.weapon(+bit: U32, +weapon: U32, gave: Bool, msg: U32, inv: Inventory) -> Maybe<&2, Inventory>:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, +weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, +weapons, powers, items, bonus, line, kills, secrets} = inv
   +new = U32.is_zero((weapons .&. bit : U32))
-  +got = {Inventory{health, armour, armourtype, cards, ammo, caps, backpack, (weapons .|. bit : U32), powers, items, bonus, line} : Inventory}
+  +got = {Inventory{health, armour, armourtype, cards, ammo, caps, backpack, (weapons .|. bit : U32), powers, items, bonus, line, kills, secrets} : Inventory}
   Inventory.taken(Bool.or(gave, new), msg, Bool.pick(Inventory, new, Inventory.want(weapon, got), got))
 
 # A placed weapon carries two clips; a dropped one carries one.
@@ -347,10 +363,10 @@ def Inventory.bag(had: Bool, caps: V.Vec) -> V.Vec:
 # P_TouchSpecialThing's backpack, always taken: the caps as the bag
 # leaves them, then a clip of each ammo type in turn.
 def Inventory.backpack(inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory.give(Inventory.am_misl(), 1, Inventory.give(Inventory.am_cell(), 1, Inventory.give(Inventory.am_shell(),
     1, Inventory.give(Inventory.am_clip(), 1, Inventory{health, armour, armourtype, cards, ammo,
-      Inventory.bag(backpack, caps), True{}, weapons, powers, items, bonus, line}))))
+      Inventory.bag(backpack, caps), True{}, weapons, powers, items, bonus, line, kills, secrets}))))
 
 # P_TouchSpecialThing's switch for the types Bendoom spawns: the
 # inventory after the grant, saying the message that case sets, and none
@@ -422,16 +438,16 @@ def Inventory.sound(+kind: U32) -> U32:
 # The end of P_TouchSpecialThing for a thing taken: the tally counts an
 # item flagged for it, and the flash grows by 6.
 def Inventory.took(counted: Bool, inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers,
-    (items + Bool.to_u32(counted) : U32), (bonus + 6 : U32), line}
+    (items + Bool.to_u32(counted) : U32), (bonus + 6 : U32), line, kills, secrets}
 
 # P_PlayerThink's counters, with HU_Ticker's: strength counts up once
 # on, the flash fades by one a tic, and so does the heads-up line's
 # counter, which goes out at zero.
 def Inventory.tic(inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, +powers, items, +bonus, +line} = inv
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, +powers, items, +bonus, +line, kills, secrets} = inv
   +strength = V.Vec.get(powers, Inventory.pw_strength())
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
     V.Vec.set(powers, Inventory.pw_strength(), (strength + Inventory.on(strength) : U32)), items,
-    (bonus - Inventory.on(bonus) : U32), (line - Inventory.on((line .&. 255 : U32)) : U32)}
+    (bonus - Inventory.on(bonus) : U32), (line - Inventory.on((line .&. 255 : U32)) : U32), kills, secrets}

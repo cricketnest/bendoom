@@ -15,6 +15,9 @@ def Sound.pistol() -> U32:
 def Sound.shotgn() -> U32:
   2
 
+def Sound.sgcock() -> U32:
+  3
+
 def Sound.firsht() -> U32:
   16
 
@@ -112,7 +115,7 @@ type Sound.Sfx is Data:
   Sfx{id: U32, lump: String, priority: U32}
 
 def Sound.table() -> List<&2, Sound.Sfx>:
-  [Sfx{1, "DSPISTOL", 64}, Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100},
+  [Sfx{1, "DSPISTOL", 64}, Sfx{3, "DSSGCOCK", 64}, Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100},
     Sfx{21, "DSDORCLS", 100}, Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{25, "DSPLPAIN", 96},
     Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78}, Sfx{34, "DSOOF", 96}, Sfx{57, "DSPLDETH", 32},
     Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100}, Sfx{93, "DSGETPOW", 60},
@@ -205,10 +208,11 @@ def Sound.sep(sine: V.Vec, +angle: U32, +facing: U32) -> U32:
 
 # Doom's S_AdjustSoundParams: the volume and separation a listener at
 # (lx, ly) facing an angle hears a source at (sx, sy) at. Volume 0 is
-# inaudible; a source at the listener's own place is centred.
-def Sound.adjust(sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx: U32, +sy: U32) -> U32 & U32:
+# inaudible. Only S_StartSound centres a coincident source; the per-tic
+# update uses the calculated separation even at that position.
+def Sound.adjust(starting: Bool, sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx: U32, +sy: U32) -> U32 & U32:
   (Sound.volume.at(F.Fixed.approx((lx - sx : U32), (ly - sy : U32))),
-    Bool.pick(U32, Bool.and(U32.is_eq(lx, sx), U32.is_eq(ly, sy)), Sound.centre(),
+    Bool.pick(U32, Bool.and(starting, Bool.and(U32.is_eq(lx, sx), U32.is_eq(ly, sy))), Sound.centre(),
       Sound.sep(sine, A.Angle.of(tanto, (sx - lx : U32), (sy - ly : U32)), facing)))
 
 # The priority of a sound, where less is more important. A sound with no
@@ -231,5 +235,7 @@ def Sound.Source.same(a: Sound.Source, b: Sound.Source) -> Bool:
       U32.is_eq(i, j)
     case Spot{x, y} Spot{u, v}:
       Bool.and(U32.is_eq(x, u), U32.is_eq(y, v))
+    case Nobody{} Nobody{}:
+      True{}
     case _ _:
       False{}

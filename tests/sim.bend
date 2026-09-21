@@ -463,8 +463,8 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 
 # The state with the player holding an inventory.
 def holding(inv: I.Inventory, s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
 # The blue key, record 87, taken strafing past it, the oracle's script:
 # 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
@@ -588,12 +588,12 @@ def opens(+open: S.State) -> IO(Unit):
 # where it now stands, as P_UnsetThingPosition and P_SetThingPosition
 # relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
   S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
-    sounds, mrnd, reborn}
+    sounds, mrnd, reborn, secrets}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -960,9 +960,9 @@ def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
 def stocked(health: U32, armour: U32, armourtype: U32, ammo: List<&2, U32>, inv: I.Inventory) -> I.Inventory:
-  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(ammo, 4), caps, backpack, weapons, powers, items,
-    bonus, line}
+    bonus, line, kills, secrets}
 
 # Walking forward from a place for some tics, then one more: the tic
 # before contact and the tic of it.
@@ -1242,9 +1242,9 @@ def dying(+level: L.Level) -> IO(Unit):
     IO.print("-")
 
 def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{p, level, H.Things.put(H.Things.none(1, H.Thing.you(), 1, 1), 0, Some{thing}), sidetex, thinkers, rnd,
-    clock, ended, usedown, sounds, mrnd, reborn}
+    clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
 # A state in the one-sector room of the closed laws: the player at rest
 # at the origin facing east with some health, the random index a blow's
@@ -1280,9 +1280,9 @@ def blows() -> IO(Unit):
 # it here.
 def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
   S.State{S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
 # The player killed on the spot by a blow from nobody.
 def killed(+s: S.State) -> S.State:
@@ -1491,6 +1491,7 @@ def fighting(+level: L.Level) -> IO(Unit):
     g3 : S.State <- fight("held", 14n, fire(), [265], g2)
     g4 : S.State <- fight("held", 14n, fire(), [265], g3)
     g5 : S.State <- fight("corpse", 30n, idle(), [265], g4)
+    IO.print("kill count " ++ U32.show(I.Inventory.kills(S.Player.inv(S.State.player(g5)))))
     b0 : S.State <- fight("barrels ready", 20n, idle(), [24, 25, 26], armoured(at(level, 992, 704, 270)))
     b1 : S.State <- fight("shot", 6n, fire(), [24, 25, 26], b0)
     b2 : S.State <- fight("held", 14n, fire(), [24, 25, 26], b1)
@@ -1501,11 +1502,60 @@ def fighting(+level: L.Level) -> IO(Unit):
     b7 : S.State <- fight("over", 40n, idle(), [24, 25, 26], b6)
     IO.print("-")
 
+def attack.target(+id: U32, +s: S.State) -> S.State:
+  S.Sim.thing.counted(id, H.Thing.hurt.target(), H.Things.you(S.State.things(s)), s)
+
+def attack.result(tag: String, +id: U32, +s: S.State) -> IO(S.State):
+  +inv = S.Player.inv(S.State.player(s))
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " health " ++ U32.show(I.Inventory.health(inv))
+      ++ " random " ++ U32.show(S.State.rnd(s)) ++ " " ++ thing(H.Things.get(S.State.things(s), id))
+      ++ spawned.all(292, S.State.things(s)))
+    return s
+
+def attack.missile.ticks(n: Nat, +id: U32, s: S.State) -> S.State:
+  match n:
+    case 0n:
+      s
+    case 1n+k:
+      attack.missile.ticks(k, id, S.Sim.thing(id, s))
+
+def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U32, +s: S.State) -> S.State:
+  S.Body{i, sx, sy, z, radius, height, flags} = source
+  +spawned = S.Sim.missile.spawn(S.Body{i, sx, sy, z, radius, height, flags},
+    S.Body{4294967294, F.Fixed.of_map(tx), F.Fixed.of_map(ty), z, radius, height, flags}, you, s)
+  +id = H.Things.count(S.State.things(s))
+  attack.missile.ticks(n, id,
+    S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
+
+def attack.missile(+level: L.Level, +x: U32, +y: U32, +tx: U32, +ty: U32, n: Nat) -> S.State:
+  +s = at(level, x, y, 0)
+  +you = H.Things.you(S.State.things(s))
+  attack.missile.from(S.Player.body(S.State.player(s), you), tx, ty, n, you, s)
+
+def attack.missile.result(tag: String, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " random " ++ U32.show(S.State.rnd(s))
+      ++ spawned.all(292, S.State.things(s)))
+    return s
+
+def attacks(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    claw : S.State <- attack.result("imp claw", 81,
+      S.Sim.troopattack(81, attack.target(81, at(level, 848, 1000, 0))))
+    bite : S.State <- attack.result("demon bite", 3,
+      S.Sim.sargattack(3, attack.target(3, at(level, 2576, 2112, 0))))
+    ball : S.State <- attack.result("imp throw", 81,
+      S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
+    wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
+    sky : S.State <- attack.missile.result("fireball sky", attack.missile(level, 64896, 256, 64640, 256, 8n))
+    IO.print("-")
+
 def weapon.inv(+ready: U32, +shells: U32, inv: I.Inventory) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory.weaponstate(ready, 255, I.Inventory{health, armour, armourtype, cards,
     V.Vec.set(ammo, I.Inventory.am_shell(), shells), caps, backpack, (weapons .|. I.Inventory.shotgun() : U32),
-    powers, items, bonus, line})
+    powers, items, bonus, line, kills, secrets})
 
 def weapon.state(+ready: U32, +row: U32, +shells: U32, +s: S.State) -> S.State:
   +p = S.State.player(s)
@@ -1554,6 +1604,7 @@ def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
     weapon(level)
     firing(level)
     fighting(level)
+    attacks(level)
     pickups(level)
     damaged(level)
     faces.cases(level)
@@ -1906,6 +1957,7 @@ def main() -> IO(Unit):
 #|sound tic 79 stop thing 296
 #|sound tic 90 DSSHOTGN from thing 182 vol 48 sep 41
 #|corpse tic 98 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 49 265 hp -5 state 127/4294967295 at 966.165649 -203.567825 0.000000 after 157 mobj 295 type 2007 at 986.506484 -210.260131 0.000000 state 35/4294967295 mobj 297 type -1 at 986.418884 -163.847015 31.348739 state 87/2 mobj 298 type -1 at 1020.558197 -163.740905 28.708389 state 87/3 mobj 299 type -1 at 1091.770843 -195.430221 26.929992 state 87/1
+#|kill count 1
 #|sound tic 6 DSPOSIT2 from thing 240 vol 53 sep 137
 #|sound tic 8 DSBGSIT1 from thing 81 vol 49 sep 165
 #|sound tic 9 DSBGSIT2 from thing 82 vol 42 sep 157
@@ -1957,6 +2009,17 @@ def main() -> IO(Unit):
 #|sound tic 128 DSPOPAIN from thing 240 vol 64 sep 140
 #|sound tic 133 DSFIRXPL from thing 304 vol 63 sep 143
 #|over tic 134 at 996.130065 770.338638 health 15 armour 58/1 rnd 153 gone gone gone mobj 302 type -3 at 987.001617 815.444839 -96.000000 state 200/3 mobj 303 type -3 at 1003.404373 899.675857 -96.000000 state 200/5 mobj 304 type -3 at 966.716430 960.872467 -96.000000 state 198/3
+#|-
+#|sound tic 0 DSCLAW from thing 81 vol 64 sep 33
+#|imp claw health 85 random 61 thing 81 type 3001 at 848.000000 1056.000000 z -128.000000 angle 270.000 sector 56 state 65 tics 8 radius 20 height 56 flags 4194310
+#|demon bite health 88 random 61 thing 3 type 3002 at 2576.000000 2112.000000 z 192.000000 angle 0.000 sector 5 state 67 tics 1 radius 30 height 56 flags 4194310
+#|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 33
+#|imp throw health 100 random 61 thing 81 type 3001 at 848.000000 1056.000000 z -128.000000 angle 270.000 sector 56 state 65 tics 8 radius 20 height 56 flags 4194310 mobj 292 type -3 at 848.001907 1051.000076 -96.000000 state 196/2
+#|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
+#|sound tic 0 DSFIRXPL from thing 292 vol 64 sep 129
+#|fireball wall random 62 mobj 292 type -3 at 748.999313 256.017166 -96.000000 state 199/6
+#|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
+#|fireball sky random 61
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159

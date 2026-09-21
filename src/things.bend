@@ -818,6 +818,31 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
 def Thing.spawn(+level: L.Level) -> Thing.Spawn:
   Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
 
+def Thing.Spawn.things(s: Thing.Spawn) -> List<&2, Thing>:
+  Spawn{things, rnd, you} = s
+  things
+
+type Thing.Totals is Data:
+  Totals{kills: U32, items: U32}
+
+def Thing.totals.flagged(+flags: U32, +bit: U32) -> U32:
+  Bool.to_u32(Bool.not(U32.is_zero((flags .&. bit : U32))))
+
+def Thing.totals.one(+flags: U32, t: Thing.Totals) -> Thing.Totals:
+  Totals{+kills, +items} = t
+  Totals{(kills + Thing.totals.flagged(flags, 4194304) : U32),
+    (items + Thing.totals.flagged(flags, 8388608) : U32)}
+
+def Thing.totals.go(things: List<&2, Thing>, t: Thing.Totals) -> Thing.Totals:
+  match things:
+    case []:
+      t
+    case Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
+      Thing.totals.go(rest, Thing.totals.one(Thing.Def.flags(Thing.info(kind)), t))
+
+def Thing.totals(+level: L.Level) -> Thing.Totals:
+  Thing.totals.go(Thing.Spawn.things(Thing.spawn(level)), Totals{0, 0})
+
 # The population
 # --------------
 

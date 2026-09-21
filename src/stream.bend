@@ -175,20 +175,29 @@ def Stream.voices(+want: U32, chans: List<Maybe<C.Channel>>, words: List<&2, U32
       IO.bind(Maybe<C.Channel> & List<&2, U32>, List<Maybe<C.Channel>> & List<&2, U32>,
         Stream.voice(want, c, words), p => Stream.voices.on(p, ws => Stream.voices(want, rest, ws)))
 
-def Stream.window.done(tape: Maybe<Stream.Tape>, q: List<Maybe<C.Channel>> & List<&2, U32>) ->
+def Stream.post(song: List<&2, U32>, words: List<&2, U32>) -> List<&2, U32>:
+  match song words:
+    case +s <> ss +w <> ws:
+      (Stream.add((w .&. 65535 : U32), (s .&. 65535 : U32))
+        .|. (Stream.add((w >> 16n : U32), (s >> 16n : U32)) << 16n) : U32) <> Stream.post(ss, ws)
+    case _ ws:
+      ws
+
+def Stream.window.done(tape: Maybe<Stream.Tape>, song: List<&2, U32>, q: List<Maybe<C.Channel>> & List<&2, U32>) ->
   IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
   (chans, words) = q
-  IO.pure(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, (tape, chans, words))
+  IO.pure(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, (tape, chans, Stream.post(song, words)))
 
 def Stream.window.mixed(chans: List<Maybe<C.Channel>>, p: Maybe<Stream.Tape> & List<&2, U32>) ->
   IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
   (tape, +words) = p
+  +count = List.length(&2, U32, words)
   IO.bind(List<Maybe<C.Channel>> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
-    Stream.voices(U32.from_nat(List.length(&2, U32, words)), chans, words), q => Stream.window.done(tape, q))
+    Stream.voices(U32.from_nat(count), chans, List.replicate(U32, count, 0)), q => Stream.window.done(tape, words, q))
 
-# The frames the device gets next: the song's, with every playing
-# channel over them. The channels are asked for as many frames as the
-# song gave, so that a pass's last short read costs a sound nothing.
+# Chocolate Doom registers OPL_Mix_Callback as MIX_CHANNEL_POST, so the
+# song is added after the sound channels have clipped. Each channel reads
+# as many frames as the song gave, so its last short read costs no sound.
 def Stream.window(+want: U32, tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>) ->
   IO(Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
   IO.bind(Maybe<Stream.Tape> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
@@ -245,6 +254,15 @@ def Stream.hear(events: List<&2, Sn.Sound.Event>, m: Maybe<Stream>) -> IO(Maybe<
       IO.pure(Maybe<Stream>, None{})
     case Some{Stream{audio, tape, chans, +dir, dry}}:
       IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.hear(dir, events, chans),
+        cs => Stream.heard(audio, tape, dir, dry, cs))
+
+def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  m: Maybe<Stream>) -> IO(Maybe<Stream>):
+  match m:
+    case None{}:
+      IO.pure(Maybe<Stream>, None{})
+    case Some{Stream{audio, tape, chans, dir, dry}}:
+      IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.update(~Ctx, ~params, ctx, chans),
         cs => Stream.heard(audio, tape, dir, dry, cs))
 
 # The sounds directory the launcher names, or none, which is one line

@@ -356,7 +356,7 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
 # place.
 def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   +hurt = S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))
-  +selected = S.Sim.weapon.select(K.Cmd.idle(), hurt)
+  +selected = S.Sim.weapon.select(K.Cmd.idle(), S.Sim.sector.secret(hurt))
   S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
     S.Sim.player.counted(S.Sim.psprites(K.Cmd.idle(), selected)))
 
@@ -462,7 +462,7 @@ def Laws.lift_crushed():
   {==}
 
 def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
-  sounds, mrnd, reborn, held):
+  sounds, mrnd, reborn, secrets, held):
   match level:
     case L.Level{geo, sectors, specials, heard}:
       %held : {S.Sim.pressed(next, _) == False{} : Bool}
@@ -484,12 +484,15 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
 
 def Laws.exit_ends(cmd):
+  {==}
+
+def Laws.sound_coincident():
   {==}
 
 def Laws.sound_places():
@@ -1139,7 +1142,7 @@ def held_y(x: U32, y: U32, after: S.Player) ->
 def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
   Held(geo, S.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)), after)):
   match before after:
-    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn} S.State{+player, L.Level{g, +sectors, +specials, +heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn, wsecrets} S.State{+player, L.Level{g, +sectors, +specials, +heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       %held_x(S.Player.x(was), S.Player.y(was), player)
         : {True{} == S.Sim.free(L.Level{geo, sectors, specials, heard}, _,
           S.Player.y(S.Player.held(S.Player.x(was), S.Player.y(was), player))) : Bool}
@@ -1152,13 +1155,13 @@ def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, b
 
 def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> Held(geo, S.State.kept(s, t)):
   match s:
-    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
 
 def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, t: S.Sim.Try, s: S.State,
   ht: Free(L.Level{geo, sa, pa, ha}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa, ha}, s)):
   match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       ht
 
 # The player's own turn: its move is checked against the geometry, and
@@ -1186,32 +1189,32 @@ def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.St
 def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.Sim.thinkers.go(fuel, cmd, geo, s)):
   match fuel s:
-    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
-    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
-    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn}:
+    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +secrets}:
       run_held(rest, cmd, geo, S.Sim.turn(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}),
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}),
         turn_held(S.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}, h))
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, h))
 
 def all_held(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.Sim.thinkers.all(fuel, cmd, geo, s)):
   match fuel s:
-    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
-    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
-    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn}:
+    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +secrets}:
       all_held(f, cmd, geo, S.Sim.thinkers.go(t <> due, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}),
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}),
         run_held(t <> due, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}, h))
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, h))
 
 def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.rested(s)):
   match s:
-    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
 
 # Reporting a sound keeps the place: it writes the sounds and the index
@@ -1219,7 +1222,7 @@ def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.St
 def heard_held(geo: L.Level.Geo, e: Sn.Sound.Event, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.State.heard(e, s)):
   match s:
-    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
 
 def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.State, h: Held(geo, s)) ->
@@ -1232,16 +1235,16 @@ def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.Stat
 
 def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.told(s)):
   match s:
-    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}:
+    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       told_go_held(geo, heard,
         S.State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd, clock, ended,
-          usedown, sounds, mrnd, reborn}, h)
+          usedown, sounds, mrnd, reborn, secrets}, h)
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, +secrets}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn, +secrets}:
       {==}
 
 # The rest of a live tic: the think, the use and the thinkers all run
@@ -1261,12 +1264,12 @@ def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State,
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, +secrets}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +reborn}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +reborn, +secrets}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       +before = {S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd,
-        reborn} : S.State}
+        reborn, secrets} : S.State}
       tic_done_free(cmd, geo, clock, before,
         S.Sim.use(Bool.and(Bool.not(S.Player.dead(player)), S.Sim.pressed(cmd, usedown)),
           S.Sim.player(S.Player.dead(player), cmd, level, clock, before)), free)
