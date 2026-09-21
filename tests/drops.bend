@@ -48,7 +48,7 @@ def body(m: Maybe<&2, H.Thing>) -> String:
         ++ " solid " ++ Bool.show(H.Thing.flagged(th, 2))
 
 def items(inv: I.Inventory) -> U32:
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   items
 
 def pickup(got: I.Inventory & H.Things, ammo: U32) -> String:

@@ -996,10 +996,42 @@ def Gfx.bar.faces(n: Nat, +i: U32) -> List<&2, String>:
 # numbers, the arms panel, the background, and the 42 faces. STMBARL and
 # STMBARR belong to Doom 1.0, which neither WAD is; the minus sign shows
 # on a negative count alone and the face background on a net game's bar.
+type Gfx.Spot is Data:
+  Spot{x: U32, y: U32}
+
+def Gfx.Spot.x(s: Gfx.Spot) -> U32:
+  Spot{x, y} = s
+  x
+
+def Gfx.Spot.y(s: Gfx.Spot) -> U32:
+  Spot{x, y} = s
+  y
+
+def Gfx.wi.spots() -> List<&2, Gfx.Spot>:
+  [Spot{224, 104}, Spot{184, 160}, Spot{112, 136}, Spot{72, 112}, Spot{88, 96}, Spot{64, 48},
+    Spot{192, 40}, Spot{136, 16}, Spot{80, 16}, Spot{64, 24}]
+
+def Gfx.wi.anim(+j: U32) -> List<&2, String>:
+  ["WIA00" ++ U32.show(j) ++ "00", "WIA00" ++ U32.show(j) ++ "01", "WIA00" ++ U32.show(j) ++ "02"]
+
+def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
+
+def Gfx.wi.names() -> List<&2, String>:
+  List.append(&2, String,
+    ["WIMAP0", "WILV00", "WILV01", "WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR",
+      "WISUCKS", "WIPCNT", "WICOLON", "WINUM0", "WINUM1", "WINUM2", "WINUM3", "WINUM4", "WINUM5",
+      "WINUM6", "WINUM7", "WINUM8", "WINUM9", "WISPLAT", "WIURH0", "WIURH1"],
+    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0))
+
 def Gfx.bar.names() -> List<&2, String>:
   List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),
     ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"],
-    Gfx.bar.faces(5n, 0)])
+    Gfx.bar.faces(5n, 0), Gfx.wi.names()])
 
 # The heads-up font
 # -----------------
@@ -1424,6 +1456,16 @@ def Gfx.sprite(+g: Gfx, state: U32, rot: U32, k: U32) -> U32:
 def Gfx.bar(+g: Gfx, k: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, bar, font} = g
   V.Vec.get(bar, k)
+
+def Gfx.patch.go(names: List<&2, String>, +name: String, +i: U32, +g: Gfx) -> U32:
+  match names:
+    case []:
+      0
+    case got <> rest:
+      Bool.pick(U32, String.eq(got, name), Gfx.bar(g, i), Gfx.patch.go(rest, name, (i + 1 : U32), g))
+
+def Gfx.patch(+g: Gfx, name: String) -> U32:
+  Gfx.patch.go(Gfx.bar.names(), name, 0, g)
 
 # The index in the array of the heads-up font's patch for a character's
 # place from HU_FONTSTART.

@@ -463,8 +463,8 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 
 # The state with the player holding an inventory.
 def holding(inv: I.Inventory, s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
-  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
 # The blue key, record 87, taken strafing past it, the oracle's script:
 # 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
@@ -588,12 +588,12 @@ def opens(+open: S.State) -> IO(Unit):
 # where it now stands, as P_UnsetThingPosition and P_SetThingPosition
 # relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
   S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
-    sounds, mrnd, reborn}
+    sounds, mrnd, reborn, secrets}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -960,9 +960,9 @@ def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
 def stocked(health: U32, armour: U32, armourtype: U32, ammo: List<&2, U32>, inv: I.Inventory) -> I.Inventory:
-  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, line} = inv
+  I.Inventory{h, a, t, cards, rounds, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory{health, armour, armourtype, cards, V.Vec.of_list(ammo, 4), caps, backpack, weapons, powers, items,
-    bonus, line}
+    bonus, line, kills, secrets}
 
 # Walking forward from a place for some tics, then one more: the tic
 # before contact and the tic of it.
@@ -1242,9 +1242,9 @@ def dying(+level: L.Level) -> IO(Unit):
     IO.print("-")
 
 def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn} = s
+  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{p, level, H.Things.put(H.Things.none(1, H.Thing.you(), 1, 1), 0, Some{thing}), sidetex, thinkers, rnd,
-    clock, ended, usedown, sounds, mrnd, reborn}
+    clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
 # A state in the one-sector room of the closed laws: the player at rest
 # at the origin facing east with some health, the random index a blow's
@@ -1280,9 +1280,9 @@ def blows() -> IO(Unit):
 # it here.
 def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
   S.State{S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
 # The player killed on the spot by a blow from nobody.
 def killed(+s: S.State) -> S.State:
@@ -1491,6 +1491,7 @@ def fighting(+level: L.Level) -> IO(Unit):
     g3 : S.State <- fight("held", 14n, fire(), [265], g2)
     g4 : S.State <- fight("held", 14n, fire(), [265], g3)
     g5 : S.State <- fight("corpse", 30n, idle(), [265], g4)
+    IO.print("kill count " ++ U32.show(I.Inventory.kills(S.Player.inv(S.State.player(g5)))))
     b0 : S.State <- fight("barrels ready", 20n, idle(), [24, 25, 26], armoured(at(level, 992, 704, 270)))
     b1 : S.State <- fight("shot", 6n, fire(), [24, 25, 26], b0)
     b2 : S.State <- fight("held", 14n, fire(), [24, 25, 26], b1)
@@ -1907,6 +1908,7 @@ def main() -> IO(Unit):
 #|sound tic 79 stop thing 296
 #|sound tic 90 DSSHOTGN from thing 182 vol 48 sep 41
 #|corpse tic 98 at 1024.000000 -224.000000 health 100 armour 0/0 rnd 49 265 hp -5 state 127/4294967295 at 966.165649 -203.567825 0.000000 after 157 mobj 295 type 2007 at 986.506484 -210.260131 0.000000 state 35/4294967295 mobj 297 type -1 at 986.418884 -163.847015 31.348739 state 87/2 mobj 298 type -1 at 1020.558197 -163.740905 28.708389 state 87/3 mobj 299 type -1 at 1091.770843 -195.430221 26.929992 state 87/1
+#|kill count 1
 #|sound tic 6 DSPOSIT2 from thing 240 vol 53 sep 137
 #|sound tic 8 DSBGSIT1 from thing 81 vol 49 sep 165
 #|sound tic 9 DSBGSIT2 from thing 82 vol 42 sep 157

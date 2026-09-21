@@ -13,7 +13,6 @@ import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/things.bend as H
 import ../src/inventory.bend as I
-import ../src/game.bend as M
 
 def held(n: Nat, forward: U32, side: U32, turn: U32, buttons: U32) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, buttons))
@@ -77,7 +76,6 @@ def route(gl: G.Gfx & L.Level) -> IO(Unit):
     r6 : S.State <- leg("key approach", [held(1n, 50, 0, 1, 2), run(58n), idle(10n), turn(47),
       left(13n)], start, r5)
     +r7 : S.State <- leg("approach blocked", [left(1n)], start, r6)
-    IO.print(M.Game.time(S.State.clock(r7)))
     return Unit{}
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -103,4 +101,3 @@ def main() -> IO(Unit):
 #|  inventory health 32 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 201 taken 141 173 174 175 197 199 207 208 275 276
 #|approach blocked tic 717 2182.186035 -90.502609 157.500 z 136.000000 ended False blue doors -128.000000 -128.000000
 #|  inventory health 32 armour 0 type 0 cards 0 ammo 50 16 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 3 flash 0 things 201 taken 141 173 174 175 197 199 207 208 275 276
-#|Time 0:20
