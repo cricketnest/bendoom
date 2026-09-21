@@ -413,7 +413,21 @@ def floors(+level: L.Level) -> IO(Unit):
     IO.print("-")
 
 # Freedoom's special 2 lines along x 2032: crossing one opens sector 145
-# for good, and crossing it again starts nothing.
+# for good, and crossing it again starts nothing. The split case starts
+# at x 2025 with 20 units of momentum. P_XYMovement crosses the line in
+# its first 10-unit half, so S_StartSound listens at x 2035, not the
+# final x 2045. tools/sound.nu over vanilla's tables and the WAD gives
+# volume 45 and separation 156 there; the final place would give 157.
+def fast(+p: S.Player) -> S.Player:
+  S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  S.Player{x, y, z, angle, F.Fixed.of_map(20), 0, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed,
+    inv, psprites, hurt}
+
+def split.crossed(+level: L.Level) -> IO(Unit):
+  +s = at(level, 2025, 65086, 0)
+  +q = S.Sim.tic(idle(), S.State.player.put(s, fast(S.State.player(s))))
+  IO.print(events(S.State.sounds(q), S.State.clock(q)) ++ line("split crossing", q))
+
 def crossed(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     x0 : S.State <- run("trigger walk", 16n, forward(), [145], at(level, 1960, 65086, 0))
@@ -422,6 +436,7 @@ def crossed(+level: L.Level) -> IO(Unit):
     x3 : S.State <- run("-", 1n, idle(), [145], x2)
     x4 : S.State <- run("back", 40n, K.Cmd.demo(4294967271, 0, 0, 0), [145], x3)
     IO.print(drawn(x4))
+    split.crossed(level)
     IO.print("-")
 
 # Freedoom's first lift, sector 98: called by the walk-over line on its
@@ -2882,6 +2897,8 @@ def main() -> IO(Unit):
 #|sound tic 105 DSBGSIT2 from thing 241 vol 48 sep 34
 #|back tic 119 1943.006134 -458.662643 0.000 z 128.000000 floor 128.000000 eye 35.955810 thinkers 9 sector 145 136.000000 260.000000
 #|sounds drew to 193
+#|sound tic 1 DSDOROPN from sector 145 vol 45 sep 156
+#|split crossing 2045.000000 -450.000000 0.000 z 128.000000 floor 128.000000 eye 41.003051
 #|-
 #|lift run tic 35 11.349639 256.160812 0.000 z 0.000000 floor 0.000000 eye 33.430175 thinkers 9 sector 98 12.000000 128.000000
 #|- tic 39 62.115066 256.179794 0.000 z 12.000000 floor 12.000000 eye 25.687744 thinkers 9 sector 98 12.000000 128.000000
