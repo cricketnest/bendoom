@@ -49,7 +49,7 @@ def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, g
   (+gfx, +level) = gl
   do IO<Unit>:
     rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(P.Project.tables(level), gfx,
-      I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), mem)))
+      I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), False{}, mem)))
     Frame.rows(200n, 0, rest)
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):

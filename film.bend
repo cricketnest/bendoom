@@ -72,7 +72,7 @@ def Film.go(cmds: List<&2, K.Cmd>, +level: L.Level, +tables: P.Project.Tables, +
         moved : List<Maybe<C.Channel>> <- Film.channels(next, heard)
         mixed : Maybe<M.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32> <- M.Stream.window(1260, tape, moved)
         Film.mixed(audio, mixed, file => later => voices =>
-          Film.shot(V.Show.rgb(I.Play.frame(tables, gfx, next, mem)),
+          Film.shot(V.Show.rgb(I.Play.frame(tables, gfx, next, True{}, mem)),
             m => Film.go(rest, level, tables, gfx, next, later, voices, dir, file, m)))
 
 def Film.play(demo: List<&2, U32>, +music: String, +sounds: String, audio: File, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
