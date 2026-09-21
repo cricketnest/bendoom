@@ -10,7 +10,8 @@ stdenvNoCC.mkDerivation {
   version = "2.0.22";
   inherit src;
 
-  patches = [ ./window-fill.patch ];
+  patches = [ ./window-fill.patch ]
+    ++ lib.optional stdenvNoCC.hostPlatform.isDarwin ./local-names.patch;
 
   nativeBuildInputs = [ makeWrapper ];
 

@@ -25,6 +25,10 @@ llvmPackages_19.stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     export HOME=$TMPDIR
+    ${lib.optionalString llvmPackages_19.stdenv.hostPlatform.isAarch64 ''
+      ulimit -S -s 32768
+      export BUN_JSC_maxPerThreadStackUsage=16777216
+    ''}
     ${lib.readFile ./compile.sh}
     for t in tests/*.bend; do
       name=$(basename $t .bend)
