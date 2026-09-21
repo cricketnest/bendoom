@@ -19,7 +19,7 @@ let
   song = music iwad;
   effects = sounds iwad;
 in
-writers.writeNuBin "bendoom-film" ''
+(writers.writeNuBin "bendoom-film" ''
   # Encodes a demo Bendoom recorded as an MP4, 35 frames a second.
   def main [demo: path, video: path] {
     let scratch = mktemp --directory
@@ -47,4 +47,7 @@ writers.writeNuBin "bendoom-film" ''
       rm --recursive $scratch
     }
   }
-''
+'').overrideAttrs {
+  preferLocalBuild = false;
+  allowSubstitutes = true;
+}
