@@ -11,7 +11,7 @@
 - [ ] `nix flake check` passes on both lanes, and the proof checks all terms
 - [x] Ticket 03 made the wall and geometry laws hold by construction: `State.held` puts the geometry and the player's place back after every thinker's turn, at a measured 0.46 ms a tic before monsters. Measure it again with the monsters thinking; if it costs a frame a second, or if any thinker could rightly move the player, replace the clamp with a proof that each thinker kind keeps both
 - [x] The erasure pass: every def is used; no current source or milestone summary describes the pre-combat game; the oracle holds no mask but the pause graphic's and the face's
-- [ ] The maintainer plays both maps with monsters to the intermission
+- [x] The maintainer plays both maps with monsters to the intermission
 - [ ] The README's milestone 6 line and the spec's status say done
 
 ## `State.held` measurement
@@ -30,3 +30,7 @@ to keep the construction that enforces both facts.
 The complete Freedoom demo in `tests/fixtures/freedoom.lmp` reaches the exit on tic 2060 with 25 health, 82 armour, random index 22, 11 of 29 kills, 11 of 49 items and no secrets. Chocolate Doom 3.1.1 reports the same exit fields. After 600 idle tics, its intermission shows 37% kills, 22% items, 0% secrets, 0:58 time and 0:30 par; the full frame comparison returns zero. `tests/route.bend` checks these results. The independent engine trace and frame report are in `/tmp/m6-routes/exit-trace/final.log` and `/tmp/m6-routes/full-exit-oracle.json`.
 
 The shareware route also reaches the exit alive and its settled intermission frame returns zero. Its 650-command script and report are in `/tmp/m6-routes/shareware-fire.script` and `/tmp/m6-routes/shareware-tally.json`. Ticket 24 separately checks the longer combat state and intermediate frames on both WADs.
+
+## Play-through
+
+21 Sep 2026. The maintainer played both packages on `a3126db` with monsters to the intermission.

@@ -4,7 +4,7 @@
 
 **Blocked by:** 11 (Ctrl fires the pistol), 16 (A woken monster chases)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `P_NoiseAlert` and `P_RecursiveSound` with the line openings as they stand on that tic, closed doors included
 - [x] `A_Look`'s sound-target branch and the ambush rule

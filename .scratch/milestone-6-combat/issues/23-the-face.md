@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (The status bar shows the inventory), 09 (The nukage hurts and the player dies), 12 (Weapons switch and the shotgun fires), 17 (Zombiemen and shotgun guys shoot); milestone 7's 01 (The sim reports its sounds)
 
-**Status:** ready-for-human
+**Status:** ready-for-agent
 
 - [x] Every priority of `ST_updateFaceWidget` that the two maps can reach, with its count, including vanilla's ouch-face bug as it stands
 - [x] The second random index starts at 64 and counts as milestone 7's ticket 01 left it; that ticket found that under `-playdemo` one or two tics run before the melt's draws, so check from the source which table entries `ST_Ticker`'s first draws read
@@ -15,6 +15,8 @@
 - [x] A closed law pins the pain offset at each health level's edge
 
 ## Comments
+
+21 Sep 2026. The maintainer played both packages of this branch in the window to the intermission and the face looks right. What is left is the deferred list below, all of it an agent's: tickets 12, 17 and 18 have since given the map weapon switching and attacking monsters, so the grin and the wince can now come from real play.
 
 ### What was built
 

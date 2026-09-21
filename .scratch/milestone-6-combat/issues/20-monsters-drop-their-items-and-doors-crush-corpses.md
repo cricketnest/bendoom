@@ -4,7 +4,7 @@
 
 **Blocked by:** 19 (Monsters are hurt and die)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The drop spawns with the dropped flag, and `P_GiveAmmo` and `P_GiveWeapon` halve for it
 - [x] `PIT_ChangeSector`'s corpse, dropped-item and shootable branches; neither map has a crusher, so crushing damage has no caller and stays out
