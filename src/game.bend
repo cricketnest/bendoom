@@ -36,7 +36,7 @@ def Game.shown(level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, play: I.Pla
 def Game.view(g: Game) -> Game & Image:
   Game{level, +gfx, +tables, +play, input, again, last, owed, mem, demo, music} = g
   Game.shown(level, gfx, tables, play, input, again, last, owed, demo, music,
-    V.Show.image(I.Play.frame(tables, gfx, play, mem)))
+    V.Show.image(I.Play.frame(tables, gfx, play, True{}, mem)))
 
 def Game.key(+code: U32, +down: Bool, g: Game) -> Game:
   Game{level, gfx, tables, play, input, again, last, owed, mem, demo, music} = g

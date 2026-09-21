@@ -842,9 +842,9 @@ def Play.playing(play: Play) -> Bool:
 
 # The frame the play shows: the level from the player's eye, or the
 # tally, both in the same 320 by 200 array.
-def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, mem: Array<U32>) -> Array<U32> & U32:
+def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
     case Playing{+state}:
-      R.Render.frame(tables, gfx, state, True{}, mem)
+      R.Render.frame(tables, gfx, state, messages, mem)
     case Showing{+wi}:
       (Inter.frame(gfx, wi, mem), 0)
