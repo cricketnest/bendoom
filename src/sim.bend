@@ -862,9 +862,7 @@ def Sim.nearby(+level: L.Level, things: H.Things, m: Sim.Body) -> List<&2, U32>:
 
 # The thing half of Doom's P_CheckPosition for a mobj's box.
 def Sim.met(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body) -> Sim.Met:
-  Body{+id, +x, +y, +z, +radius, +height, +flags} = m
-  +ids = Sim.near(level, things, x, y, radius)
-  Sim.met.go(ids, things, p, Body{id, x, y, z, radius, height, flags})
+  Sim.met.go(Sim.nearby(level, things, m), things, p, m)
 
 def Sim.met.missile(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body, +source: U32) -> Sim.Met:
   Body{+id, +x, +y, +z, +radius, +height, +flags} = m
