@@ -51,7 +51,6 @@
 - The pending queue lives in `H.Things`, not in the inventory or in `Sim.Try`. It costs one field there and keeps `Sim.touch`'s shape, which milestone 6's position check ticket is rewriting.
 - A switch's click comes from the first running button's sector, or nobody. Vanilla reads slot 0 of `buttonlist`, which can be free while a later slot runs; the two agree while at most one button runs. Neither E1M1 can run a button at all (see Surprises), so slots were not modelled.
 - The pop-back sounds from `Spot{0, 0}`. Chocolate Doom on 64 bits reads x from the next slot's timer, a raw fixed value of at most 35, less than a thousandth of a unit.
-- Lines crossed are still fired after the whole move, so a line crossed in the first half of a split move (momentum over 15 units a tic) sounds with the listener where the whole move ended, up to half a step from vanilla's. Volume can differ by one and separation by a few units when the source is near. Fixing it means firing crossings inside `Sim.try_move`, which belongs with the position check ticket.
 - `Sim.approx` moved to `F.Fixed.approx` so that `Sound.adjust` can share it. A branch that still calls `Sim.approx` needs that one name changed after merging.
 - The button is a thinker here, so its pop-back sounds in thinker order and not after all thinkers, as `P_UpdateSpecials` would.
 

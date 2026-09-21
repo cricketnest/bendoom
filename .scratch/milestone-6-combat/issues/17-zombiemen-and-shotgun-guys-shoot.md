@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (One traversal finds what a ray meets), 09 (The nukage hurts and the player dies), 16 (A woken monster chases)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `A_Chase`'s attack half, `P_CheckMissileRange`, `A_PosAttack` and `A_SPosAttack`, with reaction time and the just-attacked flag
 - [x] The player takes the damage through armour, and the attacker is recorded
@@ -55,7 +55,9 @@ monsters absent from both maps.
 
 The new loader check failed with brightness 0 before the fix and reads 1
 for Freedoom afterward. Shareware still reads 0. The fixed firing oracle
-returns zero, and the load and render tests match their expected output
-on the JavaScript lane. Native checks and the final integrated matrix
-remain before closure. Reports: `/tmp/verify-shots/frames.json` and
-`/tmp/verify-shots/zombie-fixed.json`.
+returns zero. The load test matches on both lanes, the render test matches
+on JavaScript, and the native frame dump returns zero for both firing
+poses, including the face box. The sim test matches on both lanes after
+the face fix. Ticket 25 owns the final integrated matrix. Reports are in
+`/tmp/verify-shots/frames.json`, `zombie-fixed.json`, `zombie-native.json`
+and `shotgun-native.json`.

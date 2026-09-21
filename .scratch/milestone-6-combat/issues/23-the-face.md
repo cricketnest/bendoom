@@ -38,7 +38,7 @@
 - The glances: `rndtable` read from `m_random.c` in nushell. Each face line carries the M_Random index the tic's draw left, so each is `ST_calcPainOffset(health) + rndtable[index] % 3` checked in nushell: 197 at 65 and 92 at 99 give 2, 249 at 82 and 171 at 124 give 0, 145 at 101 and 61 at 137 give 1, and all eight glances the test prints agree. Printing the draw is what turns them from pins into computed values; before the sight ticket merged they were 64 plus the tic plus the sounds, and the sights now count too.
 - The sides: `R_PointToAngle2` by hand for a player at the origin facing east. A barrel due south is at `ANG270`, which is above the facing, so the difference is `ANG270` itself, past `ANG180`, and the face turns right, offset 3. Due north is `ANG90 - 1 - tantoangle[0]`, above the facing too, and the difference is under `ANG180`, so the face turns left, offset 4. Due east the difference is 0, inside `ANG45`, so the face is the rampage one, offset 7.
 - `ST_RAMPAGEDELAY` on the 71st tic of held fire: the first tic finds `lastattackdown` at -1 and sets it to 70, and each tic after it takes one off before the test, so it reaches 0 on the 71st.
-- `M_Random`'s index in every case: 64 at the level's start, one for each tic, which is `ST_Ticker`'s draw, and one for each audible sound start but the item pickup's. The idling case ends at 124 after 60 tics with nothing heard, the blows at 68 after 4 in the closed room, and held fire at 144 after 75 tics and 5 pistol shots. Cases in the yard also count the monsters' sights, which milestone 6's ticket 15 added.
+- `M_Random`'s index in every case: 64 at the level's start, one for each tic, which is `ST_Ticker`'s draw, and one for each audible sound start but the item pickup's. The idling case ends at 124 after 60 tics with nothing heard, the blows at 68 after 4 in the closed room, and held fire at 160 after 90 tics. Cases in the yard also count the monsters' sights, which milestone 6's ticket 15 added.
 - The face pixel the render test samples, row 180 column 155: `tools/oracle.nu`'s `patch-pixels` over Freedoom says 72 in `STFST00`, 64 in `STFST01`, 59 in `STFST02`, 79 in `STFEVL0` and 8 in `STFDEAD0`.
 
 ### The first two tics under -playdemo, settled
@@ -53,11 +53,11 @@ It does not change a face. The only tics whose draw is read are the ones a glanc
 
 | case | place | script | differing | face |
 | --- | --- | --- | --- | --- |
-| the dead face | 1600 1000 90 | `650,0,0,0,0` | 48983 | 0 |
 | start, at rest | -416 256 0 | `20,0,0,0,0` | 0 | 66 |
 | switch pressed | 2064 -260 90 | `20,0,0,0,0 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0` | 0 | 28 |
+| shareware start | 1056 -3616 90 | `20,0,0,0,0` | 0 | 34 |
 
-At this ticket's checkpoint the dead view differed by 48983 pixels because chase had not landed; the face box itself was at zero. and it is the one face that holds still under the pause. The other two rows are the living face changing under the pause, which is why the box stays masked, beside 0 differing everywhere else.
+The living face changes under the pause, which is why the box stays masked. Everything outside it has zero differing pixels.
 
 The face's pixels were then compared with the patches themselves, `tools/oracle.nu`'s `patch-pixels` over Freedoom against our own frame dump: all 578 pixels of `STFST00` in the rested start's frame and all 591 of `STFDEAD0` in the dead one, none differing. Against the wrong lump, `STFST01`, the start's frame differs in 64 pixels, so the check has teeth.
 
@@ -66,8 +66,8 @@ The face's pixels were then compared with the patches themselves, `tools/oracle.
 - The face now keeps `player->attackdown` in the existing face vector. `G_PlayerReborn` starts it true, `A_WeaponReady` writes the command's attack bit, and `ST_Ticker` reads the kept value. It no longer reads the command directly. A one-tic release during the pistol's firing rows therefore leaves the rampage countdown running.
 - Chocolate Doom was traced in GDB at `ST_updateFaceWidget` from the Freedoom start. Continuous fire and 69 tics of fire followed by a release on tic 70 both leave `attackdown` true. Both have `lastattackdown` 2 on tic 69, 1 on tic 70, and show face 7 on tic 71. The sim test now replays both paths through the whole state and gets the same transition and count.
 - The shotgun guy at record 96 now supplies a real map attack for the wince case. Its first shot on tic 61 takes the player to 73 health, and the face turns left at pain level 1, index 15, with 34 tics left after `ST_Ticker` decrements it. The chainsaw pickup case already walks over the real map weapon and shows index 6, so the grin no longer depends on a constructed inventory.
-- The maintainer played both the Freedoom and shareware packages to the intermission with sound and accepted the face. The face state machine does not read WAD-specific data; each package supplies its own 42 patches through the same table.
-- A removed attacker cannot reach the fallback in these maps. Hitscan and melee damage record the attacking monster, whose corpse remains. Missile damage records the missile's source, not the missile. A barrel remains through its explosion states while the hit is handled. The only things removed immediately are pickups and crushed dropped items, and neither can damage the player. The fallback remains defensive behavior outside the maps' reachable cases.
+- The maintainer played both the Freedoom and shareware packages to the intermission with sound and accepted the face. The shareware start also has zero differing pixels outside the moving face box, with palette 0. Each package supplies its own 42 patches through the same table.
+- A removed attacker is unreachable in these maps. Hitscan and melee damage record the attacking monster, whose corpse remains. Missile damage records the missile's source, not the missile. `A_Explode` passes the barrel's target as the source to `P_RadiusAttack`, so a barrel blast records its shooter rather than the barrel. Pickups and crushed dropped items are the things removed immediately, and neither can damage the player.
 - `ST_GODFACE` remains unreachable. Neither cheat input nor an invulnerability pickup exists in these maps, so the lump stays loaded without a face-selection stage.
 
 ### Trade-offs
@@ -82,14 +82,6 @@ The face's pixels were then compared with the patches themselves, `tools/oracle.
 - Once the nukage has taken enough health, the face never glances again: the pain face's count is 35 tics and a blow lands every 32, so each blow resets it before it can time out.
 - The chainsaw's grin shows in the render test without a case of its own. `P_TouchSpecialThing` sets the pickup flash before `ST_Ticker` looks, so the frame named `chainsaw after` draws `STFEVL0`, which the sampled pixel reads as 79.
 
-### After the merge
-
-`milestone-6-7` at 5feab80, the sight ticket and the width refactor, merged in. Five conflicts, all resolved by reading both sides: the oracle's and the two tests' headers, which gained a paragraph from each side; `tests/game.bend`'s and both tests' expected blocks, regenerated; and `Sim.tic.live`, where the refactor's `+x` and `+y` lets now sit above `Sim.st.ticker`'s call with `+attack` beside them, which is the rule that keeps the native headroom. `Sim.face.hit.at` gained the thing record's new `lastlook` field.
-
-The merge moved every face that a monster's sight sound draws before: the nukage's two glances swapped and the render frames' faces changed. That is why each face line now prints the M_Random index its draw left, which is what makes the glance a computed value rather than a pin.
-
-The whole of the evidence above was rerun on the merged tree: the proof, every test on both lanes, the three oracle cases, and the two comparisons against the WAD's patches.
-
 ### Checks
 
-`bend PROOF.bend` prints "All terms check."; every test in `tests/` passes native and on bun; `doom.bend`, `tests/sim.bend`, `tests/render.bend` and `tools/frame.bend` all build natively; the three oracle cases above; `git diff --check`. The flake check is the orchestrator's.
+On the final face change, `tests/sim.bend` passes natively and on Bun, `bend PROOF.bend` prints "All terms check.", and `git diff --check` passes. The integration branch runs the whole test set and flake check after this branch merges.
