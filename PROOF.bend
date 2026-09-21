@@ -1134,8 +1134,8 @@ def push_free(+level: L.Level, +p: S.Player, +angle: U32, +move: U32, hp: Free(l
   Free(level, S.Sim.push(level, p, angle, move)):
   push_if_free(Bool.or(U32.is_zero(move), Bool.not(S.Player.onground(p))), level, p, angle, move, hp)
 
-def move_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.move(level, cmd, p)):
+def move_cmd_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
+  Free(level, S.Sim.move.cmd(level, cmd, p)):
   match cmd p:
     case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       push_free(level, S.Sim.push(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
@@ -1143,6 +1143,25 @@ def move_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
         ((angle + (turn << 16n) : U32) - A.Angle.ang90() : U32), side,
         push_free(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
           (angle + (turn << 16n) : U32), forward, hp))
+
+def pulled_free(+level: L.Level, p: S.Player, pulled: Bool, hp: Free(level, p)) ->
+  Free(level, S.Player.pulled(p, pulled)):
+  match p:
+    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
+      hp
+
+def move_go_free(pulled: Bool, +level: L.Level, cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
+  Free(level, S.Sim.move.go(pulled, level, cmd, p)):
+  match pulled:
+    case True{}:
+      move_cmd_free(level, K.Cmd.demo(100, 0, 0, 0), S.Player.pulled(p, False{}),
+        pulled_free(level, p, False{}, hp))
+    case False{}:
+      move_cmd_free(level, cmd, p, hp)
+
+def move_free(+level: L.Level, cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
+  Free(level, S.Sim.move(level, cmd, p)):
+  move_go_free(Bool.not(U32.is_zero(V.Vec.get(S.Player.hurt(p), S.Sim.hurt.justattacked()))), level, cmd, p, hp)
 
 def eye_if_free(ground: Bool, live: Bool, +level: L.Level, p: S.Player, swing: U32, hp: Free(level, p)) ->
   Free(level, S.Sim.eye.if(ground, live, p, swing)):
