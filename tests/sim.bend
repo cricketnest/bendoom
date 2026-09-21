@@ -1539,6 +1539,21 @@ def attack.missile.result(tag: String, +s: S.State) -> IO(S.State):
       ++ spawned.all(292, S.State.things(s)))
     return s
 
+def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
+  +q = Run.state(play(List.replicate(K.Cmd, n, cmd), Run{"", s}))
+  do IO<S.State>:
+    IO.print(tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " health "
+      ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " random " ++ U32.show(S.State.rnd(q))
+      ++ " at " ++ F.Fixed.show(S.Player.x(S.State.player(q))) ++ " " ++ F.Fixed.show(S.Player.y(S.State.player(q)))
+      ++ " view " ++ F.Fixed.show(S.Player.viewz(S.State.player(q)))
+      ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297))
+      ++ " imps" ++ fighter(H.Things.get(S.State.things(q), 81))
+      ++ fighter(H.Things.get(S.State.things(q), 82)) ++ fighter(H.Things.get(S.State.things(q), 84)))
+    return q
+
+def attack.play(n: Nat, cmd: K.Cmd, +s: S.State) -> S.State:
+  Run.state(play(List.replicate(K.Cmd, n, cmd), Run{"", s}))
+
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     claw : S.State <- attack.result("imp claw", 81,
@@ -1549,6 +1564,10 @@ def attacks(+level: L.Level) -> IO(Unit):
       S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
     wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
     sky : S.State <- attack.missile.result("fireball sky", attack.missile(level, 64896, 256, 64640, 256, 8n))
+    replay0 : S.State <- attack.replay("unarmoured flight", 10n, idle(),
+      attack.play(34n, fire(), attack.play(20n, idle(), at(level, 992, 704, 270))))
+    replay1 : S.State <- attack.replay("unarmoured burst", 10n, idle(), replay0)
+    replay2 : S.State <- attack.replay("unarmoured gone", 20n, idle(), replay1)
     IO.print("-")
 
 def weapon.inv(+ready: U32, +shells: U32, inv: I.Inventory) -> I.Inventory:
@@ -2020,6 +2039,9 @@ def main() -> IO(Unit):
 #|fireball wall random 62 mobj 292 type -3 at 748.999313 256.017166 -96.000000 state 199/6
 #|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
 #|fireball sky random 61
+#|unarmoured flight tic 64 health 0 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
+#|unarmoured burst tic 74 health 0 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
+#|unarmoured gone tic 94 health 0 random 195 fireball gone
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
