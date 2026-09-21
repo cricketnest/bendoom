@@ -39,6 +39,7 @@ import ../src/sim.bend as S
 import ../src/things.bend as H
 import ../src/project.bend as P
 import ../src/game.bend as M
+import ../src/inter.bend as I
 import ../src/sound.bend as Sn
 
 def pressed(+level: L.Level, sidetex: V.Vec) -> Bool:
@@ -81,6 +82,15 @@ def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
     IO.print(line(tag, state))
     return Some{g}
 
+def told.play(tag: String, play: I.Play, g: M.Game) -> IO(Maybe<M.Game>):
+  match play:
+    case I.Playing{state}:
+      told(tag, state, g)
+    case I.Showing{wi}:
+      do IO<Maybe<M.Game>>:
+        IO.print(tag ++ " tally " ++ I.Inter.show(wi))
+        return Some{g}
+
 def reported(quit: Bool, tag: String, g: M.Game) -> IO(Maybe<M.Game>):
   match quit:
     case True{}:
@@ -88,8 +98,8 @@ def reported(quit: Bool, tag: String, g: M.Game) -> IO(Maybe<M.Game>):
         IO.print(tag ++ " quit")
         return None{}
     case False{}:
-      M.Game{level, gfx, tables, +state, input, again, last, owed, mem, demo, music} = g
-      told(tag, state, M.Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music})
+      M.Game{level, gfx, tables, +play, input, again, last, owed, mem, demo, music} = g
+      told.play(tag, play, M.Game{level, gfx, tables, play, input, again, last, owed, mem, demo, music})
 
 def report(tag: String, p: Bool & M.Game) -> IO(Maybe<M.Game>):
   (quit, g) = p
@@ -115,7 +125,7 @@ def route() -> List<&2, K.Cmd>:
 # The game handed another state, to put a second case to the same loop.
 def restaged(g: M.Game, s: S.State) -> M.Game:
   M.Game{level, gfx, tables, was, input, again, last, owed, mem, demo, music} = g
-  M.Game{level, gfx, tables, s, input, again, last, owed, mem, demo, music}
+  M.Game{level, gfx, tables, I.Playing{s}, input, again, last, owed, mem, demo, music}
 
 def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
   match m:
@@ -147,14 +157,14 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
     IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
-    d : Maybe<M.Game> <- reborn(Some{M.Game{level, gfx, P.Project.tables(level), killed(level),
+    d : Maybe<M.Game> <- reborn(Some{M.Game{level, gfx, P.Project.tables(level), I.Playing{killed(level)},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
     g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)
     g3 : Maybe<M.Game> <- frame("release", 800n, [Key{32, False{}}], g2)
     g4 : Maybe<M.Game> <- frame("enter", 800n, [Key{13, True{}}], g3)
     g5 : Maybe<M.Game> <- frame("esc", 1400n, [Key{27, True{}}], g4)
-    IO.print(M.Game.time(21) ++ ", " ++ M.Game.time(2099) ++ ", " ++ M.Game.time(2100) ++ ", " ++ M.Game.time(4321))
+    return Unit{}
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -169,10 +179,8 @@ def main() -> IO(Unit):
 #|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 73
 #|dead space tic 7 ended False at 1600.000000 1000.000000 90.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 64
 #|reborn tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
-#|Time 0:00
-#|space tic 7 ended True at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 0 pressed True things 209 random 67
-#|repeat tic 7 ended True at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 0 pressed True things 209 random 67
-#|release tic 7 ended True at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 0 pressed True things 209 random 67
-#|enter tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
+#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 - - 0 0 - - 0 random 83
+#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 83
+#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
+#|enter tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
 #|esc quit
-#|Time 0:00, Time 0:59, Time 1:00, Time 2:03

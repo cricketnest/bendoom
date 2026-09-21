@@ -206,6 +206,7 @@ type Thing.Action is Data:
   Raise{}
   WeaponReady{}
   FirePistol{}
+  FireShotgun{}
   ReFire{}
   Lower{}
   Pain{}
@@ -348,7 +349,14 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"SARG", 6, False{}, 8, 113, SargAttack{}, 0},
     Row{"BAL1", 0, True{}, 4, 197, Null{}, 0}, Row{"BAL1", 1, True{}, 4, 196, Null{}, 0},
     Row{"BAL1", 2, True{}, 6, 199, Null{}, 0}, Row{"BAL1", 3, True{}, 6, 200, Null{}, 0},
-    Row{"BAL1", 4, True{}, 6, 4294967295, Null{}, 0}]
+    Row{"BAL1", 4, True{}, 6, 4294967295, Null{}, 0},
+    Row{"SHTG", 0, False{}, 1, 201, WeaponReady{}, 0}, Row{"SHTG", 0, False{}, 1, 202, Lower{}, 0},
+    Row{"SHTG", 0, False{}, 1, 203, Raise{}, 0}, Row{"SHTG", 0, False{}, 3, 205, Null{}, 0},
+    Row{"SHTG", 0, False{}, 7, 206, FireShotgun{}, 0}, Row{"SHTG", 1, False{}, 5, 207, Null{}, 0},
+    Row{"SHTG", 2, False{}, 5, 208, Null{}, 0}, Row{"SHTG", 3, False{}, 4, 209, Null{}, 0},
+    Row{"SHTG", 2, False{}, 5, 210, Null{}, 0}, Row{"SHTG", 1, False{}, 5, 211, Null{}, 0},
+    Row{"SHTG", 0, False{}, 3, 212, Null{}, 0}, Row{"SHTG", 0, False{}, 7, 201, ReFire{}, 0},
+    Row{"SHTF", 0, True{}, 4, 214, Null{}, 1}, Row{"SHTF", 1, True{}, 3, 84, Null{}, 2}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -387,9 +395,27 @@ type Thing.Weapon is Data:
 def Thing.pistol() -> Thing.Weapon:
   Weapon{60, 59, 69, 0, 79, 83}
 
+def Thing.shotgun() -> Thing.Weapon:
+  Weapon{203, 201, 202, 1, 204, 213}
+
+def Thing.weapon(+weapon: U32) -> Thing.Weapon:
+  match weapon:
+    case 2:
+      Thing.shotgun()
+    case _:
+      Thing.pistol()
+
 def Thing.Weapon.down(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   down
+
+def Thing.Weapon.up(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  up
+
+def Thing.Weapon.ready(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  ready
 
 def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
@@ -791,6 +817,31 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
 # random index once they have spawned, from 0.
 def Thing.spawn(+level: L.Level) -> Thing.Spawn:
   Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
+
+def Thing.Spawn.things(s: Thing.Spawn) -> List<&2, Thing>:
+  Spawn{things, rnd, you} = s
+  things
+
+type Thing.Totals is Data:
+  Totals{kills: U32, items: U32}
+
+def Thing.totals.flagged(+flags: U32, +bit: U32) -> U32:
+  Bool.to_u32(Bool.not(U32.is_zero((flags .&. bit : U32))))
+
+def Thing.totals.one(+flags: U32, t: Thing.Totals) -> Thing.Totals:
+  Totals{+kills, +items} = t
+  Totals{(kills + Thing.totals.flagged(flags, 4194304) : U32),
+    (items + Thing.totals.flagged(flags, 8388608) : U32)}
+
+def Thing.totals.go(things: List<&2, Thing>, t: Thing.Totals) -> Thing.Totals:
+  match things:
+    case []:
+      t
+    case Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
+      Thing.totals.go(rest, Thing.totals.one(Thing.Def.flags(Thing.info(kind)), t))
+
+def Thing.totals(+level: L.Level) -> Thing.Totals:
+  Thing.totals.go(Thing.Spawn.things(Thing.spawn(level)), Totals{0, 0})
 
 # The population
 # --------------

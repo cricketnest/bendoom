@@ -165,6 +165,31 @@ def Channel.hear(+dir: String, events: List<&2, Sn.Sound.Event>, chans: List<May
         cs : List<Maybe<Channel>> <- Channel.event(dir, e, chans)
         Channel.hear(dir, rest, cs)
 
+def Channel.moved(c: Channel, p: U32 & U32) -> IO(Maybe<Channel>):
+  Chan{file, sfx, source, left, right} = c
+  (+vol, +sep) = p
+  Channel.hush.gone(U32.is_zero(vol), file, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep))
+
+def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  c: Maybe<Channel>) -> IO(Maybe<Channel>):
+  match c:
+    case None{}:
+      IO.pure(Maybe<Channel>, None{})
+    case Some{Chan{file, sfx, +source, left, right}}:
+      Channel.moved(Chan{file, sfx, source, left, right}, params(ctx, source))
+
+# S_UpdateSounds follows the current listener and source positions.
+def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  chans: List<Maybe<Channel>>) -> IO(List<Maybe<Channel>>):
+  match chans:
+    case []:
+      IO.pure(List<Maybe<Channel>>, [])
+    case c <> rest:
+      do IO<List<Maybe<Channel>>>:
+        moved : Maybe<Channel> <- Channel.update.slot(~Ctx, ~params, ctx, c)
+        cs : List<Maybe<Channel>> <- Channel.update(~Ctx, ~params, ctx, rest)
+        return moved <> cs
+
 # Every channel's file closed, when the game lets the device go.
 def Channel.stop(chans: List<Maybe<Channel>>) -> IO(Unit):
   match chans:

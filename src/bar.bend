@@ -86,6 +86,30 @@ def Bar.patch.top(+patch: U32, +x: U32, +y: U32, p: Array<U32> & U32) -> Array<U
 def Bar.patch(+patch: U32, +x: U32, +y: U32, mem: Array<U32>) -> Array<U32>:
   Bar.patch.top(patch, x, y, B.Bytes.u16(mem, (patch + 6 : U32)))
 
+# STlib_updateMultIcon restores the old icon's rectangle from STBAR
+# before drawing a newly owned weapon's yellow number.
+def Bar.back.col(+patch: U32, +at: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, off) = p
+  Bar.down(6n, (patch + off + 7 : U32), at, mem)
+
+def Bar.back.cols(n: Nat, +patch: U32, +col: U32, +at: U32, mem: Array<U32>) -> Array<U32>:
+  match n:
+    case 0n:
+      mem
+    case 1n+m:
+      Bar.back.cols(m, patch, (col + 1 : U32), (at + 1 : U32),
+        Bar.back.col(patch, at, B.Bytes.u32(mem, (patch + 8 + col * 4 : U32))))
+
+def Bar.arms.back.go(empty: Bool, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+  match empty:
+    case True{}:
+      mem
+    case False{}:
+      Bar.back.cols(4n, G.Gfx.bar(gfx, Bar.back()), 123, (G.Gfx.frame() + 172 * 320 + 123 : U32), mem)
+
+def Bar.arms.back(+weapons: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+  Bar.arms.back.go(U32.is_zero((weapons .&. 4 : U32)), gfx, mem)
+
 # Widgets
 # -------
 
@@ -204,7 +228,8 @@ def Bar.icons(+inv: I.Inventory, +face: U32, +gfx: G.Gfx, mem: Array<U32>) -> Ar
   Bar.keys.go(3n, 0, I.Inventory.cards(inv), gfx,
     Bar.patch(G.Gfx.bar(gfx, (Bar.face() + face : U32)), 143, 168,
       Bar.arms.go(6n, 0, I.Inventory.weapons(inv), gfx,
-        Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem))))
+        Bar.arms.back(I.Inventory.weapons(inv), gfx,
+          Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem)))))
 
 # Doom's ST_Drawer with the bar on: the background, then the widgets in
 # ST_drawWidgets' order.
