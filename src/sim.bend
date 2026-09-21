@@ -2376,13 +2376,14 @@ def Sim.missile.spawn(m: Sim.Body, t: Sim.Body, +source: U32, +s: State) -> Stat
   Body{mi, +x, +y, +z, mr, mh, mf} = m
   Body{ti, +tx, +ty, +tz, tr, th, tf} = t
   +angle = A.Angle.of(L.Level.tanto(State.level(s)), (tx - x : U32), (ty - y : U32))
+  +fine = A.Angle.fine(angle)
   +speed = {655360 : U32}
   +dist = U32.max((F.Fixed.approx((tx - x : U32), (ty - y : U32)) / speed : U32), 1)
   +id = H.Things.count(State.things(s))
   +spawned = Sim.spawn(H.Thing.info(H.Thing.fireball()), x, y, (z + 2097152 : U32), s)
   Sim.sound(Sn.Sound.firsht(), Sn.Thing{id}, Sim.missile.put(H.Things.get(State.things(spawned), id), id, angle,
-    F.Fixed.mul(speed, A.Angle.cos(L.Level.sine(State.level(spawned)), angle)),
-    F.Fixed.mul(speed, A.Angle.sin(L.Level.sine(State.level(spawned)), angle)),
+    F.Fixed.mul(speed, A.Angle.cos(L.Level.sine(State.level(spawned)), fine)),
+    F.Fixed.mul(speed, A.Angle.sin(L.Level.sine(State.level(spawned)), fine)),
     F.Fixed.quot((tz - z : U32), dist), source, spawned))
 
 def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
