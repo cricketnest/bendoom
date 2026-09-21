@@ -107,6 +107,7 @@ import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
+import ./fixtures/route.bend as Rt
 import ./fixtures/combat.bend as C
 
 type Hash is Type:
@@ -273,6 +274,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
   do IO<Unit>:
+    fight : List<&2, K.Cmd> <- Rt.Route.fight()
     m1 : Array<U32> <- frame("start", tables, gfx, S.Sim.replay(idle(20n), S.State.start(level)), mem)
     m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, rested(level, east(736), east(464), 135), m1)
     m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, rested(level, west(416), east(256), 90), m2)
@@ -364,7 +366,9 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(3158), east(2176), 180))), w11)
     w13 : Array<U32> <- frame("saw attacking", tables, gfx, after([idle(40n), fired(4n)], strafed(4294967280, 13n,
       at(level, east(3158), east(2176), 180))), w12)
-    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w13)
+    w14 : Array<U32> <- frame("long fight 1453", tables, gfx,
+      S.Sim.replay(fight, S.State.start(level)), w13)
+    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w14)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
       at(level, east(1631), east(1008), 90)), g1)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
@@ -439,6 +443,7 @@ def main() -> IO(Unit):
 #|fist attacking hash 1112766053 pixels 1 1 7 5 96 59 covered True palette 0
 #|saw at rest hash 526584844 pixels 5 5 106 104 96 79 covered True palette 0
 #|saw attacking hash 1344905693 pixels 5 5 107 104 96 79 covered True palette 0
+#|long fight 1453 hash 275693603 pixels 2 2 143 2 160 44 covered True palette 10
 #|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
