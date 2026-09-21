@@ -247,6 +247,14 @@ def Stream.hear(events: List<&2, Sn.Sound.Event>, m: Maybe<Stream>) -> IO(Maybe<
       IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.hear(dir, events, chans),
         cs => Stream.heard(audio, tape, dir, dry, cs))
 
+def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx, m: Maybe<Stream>) -> IO(Maybe<Stream>):
+  match m:
+    case None{}:
+      IO.pure(Maybe<Stream>, None{})
+    case Some{Stream{audio, tape, chans, dir, dry}}:
+      IO.bind(List<Maybe<C.Channel>>, Maybe<Stream>, C.Channel.update(~Ctx, ~params, ctx, chans),
+        cs => Stream.heard(audio, tape, dir, dry, cs))
+
 # The sounds directory the launcher names, or none, which is one line
 # and a game with the music alone.
 def Stream.sounds(dir: Result<&1, &1, U32 & String, String>) -> IO(String):
