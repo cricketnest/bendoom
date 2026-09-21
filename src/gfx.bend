@@ -890,9 +890,8 @@ def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
   H.Def{kind, +state, radius, height, flags} = d
   Gfx.sprite.chase(n, False{}, state, state, marks)
 
-# The state rows the level's things spawn in, the rows their deaths lead
-# to, the pistol's, the puff's, the blood's, the fireball's, and those they lead to,
-# each once, in order.
+# The state rows the level and runtime drops can spawn, the weapons,
+# and every row those entry points lead to, each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
@@ -901,6 +900,8 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +marks = Gfx.sprite.weapon(H.Thing.shotgun(), n, marks)
   +marks = Gfx.sprite.weapon(H.Thing.fist(), n, marks)
   +marks = Gfx.sprite.weapon(H.Thing.saw(), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(2007), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(2001), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.fireball()), n, marks)
