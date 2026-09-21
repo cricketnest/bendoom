@@ -170,7 +170,8 @@ def Channel.moved(c: Channel, p: U32 & U32) -> IO(Maybe<Channel>):
   (+vol, +sep) = p
   Channel.hush.gone(U32.is_zero(vol), file, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep))
 
-def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx, c: Maybe<Channel>) -> IO(Maybe<Channel>):
+def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  c: Maybe<Channel>) -> IO(Maybe<Channel>):
   match c:
     case None{}:
       IO.pure(Maybe<Channel>, None{})
@@ -178,8 +179,8 @@ def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32
       Channel.moved(Chan{file, sfx, source, left, right}, params(ctx, source))
 
 # S_UpdateSounds follows the current listener and source positions.
-def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx, chans: List<Maybe<Channel>>) ->
-  IO(List<Maybe<Channel>>):
+def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+  chans: List<Maybe<Channel>>) -> IO(List<Maybe<Channel>>):
   match chans:
     case []:
       IO.pure(List<Maybe<Channel>>, [])
