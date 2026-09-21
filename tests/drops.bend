@@ -126,12 +126,32 @@ def pushed(m: Maybe<&2, H.Thing>) -> String:
       "xy " ++ U32.show(H.Thing.x(th)) ++ " " ++ U32.show(H.Thing.y(th))
         ++ " momentum " ++ U32.show(H.Thing.momx(th)) ++ " " ++ U32.show(H.Thing.momy(th))
 
+# Chocolate Doom's isolated zombieman is given the player as its target
+# behind shut door 80. It opens the door itself, then chases through it.
+def chasing.thing(m: Maybe<&2, H.Thing>, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      +run = H.Thing.entering(th, 89)
+      S.State.thing.put(265, H.Thing.hurting(run,
+        V.Vec.set(H.Thing.hurt(run), H.Thing.hurt.target(), H.Things.you(S.State.things(s)))), s)
+
+def chasing(+s: S.State) -> S.State:
+  chasing.thing(S.State.thing(265, s), s)
+
+def opened(+s: S.State) -> String:
+  "chase door ceiling " ++ F.Fixed.show(L.Level.ceil(S.State.level(s), 80))
+    ++ " " ++ pushed(S.State.thing(265, s)) ++ " random " ++ U32.show(S.State.rnd(s))
+
 def actual(w: Array<U32> & L.Level) -> IO(Unit):
   (mem, +level) = w
   do IO<Unit>:
     IO.print(fought(C.Combat.fought(level)))
     IO.print(crushed(C.Combat.crushed(level)))
     IO.print(living(reopened(level)))
+    IO.print(opened(S.Sim.replay(List.replicate(K.Cmd, 100n, K.Cmd.idle()), chasing(
+      S.State.at(C.Combat.isolated(level, 265, 448, 2128, 3004), L.Start{29360128, 134217728, 1073741824})))))
     IO.print("ledge push " ++ pushed(S.State.thing(184, ledge(level, 4194310))))
     IO.print("dropoff push " ++ pushed(S.State.thing(184, ledge(level, 4195334))))
 
@@ -166,5 +186,6 @@ def main() -> IO(Unit):
 #|door fight tic 40 health 15 random 34
 #|door corpse state 50 height 0 radius 0 solid False dropped 0 random 136
 #|living door ceiling -72.000000 opening True health 20
+#|chase door ceiling -4.000000 xy 29211840 136463168 momentum 0 0 random 73
 #|ledge push xy 104767616 4268374368 momentum 0 0
 #|dropoff push xy 104791625 4268379614 momentum 21758 4754

@@ -8,7 +8,7 @@
 
 - [x] The drop spawns with the dropped flag, and `P_GiveAmmo` and `P_GiveWeapon` halve for it
 - [x] `PIT_ChangeSector`'s corpse, dropped-item and shootable branches; neither map has a crusher, so crushing damage has no caller and stays out
-- [ ] Sim cases: a drop taken, a corpse gibbed by a door, a monster reopening a door, a dropped clip removed by the lift
+- [x] Sim cases: a drop taken, a corpse gibbed by a door, a monster reopening a door, a dropped clip removed by the lift
 - [x] A closed law pins the halved amounts
 - [x] A render case shows the gibs pool at zero differing pixels
 
