@@ -167,10 +167,6 @@ def Channel.model.table(p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&
   (slots, keys) = p
   slots
 
-def Channel.model.keylist(p: List<&2, Maybe<&2, Channel.Voice>> & List<&2, Maybe<&2, Nat>>) -> List<&2, Maybe<&2, Nat>>:
-  (slots, keys) = p
-  keys
-
 def Channel.model.clear(c: Maybe<&2, Channel.Voice>) -> Maybe<&2, Channel.Voice>:
   match c:
     case None{}:
