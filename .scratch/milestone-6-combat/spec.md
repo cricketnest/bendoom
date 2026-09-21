@@ -1,6 +1,6 @@
 # Milestone 6: monsters, weapons, damage, the status bar
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
@@ -140,5 +140,5 @@ Sound effects themselves (milestone 7). The chaingun, launcher, plasma rifle and
 
 - Milestones 6 and 7 share the sim's sound events and random stream. Actions record sounds where vanilla starts them, and the mixer consumes those events without changing simulation order.
 - Combat sync is the main fidelity risk. A fight has thousands of random draws spread over sight checks, chase turns, attack rolls, pain, puffs and death tics, and the thinker order decides who draws first. Long-fight oracle cases expose a misplaced draw.
-- The status bar is the quieter risk. It was never checked, because the oracle masked it. The face cannot be pinned by a paused screenshot, which is why its check moves to a replay of vanilla's source.
+- The frame comparison includes the status bar. The living face keeps ticking while play is paused, so its state is checked through vanilla's source and engine traces.
 - The Bend constraints that shape the implementation remain in the project's Bend guide.

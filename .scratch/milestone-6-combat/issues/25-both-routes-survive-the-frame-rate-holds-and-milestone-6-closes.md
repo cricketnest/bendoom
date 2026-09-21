@@ -4,15 +4,15 @@
 
 **Blocked by:** 05 (Pickups and the locked door leave a message), 23 (The face), 24 (The long fight stays in step with Chocolate Doom)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] The Freedoom route test reaches the exit and the intermission with monsters on, fighting or avoiding them, in the flake check; the shareware route is run by hand
 - [x] The window holds 35 frames a second in Freedoom's first fight with the monsters awake; the ticket records the machine, the scene and the range
-- [ ] `nix flake check` passes on both lanes, and the proof checks all terms
+- [x] `nix flake check` passes on both lanes, and the proof checks all terms
 - [x] Ticket 03 made the wall and geometry laws hold by construction: `State.held` puts the geometry and the player's place back after every thinker's turn, at a measured 0.46 ms a tic before monsters. Measure it again with the monsters thinking; if it costs a frame a second, or if any thinker could rightly move the player, replace the clamp with a proof that each thinker kind keeps both
 - [x] The erasure pass: every def is used; no current source or milestone summary describes the pre-combat game; the oracle holds no mask but the pause graphic's and the face's
 - [x] The maintainer plays both maps with monsters to the intermission
-- [ ] The README's milestone 6 line and the spec's status say done
+- [x] The README's milestone 6 line and the spec's status say done
 
 ## `State.held` measurement
 
@@ -34,3 +34,16 @@ The shareware route also reaches the exit alive and its settled intermission fra
 ## Play-through
 
 21 Sep 2026. The maintainer played both packages on `a3126db` with monsters to the intermission.
+
+## Final verification
+
+21 Sep 2026. `nix flake check` passes on x86_64-linux: all 18 tests match
+on native and JavaScript, and the proof prints `All terms check.`. Both
+the shareware and Freedoom Nix packages build natively. The
+final native frame dump returns zero differing pixels for the zombieman's
+tic-53 shot, the shotgun guy's tic-61 shot, the Freedoom tic-1453 fight,
+the shareware tic-1013 fight, and the full Freedoom route followed by
+600 intermission tics. The play comparisons retain only the pause and
+living-face masks; the intermission masks its animated background patches.
+Independent reviews of the project standards and ticket requirements
+have no remaining findings. Tickets 17, 23 and 24 are resolved.
