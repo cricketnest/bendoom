@@ -1563,6 +1563,27 @@ def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
 def attack.play(n: Nat, cmd: K.Cmd, +s: S.State) -> S.State:
   Run.state(play(List.replicate(K.Cmd, n, cmd), Run{"", s}))
 
+def attack.combatant(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
+      " gone"
+    case Some{+th}:
+      " target " ++ U32.show(H.Thing.target(th)) ++ " threshold " ++ U32.show(H.Thing.threshold(th))
+        ++ fighter(Some{th})
+
+def attack.retaliation(+level: L.Level) -> IO(Unit):
+  +s = S.State.start(level)
+  +first = S.Sim.damage(81, 4, 240, 240, s)
+  +held = S.Sim.damage(81, 4, 82, 82, first)
+  +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
+  do IO<Unit>:
+    IO.print("imp retaliates" ++ attack.combatant(H.Things.get(S.State.things(first), 81))
+      ++ " random " ++ U32.show(S.State.rnd(first)))
+    IO.print("threshold holds" ++ attack.combatant(H.Things.get(S.State.things(held), 81))
+      ++ " random " ++ U32.show(S.State.rnd(held)))
+    IO.print("barrel credits player" ++ attack.combatant(H.Things.get(S.State.things(barrel), 81))
+      ++ " random " ++ U32.show(S.State.rnd(barrel)))
+
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     claw : S.State <- attack.result("imp claw", 81,
@@ -1576,7 +1597,10 @@ def attacks(+level: L.Level) -> IO(Unit):
     replay0 : S.State <- attack.replay("unarmoured flight", 10n, idle(),
       attack.play(34n, fire(), attack.play(20n, idle(), at(level, 992, 704, 270))))
     replay1 : S.State <- attack.replay("unarmoured burst", 10n, idle(), replay0)
-    replay2 : S.State <- attack.replay("unarmoured gone", 20n, idle(), replay1)
+    +replay2 : S.State <- attack.replay("unarmoured gone", 20n, idle(), replay1)
+    IO.print("dead player idle" ++ attack.combatant(H.Things.get(S.State.things(replay2), 81))
+      ++ attack.combatant(H.Things.get(S.State.things(replay2), 82)))
+    attack.retaliation(level)
     IO.print("-")
 
 def weapon.inv(+ready: U32, +shells: U32, inv: I.Inventory) -> I.Inventory:
@@ -2051,6 +2075,10 @@ def main() -> IO(Unit):
 #|unarmoured flight tic 64 health 0 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
 #|unarmoured burst tic 74 health 0 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
 #|unarmoured gone tic 94 health 0 random 195 fireball gone
+#|dead player idle target 157 threshold 0 81 hp 60 state 65/6 at 928.322265 975.677734 -128.000000 after 157 target 157 threshold 0 82 hp 60 state 66/10 at 911.110351 1104.889648 -128.000000 after 157
+#|imp retaliates target 240 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 240 random 60
+#|threshold holds target 240 threshold 100 81 hp 52 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 61
+#|barrel credits player target 157 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 157 random 60
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
