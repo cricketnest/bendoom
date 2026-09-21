@@ -145,6 +145,10 @@ def Thing.floorz(th: Thing) -> U32:
   Thing{id, kind, x, y, z, +floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   floorz
 
+def Thing.momz(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, +momz, hurt} = th
+  momz
+
 def Thing.tics(th: Thing) -> U32:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt} = th
   tics
