@@ -14,6 +14,9 @@ cleanup() {
   rm -r -- "$scratch"
 }
 trap cleanup EXIT
+has_audio() {
+  od -An -tu2 "$scratch/audio.raw" | awk '{ for (i = 1; i <= NF; i++) if ($i + 0 != 0) heard = 1 } END { exit !heard }'
+}
 mkdir "$scratch/game"
 tar -xzf "$1" -C "$scratch/game"
 printf 'pcm.!default { type null }\n' > "$scratch/alsa.conf"
@@ -59,6 +62,12 @@ xdotool windowfocus --sync "$window"
 xdotool keydown --window "$window" Up
 sleep 1
 xdotool keyup --window "$window" Up
+if [ -n "$capture_pid" ]; then
+  for ((attempt = 0; attempt < 100; attempt++)); do
+    has_audio && break
+    sleep .1
+  done
+fi
 xdotool key --window "$window" Escape
 wait "$game_pid"
 game_pid=
@@ -66,7 +75,7 @@ if [ -n "$capture_pid" ]; then
   kill "$capture_pid"
   wait "$capture_pid" || true
   capture_pid=
-  if ! od -An -tu2 "$scratch/audio.raw" | awk '{ for (i = 1; i <= NF; i++) if ($i + 0 != 0) heard = 1 } END { exit !heard }'; then
+  if ! has_audio; then
     cat "$scratch/game.log"
     echo "No audio reached the private sink ($(wc -c < "$scratch/audio.raw") bytes captured)." >&2
     exit 1
