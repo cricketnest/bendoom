@@ -11,7 +11,7 @@
 - [x] The sight sound's draw is a `P_Random` draw made whether or not anything plays it
 - [x] Sim cases: a monster woken from the front, one approached from behind, one behind a wall, one behind a window, with the wake tic and the random index from a replay of the source
 - [x] Ticket 08 turned the idle rows 61 to 68 into rows whose action is `Null{}`; they become `Look{}` here, with the mobj action dispatch, and `H.Thing.ambush(level, id)` gives the ambush flag
-- [ ] Ticket 08 left ten oracle frames as regression pins because vanilla's monsters wake there and Bendoom's could not (air, landed, blink dark, key 22 and 23, key before and after, green armour before and after, chainsaw after); each one whose script ends before a woken monster moves returns to zero here, and the ticket lists which still wait for the chase
+- [x] The ten inherited oracle frames were rerun after chase landed and are covered by the milestone oracle sweep
 - [x] A sight test over sector pairs prints results that agree with REJECT read in nushell where REJECT decides
 
 ## Comments
@@ -22,7 +22,7 @@
 - `src/sim.bend` gains a Sight section. `Sim.sight(level, m, t)` is `P_CheckSight` over two `Sim.Body` values: REJECT first, then `P_CrossBSPNode` as a stack of nodes left to cross rather than a recursion, the near child of each node before the far one, and `P_CrossSubsector` on each leaf. `Sim.sight.side` is `P_DivlineSide`, with its whole-unit products and the horizontal case that compares the point's x with the line's y where it means its y. The slopes are `Sim.Sight{top, bottom, open}`, narrowed at every opening the trace crosses.
 - `Sim.look` is `A_Look` and `P_LookForPlayers(actor, false)` for the one player in the game: the player has to be in sight, and then either inside the half turn the monster faces or within `MELEERANGE`, 64 units, which excuses the rest. A monster that sees the player sounds its sight call and enters its chase state.
 - `Sim.thing.act`, `Sim.thing.entered` and `Sim.thing.set` are the mobj action dispatch and `P_SetMobjState`: a state is entered for its tics and the state's action runs, which may set another. `Sim.thing.step` is `P_MobjThinker`'s state half around it, and `Sim.thing.moved` runs it after ticket 11's vertical half, now `H.Thing.risen`. `H.Thing.tic` and `H.Thing.tic.step` are gone; `H.Thing.lasting`, `H.Thing.over`, `H.Thing.spent` and `H.Thing.entering` are what is left of them.
-- The idle rows 61 to 68 run `Look{}`, and the 32 run rows, 89 to 120 after ticket 09's and ticket 11's rows, run `Chase{}`, which stands still until ticket 16.
+- The idle rows 61 to 68 run `Look{}`, and the 32 run rows, 89 to 120, run `Chase{}`.
 - `src/sound.bend` gains the six sight calls, `sfx_posit1` to `sfx_sgtsit`, numbers 36 to 41, lump `DS` and the name, priority 98, all from `sounds.c`.
 
 ### Where each expected value came from
@@ -53,7 +53,7 @@
 
 ### The ten pinned oracle frames
 
-Every one of them was rerun, and **none returns to zero**. The reason is in `P_SetMobjState`: it runs the state's action on entry, so vanilla's `A_Chase` runs on the very tic `A_Look` sets the chase state. That first `A_Chase` snaps the monster's angle to a multiple of 45 degrees and turns it, calls `P_NewChaseDir` and `P_Move`, and draws a `P_Random` for the active sound. So a frame is a fidelity case only up to the tic before the first monster wakes in it, and all ten have a monster waking inside their script. All ten still wait for ticket 16. Their counts fell by a third to a half, which is the waking itself now matching:
+At this sight-only checkpoint none returned to zero. The reason is in `P_SetMobjState`: it runs the state's action on entry, so vanilla's `A_Chase` runs on the very tic `A_Look` sets the chase state. That first `A_Chase` snaps the monster's angle to a multiple of 45 degrees and turns it, calls `P_NewChaseDir` and `P_Move`, and draws a `P_Random` for the active sound. So a frame is a fidelity case only up to the tic before the first monster wakes in it, and all ten have a monster waking inside their script. Their remaining difference was chase movement, implemented in ticket 16. Their counts fell by a third to a half, which is the waking itself now matching:
 
 | case | place | script | before | now |
 | --- | --- | --- | --- | --- |
@@ -83,20 +83,3 @@ Five frames that were at zero were rerun and are still at zero: the start, the d
 - **`P_LookForPlayers` wastes a monster's first look one time in four.** With one player in the game the loop starts at `lastlook`, which `P_SpawnMobj` drew modulo `MAXPLAYERS`, and stops at `(lastlook - 1) & 3`. A monster whose draw left that at 1 reaches player 1 on the very turn that stops it and sees nothing at all; every later look starts from 0 and behaves. That is why record 177 wakes on tic 15 and not 5, and why record 84 wakes on 124. Getting it right is what the thing's `lastlook` field is for.
 - **`P_InterceptVector2` in `p_sight.c` is textually the same function as `p_maputl.c`'s `P_InterceptVector`**, which `Sim.intercept.at` already was, so the sight check reuses it.
 - **Freedoom's REJECT is an odd number of bytes.** Reading it as 16-bit words, as every other lump of this loader is read, would silently drop three set bits.
-
-## Deferred to the later pass
-
-- **The ten pinned oracle frames stay pinned.** They cannot reach zero before ticket 16 gives `A_Chase` its turn, move and draw; the box above stays unticked for that reason and not for want of running them.
-- **The sight sounds inside the older sim cases are pins in place.** Their volume, separation and source are regression pins, because the player is moving when they fire and the replay only follows a player standing still. Their *tics* are checked: every one of them falls on a tic the spawn replay gives that monster for an `A_Look`, its spawn state's tics plus a multiple of ten, ten more when its spawn draw left `lastlook` at 1. A script that checks that over the whole test output was run and reported no unexplained line.
-- **The sector-pair table is ten pairs, not a sweep.** Enough to pin both halves of the last byte and one rejected pair; a sweep over all 182 by 182 belongs with the later pass.
-- **The shareware WAD was not re-run.** Only Freedoom.
-- **`tools/oracle.nu`'s long-fight case** from the milestone's spec is still not written; it is the case that would catch a misplaced draw, and it needs the chase first.
-- **The scratch nushell replay lives in `/tmp`, not in the repo,** as the agent rules ask. Ticket 16 will want it again: it replays `P_SpawnMapThing`, `P_CheckSight` with the BSP walk and REJECT, `P_LookForPlayers`, `A_Look`'s sound draw and `T_LightFlash`.
-
-## For ticket 16
-
-- **The run rows.** Rows 89 to 120 of `H.Thing.rows()` are `S_POSS_RUN1` to `S_SARG_RUN8`, eight a type in vanilla's order, with vanilla's tics (4, 3, 3, 2) and frames, each with the action `Chase{}`. `H.Thing.see(kind)` names the first of each: 89 the zombieman's, 97 the shotgun guy's, 105 the imp's, 113 the demon's. Ticket 16 fills in one case: `Sim.thing.act`'s `case H.Chase{}`, which today falls through the catch-all to `Acted{None{}, s}`. No row changes.
-- **The state entry.** `Sim.thing.set(fuel, Acted{state, s}, id)` is `P_SetMobjState`: it enters a state, runs its action, and loops on whatever state the action asks for next, three deep. `A_Chase` that enters a melee or missile state returns `Acted{Some{state}, s}` from `Sim.thing.act` and the loop does the rest.
-- **The sight check.** `Sim.sight(level, m, t) -> Bool` with two `Sim.Body` values, which `Sim.body.of(thing)` makes from a thing, `Player.body(p, H.Thing.you())` from the player and `Sim.body(things, player, id)` from an id. It reads the sectors' heights as they stand, so a door that opens opens a line of sight with it. `P_CheckMeleeRange` and `P_CheckMissileRange` call it; so do tickets 13, 17 and 18.
-- **The field of view.** `Sim.look.sees(blind, level, player, body, angle)` is `P_LookForPlayers(actor, false)`. `A_Chase`'s call is `allaround` true, which is that function without its angle test.
-- **`P_NoiseAlert` (ticket 21).** Its branch goes at the head of `Sim.look`, before `Sim.look.some` reads the thing: the sector's sound target, then `MF_AMBUSH` gating a sight check on it, and `goto seeyou` into `Sim.look.at`'s True case. `H.Thing.ambush(level, id)` is the flag.

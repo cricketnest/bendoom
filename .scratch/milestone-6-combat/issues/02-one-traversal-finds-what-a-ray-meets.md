@@ -24,7 +24,7 @@
 - `Sim.intercept.at` is `P_InterceptVector` over a plain divline; the line version and the thing version both call it. `Sim.intercept.thing` is `PIT_AddThingIntercepts`: `(trace.dx ^ trace.dy) > 0` picks the corner-to-corner diagonal, its ends are tested with `P_PointOnDivlineSide`, and the fraction comes from the same `P_InterceptVector`.
 - The use key is the first visitor, `Sim.use.visit`, three lines of `PTR_UseTraverse`. `Sim.use.first` and `Sim.use.first.pick` are gone; `Sim.use` calls `Sim.path` with `Sim.Reach` as its carry.
 - The slide is the second, `Sim.slide.visit`, which is `PTR_SlideTraverse`: a line that blocks ends the walk and becomes the slide's when it is nearer than what an earlier corner's trace met. Its carry is `Sim.Slide`, vanilla's `slidemo`, `bestslidefrac` and `bestslideline` in one record. `Sim.trace` keeps its signature, so `PROOF.bend`'s freedom proof needed no change. `Sim.trace.go` is gone.
-- So there is one traversal for both, and it is the same one ticket 11 will hand `PTR_AimTraverse` and ticket 13 `PTR_ShootTraverse`. Vanilla's `P_SlideMove` calls `P_PathTraverse` too, so the unification is vanilla's own.
+- One traversal now serves use, `PTR_AimTraverse` and `PTR_ShootTraverse`. Vanilla's `P_SlideMove` calls `P_PathTraverse` too, so the unification is vanilla's own.
 - `Sim.keep` is now polymorphic (`~T: Data`), which deleted `Sim.meets.add`, its twin for meetings.
 - `H.Thing.Def.radius` joined `things.bend` beside `Thing.Def.kind`: the type's radius in fixed point, which the thing intercept needs and no accessor gave.
 

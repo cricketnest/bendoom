@@ -48,27 +48,6 @@
 | one shot into a barrel | 992 704 270 | `20,0,0,0,0 6,0,0,0,2` | 573 |
 | the barrel mid-explosion | 992 704 270 | `20,0,0,0,0 21,0,0,0,2` | 37596 |
 
-### What is open
-
-- **A shot that meets a thing is not at zero.** A shot into a wall is (ticket 11's frame, still 0), and the same place with the barrel replaced by a lamp, which a bullet flies past, is 0 too; put the barrel back and the tic of the shot differs by 104 pixels in one blob about the hit point, growing as the puff lives. The damage itself is not the cause: the random index after the shot is vanilla's count, and the barrel's slide is `P_XYMovement` to the unit. What ticket 11 never compared is the geometry of `PTR_AimTraverse` and `PTR_ShootTraverse` **at a mobj**, and that is where this sits. One real mismatch was found and fixed on the way: `P_BulletSlope` looks 1024 units for something to aim at (`16*64*FRACUNIT`), where this tree looked the bullet's whole 2048.
-- **A frame past about twenty tics of a fight cannot be compared at all.** Vanilla's `P_NoiseAlert` wakes monsters when the pistol fires and `A_Chase` then draws, which this tree does not do yet (tickets 16 and 21), so the random streams part. The barrel mid-explosion frame is 37596 differing for that reason, and the whole status bar is among it, since a woken monster shoots the player. The frame is kept as a pin.
-- `2380 600 180` at rest reads 25 differing on this branch and the same frame hash as `milestone-6-7`, so that divergence is the integration branch's, not this ticket's: ticket 15's monsters see the player there and vanilla's then chase.
-
-### Deferred to the later pass
-
-- The render cases: a barrel mid-explosion and blood on a hit at zero differing pixels. Both wait on the shot-at-a-thing geometry above and on the monsters' chase, without which no frame of a fight can be compared.
-- The nushell replay of `m_random.c` that would turn the pinned damages and death tics into computed values.
-- A closed law over the blast's distance measure or the thrust.
-- `nix flake check`: the orchestrator runs it on the integration branch.
-
-### What ticket 20 adds, and where
-
-`Sim.kill.thing.at` is `P_KillMobj` for a thing; the drop goes at its end, after the death state is entered, and `H.Thing.spawn.mobj`'s `MF_DROPPED` flag goes into the spawned item's `Thing.Hurt.start`. The kill count goes in the same function and is the intermission's.
-
-### What tickets 17 and 18 call
-
-`Sim.damage(target, damage, inflictor, source, s) -> State`, where `target` is the mobj hurt, `H.Things.you(things)` for the player and a thing's id otherwise, and `inflictor` and `source` are ids with `H.Thing.you()` for nobody. A monster's bullet passes no inflictor and the monster as the source, as `P_LineAttack` does; a fireball passes itself and its shooter. A thing's target is `H.Thing.target(th)` and the thing it is after is written by `Sim.awake`, which ticket 16's `A_Chase` reads.
-
 ### What surprised me
 
 - `P_SetMobjState` cannot be one function here. `A_Explode` deals damage and damage enters a state, so the two would be a circle Bend refuses. It is not one in practice either: no pain or death row of any type either map spawns carries an action on entry, so a blow's own setter runs none, and the thinker's general one runs them all.

@@ -731,8 +731,8 @@ type Play is Data:
 type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
 
-# The level as loaded, at its start: Doom's G_DoLoadLevel, which a
-# player's death will want too.
+# The level as loaded, at its start: Doom's G_DoLoadLevel, shared by
+# death and intermission restarts.
 def Play.start(+level: L.Level) -> Play:
   Playing{S.State.start(level)}
 

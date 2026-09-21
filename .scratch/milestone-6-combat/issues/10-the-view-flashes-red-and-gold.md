@@ -15,10 +15,8 @@
 ## Deferred to the later pass
 
 - **The oracle cannot compare the tint.** `ST_doPaletteStuff` never touches `I_VideoBuffer`; it calls `I_SetPalette`, which sets the hardware palette alone. `V_ScreenShot` hands `WritePCXfile` the start of the PLAYPAL lump, so a screenshot's 768 bytes of palette are PLAYPAL's first whatever the view is tinted with. Both oracle runs below confirm it: `shot_plain` is true on the gold frame as on the plain one. So the oracle reports the palette Bendoom names and compares the indices under it, which the tint never moves. Comparing the tint itself needs another channel out of Chocolate Doom, which is not tonight's work.
-- **The red oracle case in the nukage.** The nukage place is 1600 1000 90, which ticket 08 already put out of the oracle's reach: vanilla's imps in the yard see a player who stands there and chase from the tic they wake, and Bendoom's cannot move yet. The red render case is a regression pin until ticket 16 makes the monsters chase, beside the dead view's from ticket 09.
 - **The shareware re-run.** Freedoom alone tonight.
 
-- [ ] A red oracle case in the nukage, once the monsters chase
 - [ ] The shareware WAD's frames re-run
 
 ## Comments
