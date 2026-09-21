@@ -10,7 +10,7 @@ llvmPackages_19.stdenv.mkDerivation {
 
   src = lib.fileset.toSource {
     root = ../.;
-    fileset = lib.fileset.unions [ ../src ../tests ];
+    fileset = lib.fileset.unions [ ../src ../tests ../film.bend ];
   };
 
   nativeBuildInputs = [ bend bun ];
