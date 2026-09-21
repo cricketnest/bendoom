@@ -8,8 +8,7 @@
 # snd_dmxoption. It also turns off the ENDOOM screen, which would wait
 # for a key after a demo's end.
 #
-# The music: E1M1 on the given IWAD with no monsters and no sound
-# effects. The capture holds the given length of audio after the first
+# The music: an isolated E1M1 music capture with sound effects disabled. The capture holds the given length of audio after the first
 # note, at least two passes: Freedoom's song is about 130.6 s a pass,
 # the shareware one 96.0 s. The report gives the capture's frames, the
 # lead (the frames before the first sample other than zero) and the

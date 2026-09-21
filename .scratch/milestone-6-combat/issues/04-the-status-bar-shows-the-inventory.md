@@ -1,6 +1,6 @@
 # 04: The status bar shows the inventory
 
-**What to build:** The black band under the view becomes Doom's status bar, drawn by the renderer into rows 168 to 199 from the state and the WAD's own graphics: the background, ammo for the ready weapon, health, armour, the arms panel, the keys, and the four ammo counts with their caps. The face's box shows the bar's background until its ticket.
+**What to build:** The area under the view becomes Doom's status bar, drawn by the renderer into rows 168 to 199 from the state and the WAD's own graphics: the background, ammo for the ready weapon, health, armour, the arms panel, the keys, and the four ammo counts with their caps. The face's box shows the bar's background until its ticket.
 
 **Blocked by:** None (can start immediately)
 
@@ -75,20 +75,20 @@ The shareware WAD, from its own start, 1056 -3616 90, `masked` 1692 (its pause g
 - `src/bar.bend`: `Bar.patch` is `V_DrawPatch`, a column loop over `Gfx.posts` writing each post down the frame; `Bar.num` is `STlib_drawNum`, `Bar.percent` `STlib_updatePercent`, `Bar.icon` `STlib_updateMultIcon`'s draw; `Bar.keybox` is `ST_updateWidgets`' keyboxes and `Bar.arm` its w_arms choice. `Bar.draw` is `ST_Drawer` with the bar on: `ST_refreshBackground`'s STBAR, then `ST_drawWidgets` in its order.
 - `src/gfx.bend`: `Gfx.bar.names()` is the part of `ST_loadGraphics` a single player's bar draws, 35 lumps; they are copied into the array after the sprites, and `Gfx.bar` is the index of each. The array's length grew by their bytes.
 - `src/things.bend`: `Thing.Weapon` gains vanilla's `ammo`, the ammotype_t a weapon spends; the pistol's is am_clip.
-- `src/sim.bend`: `Player.ready` is `weaponinfo[player->readyweapon]`, the one place ticket 12 changes.
+- `src/sim.bend`: `Player.ready` reads `weaponinfo[player->readyweapon]` for every implemented weapon.
 - `src/inventory.bend`: readers for armour, the weapons owned, and a type's rounds and cap.
 - `src/render.bend`: `Render.frame` draws the bar over the view's 168 rows. The frame is still a pure function of the tables, the graphics and the state.
 - `tools/oracle.nu`: `face-box` is the box the 42 face patches can cover at `ST_FACESX`, `ST_FACESY`, read from the WAD as `patch-pixels` reads the pause graphic.
 - `LAWS.bend`, `PROOF.bend`: closed laws `key_boxes` and `arms_numbers`, both worked out from `ST_updateWidgets` by hand.
 - Tests: the load test prints nine bar patches' sizes; the render test hashes all 200 rows and samples the arms panel.
 
-**What was deleted.** The oracle's status-bar mask: `168 * 320` is gone from its comparison, its `masked` count and its header. `-devparm` went with it: it binds F1 to the screenshot but also writes 40 frame-rate dots along row 199, over the bar; the extra config binds F1 by itself (scancode 59), so the dots are gone rather than masked. The stale note in `src/show.bend` that the black band under the view is a sixth of the window.
+**What was deleted.** The oracle's status-bar mask: `168 * 320` is gone from its comparison, its `masked` count and its header. `-devparm` went with it: it binds F1 to the screenshot but also writes 40 frame-rate dots along row 199, over the bar; the extra config binds F1 by itself (scancode 59), so the dots are gone rather than masked. The stale note in `src/show.bend` that the former empty area under the view is a sixth of the window.
 
 **What was pulled forward.** Nothing. `weaponinfo`'s ammo field is this ticket's own need.
 
-**Left for later tickets, by design.** `STlib_drawNum`'s minus sign and its 1994 blank: no count this bar shows is negative, and no weapon without ammo can be ready until ticket 12 brings the fist and the chainsaw. `ST_refreshBackground`'s STMBARL and STMBARR are Doom 1.0's, which neither WAD is, and its face background is a net game's. The frags widget is deathmatch's.
+**Deliberately absent.** `STlib_drawNum`'s minus sign and its 1994 blank: no count this bar shows is negative. `ST_refreshBackground`'s STMBARL and STMBARR are Doom 1.0's, which neither WAD is, and its face background is a net game's. The frags widget is deathmatch's.
 
-**The frame's cost.** `bench/frames.bend`, 100 frames from the player 1 start folded into the window's image, built from this tree and from HEAD, run eight times each on the dev machine while other agents worked; the lowest of each, which is the least noisy estimate, is 1716 ms before and 1738 ms after. That is 0.22 ms a frame, 17.16 to 17.38, about 1.3 per cent and under one frame a second at 58. Drawing the whole bar every frame therefore needs no cure, and the frame stays pure. Were it ever to matter, the cut is in the window's fold and not in the bar: `Show.fold` descends into the bar's detail every frame where the black band collapsed to one pixel, and a fold that kept the last frame's image for rows whose pixels did not change would pay for the bar only when a count changes.
+**The frame's cost.** `bench/frames.bend`, 100 frames from the player 1 start folded into the window's image, built from this tree and from HEAD, run eight times each on the dev machine while other agents worked; the lowest of each, which is the least noisy estimate, is 1716 ms before and 1738 ms after. That is 0.22 ms a frame, 17.16 to 17.38, about 1.3 per cent and under one frame a second at 58. Drawing the whole bar every frame therefore needs no cure, and the frame stays pure. Were it ever to matter, the cut is in the window's fold and not in the bar: `Show.fold` descends into the bar's detail every frame where the empty area collapsed to one pixel, and a fold that kept the last frame's image for rows whose pixels did not change would pay for the bar only when a count changes.
 
 **Surprises.**
 

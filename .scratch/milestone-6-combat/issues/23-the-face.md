@@ -55,7 +55,7 @@ It does not change a face. The only tics whose draw is read are the ones a glanc
 | start, at rest | -416 256 0 | `20,0,0,0,0` | 0 | 66 |
 | switch pressed | 2064 -260 90 | `20,0,0,0,0 10,25,0,0,0 1,0,0,0,1 27,0,0,0,0` | 0 | 28 |
 
-The dead case is the one this ticket asks for. Its view cannot be compared: ticket 09 found that with monsters on, vanilla's imps in the yard wake at a player who stands 650 tics there and chase, and Bendoom's stand until ticket 16, which is the 48983. Its face box is at zero, which is the whole of what this ticket claims there, and it is the one face that holds still under the pause. The other two rows are the living face changing under the pause, which is why the box stays masked, beside 0 differing everywhere else.
+At this ticket's checkpoint the dead view differed by 48983 pixels because chase had not landed; the face box itself was at zero. and it is the one face that holds still under the pause. The other two rows are the living face changing under the pause, which is why the box stays masked, beside 0 differing everywhere else.
 
 The face's pixels were then compared with the patches themselves, `tools/oracle.nu`'s `patch-pixels` over Freedoom against our own frame dump: all 578 pixels of `STFST00` in the rested start's frame and all 591 of `STFDEAD0` in the dead one, none differing. Against the wrong lump, `STFST01`, the start's frame differs in 64 pixels, so the check has teeth.
 
@@ -65,7 +65,7 @@ The face's pixels were then compared with the patches themselves, `tools/oracle.
 - Weapon switching and the monsters' attacks, which the ticket lists as blockers: the grin is shown on the chainsaw, which changes the weapons owned though the pistol stays in hand, and the wince on a literal-state blow, as ticket 09's own cases do, since nothing on the map attacks yet.
 - Vanilla's `attackdown` is `A_WeaponReady`'s, not the command's bit, and ticket 11 keeps no field for it; this reads the bit. The two differ only for a release inside a firing sequence, which resets the rampage count here and would not in vanilla, and only where fire has been held near 70 tics.
 - The god face, `ST_GODFACE`. Neither cheat nor invulnerability exists in this game, so vanilla's test there is never true; the lump is loaded and the stage is left out.
-- An attacker removed from the population between the blow and the tic: vanilla winces at the pointer it still holds, this falls through to the plain pain face. Nothing can remove one yet.
+- An attacker removed from the population between the blow and the tic: vanilla winces at the pointer it still holds; removal falls back to the plain pain face.
 
 ### Trade-offs
 
