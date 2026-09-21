@@ -603,7 +603,9 @@ def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
 # The open door's close on tic 253, heard by a player who stands still:
 # hard left, hard right, behind, at the close distance and a unit past
 # it, at the last audible unit, a unit on, where the volume rounds to
-# nothing, and past the clipping distance.
+# nothing, and past the clipping distance. The 200/201-unit combat
+# sequences match a Chocolate Doom replay with the same player reset
+# at tic102; its same-species missile block prevents an extra imp pain.
 def placements(+open: S.State) -> IO(Unit):
   do IO<Unit>:
     listen("door on the left", 400, 0, open)
@@ -2558,19 +2560,18 @@ def main() -> IO(Unit):
 #|sound tic 211 DSPISTOL from thing 176 vol 64 sep 126
 #|sound tic 220 DSFIRXPL from thing 294 vol 47 sep 128
 #|sound tic 221 DSSHOTGN from thing 240 vol 49 sep 137
-#|sound tic 222 DSPOPAIN from thing 81 vol 50 sep 127
-#|sound tic 224 DSPOPAIN from thing 176 vol 64 sep 125
 #|sound tic 224 DSPOPAIN from thing 177 vol 64 sep 33
 #|sound tic 224 stop thing 295
-#|sound tic 228 stop thing 296
-#|sound tic 228 stop thing 298
-#|sound tic 234 stop thing 297
-#|sound tic 235 stop thing 294
+#|sound tic 226 DSFIRSHT from thing 300 vol 49 sep 127
+#|sound tic 226 DSPODTH2 from thing 176 vol 64 sep 124
+#|sound tic 228 stop thing 299
+#|sound tic 236 stop thing 294
+#|sound tic 236 stop thing 296
 #|sound tic 237 DSPISTOL from thing 177 vol 64 sep 33
-#|sound tic 239 DSPOPAIN from thing 81 vol 53 sep 126
-#|sound tic 244 stop thing 299
+#|sound tic 242 stop thing 297
+#|sound tic 244 stop thing 301
 #|door 200 ahead tic 253 832.000000 328.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 80
+#|sounds drew to 79
 #|sound tic 127 DSPISTOL from thing 176 vol 62 sep 148
 #|sound tic 141 stop thing 292
 #|sound tic 154 DSPOSACT from thing 240 vol 40 sep 135
@@ -2581,19 +2582,18 @@ def main() -> IO(Unit):
 #|sound tic 211 DSPISTOL from thing 176 vol 64 sep 126
 #|sound tic 220 DSFIRXPL from thing 294 vol 47 sep 128
 #|sound tic 221 DSSHOTGN from thing 240 vol 49 sep 137
-#|sound tic 222 DSPOPAIN from thing 81 vol 50 sep 127
-#|sound tic 224 DSPOPAIN from thing 176 vol 64 sep 125
 #|sound tic 224 DSPOPAIN from thing 177 vol 64 sep 33
 #|sound tic 224 stop thing 295
-#|sound tic 228 stop thing 296
-#|sound tic 228 stop thing 298
-#|sound tic 234 stop thing 297
-#|sound tic 235 stop thing 294
+#|sound tic 226 DSFIRSHT from thing 300 vol 49 sep 127
+#|sound tic 226 DSPODTH2 from thing 176 vol 64 sep 124
+#|sound tic 228 stop thing 299
+#|sound tic 236 stop thing 294
+#|sound tic 236 stop thing 296
 #|sound tic 237 DSPISTOL from thing 177 vol 64 sep 33
-#|sound tic 239 DSPOPAIN from thing 81 vol 53 sep 126
-#|sound tic 244 stop thing 299
+#|sound tic 242 stop thing 297
+#|sound tic 244 stop thing 301
 #|door 201 ahead tic 253 832.000000 327.000000 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 10 -128.000000 -4.000000
-#|sounds drew to 80
+#|sounds drew to 79
 #|sound tic 111 DSPOSIT3 from thing 185 vol 58 sep 224
 #|sound tic 180 DSPOSACT from thing 185 vol 58 sep 224
 #|sound tic 220 DSSHOTGN from thing 185 vol 59 sep 224
