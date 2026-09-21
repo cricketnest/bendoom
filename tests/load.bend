@@ -254,6 +254,8 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(sprite.head(gfx, 52))
     IO.print(sprite.head(gfx, 59))
     IO.print(sprite.head(gfx, 60))
+    IO.print(sprite.head(gfx, 35))
+    IO.print(sprite.head(gfx, 48))
     IO.print(sprite.head(gfx, 121))
     IO.print(sprite.head(gfx, 128))
     IO.print(sprite.head(gfx, 137))
@@ -317,6 +319,8 @@ def main() -> IO(Unit):
 #|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
 #|sprite of state 59 width 82.000000 offset -125.000000 top -97.000000
 #|sprite of state 60 width 82.000000 offset -125.000000 top -97.000000
+#|sprite of state 35 width 7.000000 offset 4.000000 top 12.000000
+#|sprite of state 48 width 38.000000 offset 21.000000 top 13.000000
 #|sprite of state 121 width 39.000000 offset 19.000000 top 51.000000
 #|sprite of state 128 width 44.000000 offset 22.000000 top 57.000000
 #|sprite of state 137 width 32.000000 offset 16.000000 top 50.000000

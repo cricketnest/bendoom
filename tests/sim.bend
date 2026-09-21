@@ -1558,7 +1558,8 @@ def attack.replay(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
   +q = Run.state(play(List.replicate(K.Cmd, n, cmd), Run{"", s}))
   do IO<S.State>:
     IO.print(tag ++ " tic " ++ U32.show(S.State.clock(q)) ++ " health "
-      ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " random " ++ U32.show(S.State.rnd(q))
+      ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(q)))) ++ " facing "
+      ++ A.Angle.show(S.Player.angle(S.State.player(q))) ++ " random " ++ U32.show(S.State.rnd(q))
       ++ " fireball" ++ fighter(H.Things.get(S.State.things(q), 297)))
     return q
 
@@ -1573,6 +1574,13 @@ def attack.combatant(m: Maybe<&2, H.Thing>) -> String:
       " target " ++ U32.show(H.Thing.target(th)) ++ " threshold " ++ U32.show(H.Thing.threshold(th))
         ++ fighter(Some{th})
 
+def attack.ticked(m: Maybe<&2, H.Thing>, +id: U32, +tics: U32, s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      S.State.thing.put(id, H.Thing.ticking(th, tics), s)
+
 # Freedoom records 240 and 81 stand 112 units apart in one room. A
 # Chocolate Doom call to A_SPosAttack followed by 60 idle tics gives
 # random indices 83 and 132 and the same health, states, targets,
@@ -1584,6 +1592,11 @@ def attack.retaliation(+level: L.Level) -> IO(Unit):
   +held = S.Sim.damage(81, 4, 82, 82, first)
   +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
   +fight = attack.play(60n, idle(), first)
+  +moved = S.State.thing.moved(24, F.Fixed.of_map(832), F.Fixed.of_map(1056), s)
+  +credited = S.Sim.thing.counted(24, H.Thing.hurt.target(), H.Things.you(S.State.things(moved)), moved)
+  +entered = S.Sim.damage.entered(24, S.State.thing(24, credited), 178, credited)
+  +ready = attack.ticked(S.State.thing(24, entered), 24, 1, entered)
+  +blast = attack.play(1n, idle(), ready)
   do IO<Unit>:
     IO.print("imp retaliates" ++ attack.combatant(H.Things.get(S.State.things(first), 81))
       ++ " random " ++ U32.show(S.State.rnd(first)))
@@ -1593,6 +1606,11 @@ def attack.retaliation(+level: L.Level) -> IO(Unit):
       ++ " random " ++ U32.show(S.State.rnd(barrel)))
     IO.print("shotgun imp fight" ++ attack.combatant(H.Things.get(S.State.things(fight), 81))
       ++ attack.combatant(H.Things.get(S.State.things(fight), 240)) ++ " random " ++ U32.show(S.State.rnd(fight)))
+    IO.print("player barrel blast" ++ attack.combatant(H.Things.get(S.State.things(blast), 81))
+      ++ attack.combatant(H.Things.get(S.State.things(blast), 240))
+      ++ attack.combatant(H.Things.get(S.State.things(blast), 82))
+      ++ attack.combatant(H.Things.get(S.State.things(blast), 83))
+      ++ fighter(H.Things.get(S.State.things(blast), 24)) ++ " random " ++ U32.show(S.State.rnd(blast)))
 
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -1616,7 +1634,8 @@ def attacks(+level: L.Level) -> IO(Unit):
 def weapon.inv(+ready: U32, +shells: U32, inv: I.Inventory) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory.weaponstate(ready, 255, I.Inventory{health, armour, armourtype, cards,
-    V.Vec.set(ammo, I.Inventory.am_shell(), shells), caps, backpack, (weapons .|. I.Inventory.shotgun() : U32),
+    V.Vec.set(ammo, I.Inventory.am_shell(), shells), caps, backpack,
+    (weapons .|. I.Inventory.shotgun() .|. I.Inventory.weaponbit(ready) : U32),
     powers, items, bonus, line, kills, secrets})
 
 def weapon.state(+ready: U32, +row: U32, +shells: U32, +s: S.State) -> S.State:
@@ -1646,6 +1665,36 @@ def weapon.pick(m: Maybe<&2, I.Inventory>) -> String:
       "ready " ++ U32.show(I.Inventory.ready(inv)) ++ " pending " ++ U32.show(I.Inventory.pending(inv))
         ++ " shells " ++ U32.show(I.Inventory.rounds(I.Inventory.am_shell(), inv))
 
+def weapon.strong(+s: S.State) -> S.State:
+  +p = S.State.player(s)
+  S.State.player.put(s, S.Player.holding(p, I.Inventory.strong(S.Player.inv(p))))
+
+def weapon.health(m: Maybe<&2, H.Thing>) -> U32:
+  match m:
+    case None{}:
+      0
+    case Some{+th}:
+      H.Thing.health(th)
+
+def weapon.got(m: Maybe<&2, I.Inventory>) -> I.Inventory:
+  Maybe.default(&2, I.Inventory, m, I.Inventory.start())
+
+def weapon.carrying(+strong: Bool, +s: S.State) -> S.State:
+  +p = S.State.player(s)
+  +inv = weapon.got(I.Inventory.weapon(I.Inventory.chainsaw(), 7, False{}, 0, I.Inventory.start()))
+  S.State.player.put(s, S.Player.holding(p, Bool.pick(I.Inventory, strong, I.Inventory.strong(inv), inv)))
+
+def weapon.melee(tag: String, +id: U32, +s: S.State) -> IO(S.State):
+  +p = S.State.player(s)
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " health "
+      ++ U32.show(weapon.health(H.Things.get(S.State.things(s), id))) ++ " random " ++ U32.show(S.State.rnd(s))
+      ++ " angle " ++ A.Angle.show(S.Player.angle(p)) ++ " at " ++ F.Fixed.show(S.Player.x(p)) ++ " "
+      ++ F.Fixed.show(S.Player.y(p)) ++ " momentum " ++ F.Fixed.show(S.Player.momx(p)) ++ " "
+      ++ F.Fixed.show(S.Player.momy(p)) ++ " pull "
+      ++ U32.show(V.Vec.get(S.Player.hurt(p), S.Sim.hurt.justattacked())))
+    return s
+
 def weapons(+level: L.Level) -> IO(Unit):
   +base = weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 4, S.State.start(level))
   do IO<Unit>:
@@ -1659,6 +1708,19 @@ def weapons(+level: L.Level) -> IO(Unit):
       weapon.state(2, H.Thing.Weapon.ready(H.Thing.shotgun()), 1, S.State.start(level)))
     l1 : S.State <- weapon.run("last blast", 3n, idle(), l0)
     l2 : S.State <- weapon.run("switch away", 70n, idle(), l1)
+    p0 : S.State <- weapon.melee("punch", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+      weapon.state(0, H.Thing.Weapon.ready(H.Thing.fist()), 0, at(level, 992, 660, 270))))
+    p1 : S.State <- weapon.melee("berserk punch", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+      weapon.strong(weapon.state(0, H.Thing.Weapon.ready(H.Thing.fist()), 0, at(level, 992, 660, 270)))))
+    c0 : S.State <- weapon.melee("saw hit", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+      weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0, at(level, 992, 660, 270))))
+    c1 : S.State <- weapon.melee("saw pull", 25, S.Sim.tic(fire(), c0))
+    k3 : S.State <- weapon.run("key 1 saw", 1n, K.Cmd.demo(0, 0, 0, 4),
+      weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 0,
+        weapon.carrying(False{}, S.State.start(level))))
+    k4 : S.State <- weapon.run("key 1 berserk", 1n, K.Cmd.demo(0, 0, 0, 4),
+      weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0,
+        weapon.carrying(True{}, S.State.start(level))))
     IO.print("-")
 
 def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
@@ -2082,14 +2144,15 @@ def main() -> IO(Unit):
 #|fireball wall random 62 mobj 292 type -3 at 748.999313 256.017166 -96.000000 state 199/6
 #|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
 #|fireball sky random 61
-#|unarmoured flight tic 64 health 0 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
-#|unarmoured burst tic 74 health 0 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
-#|unarmoured gone tic 94 health 0 random 195 fireball gone
+#|unarmoured flight tic 64 health 0 facing 270.000 random 186 fireball 297 hp 1000 state 196/2 at 927.402160 1031.680648 -96.000000 after 82
+#|unarmoured burst tic 74 health 0 facing 270.000 random 192 fireball 297 hp 1000 state 199/2 at 933.918884 1002.397048 -96.000000 after 82
+#|unarmoured gone tic 94 health 0 facing 270.000 random 195 fireball gone
 #|dead player idle target 157 threshold 0 81 hp 60 state 65/6 at 928.322265 975.677734 -128.000000 after 157 target 157 threshold 0 82 hp 60 state 66/10 at 911.110351 1104.889648 -128.000000 after 157
 #|imp retaliates target 240 threshold 100 81 hp 33 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 83
 #|threshold holds target 240 threshold 100 81 hp 29 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 84
-#|barrel credits player target 157 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 157 random 60
+#|barrel credits player target 157 threshold 99 81 hp 56 state 105/3 at 842.262695 1050.262695 -128.000000 after 157 random 62
 #|shotgun imp fight target 240 threshold 87 81 hp 15 state 108/3 at 891.248580 1056.017028 -128.000000 after 240 target 81 threshold 99 240 hp 12 state 189/7 at 982.616607 1055.972488 -128.000000 after 81 random 132
+#|player barrel blast target 4294967295 threshold 0 81 hp -68 state 160/2 at 848.000000 1056.000000 -128.000000 after 4294967295 target 157 threshold 99 240 hp 10 state 97/2 at 956.762649 1050.263641 -128.000000 after 157 target 157 threshold 100 82 hp 24 state 153/1 at 848.634658 1172.454956 -128.000000 after 157 gone 24 hp -108 state 176/5 at 832.000000 1056.000000 -128.000000 after 157 random 67
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
@@ -2176,11 +2239,12 @@ def main() -> IO(Unit):
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 things 208 taken 2 message 15 "A chainsaw!  Find some meat!" tics 140
 #|sounds drew to 102
 #|sound tic 23 DSDMACT from thing 98 vol 37 sep 79
+#|sound tic 30 DSSAWUP from thing 4294967295 vol 64 sep 128
 #|owned chainsaw strafe tic 33 3141.789398 2136.822265 157.500 z 194.000000 floor 194.000000 eye 30.035858
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 15 "A chainsaw!  Find some meat!" tics 107
 #|- tic 34 3139.581390 2131.485961 157.500 z 194.000000 floor 194.000000 eye 30.413955
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 15 "A chainsaw!  Find some meat!" tics 106
-#|sounds drew to 101
+#|sounds drew to 102
 #|health bonus tic 11 470.388839 256.013870 0.000 z -128.000000 floor -128.000000 eye 41.015975
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 209 taken message 0 "" tics 0
 #|sound tic 12 stop thing 268
@@ -3267,4 +3331,14 @@ def main() -> IO(Unit):
 #|sound tic 4 DSSHOTGN from thing 4294967295 vol 64 sep 128
 #|last blast tic 4 ready 2 pending 255 shells 0 state Some(205) tics 7 at 1.000000 32.000000 flash Some(213) tics 3 at 1.000000 32.000000 random 110
 #|switch away tic 74 ready 1 pending 255 shells 0 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 119
+#|sound tic 5 DSPUNCH from thing 4294967295 vol 64 sep 128
+#|punch health 16 random 75 angle 270.000 at 992.000000 660.000000 momentum 0.000000 0.000000 pull 0
+#|sound tic 5 DSPUNCH from thing 4294967295 vol 64 sep 128
+#|berserk punch health 4294967276 random 75 angle 270.000 at 992.000000 660.000000 momentum 0.000000 0.000000 pull 0
+#|sound tic 5 DSSAWHIT from thing 4294967295 vol 64 sep 128
+#|saw hit health 6 random 84 angle 270.000 at 992.000000 660.000000 momentum 0.165481 -2.101348 pull 1
+#|sound tic 6 DSPOSIT2 from thing 240 vol 50 sep 136
+#|saw pull health 6 random 90 angle 270.000 at 992.000000 660.000000 momentum 0.151031 -4.736343 pull 0
+#|key 1 saw tic 1 ready 1 pending 7 shells 0 state Some(69) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
+#|key 1 berserk tic 1 ready 7 pending 0 shells 0 state Some(225) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
 #|-
