@@ -26,8 +26,8 @@ small (156 and 158 dry frames).
 The audio device was a 44100 Hz PipeWire null sink whose monitor showed
 nonzero audio; no hardware output was linked. The erasure scan removed the
 last unused channel-model accessor and replaced the spec's old silent-level
-and 3072-frame descriptions. The two human listening checks remain open, so
-the milestone line is deliberately not marked done.
+and 3072-frame descriptions. Combat audio verification in ticket 09 and the final integrated checks
+remain before the milestone can close.
 
 ## Play-through
 
