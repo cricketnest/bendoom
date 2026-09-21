@@ -413,6 +413,10 @@ def Thing.Weapon.up(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   up
 
+def Thing.Weapon.ready(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  ready
+
 def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   ammo
