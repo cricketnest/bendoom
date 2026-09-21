@@ -20,9 +20,10 @@ type Project.Tables is Data:
     yslope: V.Vec, distscale: V.Vec, coords: V.Vec, clipangle: U32}
 
 # The eye for one frame: where it is, how high, where it looks, with
-# the sine and cosine of that.
+# the sine and cosine of that, and Doom's extralight, the muzzle flash's
+# brightening of every light number the frame turns into a colormap.
 type View is Data:
-  View{x: U32, y: U32, z: U32, angle: U32, sin: U32, cos: U32, tables: Project.Tables}
+  View{x: U32, y: U32, z: U32, angle: U32, sin: U32, cos: U32, tables: Project.Tables, extralight: U32}
 
 # Half the view's width and height as fixed point: Doom's centerxfrac,
 # which is also its projection, and centeryfrac.
@@ -141,67 +142,71 @@ def Project.tables(+level: L.Level) -> Project.Tables:
 # --------
 
 # Doom's R_SetupFrame.
-def View.make(+tables: Project.Tables, x: U32, y: U32, z: U32, +angle: U32) -> View:
+def View.make(+tables: Project.Tables, x: U32, y: U32, z: U32, +angle: U32, extralight: U32) -> View:
   Tables{+sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   View{x, y, z, angle, A.Angle.sin(sine, A.Angle.fine(angle)), A.Angle.cos(sine, A.Angle.fine(angle)),
-    tables}
+    tables, extralight}
 
 def View.angle(+v: View) -> U32:
-  View{x, y, z, angle, sin, cos, tables} = v
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
   angle
 
 def View.z(+v: View) -> U32:
-  View{x, y, z, angle, sin, cos, tables} = v
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
   z
 
+def View.extralight(+v: View) -> U32:
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
+  extralight
+
 def View.sine(+v: View) -> V.Vec:
-  View{x, y, z, angle, sin, cos, tables} = v
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   sine
 
 def View.tangent(+v: View) -> V.Vec:
-  View{x, y, z, angle, sin, cos, tables} = v
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   tangent
 
 def View.clipangle(+v: View) -> U32:
-  View{x, y, z, angle, sin, cos, tables} = v
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   clipangle
 
 # The column at or after a view angle, which is relative to the view's
 # and a quarter turn on: Doom's viewangletox[(angle + ANG90) >> 19].
 def View.tox(+v: View, angle: U32) -> U32:
-  View{x, y, z, va, sin, cos, tables} = v
+  View{x, y, z, va, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   V.Vec.get(angletox, A.Angle.fine((angle + A.Angle.ang90() : U32)))
 
 # A column's least view angle.
 def View.xtoangle(+v: View, x: U32) -> U32:
-  View{vx, y, z, angle, sin, cos, tables} = v
+  View{vx, y, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   V.Vec.get(xtoangle, x)
 
 def View.yslope(+v: View, y: U32) -> U32:
-  View{vx, vy, z, angle, sin, cos, tables} = v
+  View{vx, vy, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   V.Vec.get(yslope, y)
 
 def View.distscale(+v: View, x: U32) -> U32:
-  View{vx, y, z, angle, sin, cos, tables} = v
+  View{vx, y, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   V.Vec.get(distscale, x)
 
 # Doom's checkcoord: which of a box's top, bottom, left and right is
 # corner coordinate k for the eye's position pos about it.
 def View.coord(+v: View, pos: U32, k: U32) -> U32:
-  View{vx, y, z, angle, sin, cos, tables} = v
+  View{vx, y, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   V.Vec.get(coords, (pos * 4 + k : U32))
 
 # Doom's R_PointToAngle: the angle of a point from the eye.
 def View.angle_to(+v: View, x: U32, y: U32) -> U32:
-  View{vx, vy, z, angle, sin, cos, tables} = v
+  View{vx, vy, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   A.Angle.of(tanto, (x - vx : U32), (y - vy : U32))
 
@@ -212,7 +217,7 @@ def View.dist_to.go(+sine: V.Vec, +tanto: V.Vec, +dx: U32, +dy: U32) -> U32:
 # Doom's R_PointToDist, with Chocolate Doom's guard against a point at
 # the eye: the longer leg over the cosine of the angle between.
 def View.dist_to(+v: View, x: U32, y: U32) -> U32:
-  View{vx, vy, z, angle, sin, cos, tables} = v
+  View{vx, vy, z, angle, sin, cos, tables, extralight} = v
   Tables{sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   +dx = F.Fixed.abs((x - vx : U32))
   +dy = F.Fixed.abs((y - vy : U32))
@@ -226,7 +231,7 @@ def View.scale.of(+num: U32, +den: U32) -> U32:
 # angle and its distance, at a global view angle; at most 64, at least
 # 1/256, and 64 where the division would overflow.
 def View.scale(+v: View, +visangle: U32, normal: U32, distance: U32) -> U32:
-  View{x, y, z, angle, sin, cos, tables} = v
+  View{x, y, z, angle, sin, cos, tables, extralight} = v
   Tables{+sine, tangent, tanto, angletox, xtoangle, yslope, distscale, coords, clipangle} = tables
   View.scale.of(
     F.Fixed.mul(Project.centerx(), A.Angle.sin(sine, A.Angle.fine((A.Angle.ang90() + visangle - normal : U32)))),
@@ -259,6 +264,13 @@ def View.span(+v: View, +a1: U32, +a2: U32) -> View.Span:
 
 # Light
 # -----
+
+# Doom's light number for a sector: its light level shifted down, with
+# the extra light a muzzle flash adds and whatever else the caller adds
+# to it, held to 0 and 15. Every light a frame turns into a colormap
+# comes through here.
+def Project.lightnum(+light: U32, +extra: U32) -> U32:
+  F.Fixed.max(0, F.Fixed.min(15, ((light >> 4n) + extra : U32)))
 
 # A colormap number: the light's start less the fade, held to 0 and 31.
 def Project.shade(+startmap: U32, fade: U32) -> U32:

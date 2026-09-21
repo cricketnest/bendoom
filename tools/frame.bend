@@ -40,11 +40,17 @@ def Frame.rows(n: Nat, +row: U32, mem: Array<U32>) -> IO(Unit):
           B.Bytes.fields(320n, (G.Gfx.frame() + row * 320 : U32), 1, [0]), mem)))
         Frame.rows(m, (row + 1 : U32), next)
 
+def Frame.palette(p: Array<U32> & U32) -> Array<U32> & String:
+  (mem, palette) = p
+  (mem, B.Bytes.hex([palette]))
+
 def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, gl: G.Gfx & L.Level) ->
   IO(Unit):
   (+gfx, +level) = gl
-  Frame.rows(200n, 0, I.Play.frame(P.Project.tables(level), gfx,
-    I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), mem))
+  do IO<Unit>:
+    rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(P.Project.tables(level), gfx,
+      I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), mem)))
+    Frame.rows(200n, 0, rest)
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w

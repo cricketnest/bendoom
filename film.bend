@@ -7,8 +7,9 @@ import ./src/bytes.bend as B
 import ./src/level.bend as L
 import ./src/gfx.bend as G
 import ./src/keys.bend as K
-import ./src/inter.bend as I
+import ./src/sim.bend as S
 import ./src/project.bend as P
+import ./src/render.bend as R
 import ./src/show.bend as V
 import ./src/demo.bend as D
 
@@ -25,19 +26,19 @@ def Film.shot(p: Array<U32> & List<&2, U32>, rest: Array<U32> -> IO(Unit)) -> IO
     IO.print(B.Bytes.hex(Film.rgb(colours)))
     rest(mem)
 
-def Film.go(cmds: List<&2, K.Cmd>, +tables: P.Project.Tables, +gfx: G.Gfx, +level: L.Level, play: I.Play,
-  mem: Array<U32>) -> IO(Unit):
+def Film.go(cmds: List<&2, K.Cmd>, +tables: P.Project.Tables, +gfx: G.Gfx, state: S.State, mem: Array<U32>) ->
+  IO(Unit):
   match cmds:
     case []:
       IO.pure(Unit, Unit{})
     case cmd <> rest:
-      +next = I.Play.tic(level, cmd, False{}, play)
-      Film.shot(B.Bytes.each(~U32, ~V.Show.colour, B.Bytes.fields(U32.to_nat(64000), 0, 1, [0]),
-        I.Play.frame(tables, gfx, next, mem)), m => Film.go(rest, tables, gfx, level, next, m))
+      +next = S.Sim.tic(cmd, state)
+      Film.shot(V.Show.rgb(R.Render.frame(tables, gfx, next, True{}, mem)),
+        m => Film.go(rest, tables, gfx, next, m))
 
 def Film.play(demo: List<&2, U32>, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
-  Film.go(D.Demo.play(demo), P.Project.tables(level), gfx, level, I.Play.start(level), mem)
+  Film.go(D.Demo.play(demo), P.Project.tables(level), gfx, S.State.start(level), mem)
 
 def Film.start(demo: List<&2, U32>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w

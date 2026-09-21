@@ -10,6 +10,7 @@ import ./inter.bend as I
 import ./project.bend as P
 import ./show.bend as V
 import ./demo.bend as D
+import ./sound.bend as Sn
 import ./stream.bend as M
 
 # The clock is read each frame; the tics it owes accumulate in
@@ -86,15 +87,35 @@ def Game.ended(ending: Bool, demo: Maybe<D.Demo.Rec>) -> IO(Maybe<D.Demo.Rec>):
     case False{}:
       IO.pure(Maybe<D.Demo.Rec>, demo)
 
+type Game.Steps is Data:
+  Steps{play: I.Play, sounds: List<&2, Sn.Sound.Event>}
+
+def Game.tics(cmds: List<&2, K.Cmd>, +held: Bool, +level: L.Level, play: I.Play,
+  sounds: List<&2, Sn.Sound.Event>) -> Game.Steps:
+  match cmds:
+    case []:
+      Steps{play, sounds}
+    case cmd <> rest:
+      +step = I.Play.step(level, cmd, held, play)
+      Game.tics(rest, held, level, I.Play.Step.play(step),
+        List.append(&2, Sn.Sound.Event, sounds, I.Play.Step.sounds(step)))
+
+def Game.started(+play: I.Play, demo: Maybe<D.Demo.Rec>, +level: L.Level, gfx: G.Gfx,
+  tables: P.Project.Tables, input: K.Input, +again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
+  music: Maybe<M.Stream>, steps: Game.Steps) -> IO(Bool & Game):
+  Steps{+next, events} = steps
+  do IO<Bool & Game>:
+    playing : Maybe<M.Stream> <- M.Stream.hear(events, music)
+    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(I.Play.playing(play), Bool.not(I.Play.playing(next))),
+      demo)
+    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, playing})
+
 def Game.advanced(+play: I.Play, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, +level: L.Level, gfx: G.Gfx,
   tables: P.Project.Tables, input: K.Input, +again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
   music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
-  +next = I.Play.tics(cmds, again, level, play)
-  do IO<Bool & Game>:
-    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(I.Play.playing(play), Bool.not(I.Play.playing(next))),
-      demo)
-    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, music})
+  Game.started(play, demo, level, gfx, tables, input, again, last, owed, mem, music,
+    Game.tics(cmds, again, level, I.Play.ready(level, play), []))
 
 # The play runs the tics the clock owes since the last frame, each on
 # the command built from the held keys, as the demo holds it, and with
@@ -127,14 +148,21 @@ def Game.stepped(now: Nat, p: Bool & Game) -> IO(Bool & Game):
 def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
   Game.stepped(now, Game.events(events, (False{}, g)))
 
-# The device's queue is topped up before the frame's events and tics, so
-# that the song plays on whatever the tics cost.
-def Game.tick(events: List<Event>, g: Game) -> IO(Bool & Game):
+def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
   Game{level, gfx, tables, play, input, again, last, owed, mem, demo, music} = g
+  IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(music),
+    playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, play, input, again, last, owed, mem,
+      demo, playing})))
+
+def Game.mixed(p: Bool & Game) -> IO(Bool & Game):
+  (+quit, g) = p
+  Game.wrote(quit, g)
+
+def Game.tick(events: List<Event>, g: Game) -> IO(Bool & Game):
   do IO<Bool & Game>:
-    playing : Maybe<M.Stream> <- M.Stream.play(music)
     now : Nat <- IO.now()
-    Game.frame(now, events, Game{level, gfx, tables, play, input, again, last, owed, mem, demo, playing})
+    stepped : Bool & Game <- Game.frame(now, events, g)
+    Game.mixed(stepped)
 
 # The window, the demo and the song let go, whether the game quits or
 # its fuel runs out: the frames whose top-up found the device's queue

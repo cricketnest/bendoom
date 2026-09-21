@@ -3,19 +3,19 @@
 # where ST_createWidgets puts its widget and written as V_DrawPatch
 # writes one, over the background and under nothing. Single player, so
 # the frags widget and the net game's face background are never drawn
-# and the arms panel always is. The face is ticket 23's; until then the
-# background shows in its box.
+# and the arms panel always is. The face is drawn from the index the
+# sim's ST_Ticker chose.
 import Base
 import ./bytes.bend as B
 import ./vec.bend as V
 import ./gfx.bend as G
-import ./draw.bend as D
 import ./things.bend as H
 import ./inventory.bend as I
 
 # The slots of Gfx.bar.names(): the ten tall digits from 0, the ten
 # short ones from 10, the percent sign, the six key icons from 21, the
-# six grey weapon numbers from 27, the arms panel, the background.
+# six grey weapon numbers from 27, the arms panel, the background, and
+# the 42 faces from 35, which the face index numbers.
 def Bar.tall() -> U32:
   0
 
@@ -37,6 +37,55 @@ def Bar.arms() -> U32:
 def Bar.back() -> U32:
   34
 
+def Bar.face() -> U32:
+  35
+
+# Patches
+# -------
+
+# A post's texels written down a column of the frame, a row apart.
+def Bar.down(n: Nat, +from: U32, +to: U32, mem: Array<U32>) -> Array<U32>:
+  match n:
+    case 0n:
+      mem
+    case 1n+m:
+      Bar.down(m, (from + 1 : U32), (to + 320 : U32), G.Gfx.move.put(to, B.Bytes.at(mem, from)))
+
+# One post of a patch's column, at its rows of the frame from the
+# column's first, which the context carries.
+def Bar.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +at: U32) -> Array<U32>:
+  Bar.down(U32.to_nat(len), (src + 3 : U32), (at + delta * 320 : U32), mem)
+
+def Bar.column(+patch: U32, +at: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, off) = p
+  G.Gfx.posts(~U32, ~Bar.post, 64n, G.Post{False{}, mem, (patch + off : U32)}, at)
+
+# The patch's columns in turn, each from its own column offset.
+def Bar.cols(n: Nat, +patch: U32, +col: U32, +at: U32, mem: Array<U32>) -> Array<U32>:
+  match n:
+    case 0n:
+      mem
+    case 1n+m:
+      Bar.cols(m, patch, (col + 1 : U32), (at + 1 : U32),
+        Bar.column(patch, at, B.Bytes.u32(mem, (patch + 8 + col * 4 : U32))))
+
+def Bar.patch.wide(+patch: U32, +at: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, width) = p
+  Bar.cols(U32.to_nat(width), patch, 0, at, mem)
+
+def Bar.patch.left(+patch: U32, +x: U32, +row: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, left) = p
+  Bar.patch.wide(patch, (G.Gfx.frame() + row * 320 + x - G.Gfx.s16(left) : U32), B.Bytes.u16(mem, patch))
+
+def Bar.patch.top(+patch: U32, +x: U32, +y: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, top) = p
+  Bar.patch.left(patch, x, (y - G.Gfx.s16(top) : U32), B.Bytes.u16(mem, (patch + 4 : U32)))
+
+# Doom's V_DrawPatch: the patch's posts written into the frame at x, y
+# less its offsets, with what lies between them left as it was.
+def Bar.patch(+patch: U32, +x: U32, +y: U32, mem: Array<U32>) -> Array<U32>:
+  Bar.patch.top(patch, x, y, B.Bytes.u16(mem, (patch + 6 : U32)))
+
 # Widgets
 # -------
 
@@ -54,7 +103,7 @@ def Bar.num.go(n: Nat, more: Bool, +num: U32, +x: U32, +y: U32, +w: U32, +font: 
       +left = (x - w : U32)
       +rest = (num / 10 : U32)
       Bar.num.go(m, Bool.not(U32.is_zero(rest)), rest, left, y, w, font, gfx,
-        D.Draw.patch(Bar.digit(gfx, font, (num % 10 : U32)), left, y, mem))
+        Bar.patch(Bar.digit(gfx, font, (num % 10 : U32)), left, y, mem))
     case _ _:
       mem
 
@@ -74,7 +123,7 @@ def Bar.num(width: Nat, +num: U32, +x: U32, +y: U32, +font: U32, +gfx: G.Gfx, me
 # Doom's STlib_updatePercent: the percent sign at the widget's place,
 # then its number of three tall digits.
 def Bar.percent(+num: U32, +x: U32, +y: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
-  Bar.num(3n, num, x, y, Bar.tall(), gfx, D.Draw.patch(G.Gfx.bar(gfx, Bar.prcnt()), x, y, mem))
+  Bar.num(3n, num, x, y, Bar.tall(), gfx, Bar.patch(G.Gfx.bar(gfx, Bar.prcnt()), x, y, mem))
 
 # ST_AMMO0Y on: the rows of the four ammo counts and their caps, the
 # rockets' under the cells'.
@@ -108,7 +157,7 @@ def Bar.arms.go(n: Nat, +i: U32, +weapons: U32, +gfx: G.Gfx, mem: Array<U32>) ->
       mem
     case 1n+m:
       Bar.arms.go(m, (i + 1 : U32), weapons, gfx,
-        D.Draw.patch(G.Gfx.bar(gfx, Bar.arm(weapons, i)), (111 + (i % 3) * 12 : U32),
+        Bar.patch(G.Gfx.bar(gfx, Bar.arm(weapons, i)), (111 + (i % 3) * 12 : U32),
           (172 + (i / 3) * 10 : U32), mem))
 
 # ST_updateWidgets' keyboxes: a colour shows its skull when that is
@@ -125,7 +174,7 @@ def Bar.icon(shown: Bool, +slot: U32, +x: U32, +y: U32, +gfx: G.Gfx, mem: Array<
     case False{}:
       mem
     case True{}:
-      D.Draw.patch(G.Gfx.bar(gfx, slot), x, y, mem)
+      Bar.patch(G.Gfx.bar(gfx, slot), x, y, mem)
 
 # The three key slots down the bar's right, ST_KEY0Y on.
 def Bar.keys.go(n: Nat, +i: U32, +cards: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
@@ -148,15 +197,48 @@ def Bar.numbers(+inv: I.Inventory, +ammo: U32, +gfx: G.Gfx, mem: Array<U32>) -> 
       Bar.ammo.go(4n, 0, Bar.ammo.rows(), inv, gfx,
         Bar.num(3n, I.Inventory.rounds(ammo, inv), 44, 171, Bar.tall(), gfx, mem))))
 
-# ST_drawWidgets' icons: the arms panel with its six weapon numbers, and
-# the key slot of each colour.
-def Bar.icons(+inv: I.Inventory, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+# ST_drawWidgets' icons: the arms panel with its six weapon numbers, the
+# face the sim chose at ST_FACESX, ST_FACESY, and the key slot of each
+# colour.
+def Bar.icons(+inv: I.Inventory, +face: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   Bar.keys.go(3n, 0, I.Inventory.cards(inv), gfx,
-    Bar.arms.go(6n, 0, I.Inventory.weapons(inv), gfx,
-      D.Draw.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem)))
+    Bar.patch(G.Gfx.bar(gfx, (Bar.face() + face : U32)), 143, 168,
+      Bar.arms.go(6n, 0, I.Inventory.weapons(inv), gfx,
+        Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem))))
 
 # Doom's ST_Drawer with the bar on: the background, then the widgets in
 # ST_drawWidgets' order.
-def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
-  Bar.icons(inv, gfx,
-    Bar.numbers(inv, H.Thing.Weapon.ammo(ready), gfx, D.Draw.patch(G.Gfx.bar(gfx, Bar.back()), 0, 168, mem)))
+def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +face: U32, +gfx: G.Gfx, mem: Array<U32>) ->
+  Array<U32>:
+  Bar.icons(inv, face, gfx,
+    Bar.numbers(inv, H.Thing.Weapon.ammo(ready), gfx, Bar.patch(G.Gfx.bar(gfx, Bar.back()), 0, 168, mem)))
+
+# The palette
+# -----------
+
+# ST_doPaletteStuff's berserk fade, 12 - (strength >> 6), which stands
+# in for the damage count while it is the larger. It is nothing once the
+# power is off, and nothing again once it has counted past 768, where
+# vanilla's int goes negative and loses to a count that never is.
+def Bar.fade(+strength: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(strength), 0, (12 - U32.min(12, (strength >> 6n : U32)) : U32))
+
+# One of the eight red palettes from STARTREDPALS, a step every eight
+# counts, the eighth held past that.
+def Bar.red(+cnt: U32) -> U32:
+  (1 + U32.min(7, ((cnt + 7 : U32) >> 3n : U32)) : U32)
+
+# One of the four gold palettes from STARTBONUSPALS, the same steps.
+def Bar.gold(+bonus: U32) -> U32:
+  (9 + U32.min(3, ((bonus + 7 : U32) >> 3n : U32)) : U32)
+
+def Bar.palette.of(+cnt: U32, +bonus: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(cnt), Bool.pick(U32, U32.is_zero(bonus), 0, Bar.gold(bonus)), Bar.red(cnt))
+
+# ST_doPaletteStuff: which of PLAYPAL's fourteen palettes the frame is
+# shown in. Red by the damage count or the berserk fade, whichever is
+# larger; gold by the pickup flash where no red is due; the plain
+# palette otherwise. Neither map spawns a radiation suit on this skill,
+# so RADIATIONPAL is never picked.
+def Bar.palette(+damage: U32, +strength: U32, +bonus: U32) -> U32:
+  Bar.palette.of(U32.max(damage, Bar.fade(strength)), bonus)

@@ -155,53 +155,6 @@ def Draw.span(mem: Array<U32>, y: U32, +x1: U32, x2: U32, xfrac: U32, yfrac: U32
     Span{mem, (G.Gfx.frame() + y * 320 : U32), Draw.span.pack(xfrac, yfrac), Draw.span.pack(xstep, ystep),
       src, cmap}))
 
-# Patches
-# -------
-
-# A post's texels written down a column of the frame, a row apart.
-def Draw.down(n: Nat, +from: U32, +to: U32, mem: Array<U32>) -> Array<U32>:
-  match n:
-    case 0n:
-      mem
-    case 1n+m:
-      Draw.down(m, (from + 1 : U32), (to + 320 : U32), G.Gfx.move.put(to, B.Bytes.at(mem, from)))
-
-# One post of a patch's column, at its rows of the frame from the
-# column's first, which the context carries.
-def Draw.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +at: U32) -> Array<U32>:
-  Draw.down(U32.to_nat(len), (src + 3 : U32), (at + delta * 320 : U32), mem)
-
-def Draw.patch.column(+patch: U32, +at: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, off) = p
-  G.Gfx.posts(~U32, ~Draw.post, 64n, G.Post{False{}, mem, (patch + off : U32)}, at)
-
-# The patch's columns in turn, each from its own column offset.
-def Draw.patch.cols(n: Nat, +patch: U32, +col: U32, +at: U32, mem: Array<U32>) -> Array<U32>:
-  match n:
-    case 0n:
-      mem
-    case 1n+m:
-      Draw.patch.cols(m, patch, (col + 1 : U32), (at + 1 : U32),
-        Draw.patch.column(patch, at, B.Bytes.u32(mem, (patch + 8 + col * 4 : U32))))
-
-def Draw.patch.wide(+patch: U32, +at: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, width) = p
-  Draw.patch.cols(U32.to_nat(width), patch, 0, at, mem)
-
-def Draw.patch.left(+patch: U32, +x: U32, +row: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, left) = p
-  Draw.patch.wide(patch, (G.Gfx.frame() + row * 320 + x - G.Gfx.s16(left) : U32), B.Bytes.u16(mem, patch))
-
-def Draw.patch.top(+patch: U32, +x: U32, +y: U32, p: Array<U32> & U32) -> Array<U32>:
-  (mem, top) = p
-  Draw.patch.left(patch, x, (y - G.Gfx.s16(top) : U32), B.Bytes.u16(mem, (patch + 4 : U32)))
-
-# Doom's V_DrawPatch: the patch's posts written into the frame at x, y
-# less its offsets, with what lies between them left as it was. The
-# status bar and the intermission draw with it.
-def Draw.patch(+patch: U32, +x: U32, +y: U32, mem: Array<U32>) -> Array<U32>:
-  Draw.patch.top(patch, x, y, B.Bytes.u16(mem, (patch + 6 : U32)))
-
 # n slots from i set to v.
 def Draw.set(n: Nat, mem: Array<U32>, +i: U32, +v: U32) -> Array<U32>:
   match n:
@@ -214,3 +167,52 @@ def Draw.set(n: Nat, mem: Array<U32>, +i: U32, +v: U32) -> Array<U32>:
 # above row 0 and the floor's below the last.
 def Draw.clear(mem: Array<U32>) -> Array<U32>:
   Draw.set(320n, Draw.set(320n, mem, G.Gfx.ceilclip(), 4294967295), G.Gfx.floorclip(), 168)
+
+# Patches
+# -------
+
+# n slots copied from the array down a screen column, a row apart.
+def Draw.down(n: Nat, +from: U32, +to: U32, mem: Array<U32>) -> Array<U32>:
+  match n:
+    case 0n:
+      mem
+    case 1n+m:
+      Draw.down(m, (from + 1 : U32), (to + 320 : U32), G.Gfx.move.put(to, B.Bytes.at(mem, from)))
+
+# V_DrawPatch's inner loop for one post: its texels straight down the
+# screen from the post's row, with no colormap and no clip, since the
+# heads-up line draws inside the screen.
+def Draw.patch.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +at: U32) -> Array<U32>:
+  Draw.down(U32.to_nat(len), (src + 3 : U32), (at + delta * 320 : U32), mem)
+
+# The patch being drawn: the array, the patch's index and the index in
+# the frame of the top of the column to come.
+type Draw.Patch is Type:
+  Patch{mem: Array<U32>, patch: U32, at: U32}
+
+def Draw.patch.col.of(+patch: U32, +at: U32, p: Array<U32> & U32) -> Draw.Patch:
+  (mem, +off) = p
+  Patch{G.Gfx.posts(~U32, ~Draw.patch.post, 256n, G.Post{False{}, mem, (patch + off : U32)}, at), patch,
+    (at + 1 : U32)}
+
+def Draw.patch.col(c: Nat, st: Draw.Patch) -> Draw.Patch:
+  Patch{mem, +patch, +at} = st
+  Draw.patch.col.of(patch, at, B.Bytes.u32(mem, (patch + 8 + U32.from_nat(c) * 4 : U32)))
+
+def Draw.Patch.mem(st: Draw.Patch) -> Array<U32>:
+  Patch{mem, patch, at} = st
+  mem
+
+def Draw.patch.of(+patch: U32, +x: U32, +y: U32, p: Array<U32> & List<&2, U32>) -> Array<U32>:
+  (mem, dims) = p
+  match dims:
+    case width <> left <> top <> rest:
+      Draw.Patch.mem(Draw.each(~Draw.Patch, ~Draw.patch.col, U32.to_nat(width), 0n,
+        Patch{mem, patch, (G.Gfx.frame() + (y - G.Gfx.s16(top)) * 320 + x - G.Gfx.s16(left) : U32)}))
+    case _:
+      mem
+
+# Doom's V_DrawPatch: the patch's columns from x, y with its offsets
+# taken off, post by post, straight into the frame.
+def Draw.patch(mem: Array<U32>, +patch: U32, x: U32, y: U32) -> Array<U32>:
+  Draw.patch.of(patch, x, y, B.Bytes.each(~U32, ~B.Bytes.u16, [patch, (patch + 4 : U32), (patch + 6 : U32)], mem))

@@ -14,6 +14,7 @@ import ./keys.bend as K
 import ./random.bend as M
 import ./draw.bend as D
 import ./sim.bend as S
+import ./sound.bend as Sn
 import ./project.bend as P
 import ./render.bend as R
 
@@ -390,7 +391,7 @@ def Inter.show(wi: Inter) -> String:
 # Doom's V_DrawPatch: the patch of a name at x, y, its offsets taken
 # off, over whatever the frame holds.
 def Inter.patch(+gfx: G.Gfx, name: String, x: U32, y: U32, mem: Array<U32>) -> Array<U32>:
-  D.Draw.patch(G.Gfx.patch(gfx, name), x, y, mem)
+  D.Draw.patch(mem, G.Gfx.patch(gfx, name), x, y)
 
 # A patch's width, height, left offset or top offset, as the array holds
 # its header.
@@ -698,10 +699,27 @@ type Play is Data:
   Playing{state: S.State}
   Showing{inter: Inter}
 
+type Play.Step is Data:
+  Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
+
 # The level as loaded, at its start: Doom's G_DoLoadLevel, which a
 # player's death will want too.
 def Play.start(+level: L.Level) -> Play:
   Playing{S.State.start(level)}
+
+def Play.restarted(reborn: Bool, +level: L.Level, state: S.State) -> Play:
+  match reborn:
+    case True{}:
+      Play.start(level)
+    case False{}:
+      Playing{state}
+
+def Play.ready(+level: L.Level, play: Play) -> Play:
+  match play:
+    case Playing{+state}:
+      Play.restarted(S.State.reborn(state), level, state)
+    case Showing{wi}:
+      Showing{wi}
 
 # G_DoCompleted: the tic that ends the level hands the tally its counts,
 # the totals and the time.
@@ -729,17 +747,29 @@ def Play.showing(over: Bool, +level: L.Level, cmd: K.Cmd, press: Bool, wi: Inter
 def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
   Bool.or(held, K.Cmd.use(cmd))
 
+def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
+  match play:
+    case Playing{state}:
+      +after = S.Sim.tic(cmd, state)
+      Step{Play.after(after), S.State.sounds(after)}
+    case Showing{+wi}:
+      Step{Play.showing(Inter.over(wi), level, cmd, Play.pressed(held, cmd), wi), []}
+
+def Play.Step.play(step: Play.Step) -> Play:
+  Step{play, sounds} = step
+  play
+
+def Play.Step.sounds(step: Play.Step) -> List<&2, Sn.Sound.Event>:
+  Step{play, sounds} = step
+  sounds
+
 # A tic of the play: the level's tic while it runs, then the tally's,
 # and, on the tic after the tally is done, the first tic of a level
 # built from the map as loaded, where Doom's G_DoWorldDone loads the
 # next. Held is a key outside the command that accelerates the tally,
 # which the level pays no heed.
 def Play.tic(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play:
-  match play:
-    case Playing{state}:
-      Play.after(S.Sim.tic(cmd, state))
-    case Showing{+wi}:
-      Play.showing(Inter.over(wi), level, cmd, Play.pressed(held, cmd), wi)
+  Play.Step.play(Play.step(level, cmd, held, play))
 
 # A tic for each command of a list, with a key held throughout: a frame
 # of the game's loop.
@@ -774,9 +804,9 @@ def Play.playing(play: Play) -> Bool:
 
 # The frame the play shows: the level from the player's eye, or the
 # tally, both in the same 320 by 200 array.
-def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, mem: Array<U32>) -> Array<U32>:
+def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, mem: Array<U32>) -> Array<U32> & U32:
   match play:
     case Playing{+state}:
-      R.Render.frame(tables, gfx, state, mem)
+      R.Render.frame(tables, gfx, state, True{}, mem)
     case Showing{+wi}:
-      Inter.frame(gfx, wi, mem)
+      (Inter.frame(gfx, wi, mem), 0)

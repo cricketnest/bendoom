@@ -89,10 +89,11 @@ def Segs.sil(+view: P.View, +level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg) -> U
 # -----
 
 # Doom's fake contrast: a wall along the x axis a light number darker,
-# one along the y axis a number brighter; held to 0 and 15.
-def Segs.lightnum(seg: L.Level.Seg, light: U32) -> U32:
+# one along the y axis a number brighter, on top of the view's extra
+# light; held to 0 and 15.
+def Segs.lightnum(seg: L.Level.Seg, light: U32, +extralight: U32) -> U32:
   L.Seg{+x1, +y1, +x2, +y2, angle, offset, flags, side, front, back} = seg
-  F.Fixed.max(0, F.Fixed.min(15, ((light >> 4n) - Bool.to_u32(U32.is_eq(y1, y2))
+  P.Project.lightnum(light, ((extralight - Bool.to_u32(U32.is_eq(y1, y2))
     + Bool.to_u32(Bool.and(Bool.not(U32.is_eq(y1, y2)), U32.is_eq(x1, x2))) : U32)))
 
 # The range
@@ -188,7 +189,7 @@ def Segs.rw(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, wall
     U32.is_eq(G.Gfx.floorpic(gfx, back), G.Gfx.floorpic(gfx, front)),
     U32.is_eq(G.Gfx.ceilpic(gfx, back), G.Gfx.ceilpic(gfx, front)),
     L.Level.sector(level, front), L.Level.sector(level, back), P.View.z(view), skyfront,
-    Segs.lightnum(seg, L.Level.sector.light(level, front)), geo)
+    Segs.lightnum(seg, L.Level.sector.light(level, front), P.View.extralight(view)), geo)
 
 # The seg loop
 # ------------

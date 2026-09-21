@@ -9,6 +9,12 @@ import ./angle.bend as A
 
 # A sound is named by its sfxenum_t number; 0 is vanilla's sfx_None, the
 # sound that starts nothing.
+def Sound.pistol() -> U32:
+  1
+
+def Sound.shotgn() -> U32:
+  2
+
 def Sound.pstart() -> U32:
   18
 
@@ -27,14 +33,57 @@ def Sound.stnmov() -> U32:
 def Sound.swtchn() -> U32:
   23
 
+def Sound.plpain() -> U32:
+  25
+
+def Sound.dmpain() -> U32:
+  26
+
+def Sound.popain() -> U32:
+  27
+
+def Sound.slop() -> U32:
+  31
+
 def Sound.itemup() -> U32:
   32
+
+# The sight calls of the four monster types: the former humans share
+# three, the imp two, and the demon has its own.
+def Sound.posit1() -> U32:
+  36
+
+def Sound.posit3() -> U32:
+  38
+
+def Sound.bgsit1() -> U32:
+  39
+
+def Sound.bgsit2() -> U32:
+  40
 
 def Sound.wpnup() -> U32:
   33
 
 def Sound.oof() -> U32:
   34
+
+def Sound.pldeth() -> U32:
+  57
+
+# The three zombie death sounds and the two imp ones are groups A_Scream
+# draws one of; the demon's and the barrel's stand alone.
+def Sound.podth1() -> U32:
+  59
+
+def Sound.bgdth1() -> U32:
+  62
+
+def Sound.sgtdth() -> U32:
+  64
+
+def Sound.barexp() -> U32:
+  82
 
 def Sound.noway() -> U32:
   81
@@ -54,10 +103,15 @@ type Sound.Sfx is Data:
   Sfx{id: U32, lump: String, priority: U32}
 
 def Sound.table() -> List<&2, Sound.Sfx>:
-  [Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100}, Sfx{21, "DSDORCLS", 100},
-    Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78},
-    Sfx{34, "DSOOF", 96}, Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100},
-    Sfx{93, "DSGETPOW", 60}]
+  [Sfx{1, "DSPISTOL", 64}, Sfx{18, "DSPSTART", 100}, Sfx{19, "DSPSTOP", 100}, Sfx{20, "DSDOROPN", 100},
+    Sfx{21, "DSDORCLS", 100}, Sfx{22, "DSSTNMOV", 119}, Sfx{23, "DSSWTCHN", 78}, Sfx{25, "DSPLPAIN", 96},
+    Sfx{32, "DSITEMUP", 78}, Sfx{33, "DSWPNUP", 78}, Sfx{34, "DSOOF", 96}, Sfx{57, "DSPLDETH", 32},
+    Sfx{81, "DSNOWAY", 78}, Sfx{88, "DSBDOPN", 100}, Sfx{89, "DSBDCLS", 100}, Sfx{93, "DSGETPOW", 60},
+    Sfx{26, "DSDMPAIN", 96}, Sfx{27, "DSPOPAIN", 96}, Sfx{31, "DSSLOP", 78}, Sfx{36, "DSPOSIT1", 98},
+    Sfx{37, "DSPOSIT2", 98}, Sfx{38, "DSPOSIT3", 98}, Sfx{39, "DSBGSIT1", 98}, Sfx{40, "DSBGSIT2", 98},
+    Sfx{41, "DSSGTSIT", 98}, Sfx{59, "DSPODTH1", 70}, Sfx{60, "DSPODTH2", 70}, Sfx{61, "DSPODTH3", 70},
+    Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
+    Sfx{2, "DSSHOTGN", 64}, Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel
@@ -146,3 +200,26 @@ def Sound.adjust(sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx
   (Sound.volume.at(F.Fixed.approx((lx - sx : U32), (ly - sy : U32))),
     Bool.pick(U32, Bool.and(U32.is_eq(lx, sx), U32.is_eq(ly, sy)), Sound.centre(),
       Sound.sep(sine, A.Angle.of(tanto, (sx - lx : U32), (sy - ly : U32)), facing)))
+
+# The priority of a sound, where less is more important. A sound with no
+# row of its own is the least important there is.
+def Sound.priority(rows: List<&2, Sound.Sfx>, +sfx: U32) -> U32:
+  match rows:
+    case []:
+      255
+    case Sfx{id, lump, priority} <> rest:
+      Bool.pick(U32, U32.is_eq(id, sfx), priority, Sound.priority(rest, sfx))
+
+# Whether a sound from one source cuts a sound from another, as
+# S_StopSound compares origins. A sound from nobody has no origin to
+# compare, so it cuts nothing.
+def Sound.Source.same(a: Sound.Source, b: Sound.Source) -> Bool:
+  match a b:
+    case Thing{i} Thing{j}:
+      U32.is_eq(i, j)
+    case Sector{i} Sector{j}:
+      U32.is_eq(i, j)
+    case Spot{x, y} Spot{u, v}:
+      Bool.and(U32.is_eq(x, u), U32.is_eq(y, v))
+    case _ _:
+      False{}

@@ -7,7 +7,7 @@
 
 stdenvNoCC.mkDerivation {
   pname = "bend";
-  version = "2.0.5";
+  version = "2.0.22";
   inherit src;
 
   patches = [ ./window-fill.patch ];
@@ -22,6 +22,7 @@ stdenvNoCC.mkDerivation {
     cp -r bend2 guide $out/share/bend/
     makeWrapper ${bun}/bin/bun $out/bin/bend \
       --add-flags "$out/share/bend/bend2/main.ts" \
+      --set BEND_NO_TELEMETRY 1 \
       --set-default CC ${llvmPackages_19.clang}/bin/clang \
       --prefix PATH : ${lib.makeBinPath [ llvmPackages_19.clang ]}
     runHook postInstall

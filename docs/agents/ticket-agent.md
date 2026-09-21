@@ -7,7 +7,7 @@ What every agent dispatched to a ticket does. The dispatch prompt names the work
 - Only in the worktree the prompt names. Never touch the main checkout or a sibling worktree. Never rebase or push, and never commit to another branch. The one merge you make is the last step: once your work is committed, merge the integration branch the prompt names INTO your branch, resolve the conflicts by reading both sides, and run the proof and the tests again, so that your branch merges back clean.
 - Run tools through the dev shell, `nix develop -c <command>` from the worktree: bend, bun, nu, chocolate-doom, Xvfb and xdotool are in it, and `BENDOOM_IWAD` is Freedoom there. The shareware WAD is `doom1.wad` under the `doom1-wad` store path (`nix build .#doom1-wad --print-out-paths`).
 - Other agents run the same commands beside you. Never kill processes by a pattern (`pkill -f`, `killall`); kill only a PID you started.
-- Proof checks peak at about 4 GB of memory. Run every heavy command under the one lock, so that one runs at a time across all agents: `flock /tmp/bendoom-heavy.lock nix develop -c bend PROOF.bend`, and the same for `nix flake check` and any `nix build`. Compiling and running a single test or the frame dump needs no lock.
+- Proof checks peak at about 4 GB of memory. Run the proof under the one lock, so that one runs at a time across all agents: `flock /tmp/bendoom-heavy.lock nix develop -c bend PROOF.bend`. Do not run `nix flake check`: the orchestrator runs it on the integration branch after each merge, under the same lock.
 - Scratch files go under `/tmp/<branch>/`, never in the repo.
 
 ## Read before editing
@@ -35,7 +35,7 @@ Half the effort goes to removing. Replacing X with Y includes deleting X. Update
 
 ## Run and report
 
-1. Run the proof, every test on both lanes and the oracle cases. Run `nix flake check` once, on your own work before the final merge; it sees only files that are git-added. After merging the integration branch, run the proof and the tests again but not the flake check: the orchestrator runs it on the integration branch, and the lock it holds for ten minutes is what lets the integration branch move under the agents waiting behind you.
+1. Run the proof, every test on both lanes and the oracle cases, before your final merge and again after it. The orchestrator runs `nix flake check` on the integration branch.
 2. Commit in the repo's style: a conventional prefix and a lower-case subject that says what now holds (`git log --oneline -15`). No `Co-Authored-By` trailer. Do not change git config; preserve the configured author and GitHub no-reply email.
 3. In the ticket file, tick the boxes you met, set `**Status:** resolved` only if every box is met, and append under `## Comments`: where each expected value came from, the oracle reports, what was built, what was deleted, what was pulled forward from a later ticket, what surprised you. Plain words, no em dashes, no puffery.
 4. The final message: commit hashes, the proof, test and oracle results verbatim with output on failure, the interface later tickets call, every trade-off taken, and anything left open. Report failures plainly, and claim no box you did not verify.

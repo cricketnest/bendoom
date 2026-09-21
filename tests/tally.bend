@@ -47,12 +47,10 @@ def idle(n: Nat) -> List<&2, K.Cmd>:
 # The exit room's door used from inside, the walk to the switch, and the
 # use that takes it, as tests/game.bend walks it.
 def route() -> List<&2, K.Cmd>:
-  List.concat(&2, K.Cmd, [idle(5n), held(1n, 0, 0, 0, True{}), held(1n, 0, 0, 64, False{}),
-    held(25n, 25, 0, 0, False{}), idle(8n), held(1n, 0, 0, 16, False{}),
-    held(1n, 0, 0, 0, True{})])
+  List.concat(&2, K.Cmd, [held(1n, 0, 0, 16, False{}), idle(5n), held(1n, 0, 0, 0, True{})])
 
 def beside() -> L.Level.Start:
-  L.Start{F.Fixed.neg(F.Fixed.of_map(224)), F.Fixed.of_map(1340), A.Angle.of_thing(90)}
+  L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316), A.Angle.of_thing(180)}
 
 def line(tag: String, play: W.Play) -> String:
   match play:
@@ -146,29 +144,29 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 #|start kills 0/29 items 0/49 secrets 0/4 time 0
-#|exit kills 0/29 items 0/49 secrets 0/4 time 42 ended True random 66
-#|bcnt 0 count 1 cnt 35 bcnt 0 shown - - - - - anims - - - - - - - - - - random 76
-#|bcnt 1 count 1 cnt 34 bcnt 1 shown - - - - - anims - - 0 - - - - - 0 - random 76
-#|bcnt 34 count 1 cnt 1 bcnt 34 shown - - - - - anims 2 2 0 2 2 2 2 2 0 2 random 76
-#|bcnt 35 count 2 cnt 35 bcnt 35 shown - - - - - anims 2 2 0 2 2 2 2 2 0 2 random 76
-#|bcnt 36 count 3 cnt 35 bcnt 36 shown 0 - - - - anims 2 2 0 0 2 2 2 0 0 2 random 76
-#|bcnt 71 count 4 cnt 35 bcnt 71 shown 0 - - - - anims 0 2 0 0 2 2 2 0 0 2 random 76
-#|bcnt 72 count 5 cnt 35 bcnt 72 shown 0 0 - - - anims 0 0 0 0 2 2 2 0 0 0 random 76
-#|bcnt 107 count 6 cnt 35 bcnt 107 shown 0 0 - - - anims 0 0 0 0 2 0 0 0 0 0 random 76
-#|bcnt 108 count 7 cnt 35 bcnt 108 shown 0 0 0 - - anims 0 0 0 0 2 0 0 0 0 0 random 76
-#|bcnt 143 count 8 cnt 35 bcnt 143 shown 0 0 0 - - anims 0 0 0 0 0 0 0 0 0 0 random 76
-#|bcnt 144 count 8 cnt 35 bcnt 144 shown 0 0 0 1 2 anims 0 0 1 0 0 0 0 0 1 0 random 76
-#|bcnt 145 count 8 cnt 35 bcnt 145 shown 0 0 0 1 5 anims 0 0 1 0 0 0 0 0 1 0 random 76
-#|bcnt 154 count 9 cnt 35 bcnt 154 shown 0 0 0 1 30 anims 1 1 1 1 1 1 1 1 1 1 random 76
-#|bcnt 155 count 9 cnt 34 bcnt 155 shown 0 0 0 1 30 anims 1 1 2 1 1 1 1 1 2 1 random 76
-#|bcnt 189 count 10 cnt 35 bcnt 189 shown 0 0 0 1 30 anims 1 1 2 1 1 1 1 1 2 1 random 76
-#|bcnt 190 count 10 cnt 35 bcnt 190 shown 0 0 0 1 30 anims 1 1 2 2 1 1 1 2 2 1 random 76
-#|bcnt 191 count 10 cnt 35 bcnt 191 shown 0 0 0 1 30 anims 1 1 2 2 1 1 1 2 2 1 random 76
-#|jumped count 10 cnt 30 bcnt 42 shown 0 0 0 1 30 anims 0 0 0 0 2 0 0 0 0 0 random 76
-#|next next cnt 140 bcnt 44 shown 0 0 0 1 30 anims - - - - - - - - - - random 86
-#|cut short done cnt 10 bcnt 66 shown 0 0 0 1 30 anims 1 1 1 1 1 1 1 1 1 1 random 86
-#|nine tics on done cnt 1 bcnt 75 shown 0 0 0 1 30 anims 2 1 2 2 1 2 2 1 2 2 random 86
-#|ten tics on done cnt 0 bcnt 76 shown 0 0 0 1 30 anims 2 1 2 2 1 2 2 1 2 2 random 86
+#|exit kills 0/29 items 0/49 secrets 0/4 time 7 ended True random 73
+#|bcnt 0 count 1 cnt 35 bcnt 0 shown - - - - - anims - - - - - - - - - - random 83
+#|bcnt 1 count 1 cnt 34 bcnt 1 shown - - - - - anims - 0 - - - - - - - 0 random 83
+#|bcnt 34 count 1 cnt 1 bcnt 34 shown - - - - - anims 2 0 2 2 2 2 2 2 2 0 random 83
+#|bcnt 35 count 2 cnt 35 bcnt 35 shown - - - - - anims 2 0 2 2 2 2 0 2 2 0 random 83
+#|bcnt 36 count 3 cnt 35 bcnt 36 shown 0 - - - - anims 0 0 2 2 2 2 0 2 2 0 random 83
+#|bcnt 71 count 4 cnt 35 bcnt 71 shown 0 - - - - anims 0 0 2 2 2 2 0 2 2 0 random 83
+#|bcnt 72 count 5 cnt 35 bcnt 72 shown 0 0 - - - anims 0 0 0 2 2 0 0 2 2 0 random 83
+#|bcnt 107 count 6 cnt 35 bcnt 107 shown 0 0 - - - anims 0 0 0 0 2 0 0 2 0 0 random 83
+#|bcnt 108 count 7 cnt 35 bcnt 108 shown 0 0 0 - - anims 0 0 0 0 2 0 0 2 0 0 random 83
+#|bcnt 143 count 8 cnt 35 bcnt 143 shown 0 0 0 - - anims 0 0 0 0 0 0 0 0 0 0 random 83
+#|bcnt 144 count 8 cnt 35 bcnt 144 shown 0 0 0 0 2 anims 0 1 0 0 0 0 0 0 0 1 random 83
+#|bcnt 145 count 8 cnt 35 bcnt 145 shown 0 0 0 0 5 anims 0 1 0 0 0 0 1 0 0 1 random 83
+#|bcnt 154 count 9 cnt 35 bcnt 154 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 83
+#|bcnt 155 count 9 cnt 34 bcnt 155 shown 0 0 0 0 30 anims 1 2 1 1 1 1 1 1 1 2 random 83
+#|bcnt 189 count 10 cnt 35 bcnt 189 shown 0 0 0 0 30 anims 1 2 1 1 1 1 2 1 1 2 random 83
+#|bcnt 190 count 10 cnt 35 bcnt 190 shown 0 0 0 0 30 anims 2 2 1 1 1 1 2 1 1 2 random 83
+#|bcnt 191 count 10 cnt 35 bcnt 191 shown 0 0 0 0 30 anims 2 2 1 1 1 1 2 1 1 2 random 83
+#|jumped count 10 cnt 30 bcnt 42 shown 0 0 0 0 30 anims 0 0 0 0 2 0 0 2 0 0 random 83
+#|next next cnt 140 bcnt 44 shown 0 0 0 0 30 anims - - - - - - - - - - random 93
+#|cut short done cnt 10 bcnt 66 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 93
+#|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93
+#|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93
 #|the level again level tic 1 kills 0/29 items 0/49 secrets 0/4 time 1
 #|in the secret tic 0 at 400.000000 2040.000000 sector 86 special 9 left 1 counted 0
 #|stood a tic tic 1 at 400.000000 2040.000000 sector 86 special 9 left 0 counted 1

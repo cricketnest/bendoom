@@ -6,7 +6,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     bend-src = {
-      url = "github:bendlang/bend/e6676b080f25b1bc1bf5b5b7d7a17e22f8022599";
+      url = "github:bendlang/bend/94ee9ba40043643df648b13fc5638b065a37cb4e";
       flake = false;
     };
   };
@@ -99,10 +99,9 @@
             ];
             buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.libx11 pkgs.alsa-lib ];
             BENDOOM_IWAD = freedoom;
-            BEND_NO_TELEMETRY = "1";
-          } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             BENDOOM_MUSIC = music freedoom;
             BENDOOM_SOUNDS = sounds freedoom;
+          } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             ALSA_PLUGIN_DIR = alsa-plugins;
           });
         };

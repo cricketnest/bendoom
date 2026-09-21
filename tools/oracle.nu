@@ -51,6 +51,11 @@ def pcx-indices []: binary -> list<string> {
   | str trim | split row ' '
 }
 
+def pcx-palette []: binary -> string {
+  let pcx = $in
+  $pcx | bytes at (($pcx | bytes length) - 768).. | encode hex | str lowercase
+}
+
 # The posts of the patch column whose first is at the offset piped in:
 # each one's first row in the patch, its length, and where its pixels
 # start, up to the column's 255.
@@ -151,7 +156,7 @@ def face-box [wad: binary]: nothing -> list<int> {
 # messages off; the extra config binds F1, scancode 59, to the
 # screenshot, since -devparm, which binds it too, writes its frame-rate
 # dots over the bar's last row.
-def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path]: nothing -> list<string> {
+def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path]: nothing -> record<indices: list<string>, palette: string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
@@ -177,8 +182,11 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
       ^xdotool keyup --window $target F1
       sleep 400ms
       let file = $dir | path join $"DOOM($n | fill --alignment right --character '0' --width 2).pcx"
-      if ($file | path exists) { open --raw $file | pcx-indices } else { [] }
-    } | where {|shot| ($shot | is-not-empty) and ($told | all {|p| ($shot | get $p.at) == $p.colour }) } | first 1
+      if ($file | path exists) {
+        let pcx = open --raw $file
+        {indices: ($pcx | pcx-indices), palette: ($pcx | pcx-palette)}
+      } else { {indices: [], palette: ""} }
+    } | where {|shot| ($shot.indices | is-not-empty) and ($told | all {|p| ($shot.indices | get $p.at) == $p.colour }) } | first 1
   } } finally {
     job kill $game
     job kill $server
@@ -209,17 +217,22 @@ def main [
   let tail = if $tally { [{tics: 2100, bytes: 0x[00 00 00 00]}] } else {
     [{tics: 1, bytes: 0x[00 00 00 81]} {tics: 2100, bytes: 0x[00 00 00 00]}] }
   let shot = vanilla ($bytes | placed $x $y $angle $things) $name ($runs | append $tail | demo) $tics $told $dir
-  let ours = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame }
-    | lines | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
+  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame } | lines
+  let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let masked = if $tally { anim-boxes $bytes } else { ($told | get at) ++ (face-box $bytes) }
-  let differing = 0..<(200 * 320) | where {|i| ($shot | get $i) != ($ours | get $i) } | where $it not-in $masked
+  let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
+  let differing = $off | where $it not-in $masked
+  let playpal = $bytes | lumps | where name == "PLAYPAL" | last | get pos
   if not $keep { rm --recursive $dir }
   {
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
+    face: ($off | where $it in (face-box $bytes) | length)
     masked: ($masked | uniq | where $it < 200 * 320 | length)
-    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot | get $i), ours: ($ours | get $i)} })
+    palette: ($"0x($dump | first)" | into int)
+    shot_plain: ($shot.palette == ($bytes | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
+    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
     scratch: (if $keep { $dir } else { null })
   }
 }

@@ -40,7 +40,7 @@ def ints(samples: List<&2, F32>) -> String:
 
 # The samples of a read as Audio.write takes them, left then right.
 def samples(bytes: List<&2, U32>) -> String:
-  ints(A.Stream.samples(bytes))
+  ints(A.Stream.samples(A.Stream.words(bytes)))
 
 def told(tag: String, p: A.Stream.Tape & List<&2, U32>) -> IO(A.Stream.Tape):
   (tape, bytes) = p
@@ -58,7 +58,7 @@ def dropped(p: A.Stream.Tape & List<&2, U32>, rest: A.Stream.Tape -> IO(A.Stream
   rest(tape)
 
 # The piece counts a span takes in turn; once they run out it goes in
-# the 3072 frames a game frame asks for.
+# pieces of 3072 frames.
 def sizes() -> List<&2, U32>:
   [1, 7, 100, 2048, 33, 999, 3072, 5]
 
