@@ -52,7 +52,6 @@
 
 - **A shot that meets a thing is not at zero.** A shot into a wall is (ticket 11's frame, still 0), and the same place with the barrel replaced by a lamp, which a bullet flies past, is 0 too; put the barrel back and the tic of the shot differs by 104 pixels in one blob about the hit point, growing as the puff lives. The damage itself is not the cause: the random index after the shot is vanilla's count, and the barrel's slide is `P_XYMovement` to the unit. What ticket 11 never compared is the geometry of `PTR_AimTraverse` and `PTR_ShootTraverse` **at a mobj**, and that is where this sits. One real mismatch was found and fixed on the way: `P_BulletSlope` looks 1024 units for something to aim at (`16*64*FRACUNIT`), where this tree looked the bullet's whole 2048.
 - **A frame past about twenty tics of a fight cannot be compared at all.** Vanilla's `P_NoiseAlert` wakes monsters when the pistol fires and `A_Chase` then draws, which this tree does not do yet (tickets 16 and 21), so the random streams part. The barrel mid-explosion frame is 37596 differing for that reason, and the whole status bar is among it, since a woken monster shoots the player. The frame is kept as a pin.
-- **The pain frame and the gib frames are not loaded.** Marking them for the sprite load moves the pixels of six frames of the render test that read zero against vanilla today (`air`, `landed`, `key`, `green armour`, `chainsaw`, `dead`), and `2380 600 180` goes from its own state to 42 differing. Marking the death rows alone leaves every hash and every oracle frame where it was, so that is what ships: a corpse and the barrel's explosion draw, and a monster in its three to six pain tics and a gibbed one draw nothing. Something in `src/gfx.bend`'s loader is tipped over by the extra sprite lumps; finding it is its own ticket.
 - `2380 600 180` at rest reads 25 differing on this branch and the same frame hash as `milestone-6-7`, so that divergence is the integration branch's, not this ticket's: ticket 15's monsters see the player there and vanilla's then chase.
 
 ### Deferred to the later pass
@@ -75,3 +74,13 @@
 - `P_SetMobjState` cannot be one function here. `A_Explode` deals damage and damage enters a state, so the two would be a circle Bend refuses. It is not one in practice either: no pain or death row of any type either map spawns carries an action on entry, so a blow's own setter runs none, and the thinker's general one runs them all.
 - The damage section had to move above the firing that calls it, which cost `P_DropWeapon` the general `P_SetPsprite` loop. Writing that one step out is exact, since the down state lasts a tic.
 - A barrel's target is set only when it survives the hit, so a barrel killed outright by another barrel's blast credits its own kills to nobody, as vanilla's does.
+
+### Pain and gib sprites restored, 2026-09-21
+
+`Gfx.sprite.hurt` now follows the pain and gib entry chains as well as death. The earlier claim that extra lumps corrupt unrelated frames does not reproduce on the current tree: every existing render hash is unchanged, and all 20 rest/rotation oracle poses plus five movement, key and armour cases report `differing: 0`. No hash was regenerated.
+
+The loader test reads all four monsters' pain entry headers and the three available gib entry headers. Expected widths and offsets came from Freedoom's POSSG1, POSSM0, SPOSG1, SPOSM0, TROOH1, TROON0 and SARGH1 headers read in nushell; the state-to-frame mapping is `info.c`.
+
+The actual pain case at `1024 -224 180`, script `20,0,0,0,0 6,0,0,0,2`, improves from 2680 differing pixels to 392. The remaining blood/impact mismatch is still open, so this is not a zero-frame claim and does not close this ticket.
+
+Validation on the restored loader: full `PROOF.bend --check-only` prints `All terms check.`; all 14 tests pass natively and on Bun, including the seven independently read sprite headers. Logs and oracle reports are under `/tmp/fix-monster-sprites/`.

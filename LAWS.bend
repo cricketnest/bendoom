@@ -507,7 +507,7 @@ def Closed.level(ox: U32, records: V.Vec, count: U32) -> L.Level:
     L.Things{records, count}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
-    V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4)})
+    V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4), V.Vec.of_list([], 3)})
 
 def Closed.doors() -> L.Level:
   Closed.level(0, V.Leaf{0}, 0)
@@ -1245,6 +1245,19 @@ law ammo_amounts:
       Got{[], Closed.inv([Ammo{[50, 0, 100, 0]}, Flash{6}])}, Got{[], Closed.inv([Ammo{[50, 0, 0, 5]}, Flash{6}])}]
     : List<&2, Closed.Got>}
 
+def Closed.granted(kind: U32, dropped: Bool) -> I.Inventory:
+  Maybe.default(&2, I.Inventory, I.Inventory.grant(kind, dropped, I.Inventory.start()), I.Inventory.start())
+
+# P_TouchSpecialThing gives a dropped clip half a load (5 bullets).
+# P_GiveWeapon gives a dropped shotgun one load (4 shells), versus two
+# for a placed shotgun. G_PlayerReborn starts with 50 bullets.
+law dropped_ammo:
+  {[I.Inventory.rounds(I.Inventory.am_clip(), Closed.granted(2007, True{})),
+    I.Inventory.rounds(I.Inventory.am_shell(), Closed.granted(2001, True{})),
+    I.Inventory.rounds(I.Inventory.am_clip(), Closed.granted(2007, False{})),
+    I.Inventory.rounds(I.Inventory.am_shell(), Closed.granted(2001, False{}))]
+    == [55, 4, 60, 8] : List<&2, U32>}
+
 # LAW: maxammo's caps, 200 bullets, 50 shells, 300 cells and 50 rockets.
 # At each, the loose round and the box are refused, stay, and change
 # nothing; one short of each, the box is taken and fills it to the cap
@@ -1463,7 +1476,8 @@ law thing_move_is_checked:
   for +ts: H.Things
   for +p: S.Player
   for s: S.State
-  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y, ts, p, s)) : Bool}
+  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y,
+    S.Sim.met(level, ts, p, S.Sim.Body.at(m, x, y)), s)) : Bool}
   {True{} == S.Sim.Fit.ok(S.Sim.check(level, ts, p, S.Sim.Body.at(m, x, y), 3)) : Bool}
 
 # LAW: clear is pinned to the mobjs: when nothing stops a box, every
@@ -1758,7 +1772,7 @@ def Closed.stocked() -> S.State:
 # What P_SpawnMobj leaves on a thing of a type that looked at a player.
 def Closed.spawned.hurt(+kind: U32, lastlook: U32) -> V.Vec:
   H.Thing.Hurt.start(kind, H.Thing.Def.flags(H.Thing.info(kind)),
-    F.Fixed.of_map(H.Thing.Def.height(H.Thing.info(kind))), lastlook)
+    F.Fixed.of_map(H.Thing.Def.height(H.Thing.info(kind))), H.Thing.Def.radius(H.Thing.info(kind)), lastlook)
 
 # The bonus and the armour as they spawned, in a state for some tics.
 def Closed.bonus(state: U32, tics: U32) -> H.Thing:

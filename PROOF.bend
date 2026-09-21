@@ -342,28 +342,28 @@ def Laws.lowest_number_wins(two, three):
 def rest_player(+x: U32, +y: U32) -> S.Player:
   S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Laws.Closed.unarmed(), S.Sim.Hurt.start()}
 
-def rest_before(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
-  Laws.Closed.state(rest_player(x, y), L.Level{geo, sectors, specials}, 0)
+def rest_before(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
+  Laws.Closed.state(rest_player(x, y), L.Level{geo, sectors, specials, heard}, 0)
 
-def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
-  S.State.player.put(rest_before(geo, sectors, specials, x, y),
-    S.Sim.eye(L.Level{geo, sectors, specials}, 0,
-      S.Sim.move(L.Level{geo, sectors, specials}, K.Cmd.idle(), rest_player(x, y))))
+def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
+  S.State.player.put(rest_before(geo, sectors, specials, heard, x, y),
+    S.Sim.eye(L.Level{geo, sectors, specials, heard}, 0,
+      S.Sim.move(L.Level{geo, sectors, specials, heard}, K.Cmd.idle(), rest_player(x, y))))
 
 # The think a tic from rest makes, once the nukage's flag is known: a
 # level the law says nothing about leaves that flag stuck, and the blow
 # it may deal writes the health, the wound and the momentum, never the
 # place.
-def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) -> S.State:
+def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
     S.Sim.player.counted(S.Sim.psprites(K.Cmd.idle(),
-      S.Sim.sector.secret(S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, x, y))))))
+      S.Sim.sector.secret(S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))))))
 
-def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x: U32, +y: U32) ->
+def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(due, geo, sectors, specials, x, y)))),
+      rest_think(due, geo, sectors, specials, heard, x, y)))),
     S.Player.y(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(due, geo, sectors, specials, x, y)))))
+      rest_think(due, geo, sectors, specials, heard, x, y)))))
     == (x, y) : U32 & U32}:
   match due:
     case True{}:
@@ -373,22 +373,22 @@ def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +x
 
 def Laws.tic_rest(level, x, y):
   match level:
-    case L.Level{geo, sectors, specials}:
-      rest_due(Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials},
-          L.Level.sector_at(L.Level{geo, sectors, specials},
-            S.Player.x(S.State.player(rest_walked(geo, sectors, specials, x, y))),
-            S.Player.y(S.State.player(rest_walked(geo, sectors, specials, x, y))))), 7),
+    case L.Level{geo, sectors, specials, heard}:
+      rest_due(Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials, heard},
+          L.Level.sector_at(L.Level{geo, sectors, specials, heard},
+            S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+            S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))))), 7),
         Bool.and(U32.is_zero((0 .&. 31 : U32)),
-          U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, x, y))),
-            L.Level.floor(L.Level{geo, sectors, specials},
-              L.Level.sector_at(L.Level{geo, sectors, specials},
-                S.Player.x(S.State.player(rest_walked(geo, sectors, specials, x, y))),
-                S.Player.y(S.State.player(rest_walked(geo, sectors, specials, x, y)))))))),
-        geo, sectors, specials, x, y)
+          U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+            L.Level.floor(L.Level{geo, sectors, specials, heard},
+              L.Level.sector_at(L.Level{geo, sectors, specials, heard},
+                S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+                S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y)))))))),
+        geo, sectors, specials, heard, x, y)
 
 def Laws.tic_counts(cmd, p, level, clock):
   match level:
-    case L.Level{geo, sectors, specials}:
+    case L.Level{geo, sectors, specials, heard}:
       {==}
 
 def Laws.tic_from_rest():
@@ -460,7 +460,7 @@ def Laws.lift_crushed():
 def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
   sounds, mrnd, reborn, secrets, held):
   match level:
-    case L.Level{geo, sectors, specials}:
+    case L.Level{geo, sectors, specials, heard}:
       %held : {S.Sim.pressed(next, _) == False{} : Bool}
       {==}
 
@@ -480,7 +480,7 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
@@ -1026,9 +1026,9 @@ def heights_ok(+level: L.Level, +x: U32, +y: U32, +r: U32, line: L.Level.Line, f
 
 # A line's condition reads its ends, flags and sides, which two levels
 # of one geometry share whatever their sectors and specials hold.
-def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +r: U32, +mask: U32,
+def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, +pb: V.Vec, +hb: V.Vec, +x: U32, +y: U32, +r: U32, +mask: U32,
   +i: U32) ->
-  {S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i) == S.Sim.line_ok(L.Level{geo, sb, pb}, x, y, r, mask, i)
+  {S.Sim.line_ok(L.Level{geo, sa, pa, ha}, x, y, r, mask, i) == S.Sim.line_ok(L.Level{geo, sb, pb, hb}, x, y, r, mask, i)
     : Bool}:
   match geo:
     case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
@@ -1047,48 +1047,48 @@ def cross_same(ok: Bool, +la: L.Level, +lb: L.Level, +x: U32, +y: U32, +r: U32, 
         : {_ == S.Sim.Fit.ok(S.Sim.fit.heights(lb, x, y, r, lineb, S.Fit{True{}, gl, hl, il})) : Bool}
       heights_ok(lb, x, y, r, lineb, S.Fit{True{}, gl, hl, il})
 
-def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32, +r: U32,
+def line_same(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, +pb: V.Vec, +hb: V.Vec, +x: U32, +y: U32, +r: U32,
   +mask: U32, +i: U32, fa: S.Sim.Fit, fb: S.Sim.Fit, e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
-  {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, fa))
-    == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb)) : Bool}:
+  {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa, ha}, x, y, r, mask, i, fa))
+    == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb, hb}, x, y, r, mask, i, fb)) : Bool}:
   match fa fb:
     case S.Fit{False{}, fl, cl, dl} S.Fit{False{}, gl, hl, il}:
       {==}
     case S.Fit{True{}, +fl, +cl, +dl} S.Fit{True{}, +gl, +hl, +il}:
-      %cond_same(geo, sa, pa, sb, pb, x, y, r, mask, i)
-        : {S.Sim.Fit.ok(S.Sim.fit.cross(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa},
-          x, y, r, L.Level.line(L.Level{geo, sa, pa}, i), fl, cl, dl))
-          == S.Sim.Fit.ok(S.Sim.fit.cross(_, L.Level{geo, sb, pb}, x, y, r, L.Level.line(L.Level{geo, sb, pb}, i), gl,
+      %cond_same(geo, sa, pa, ha, sb, pb, hb, x, y, r, mask, i)
+        : {S.Sim.Fit.ok(S.Sim.fit.cross(S.Sim.line_ok(L.Level{geo, sa, pa, ha}, x, y, r, mask, i), L.Level{geo, sa, pa, ha},
+          x, y, r, L.Level.line(L.Level{geo, sa, pa, ha}, i), fl, cl, dl))
+          == S.Sim.Fit.ok(S.Sim.fit.cross(_, L.Level{geo, sb, pb, hb}, x, y, r, L.Level.line(L.Level{geo, sb, pb, hb}, i), gl,
             hl, il)) : Bool}
-      cross_same(S.Sim.line_ok(L.Level{geo, sa, pa}, x, y, r, mask, i), L.Level{geo, sa, pa}, L.Level{geo, sb, pb}, x,
-        y, r, L.Level.line(L.Level{geo, sa, pa}, i), L.Level.line(L.Level{geo, sb, pb}, i), fl, cl, dl, gl, hl, il)
+      cross_same(S.Sim.line_ok(L.Level{geo, sa, pa, ha}, x, y, r, mask, i), L.Level{geo, sa, pa, ha}, L.Level{geo, sb, pb, hb}, x,
+        y, r, L.Level.line(L.Level{geo, sa, pa, ha}, i), L.Level.line(L.Level{geo, sb, pb, hb}, i), fl, cl, dl, gl, hl, il)
     case S.Fit{True{}, fl, cl, dl} S.Fit{False{}, gl, hl, il}:
-      %e : BD(_, Unit, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, S.Fit{True{}, fl, cl, dl}))
-        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, S.Fit{False{}, gl, hl, il})) : Bool})
+      %e : BD(_, Unit, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa, ha}, x, y, r, mask, i, S.Fit{True{}, fl, cl, dl}))
+        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb, hb}, x, y, r, mask, i, S.Fit{False{}, gl, hl, il})) : Bool})
       Unit{}
     case S.Fit{False{}, fl, cl, dl} S.Fit{True{}, gl, hl, il}:
-      %e : BD(_, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, S.Fit{False{}, fl, cl, dl}))
-        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, S.Fit{True{}, gl, hl, il})) : Bool}, Unit)
+      %e : BD(_, {S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sa, pa, ha}, x, y, r, mask, i, S.Fit{False{}, fl, cl, dl}))
+        == S.Sim.Fit.ok(S.Sim.fit.line(L.Level{geo, sb, pb, hb}, x, y, r, mask, i, S.Fit{True{}, gl, hl, il})) : Bool}, Unit)
       Unit{}
 
-def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
+def go_same(lines: List<&2, U32>, +geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, +pb: V.Vec, +hb: V.Vec,
   +x: U32, +y: U32, +r: U32, +mask: U32, +fa: S.Sim.Fit, +fb: S.Sim.Fit,
   e: {S.Sim.Fit.ok(fa) == S.Sim.Fit.ok(fb) : Bool}) ->
-  {S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sa, pa}, x, y, r, mask, fa))
-    == S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sb, pb}, x, y, r, mask, fb)) : Bool}:
+  {S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sa, pa, ha}, x, y, r, mask, fa))
+    == S.Sim.Fit.ok(S.Sim.fit.go(lines, L.Level{geo, sb, pb, hb}, x, y, r, mask, fb)) : Bool}:
   match lines:
     case []:
       e
     case +i <> rest:
-      go_same(rest, geo, sa, pa, sb, pb, x, y, r, mask, S.Sim.fit.line(L.Level{geo, sa, pa}, x, y, r, mask, i, fa),
-        S.Sim.fit.line(L.Level{geo, sb, pb}, x, y, r, mask, i, fb),
-        line_same(geo, sa, pa, sb, pb, x, y, r, mask, i, fa, fb, e))
+      go_same(rest, geo, sa, pa, ha, sb, pb, hb, x, y, r, mask, S.Sim.fit.line(L.Level{geo, sa, pa, ha}, x, y, r, mask, i, fa),
+        S.Sim.fit.line(L.Level{geo, sb, pb, hb}, x, y, r, mask, i, fb),
+        line_same(geo, sa, pa, ha, sb, pb, hb, x, y, r, mask, i, fa, fb, e))
 
 # The lines gathered for a box are the blockmap's, which two levels of
 # one geometry share.
-def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x0: U32, +y0: U32, +x1: U32,
+def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, +pb: V.Vec, +hb: V.Vec, +x0: U32, +y0: U32, +x1: U32,
   +y1: U32) ->
-  {S.Sim.lines(L.Level{geo, sa, pa}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb}, x0, y0, x1, y1)
+  {S.Sim.lines(L.Level{geo, sa, pa, ha}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb, hb}, x0, y0, x1, y1)
     : List<&2, U32>}:
   match geo:
     case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
@@ -1096,25 +1096,25 @@ def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec,
 
 # Free is the same in two levels of one geometry: the lines gathered are
 # its blockmap's, and each one's condition is the geometry's.
-def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +sb: V.Vec, +pb: V.Vec, +x: U32, +y: U32) ->
-  {S.Sim.free(L.Level{geo, sa, pa}, x, y) == S.Sim.free(L.Level{geo, sb, pb}, x, y) : Bool}:
-  %lines_same(geo, sa, pa, sb, pb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, +pb: V.Vec, +hb: V.Vec, +x: U32, +y: U32) ->
+  {S.Sim.free(L.Level{geo, sa, pa, ha}, x, y) == S.Sim.free(L.Level{geo, sb, pb, hb}, x, y) : Bool}:
+  %lines_same(geo, sa, pa, ha, sb, pb, hb, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
     (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32))
-    : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32),
-      (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa},
+    : {S.Sim.Fit.ok(S.Sim.fit.go(S.Sim.lines(L.Level{geo, sa, pa, ha}, (x - S.Sim.radius() : U32),
+      (y - S.Sim.radius() : U32), (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), L.Level{geo, sa, pa, ha},
       x, y,
-      S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y)))
-      == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb}, x, y, S.Sim.radius(), 1,
-        S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y))) : Bool}
-  go_same(S.Sim.lines(L.Level{geo, sa, pa}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
-    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, sb, pb, x, y, S.Sim.radius(), 1,
-    S.Sim.fit.start(True{}, L.Level{geo, sa, pa}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb}, x, y), {==})
+      S.Sim.radius(), 1, S.Sim.fit.start(True{}, L.Level{geo, sa, pa, ha}, x, y)))
+      == S.Sim.Fit.ok(S.Sim.fit.go(_, L.Level{geo, sb, pb, hb}, x, y, S.Sim.radius(), 1,
+        S.Sim.fit.start(True{}, L.Level{geo, sb, pb, hb}, x, y))) : Bool}
+  go_same(S.Sim.lines(L.Level{geo, sa, pa, ha}, (x - S.Sim.radius() : U32), (y - S.Sim.radius() : U32),
+    (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, ha, sb, pb, hb, x, y, S.Sim.radius(), 1,
+    S.Sim.fit.start(True{}, L.Level{geo, sa, pa, ha}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb, hb}, x, y), {==})
 
 # Held: free in a geometry, whatever the state's sectors and specials
 # have become. Each thinker's turn keeps it: the turn is held to the
 # geometry and the player's place, or is the player's own move.
 def Held(geo: L.Level.Geo, +s: S.State) -> Type:
-  {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s))},
+  {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)), L.Level.alerted(S.State.level(s))},
     S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))) : Bool}
 
 def held_x(x: U32, y: U32, after: S.Player) ->
@@ -1135,13 +1135,13 @@ def held_y(x: U32, y: U32, after: S.Player) ->
 def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
   Held(geo, S.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)), after)):
   match before after:
-    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn, wsecrets} S.State{+player, L.Level{g, +sectors, +specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn, wsecrets} S.State{+player, L.Level{g, +sectors, +specials, +heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       %held_x(S.Player.x(was), S.Player.y(was), player)
-        : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, _,
+        : {True{} == S.Sim.free(L.Level{geo, sectors, specials, heard}, _,
           S.Player.y(S.Player.held(S.Player.x(was), S.Player.y(was), player))) : Bool}
       %held_y(S.Player.x(was), S.Player.y(was), player)
-        : {True{} == S.Sim.free(L.Level{geo, sectors, specials}, S.Player.x(was), _) : Bool}
-      %free_geo(geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), sectors, specials, S.Player.x(was),
+        : {True{} == S.Sim.free(L.Level{geo, sectors, specials, heard}, S.Player.x(was), _) : Bool}
+      %free_geo(geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), L.Level.alerted(wlevel), sectors, specials, heard, S.Player.x(was),
         S.Player.y(was))
         : {True{} == _ : Bool}
       h
@@ -1151,8 +1151,8 @@ def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> He
     case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       h
 
-def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, t: S.Sim.Try, s: S.State,
-  ht: Free(L.Level{geo, sa, pa}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa}, s)):
+def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, t: S.Sim.Try, s: S.State,
+  ht: Free(L.Level{geo, sa, pa, ha}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa, ha}, s)):
   match t s:
     case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
       ht
@@ -1160,13 +1160,13 @@ def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, t: S.Sim.Try, s: S.Stat
 # The player's own turn: its move is checked against the geometry, and
 # the lines it fires are held.
 def mobj_held(+cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) -> Held(geo, S.Sim.mobj(cmd, geo, s)):
-  +level = {L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s))} : L.Level}
+  +level = {L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)), L.Level.alerted(S.State.level(s))} : L.Level}
   +went = S.State.moved(S.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), level, s)
   kept_held(geo, S.State.held(geo, S.Player.x(S.State.player(went)), S.Player.y(S.State.player(went)),
       S.Sim.mobj.tics(S.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
     S.Mobj{H.Things.you(S.State.things(s))},
     held_free(geo, went, S.Sim.mobj.tics(S.Sim.cross(S.Player.crossed(S.State.player(went)), went)),
-      moved_held(geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)),
+      moved_held(geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)), L.Level.alerted(S.State.level(s)),
         S.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), s,
         mobj_z_free(level, S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s)),
           xy_free(level, S.State.things(s), cmd, S.State.player(s), h)))))
@@ -1235,9 +1235,9 @@ def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.Stat
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, +secrets}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, False{}, usedown, sounds, mrnd, reborn, +secrets}:
       {==}
 
 # The rest of a live tic: the think, the use and the thinkers all run
@@ -1257,10 +1257,10 @@ def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State,
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, +secrets}:
       free
-    case S.State{+player, L.Level{+geo, +sectors, +specials}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +reborn, +secrets}:
-      +level = {L.Level{geo, sectors, specials} : L.Level}
+    case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, False{}, +usedown, sounds, +mrnd, +reborn, +secrets}:
+      +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       +before = {S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd,
         reborn, secrets} : S.State}
       tic_done_free(cmd, geo, clock, before,
@@ -1760,4 +1760,7 @@ def Laws.key_boxes():
   {==}
 
 def Laws.arms_numbers():
+  {==}
+
+def Laws.dropped_ammo():
   {==}

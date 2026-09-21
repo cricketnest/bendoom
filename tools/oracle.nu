@@ -14,9 +14,9 @@
 # after the same script, over all 200 rows but for the pause graphic and
 # the box the marine's face covers: the status bar's ticker runs on
 # while the playsim is paused, so the face keeps changing under the
-# screenshot. The default script idles 20 tics, past the pistol's rise.
-# Vanilla's monsters wake when they see the player and Bendoom's do not
-# yet, so a place compares the two only while none sees the player.
+# screenshot. The report counts that box separately, as `face`, which is
+# 0 only where the face holds still under the pause, as the dead one
+# does. The default script idles 20 tics, past the pistol's rise.
 #
 # --tally compares the tally the exit leads to instead. Its script takes
 # the exit and then idles long enough for WI_updateStats to settle,
@@ -166,7 +166,8 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   let display = $":(open --raw ($dir | path join display) | str trim)"
   let game = job spawn {
     cd $dir
-    with-env {HOME: $dir, DISPLAY: $display} {
+    hide-env --ignore-errors WAYLAND_DISPLAY
+    with-env {HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy} {
       ^chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig extra.cfg -window -nosound | ignore
     }
   }

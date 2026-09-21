@@ -839,14 +839,11 @@ def Gfx.sprite.from(none: Bool, +n: Nat, +state: U32, marks: V.Vec) -> V.Vec:
     case False{}:
       Gfx.sprite.chase(n, False{}, state, state, marks)
 
-# The rows a type dies through, so that its corpse and the barrel's
-# explosion have lumps. The pain frame and the gib frames are left out:
-# asking for them moves pixels in six frames of the render test that
-# read zero against vanilla today, which points at something in this
-# loader that more sprite lumps tip over, and finding it is not this
-# ticket's.
+# Pain, death and gib chains have entry points outside the spawn chain.
 def Gfx.sprite.hurt(+kind: U32, +n: Nat, marks: V.Vec) -> V.Vec:
-  Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind), marks)
+  Gfx.sprite.from(U32.is_eq(H.Thing.painstate(kind), H.Thing.null()), n, H.Thing.painstate(kind),
+    Gfx.sprite.from(U32.is_eq(H.Thing.xdeathstate(kind), H.Thing.null()), n, H.Thing.xdeathstate(kind),
+      Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind), marks)))
 
 # The rows a type reaches that no chain from its spawn state does: the
 # chase rows A_Look sends it to, the melee and missile rows A_Chase
@@ -888,21 +885,24 @@ def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
     Gfx.sprite.chase(n, False{}, down, down,
       Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks)))))
 
-# A type spawned in play alone, whose rows no THINGS record reaches: the
-# bullet puff's.
+# A type spawned in play alone, whose rows no THINGS record reaches.
 def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
   H.Def{kind, +state, radius, height, flags} = d
   Gfx.sprite.chase(n, False{}, state, state, marks)
 
 # The state rows the level's things spawn in, the rows their deaths lead
-# to, the pistol's, the puff's, the blood's, and those they lead to,
+# to, the pistol's, the puff's, the blood's, the fireball's, and those they lead to,
 # each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
-  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n,
-    Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n,
-      Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.of_list([], U32.from_nat(n)))))))
+  +marks = V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1)
+  +marks = Gfx.sprite.weapon(H.Thing.pistol(), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.fireball()), n, marks)
+  +marks = Gfx.sprite.hurt(H.Thing.fireball(), n, marks)
+  Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, marks))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
   match views:

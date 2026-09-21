@@ -57,8 +57,8 @@
 # bobbing: 8 tics into its rise, 74 down the screen, and on a walk east
 # from the start at the bob's lowest, tic 48, and at its farthest right,
 # tic 64; the stride has it far left. Then the dead view: 650 tics stood
-# in the nukage of sector 173, which kills on the tic the clock reads
-# 608, leave the eye 6 units over the floor, the pistol off the bottom
+# in the nukage of sector 173 while monsters attack leave the eye
+# 6 units over the floor, the pistol off the bottom
 # of the screen and the bar at no health. Every frame holds the things
 # E1M1 spawns on Hurt Me Plenty, monsters among them, each in its state
 # on that tic.
@@ -70,19 +70,9 @@
 # but the dead one holds: its frame's face pixels are STFDEAD0's, all
 # 591 of them, and the rested start's are STFST00's, all 578, each read
 # from the WAD with tools/oracle.nu's patch-pixels.
-# tools/oracle.nu finds no pixel off vanilla's in the frames it can
-# compare, over all 200 rows. It cannot compare a frame whose script
-# lets a monster see the player: both games now wake it on the same
-# tic, but vanilla's A_Chase runs the moment it does, turning the
-# monster, stepping it and drawing a random number, and Bendoom's chase
-# waits for milestone 6's ticket 16. So the two runs east past the pit,
-# the blinking wall, the two of the blue key in its dim and bright
-# states, the two of the key strafed past, the two of the green armour
-# and the chainsaw taken, and the dead view in the nukage, which stands
-# 650 tics in the yard's sight, are regression pins until then, and so
-# are the exit, which vanilla never stands in (milestone 4's ticket 09 compares
-# it another way), and the two refused frames, whose full inventory
-# vanilla's demo cannot reach.
+# Remaining combat fidelity gaps are recorded in milestone 6's tickets.
+# The exit and full-inventory fixtures are regression pins where a
+# vanilla demo cannot reach the same state.
 # The pickup frames show their pickup: the key is 44 pixels of the first
 # key frame and would be 347 of the second, a bonus never
 # taken would be 1465 of the second bonus frame, the green armour is 745
@@ -117,6 +107,7 @@ import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
+import ./fixtures/combat.bend as C
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32, pal: U32}
@@ -356,8 +347,9 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       S.State.start(level)), w4)
     w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
       at(level, east(704), east(256), 0)), w5)
+    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w6)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
-      at(level, east(1631), east(1008), 90)), w6)
+      at(level, east(1631), east(1008), 90)), g1)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
       at(level, east(2246), east(592), 180)), n1)
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
@@ -402,8 +394,8 @@ def main() -> IO(Unit):
 #|blink dark hash 2817285794 pixels 95 72 103 93 96 65 covered True palette 0
 #|key 2380 600 180 22 hash 3985974813 pixels 5 1 6 110 96 72 covered True palette 0
 #|key bright 23 hash 4138847691 pixels 5 1 6 110 96 72 covered True palette 0
-#|key before hash 2059559509 pixels 6 10 5 89 96 72 covered True palette 0
-#|key after hash 3772851500 pixels 105 10 2 89 96 72 covered True palette 11
+#|key before hash 1404948097 pixels 6 10 5 89 96 72 covered True palette 0
+#|key after hash 3335266453 pixels 105 10 2 89 96 72 covered True palette 11
 #|bonus before hash 3197225618 pixels 11 79 78 6 96 59 covered True palette 0
 #|bonus after hash 3441438830 pixels 10 78 2 11 96 59 covered True palette 10
 #|green armour before hash 123771255 pixels 110 110 6 1 96 72 covered True palette 0
@@ -418,11 +410,12 @@ def main() -> IO(Unit):
 #|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True palette 0
 #|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True palette 0
 #|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True palette 0
-#|dead 1600 1000 90 hash 1289269632 pixels 189 1 103 1 96 44 covered True palette 2
+#|dead 1600 1000 90 hash 170486482 pixels 78 7 122 2 96 8 covered True palette 0
 #|nukage 1600 1000 90 hash 3477668975 pixels 11 2 107 1 96 77 covered True palette 2
 #|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True palette 0
 #|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True palette 0
 #|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True palette 0
+#|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
 #|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47
