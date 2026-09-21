@@ -707,23 +707,6 @@ def Thing.zmove(thing: Thing) -> Thing:
   Thing.zmove.put(Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
     Thing.zmove.floor(F.Fixed.le((z + momz : U32), floorz), falls, (z + momz : U32), momz, floorz, ceilz, height))
 
-# The vertical half of Doom's P_MobjThinker, run for a mobj off its
-# floor or with momentum, as vanilla runs P_ZMovement. A thing that
-# stands still never asks for its type, which is a search.
-def Thing.tic.z(moves: Bool, thing: Thing) -> Thing:
-  match moves:
-    case False{}:
-      thing
-    case True{}:
-      Thing.zmove(thing)
-
-# The vertical half of a thing's tic, run before the state half, which
-# is the sim's because a state's action is.
-def Thing.risen(thing: Thing) -> Thing:
-  Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, +momz, hurt} = thing
-  Thing.tic.z(Bool.or(Bool.not(U32.is_eq(z, floorz)), Bool.not(U32.is_zero(momz))),
-    Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt})
-
 # Whether a thing has entered S_NULL and so removed itself.
 def Thing.gone(thing: Thing) -> Bool:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, +state, tics, momz, hurt} = thing
