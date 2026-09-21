@@ -307,11 +307,13 @@ def Inventory.ammo.switch(empty: Bool, t: U32, +inv: Inventory) -> Inventory:
 
 # P_GiveAmmo's rounds: clips of an ammo type, up to its cap. Only the
 # easiest and hardest skills double them, never Hurt Me Plenty.
-def Inventory.give(+t: U32, clips: U32, inv: Inventory) -> Inventory:
+def Inventory.give(+t: U32, +clips: U32, inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line} = inv
   +old = V.Vec.get(ammo, t)
   +given = {Inventory{health, armour, armourtype, cards,
-    V.Vec.set(ammo, t, Inventory.upto(old, (clips * Inventory.clip(t) : U32), V.Vec.get(caps, t))),
+    V.Vec.set(ammo, t, Inventory.upto(old,
+      Bool.pick(U32, U32.is_zero(clips), (Inventory.clip(t) / 2 : U32), (clips * Inventory.clip(t) : U32)),
+      V.Vec.get(caps, t))),
     caps, backpack, weapons, powers, items, bonus, line} : Inventory}
   Inventory.ammo.switch(U32.is_zero(old), t, given)
 
@@ -329,9 +331,10 @@ def Inventory.weapon(+bit: U32, +weapon: U32, gave: Bool, msg: U32, inv: Invento
   +got = {Inventory{health, armour, armourtype, cards, ammo, caps, backpack, (weapons .|. bit : U32), powers, items, bonus, line} : Inventory}
   Inventory.taken(Bool.or(gave, new), msg, Bool.pick(Inventory, new, Inventory.want(weapon, got), got))
 
-# A weapon found with ammo of a type: two clips of it.
-def Inventory.armed(bit: U32, weapon: U32, +t: U32, msg: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
-  Inventory.weapon(bit, weapon, Inventory.room(t, inv), msg, Inventory.give(t, 2, inv))
+# A placed weapon carries two clips; a dropped one carries one.
+def Inventory.armed(bit: U32, weapon: U32, +t: U32, dropped: Bool, msg: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
+  Inventory.weapon(bit, weapon, Inventory.room(t, inv), msg,
+    Inventory.give(t, Bool.pick(U32, dropped, 1, 2), inv))
 
 # The caps once a backpack is taken: the first doubles each.
 def Inventory.bag(had: Bool, caps: V.Vec) -> V.Vec:
@@ -358,7 +361,7 @@ def Inventory.backpack(inv: Inventory) -> Inventory:
 # brings two clips of its ammo, and the chainsaw has none. The types
 # neither E1M1 places keep their grant and say nothing, since no play
 # could show their strings.
-def Inventory.grant(kind: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
+def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inventory>:
   match kind:
     case 5:
       Some{Inventory.card(Inventory.bluecard(), Msg.Message.gotbluecard(), inv)}
@@ -367,17 +370,17 @@ def Inventory.grant(kind: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
     case 17:
       Inventory.ammo(Inventory.am_cell(), 5, Msg.Message.none(), inv)
     case 2001:
-      Inventory.armed(Inventory.shotgun(), 2, Inventory.am_shell(), Msg.Message.gotshotgun(), inv)
+      Inventory.armed(Inventory.shotgun(), 2, Inventory.am_shell(), dropped, Msg.Message.gotshotgun(), inv)
     case 2002:
-      Inventory.armed(Inventory.chaingun(), 3, Inventory.am_clip(), Msg.Message.none(), inv)
+      Inventory.armed(Inventory.chaingun(), 3, Inventory.am_clip(), dropped, Msg.Message.none(), inv)
     case 2003:
-      Inventory.armed(Inventory.launcher(), 4, Inventory.am_misl(), Msg.Message.none(), inv)
+      Inventory.armed(Inventory.launcher(), 4, Inventory.am_misl(), dropped, Msg.Message.none(), inv)
     case 2004:
-      Inventory.armed(Inventory.plasma(), 5, Inventory.am_cell(), Msg.Message.none(), inv)
+      Inventory.armed(Inventory.plasma(), 5, Inventory.am_cell(), dropped, Msg.Message.none(), inv)
     case 2005:
       Inventory.weapon(Inventory.chainsaw(), 7, False{}, Msg.Message.gotchainsaw(), inv)
     case 2007:
-      Inventory.ammo(Inventory.am_clip(), 1, Msg.Message.gotclip(), inv)
+      Inventory.ammo(Inventory.am_clip(), Bool.pick(U32, dropped, 0, 1), Msg.Message.gotclip(), inv)
     case 2008:
       Inventory.ammo(Inventory.am_shell(), 1, Msg.Message.gotshells(), inv)
     case 2010:

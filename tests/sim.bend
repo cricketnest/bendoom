@@ -822,6 +822,13 @@ def thing(m: Maybe<&2, H.Thing>) -> String:
         ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle) ++ " sector " ++ U32.show(sector)
         ++ " state " ++ U32.show(state) ++ " tics " ++ U32.show(tics) ++ described(H.Thing.def(kind))
 
+def ambush(m: Maybe<&2, H.Thing>) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{th}:
+      H.Thing.ambush(th)
+
 def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
   match chosen:
     case []:
@@ -829,7 +836,7 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
     case +id <> rest:
       do IO<Unit>:
         IO.print(thing(H.Things.get(S.State.things(s), id)) ++ " ambush "
-          ++ Bool.show(H.Thing.ambush(S.State.level(s), id)))
+          ++ Bool.show(ambush(H.Things.get(S.State.things(s), id))))
         things(rest, s)
 
 # What the blockmap links hold: how many links, how many of solid
@@ -1531,7 +1538,7 @@ def weapon.pick(m: Maybe<&2, I.Inventory>) -> String:
 def weapons(+level: L.Level) -> IO(Unit):
   +base = weapon.state(1, 59, 4, S.State.start(level))
   do IO<Unit>:
-    IO.print("shotgun pickup " ++ weapon.pick(I.Inventory.grant(2001, I.Inventory.start())))
+    IO.print("shotgun pickup " ++ weapon.pick(I.Inventory.grant(2001, False{}, I.Inventory.start())))
     k0 : S.State <- weapon.run("key", 1n, K.Cmd.demo(0, 0, 0, 20), base)
     k1 : S.State <- weapon.run("mid switch", 8n, idle(), k0)
     k2 : S.State <- weapon.run("shotgun ready", 24n, idle(), k1)
@@ -3038,12 +3045,12 @@ def main() -> IO(Unit):
 #|shotgun pickup ready 1 pending 2 shells 8
 #|key tic 1 ready 1 pending 2 shells 4 state Some(69) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
 #|mid switch tic 9 ready 1 pending 2 shells 4 state Some(69) tics 1 at 1.000000 86.000000 flash None tics 0 at 1.000000 86.000000 random 64
-#|shotgun ready tic 33 ready 2 pending 255 shells 4 state Some(190) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 65
-#|trigger tic 34 ready 2 pending 255 shells 4 state Some(193) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 65
+#|shotgun ready tic 33 ready 2 pending 255 shells 4 state Some(201) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 65
+#|trigger tic 34 ready 2 pending 255 shells 4 state Some(204) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 65
 #|sound tic 37 DSSHOTGN from thing 4294967295 vol 64 sep 128
-#|blast tic 37 ready 2 pending 255 shells 3 state Some(194) tics 7 at 1.000000 32.000000 flash Some(202) tics 3 at 1.000000 32.000000 random 114
-#|last trigger tic 1 ready 2 pending 255 shells 1 state Some(193) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 61
+#|blast tic 37 ready 2 pending 255 shells 3 state Some(205) tics 7 at 1.000000 32.000000 flash Some(213) tics 3 at 1.000000 32.000000 random 114
+#|last trigger tic 1 ready 2 pending 255 shells 1 state Some(204) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 61
 #|sound tic 4 DSSHOTGN from thing 4294967295 vol 64 sep 128
-#|last blast tic 4 ready 2 pending 255 shells 0 state Some(194) tics 7 at 1.000000 32.000000 flash Some(202) tics 3 at 1.000000 32.000000 random 110
+#|last blast tic 4 ready 2 pending 255 shells 0 state Some(205) tics 7 at 1.000000 32.000000 flash Some(213) tics 3 at 1.000000 32.000000 random 110
 #|switch away tic 74 ready 1 pending 255 shells 0 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 119
 #|-

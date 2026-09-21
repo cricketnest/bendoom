@@ -70,19 +70,9 @@
 # but the dead one holds: its frame's face pixels are STFDEAD0's, all
 # 591 of them, and the rested start's are STFST00's, all 578, each read
 # from the WAD with tools/oracle.nu's patch-pixels.
-# tools/oracle.nu finds no pixel off vanilla's in the frames it can
-# compare, over all 200 rows. It cannot compare a frame whose script
-# lets a monster see the player: both games now wake it on the same
-# tic, but vanilla's A_Chase runs the moment it does, turning the
-# monster, stepping it and drawing a random number, and Bendoom's chase
-# waits for milestone 6's ticket 16. So the two runs east past the pit,
-# the blinking wall, the two of the blue key in its dim and bright
-# states, the two of the key strafed past, the two of the green armour
-# and the chainsaw taken, and the dead view in the nukage, which stands
-# 650 tics in the yard's sight, are regression pins until then, and so
-# are the exit, which vanilla never stands in (milestone 4's ticket 09 compares
-# it another way), and the two refused frames, whose full inventory
-# vanilla's demo cannot reach.
+# Remaining combat fidelity gaps are recorded in milestone 6's tickets.
+# The exit and full-inventory fixtures are regression pins where a
+# vanilla demo cannot reach the same state.
 # The pickup frames show their pickup: the key is 44 pixels of the first
 # key frame and would be 347 of the second, a bonus never
 # taken would be 1465 of the second bonus frame, the green armour is 745
@@ -117,6 +107,7 @@ import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
+import ./fixtures/combat.bend as C
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32, pal: U32}
@@ -360,8 +351,9 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(824), east(896), 0)), w7)
     w9 : Array<U32> <- frame("shotgun firing", tables, gfx, after([idle(20n), walk(5n), idle(40n), fired(3n)],
       at(level, east(824), east(896), 0)), w8)
+    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w9)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
-      at(level, east(1631), east(1008), 90)), w9)
+      at(level, east(1631), east(1008), 90)), g1)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
       at(level, east(2246), east(592), 180)), n1)
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
@@ -430,6 +422,7 @@ def main() -> IO(Unit):
 #|shotgun lowering hash 4038683862 pixels 158 79 79 93 96 64 covered True palette 0
 #|shotgun at rest hash 4155222496 pixels 9 8 78 93 96 72 covered True palette 0
 #|shotgun firing hash 4015107196 pixels 159 8 78 93 96 59 covered True palette 0
+#|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
 #|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47
