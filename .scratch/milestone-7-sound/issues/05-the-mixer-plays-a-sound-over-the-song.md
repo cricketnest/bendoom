@@ -1,46 +1,34 @@
 # 05: The mixer plays a sound over the song
 
-**What to build:** The music stream becomes the mixer and stays the only writer to `Audio`. Given the song and a list of hand-written events (this sound, from this frame, at these left and right volumes), it streams each playing sound from its file, adds it to the song with SDL_mixer's arithmetic and clipping, and produces the frames the device would get. No channel logic yet.
+**What to build:** One audio writer streams the song and playing effects with Chocolate Doom's sample arithmetic and clipping.
 
 **Blocked by:** 04 (The sounds node)
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [x] Each playing sound is read from its file front to back, and nothing but the frames about to be written is held
-- [x] Volumes scale and sums clip as SDL_mixer's do, at Chocolate Doom's default music and sound volumes
-- [x] With no sound playing the output equals the song alone, and milestone 8's stream test keeps its values
-- [x] A test on both lanes mixes Freedoom's sounds and song in pieces of varying frame counts and prints a hash and sampled values at each sound's start and end and where two overlap, with expected values read from the recordings in nushell
-- [ ] `tools/listen.nu` compares three recordings with the mixer's output placed at the recorded starts: one centred sound, two overlapping, one over the music; the ticket records differing samples and the largest difference, target zero
-- [x] The old stream's code that the mixer replaces is deleted, not kept beside it
+- [x] Effects stream front to back, holding only the frames about to be written
+- [x] Scaling, channel order and saturation match SDL_mixer at the default volumes
+- [x] With no effects, output equals the song and the existing stream expectations remain unchanged
+- [x] Both lanes check varying window sizes, sound starts/ends and overlap
+- [x] Three recorded comparisons have zero differing samples and zero largest difference
+- [x] The superseded stream implementation is deleted
 
-## Deferred to the later pass
+## Verification
 
-- The three recordings through `tools/listen.nu` and the count of differing samples, the unticked box above. What stands in for it tonight is the grunt over silence, whose hash and frames are the ones ticket 03 took from Chocolate Doom's capture and from its own `Mix_Chunk` under gdb.
-- The `song` line of `tests/mixer.bend`, the song with two sounds over it, is a regression pin and not a recording's value. The recording comparison above is what would settle it.
+The 21 Sep comparisons used Freedoom 0.13.0 and Chocolate Doom 3.1.1's SDL disk audio output, then emitted PCM from the real `Stream.window` and `Channel.hear` functions at the recorded effect starts. Each comparison covered every stereo sample in its window, including silence after effects ended.
 
-## Comments
+| Recording | Setup | Frames compared | Differing samples | Largest difference |
+| --- | --- | ---: | ---: | ---: |
+| Centred DSNOWAY | `tools/listen.nu sounds -480 192 180 20,0,0,0,0 1,0,0,0,1 40,0,0,0,0` | 32768 | 0 | 0 |
+| Door and pistol overlap | Isolated sector-80 door fixture, player 448,2048 facing 90; 20 idle, one use, one attack, 80 idle | 83968 | 0 | 0 |
+| OPL music and DSNOWAY | Same centred scene; actual OPL callback output recorded alongside the final device output | 205824 | 0 | 0 |
 
-20 Sep 2026.
+The overlap capture starts DSDOROPN at frame 118784, volume 64/separation 129, and DSPISTOL at 125952, volume 64/separation 128. The music capture starts DSNOWAY at 110592. Its OPL samples were dumped immediately after `OPL3_GenerateStream` and fed to Bend as the song input: this checks the mixer against Chocolate Doom's actual music, independently of startup phase differences in a separately rendered song. It does not claim those two OPL startup phases are identical.
 
-### What was built
+Artifacts are under `/tmp/m7-06/audio/`: `centred.json`, `overlap.json`, `music.json`, their Bend drivers and PCM outputs, and `music-trace/trace.gdb` plus the paired recordings. `tests/mixer.bend` retains the recorded grunt values and explicitly labels its separately rendered song hash as a regression pin.
 
-- `src/stream.bend` is the mixer. `Stream.window(want, tape, chans)` is the whole seam: it reads the song's next frames (silence when there is no render), then folds every playing channel over them, and answers the tape, the channels and the frames. `Stream.frame` is that window between the two writes to `Audio` that read the queue and fill it. Nothing else writes to the device.
-- The frames travel as one word a frame, the left sample in the low half and the right in the high, which is what the mix adds to and what `Stream.samples` turns into what `Audio.write` takes. `Stream.words` makes them from the song's bytes. The old `Stream.samples`, which went from bytes straight to floats, is gone.
-- `Stream.side` is SDL_mixer 2.8.2's `_Eff_position_s16lsb` on one side, `(Sint16) ((float) sample * (side / 255.0f))` truncated toward zero. `Stream.add` is SDL 3.4.14's `SDL_MixAudio` at volume 128, which `ADJUST_VOLUME` leaves as `sample * 128 / 128`: an integer sum clipped to `SDL_MIN_SINT16` and `SDL_MAX_SINT16`. Both sign bits are flipped so the sum runs in 0 to 131070 and the clamp is `U32.clamp`, since a U32 has no room below zero.
-- Channels are added one at a time in slot order, since `mix_channels` in SDL_mixer's `mixer.c` writes the music first and then calls `SDL_MixAudioFormat` once a channel, so the clipping of one addition is what the next adds to.
-- A channel's file is read `want * 2` bytes a frame of the loop and nothing is held but the frames going out. A read that comes up short is the sound's end: the file closes and the channel frees itself, the same way `Stream.pull` finds the end of a pass.
-- The channels are asked for as many frames as the song gave, not for the whole top-up, so that the short read at a pass's end (three frames, once every 2.2 minutes) costs a playing sound nothing.
-- The mixer now holds the sounds directory and a `Maybe` of the song's tape, so the three empty cases each say one line and play what is left: no device (silent), no render with sounds (the sounds alone), no render and no sounds (silent, the device let go), no sounds directory (the music alone).
-- `tests/sfx.bend` lost its own copy of the side scaling and calls `Stream.side`, which ticket 03's comment asked for. Its values did not move, so the mixer's scaling is now what that test checks against Chocolate Doom.
+## Implementation
 
-### Where each expected value came from
+`Stream.window` reads only the requested frames, folds effects in channel-slot order over silence, then adds the stereo song. Chocolate Doom registers its OPL callback with `MIX_CHANNEL_POST`; treating OPL as SDL_mixer's ordinary music hook gave the wrong clipping order. The saturation case in `tests/mixer.bend` distinguishes these orders: two effects of 30000 clip to 32767 before music of -30000 yields 2767.
 
-- `tests/mixer.bend`'s `grunt` line is DSNOWAY started centred at the default volume with no song under it, read in windows of 1, 7, 100, 2048, 33, 999, 3072, 5 and then 3072 frames. Its hash, 3631499139, and its frames 0, 1, 3, 2714 and 16995 are `tests/sfx.bend`'s `heard` values for the same sound, which ticket 03 read from `tools/listen.nu`'s capture of Chocolate Doom and checked against Chocolate Doom's own `Mix_Chunk` dumped under gdb. They came out equal on the first run of the mixer, so the file reading, the window splitting and the scaling all agree with the original.
-- Frame 16996, the one after the sound's last, is 0 0 and the table after the run is empty: the channel freed itself where the file ended.
-- The `song` line is a regression pin, said so in the test's header.
-- `tests/stream.bend` keeps every value it had, which is the no-channel case.
-
-### Trade-offs
-
-- The mixer holds the channels rather than the game record holding them beside the music. They are still outside the sim's state, which is what the milestone asks, and it keeps one value to thread through the loop and one place that closes the files. A game with no device has no channels at all, which is right: nothing can play.
-- With no sounds directory the mixer still tries to open each sound's file and takes the failure as a drop. It costs one failed open a sound and saves a branch, and the line at startup already says what is happening.
+`Stream.side` implements SDL_mixer's floating-point pan scaling truncated toward zero. `Stream.add` clips each integer sum to signed 16-bit range. Packed stereo words become floats only at `Audio.write`. A short effect read closes its file and frees its slot; a short song read limits the shared window so no effect samples are lost at a song boundary.

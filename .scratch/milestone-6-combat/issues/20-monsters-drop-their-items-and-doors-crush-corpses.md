@@ -29,5 +29,4 @@ clip, and random index 136. The full frame differs by zero pixels.
 matches every recorded player/monster position, health, random index and
 door height, and its final frame differs by zero pixels.
 
-Full integration checks and the explicit living-monster door-reopening
-case remain before closure.
+The living-monster fixture starts sector 80's ceiling at -72 and runs idle, use, idle, use, then two idle tics. Chocolate Doom's ceiling sequence is -72, -70, -68, -70, -72, -72; at tic 6 the door is opening again and the monster still has 20 health. `tests/drops.bend` checks that reversal. Full integration checks remain before closure.
