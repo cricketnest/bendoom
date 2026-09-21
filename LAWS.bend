@@ -403,7 +403,7 @@ law pistol_spends:
 
 def Closed.shotgun.empty() -> I.Inventory:
   I.Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
-    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, kills, secrets}
+    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, 0, 0}
 
 # LAW: P_CheckAmmo's preference chooses the pistol when the ready
 # shotgun has spent its last shell and bullets remain.
