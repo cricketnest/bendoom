@@ -1574,6 +1574,13 @@ def attack.combatant(m: Maybe<&2, H.Thing>) -> String:
       " target " ++ U32.show(H.Thing.target(th)) ++ " threshold " ++ U32.show(H.Thing.threshold(th))
         ++ fighter(Some{th})
 
+def attack.ticked(m: Maybe<&2, H.Thing>, +id: U32, +tics: U32, s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{th}:
+      S.State.thing.put(id, H.Thing.ticking(th, tics), s)
+
 # Freedoom records 240 and 81 stand 112 units apart in one room. A
 # Chocolate Doom call to A_SPosAttack followed by 60 idle tics gives
 # random indices 83 and 132 and the same health, states, targets,
@@ -1585,6 +1592,11 @@ def attack.retaliation(+level: L.Level) -> IO(Unit):
   +held = S.Sim.damage(81, 4, 82, 82, first)
   +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
   +fight = attack.play(60n, idle(), first)
+  +moved = S.State.thing.moved(24, F.Fixed.of_map(832), F.Fixed.of_map(1056), s)
+  +credited = S.Sim.thing.counted(24, H.Thing.hurt.target(), H.Things.you(S.State.things(moved)), moved)
+  +entered = S.Sim.damage.entered(24, S.State.thing(24, credited), 178, credited)
+  +ready = attack.ticked(S.State.thing(24, entered), 24, 1, entered)
+  +blast = attack.play(1n, idle(), ready)
   do IO<Unit>:
     IO.print("imp retaliates" ++ attack.combatant(H.Things.get(S.State.things(first), 81))
       ++ " random " ++ U32.show(S.State.rnd(first)))
@@ -1594,6 +1606,11 @@ def attack.retaliation(+level: L.Level) -> IO(Unit):
       ++ " random " ++ U32.show(S.State.rnd(barrel)))
     IO.print("shotgun imp fight" ++ attack.combatant(H.Things.get(S.State.things(fight), 81))
       ++ attack.combatant(H.Things.get(S.State.things(fight), 240)) ++ " random " ++ U32.show(S.State.rnd(fight)))
+    IO.print("player barrel blast" ++ attack.combatant(H.Things.get(S.State.things(blast), 81))
+      ++ attack.combatant(H.Things.get(S.State.things(blast), 240))
+      ++ attack.combatant(H.Things.get(S.State.things(blast), 82))
+      ++ attack.combatant(H.Things.get(S.State.things(blast), 83))
+      ++ fighter(H.Things.get(S.State.things(blast), 24)) ++ " random " ++ U32.show(S.State.rnd(blast)))
 
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -2089,8 +2106,9 @@ def main() -> IO(Unit):
 #|dead player idle target 157 threshold 0 81 hp 60 state 65/6 at 928.322265 975.677734 -128.000000 after 157 target 157 threshold 0 82 hp 60 state 66/10 at 911.110351 1104.889648 -128.000000 after 157
 #|imp retaliates target 240 threshold 100 81 hp 33 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 83
 #|threshold holds target 240 threshold 100 81 hp 29 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 84
-#|barrel credits player target 157 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 157 random 60
+#|barrel credits player target 157 threshold 99 81 hp 56 state 105/3 at 842.262695 1050.262695 -128.000000 after 157 random 62
 #|shotgun imp fight target 240 threshold 87 81 hp 15 state 108/3 at 891.248580 1056.017028 -128.000000 after 240 target 81 threshold 99 240 hp 12 state 189/7 at 982.616607 1055.972488 -128.000000 after 81 random 132
+#|player barrel blast target 4294967295 threshold 0 81 hp -68 state 160/2 at 848.000000 1056.000000 -128.000000 after 4294967295 target 157 threshold 99 240 hp 10 state 97/2 at 956.762649 1050.263641 -128.000000 after 157 target 157 threshold 100 82 hp 24 state 153/1 at 848.634658 1172.454956 -128.000000 after 157 gone 24 hp -108 state 176/5 at 832.000000 1056.000000 -128.000000 after 157 random 67
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159

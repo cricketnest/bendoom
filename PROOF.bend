@@ -475,7 +475,7 @@ def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
   +hurt = S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))
   +selected = S.Sim.weapon.select(K.Cmd.idle(), S.Sim.sector.secret(hurt))
   S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
-    S.Sim.player.counted(S.Sim.psprites(K.Cmd.idle(), selected)))
+    S.Sim.player.counted(S.Sim.psprites.with(~S.Sim.damage.enter.acted, K.Cmd.idle(), selected)))
 
 def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
