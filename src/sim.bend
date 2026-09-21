@@ -5868,7 +5868,7 @@ def Sim.missile.z.move(hit: Bool, sky: Bool, +th: H.Thing, +id: U32, +s: State) 
     case True{}:
       Sim.missile.z.hit(sky, id, s)
     case False{}:
-      Sim.thing.moved(H.Thing.risen(th), id, s)
+      Sim.thing.moved(H.Thing.zmove(th), id, s)
 
 def Sim.missile.z(+th: H.Thing, +id: U32, +s: State) -> State:
   H.Thing{tid, kind, x, y, +z, +floorz, +ceilz, angle, +sector, state, tics, +momz, +hurt} = th
@@ -5884,7 +5884,14 @@ def Sim.thing.vertical(missile: Bool, +th: H.Thing, +id: U32, +s: State) -> Stat
     case True{}:
       Sim.missile.z(th, id, s)
     case False{}:
-      Sim.thing.moved(H.Thing.risen(th), id, s)
+      Sim.thing.moved(H.Thing.zmove(th), id, s)
+
+def Sim.thing.vertical.if(moves: Bool, +th: H.Thing, +id: U32, +s: State) -> State:
+  match moves:
+    case True{}:
+      Sim.thing.vertical(H.Thing.flagged(th, 65536), th, id, s)
+    case False{}:
+      Sim.thing.moved(th, id, s)
 
 # The thing after its tic: one that entered S_NULL removed itself, as
 # P_SetMobjState does, and its thinker ends at its next turn.
@@ -5910,7 +5917,8 @@ def Sim.thing.stepped(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> State:
     case None{}:
       Sim.thing.after(id, s)
     case Some{+th}:
-      Sim.thing.after(id, Sim.thing.vertical(H.Thing.flagged(th, 65536), th, id, s))
+      Sim.thing.after(id, Sim.thing.vertical.if(Bool.or(Bool.not(U32.is_eq(H.Thing.z(th), H.Thing.floorz(th))),
+        Bool.not(U32.is_zero(H.Thing.momz(th)))), th, id, s))
 
 # Doom's P_MobjThinker for a thing: the horizontal move a blow gave it,
 # then the vertical, then its tic through its states, whose actions run
