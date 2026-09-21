@@ -899,7 +899,7 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n,
     Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n,
-      Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.of_list([], U32.from_nat(n)))))))
+      Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1))))))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
   match views:

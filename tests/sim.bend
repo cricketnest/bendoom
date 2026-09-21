@@ -822,6 +822,13 @@ def thing(m: Maybe<&2, H.Thing>) -> String:
         ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle) ++ " sector " ++ U32.show(sector)
         ++ " state " ++ U32.show(state) ++ " tics " ++ U32.show(tics) ++ described(H.Thing.def(kind))
 
+def ambush(m: Maybe<&2, H.Thing>) -> Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{th}:
+      H.Thing.ambush(th)
+
 def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
   match chosen:
     case []:
@@ -829,7 +836,7 @@ def things(chosen: List<&2, U32>, +s: S.State) -> IO(Unit):
     case +id <> rest:
       do IO<Unit>:
         IO.print(thing(H.Things.get(S.State.things(s), id)) ++ " ambush "
-          ++ Bool.show(H.Thing.ambush(S.State.level(s), id)))
+          ++ Bool.show(ambush(H.Things.get(S.State.things(s), id))))
         things(rest, s)
 
 # What the blockmap links hold: how many links, how many of solid

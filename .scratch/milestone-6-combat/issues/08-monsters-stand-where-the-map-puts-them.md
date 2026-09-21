@@ -34,7 +34,7 @@ What was built:
 
 - `src/things.bend` gains eight state rows, `S_POSS_STND` to `S_SARG_STND2`, each 10 tics and each leading to the other, and four definitions: 3004, 9 and 3001 at radius 20, height 56, and 3002 at radius 30, all with `MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL`, 4194310. Nothing else changed in the spawn: monsters spawned because they now have definitions.
 - The idle rows' action is `Null{}`, not a named `Look{}`. Vanilla's `A_Look` belongs there and the table's comment says so, but the only dispatch over `Thing.Action` today is the weapon sprite's, where a `Look{}` case could only be a branch that never runs. Ticket 15 adds the mobj dispatch and turns those eight `Null{}`s into `Look{}` in the same diff.
-- `Thing.ambush` is `P_SpawnMapThing`'s `MF_AMBUSH`: a map thing's id is its record's index, so the flag is read back from the record's options rather than stored on the thing, and a thing spawned in play, whose id is past the records, has none. That keeps this ticket out of ticket 03's `Thing` record.
+- `P_SpawnMapThing` copies options bit 8 into the thing's `MF_AMBUSH` flag. Ticket 21 keeps it in the live flags, because `A_FaceTarget` clears it.
 - The oracle's demo header carries 0 in the no-monsters byte (`src/demo.bend`, `tools/demo.nu`, `tests/demo.bend`), so Chocolate Doom now spawns the map's monsters in every oracle case, film and sound capture.
 
 The random index after spawn, from the replay, and what Bendoom prints:
