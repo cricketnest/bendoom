@@ -162,6 +162,10 @@ def Thing.sector(th: Thing) -> U32:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics, momz, hurt} = th
   sector
 
+def Thing.momz(th: Thing) -> U32:
+  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, +momz, hurt} = th
+  momz
+
 # The thing with some vertical momentum, which P_SpawnBlood gives.
 def Thing.rising(th: Thing, momz: U32) -> Thing:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, was, hurt} = th
@@ -209,6 +213,8 @@ type Thing.Action is Data:
   Face{}
   PosAttack{}
   SPosAttack{}
+  TroopAttack{}
+  SargAttack{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -330,7 +336,14 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"POSS", 4, False{}, 10, 185, Face{}, 0}, Row{"POSS", 5, False{}, 8, 186, PosAttack{}, 0},
     Row{"POSS", 4, False{}, 8, 89, Null{}, 0},
     Row{"SPOS", 4, False{}, 10, 188, Face{}, 0}, Row{"SPOS", 5, True{}, 10, 189, SPosAttack{}, 0},
-    Row{"SPOS", 4, False{}, 10, 97, Null{}, 0}]
+    Row{"SPOS", 4, False{}, 10, 97, Null{}, 0},
+    Row{"TROO", 4, False{}, 8, 191, Face{}, 0}, Row{"TROO", 5, False{}, 8, 192, Face{}, 0},
+    Row{"TROO", 6, False{}, 6, 105, TroopAttack{}, 0},
+    Row{"SARG", 4, False{}, 8, 194, Face{}, 0}, Row{"SARG", 5, False{}, 8, 195, Face{}, 0},
+    Row{"SARG", 6, False{}, 8, 113, SargAttack{}, 0},
+    Row{"BAL1", 0, True{}, 4, 197, Null{}, 0}, Row{"BAL1", 1, True{}, 4, 196, Null{}, 0},
+    Row{"BAL1", 2, True{}, 6, 199, Null{}, 0}, Row{"BAL1", 3, True{}, 6, 200, Null{}, 0},
+    Row{"BAL1", 4, True{}, 6, 4294967295, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -448,7 +461,7 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
     Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
     Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}, Def{4294967295, 85, 20, 16, 528},
-    Def{4294967294, 181, 20, 16, 16}]
+    Def{4294967294, 181, 20, 16, 16}, Def{4294967293, 196, 6, 8, 328208}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -460,6 +473,9 @@ def Thing.puff() -> U32:
 # bullet in flesh spawns it.
 def Thing.blood() -> U32:
   4294967294
+
+def Thing.fireball() -> U32:
+  4294967293
 
 def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
@@ -523,10 +539,11 @@ def Thing.attacksound(+kind: U32) -> U32:
 # demon's are ticket 18's: until it gives them their rows both answer 0
 # here, which is the guard that keeps their A_Chase from ever attacking.
 def Thing.melee(+kind: U32) -> U32:
-  0
+  Bool.pick(U32, U32.is_eq(kind, 3001), 190, Bool.pick(U32, U32.is_eq(kind, 3002), 193, 0))
 
 def Thing.missile(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187, 0))
+  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187,
+    Bool.pick(U32, U32.is_eq(kind, 3001), 190, 0)))
 
 # The rest of Doom's mobjinfo for the types a blow reaches, read by kind
 # for the same reason: the spawn health, the pain chance, the rows of
