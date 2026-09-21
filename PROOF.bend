@@ -488,6 +488,9 @@ def Laws.once_clears(line, s):
 def Laws.exit_ends(cmd):
   {==}
 
+def Laws.sound_coincident():
+  {==}
+
 def Laws.sound_places():
   {==}
 

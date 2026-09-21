@@ -40,8 +40,8 @@
 # read in the same uneven windows. The hash is over every frame of the
 # run and the frames named are the first, the last before the second
 # sound, the first two of the overlap and the last of the run. Those are
-# regression pins: the comparison of a mix with a recording of
-# Chocolate Doom is milestone 7's ticket 05's deferred box.
+# regression pins; ticket 05 records separate sample-for-sample
+# comparisons with Chocolate Doom, including its actual OPL output.
 import Base
 import ../src/fnv.bend as H
 import ../src/sound.bend as Sn

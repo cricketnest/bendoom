@@ -822,7 +822,7 @@ law exit_ends:
 
 # What a listener d units south of a source hears, facing an angle.
 def Closed.heard(d: U32, facing: U32) -> U32 & U32:
-  Sn.Sound.adjust(L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
+  Sn.Sound.adjust(True{}, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
     F.Fixed.neg(F.Fixed.of_map(d)), facing, 0, 0)
 
 # LAW: S_AdjustSoundParams, by hand from s_sound.c and tables.c. The
@@ -840,6 +840,14 @@ law sound_places:
     Closed.heard(1185, 1073741824), Closed.heard(1201, 1073741824))
     == ((51, 33), (51, 224), (51, 128), (64, 129), (63, 129), (1, 129), (0, 129), (0, 129))
     : (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32)}
+
+def Closed.coincident(starting: Bool) -> U32 & U32:
+  Sn.Sound.adjust(starting, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)),
+    0, 0, 1073741824, 0, 0)
+
+law sound_coincident:
+  {(Closed.coincident(True{}), Closed.coincident(False{})) == ((64, 128), (64, 224))
+    : (U32 & U32) & (U32 & U32)}
 
 # LAW: the manual door's sounds, where T_VerticalDoor and EV_VerticalDoor
 # start them: sfx_doropn, 20, on the tic of the use, nothing on the next,

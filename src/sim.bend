@@ -2309,10 +2309,10 @@ def Sim.sound.place(source: Sn.Sound.Source, +s: State) -> Sn.Sound.Source:
       other
 
 # The volume and separation the player hears a place at.
-def Sim.sound.params(place: Sn.Sound.Source, +level: L.Level, +p: Player) -> U32 & U32:
+def Sim.sound.params(starting: Bool, place: Sn.Sound.Source, +level: L.Level, +p: Player) -> U32 & U32:
   match place:
     case Sn.Spot{x, y}:
-      Sn.Sound.adjust(L.Level.sine(level), L.Level.tanto(level), Player.x(p), Player.y(p), Player.angle(p), x, y)
+      Sn.Sound.adjust(starting, L.Level.sine(level), L.Level.tanto(level), Player.x(p), Player.y(p), Player.angle(p), x, y)
     case _:
       (Sn.Sound.volume(), Sn.Sound.centre())
 
@@ -2327,11 +2327,11 @@ def Sim.sound.start(+sfx: U32, source: Sn.Sound.Source, params: U32 & U32, s: St
   (+vol, sep) = params
   Sim.sound.if(Bool.not(Bool.or(U32.is_zero(sfx), U32.is_zero(vol))), Sn.Start{sfx, source, vol, sep}, s)
 
-def Sim.sound.parameters(+s: State, source: Sn.Sound.Source) -> U32 & U32:
-  Sim.sound.params(Sim.sound.place(source, s), State.level(s), State.player(s))
+def Sim.sound.parameters(starting: Bool, +s: State, source: Sn.Sound.Source) -> U32 & U32:
+  Sim.sound.params(starting, Sim.sound.place(source, s), State.level(s), State.player(s))
 
 def Sim.sound.told(sfx: U32, +source: Sn.Sound.Source, +s: State) -> State:
-  Sim.sound.start(sfx, source, Sim.sound.parameters(s, source), s)
+  Sim.sound.start(sfx, source, Sim.sound.parameters(True{}, s, source), s)
 
 # Doom's S_StartSound: a source starts a sound, heard by the player where
 # the state has it. What the things were heard doing is reported first,

@@ -208,10 +208,11 @@ def Sound.sep(sine: V.Vec, +angle: U32, +facing: U32) -> U32:
 
 # Doom's S_AdjustSoundParams: the volume and separation a listener at
 # (lx, ly) facing an angle hears a source at (sx, sy) at. Volume 0 is
-# inaudible; a source at the listener's own place is centred.
-def Sound.adjust(sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx: U32, +sy: U32) -> U32 & U32:
+# inaudible. Only S_StartSound centres a coincident source; the per-tic
+# update uses the calculated separation even at that position.
+def Sound.adjust(starting: Bool, sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx: U32, +sy: U32) -> U32 & U32:
   (Sound.volume.at(F.Fixed.approx((lx - sx : U32), (ly - sy : U32))),
-    Bool.pick(U32, Bool.and(U32.is_eq(lx, sx), U32.is_eq(ly, sy)), Sound.centre(),
+    Bool.pick(U32, Bool.and(starting, Bool.and(U32.is_eq(lx, sx), U32.is_eq(ly, sy))), Sound.centre(),
       Sound.sep(sine, A.Angle.of(tanto, (sx - lx : U32), (sy - ly : U32)), facing)))
 
 # The priority of a sound, where less is more important. A sound with no
