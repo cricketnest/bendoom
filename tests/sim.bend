@@ -1502,11 +1502,61 @@ def fighting(+level: L.Level) -> IO(Unit):
     b7 : S.State <- fight("over", 40n, idle(), [24, 25, 26], b6)
     IO.print("-")
 
+def attack.target(+id: U32, +s: S.State) -> S.State:
+  S.Sim.thing.counted(id, H.Thing.hurt.target(), H.Things.you(S.State.things(s)), s)
+
+def attack.result(tag: String, +id: U32, +s: S.State) -> IO(S.State):
+  +inv = S.Player.inv(S.State.player(s))
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " health " ++ U32.show(I.Inventory.health(inv))
+      ++ " random " ++ U32.show(S.State.rnd(s)) ++ " " ++ thing(H.Things.get(S.State.things(s), id))
+      ++ spawned.all(292, S.State.things(s)))
+    return s
+
+def attack.missile.ticks(n: Nat, +id: U32, s: S.State) -> S.State:
+  match n:
+    case 0n:
+      s
+    case 1n+k:
+      attack.missile.ticks(k, id, S.Sim.thing(id, s))
+
+def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U32, +s: S.State) -> S.State:
+  S.Body{i, sx, sy, z, radius, height, flags} = source
+  +spawned = S.Sim.missile.spawn(S.Body{i, sx, sy, z, radius, height, flags},
+    S.Body{4294967294, F.Fixed.of_map(tx), F.Fixed.of_map(ty), z, radius, height, flags}, you, s)
+  +id = H.Things.count(S.State.things(s))
+  attack.missile.ticks(n, id,
+    S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
+
+def attack.missile(+level: L.Level, +x: U32, +y: U32, +tx: U32, +ty: U32, n: Nat) -> S.State:
+  +s = at(level, x, y, 0)
+  +you = H.Things.you(S.State.things(s))
+  attack.missile.from(S.Player.body(S.State.player(s), you), tx, ty, n, you, s)
+
+def attack.missile.result(tag: String, +s: S.State) -> IO(S.State):
+  do IO<S.State>:
+    IO.print(events(S.State.sounds(s), S.State.clock(s)) ++ tag ++ " random " ++ U32.show(S.State.rnd(s))
+      ++ spawned.all(292, S.State.things(s)))
+    return s
+
+def attacks(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    claw : S.State <- attack.result("imp claw", 81,
+      S.Sim.troopattack(81, attack.target(81, at(level, 848, 1000, 0))))
+    bite : S.State <- attack.result("demon bite", 3,
+      S.Sim.sargattack(3, attack.target(3, at(level, 2576, 2112, 0))))
+    ball : S.State <- attack.result("imp throw", 81,
+      S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
+    wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
+    sky : S.State <- attack.missile.result("fireball sky", attack.missile(level, 64896, 256, 64640, 256, 8n))
+    IO.print("-")
+
 def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
   do IO<Unit>:
     weapon(level)
     firing(level)
     fighting(level)
+    attacks(level)
     pickups(level)
     damaged(level)
     faces.cases(level)
@@ -1904,6 +1954,17 @@ def main() -> IO(Unit):
 #|sound tic 126 DSBGACT from thing 85 vol 5 sep 33
 #|sound tic 132 DSBGACT from thing 82 vol 64 sep 128
 #|over tic 134 at 990.940673 775.486297 health 44 armour 72/1 rnd 105 gone gone gone
+#|-
+#|sound tic 0 DSCLAW from thing 81 vol 64 sep 33
+#|imp claw health 85 random 61 thing 81 type 3001 at 848.000000 1056.000000 z -128.000000 angle 270.000 sector 56 state 65 tics 8 radius 20 height 56 flags 4194310
+#|demon bite health 88 random 61 thing 3 type 3002 at 2576.000000 2112.000000 z 192.000000 angle 0.000 sector 5 state 67 tics 1 radius 30 height 56 flags 4194310
+#|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 33
+#|imp throw health 100 random 61 thing 81 type 3001 at 848.000000 1056.000000 z -128.000000 angle 270.000 sector 56 state 65 tics 8 radius 20 height 56 flags 4194310 mobj 292 type -3 at 848.001907 1051.000076 -96.000000 state 196/2
+#|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
+#|sound tic 0 DSFIRXPL from thing 292 vol 64 sep 129
+#|fireball wall random 62 mobj 292 type -3 at 748.999313 256.017166 -96.000000 state 199/6
+#|sound tic 0 DSFIRSHT from thing 292 vol 64 sep 128
+#|fireball sky random 61
 #|-
 #|sound tic 6 DSPOSIT3 from thing 240 vol 55 sep 148
 #|sound tic 8 DSBGSIT1 from thing 81 vol 62 sep 159
