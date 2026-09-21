@@ -847,14 +847,6 @@ def Sim.met.go(ids: List<&2, U32>, +things: H.Things, +p: Player, +m: Sim.Body) 
     case +id <> rest:
       Sim.met.if(Sim.stops.at(things, p, m, id), id, Sim.met.go(rest, things, p, m))
 
-def Sim.met.missile.go(ids: List<&2, U32>, +source: U32, +things: H.Things, +p: Player, +m: Sim.Body) -> Sim.Met:
-  match ids:
-    case []:
-      Met{[], None{}}
-    case +id <> rest:
-      Sim.met.if(Bool.and(Bool.not(U32.is_eq(id, source)), Sim.stops.at(things, p, m, id)), id,
-        Sim.met.missile.go(rest, source, things, p, m))
-
 # The mobjs near a mobj's box.
 def Sim.nearby(+level: L.Level, things: H.Things, m: Sim.Body) -> List<&2, U32>:
   Body{id, x, y, z, radius, height, flags} = m
@@ -867,7 +859,7 @@ def Sim.met(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body) -> Sim.
 def Sim.met.missile(+level: L.Level, +things: H.Things, p: Player, +m: Sim.Body, +source: U32) -> Sim.Met:
   Body{+id, +x, +y, +z, +radius, +height, +flags} = m
   +ids = Sim.near(level, things, x, y, radius)
-  Sim.met.missile.go(ids, source, things, p, Body{id, x, y, z, radius, height, flags})
+  Sim.met.go(H.Things.without(ids, source), things, p, Body{id, x, y, z, radius, height, flags})
 
 def Sim.Met.hit(t: Sim.Met) -> Maybe<&2, U32>:
   Met{before, hit} = t
@@ -5367,9 +5359,8 @@ def Sim.chase.on(+id: U32, +s: State) -> Sim.Acted:
 # and its range let it, and otherwise walks, picking a new direction when
 # its count runs out or its move is blocked, and calling out on a draw
 # under 3. The netgame branch that looks for a nearer player is left
-# out with the other players. Ticket 18 adds the melee branch, between
-# the just-attacked test and the missile one, when it gives the imp and
-# the demon the rows H.Thing.melee answers 0 for here.
+# out with the other players. The melee branch sits between the
+# just-attacked test and the missile one.
 def Sim.chase(+id: U32, +s: State) -> Sim.Acted:
   Sim.chase.on(id, Sim.chase.tick(id, s))
 
