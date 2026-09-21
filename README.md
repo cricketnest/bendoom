@@ -20,7 +20,9 @@ If flakes aren't enabled on your system, put this after `nix`:
 
     --extra-experimental-features 'nix-command flakes'
 
-It runs on x86_64 Linux. aarch64 Linux and macOS are untested.
+Builds are available for x86_64 Linux, aarch64 Linux and Apple Silicon
+macOS. CI checks all three; gameplay and audio on macOS still need a
+hardware test.
 
 Without Nix, download and run the portable release:
 
