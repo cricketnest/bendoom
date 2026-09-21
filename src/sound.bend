@@ -48,12 +48,6 @@ def Sound.swtchn() -> U32:
 def Sound.plpain() -> U32:
   25
 
-def Sound.dmpain() -> U32:
-  26
-
-def Sound.popain() -> U32:
-  27
-
 def Sound.slop() -> U32:
   31
 
@@ -90,9 +84,6 @@ def Sound.podth1() -> U32:
 
 def Sound.bgdth1() -> U32:
   62
-
-def Sound.sgtdth() -> U32:
-  64
 
 def Sound.barexp() -> U32:
   82

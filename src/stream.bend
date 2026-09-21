@@ -203,12 +203,12 @@ def Stream.window(+want: U32, tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Chan
   IO.bind(Maybe<Stream.Tape> & List<&2, U32>, Maybe<Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
     Stream.song(want, tape), p => Stream.window.mixed(chans, p))
 
-# The frames the device holds between top-ups, of the ring's 4096: 46.4
-# ms at 44100 Hz, so a game frame longer than that lets the ring run
-# dry. The window bench found no such frame at 55 frames a second, and
-# the delay a sound waits is that much against Chocolate Doom's 23.2.
+# The frames the device holds between top-ups, of the ring's 4096: 52.2
+# ms at 44100 Hz, against Chocolate Doom's 1024 frames and 23.2 ms.
+# The fight bench found 2048 dry on its cold run, 1536 intermittently
+# dry and 1024 routinely dry.
 def Stream.top() -> U32:
-  2048
+  2304
 
 def Stream.wrote(tape: Maybe<Stream.Tape>, chans: List<Maybe<C.Channel>>, dir: String, dry: U32,
   p: Audio & U32) -> IO(Stream):

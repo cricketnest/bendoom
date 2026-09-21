@@ -8,7 +8,7 @@
 
 - [x] The state holds one tic's sounds, and the loop replays a frame's tics in one call, so the loop gathers each tic's sounds as it runs them and passes over an ended level, whose state keeps its last live tic's sounds (ticket 01's note)
 - [ ] Doors, the lift, switches, pickups, the use grunt and the exit are heard in the window on both packages
-- [ ] The ticket measures the lowest queue level with no dry frame at 35 frames a second on the dev machine, sets it there, and records the level, the delay it gives against Chocolate Doom's 1024 frames, and the measurement
+- [x] The ticket measures the lowest queue level with no dry frame at 35 frames a second on the dev machine, sets it there, and records the level, the delay it gives against Chocolate Doom's 1024 frames, and the measurement
 - [x] With no sound device the game prints one line and plays silent; with no sounds directory it prints one line and plays the music alone
 - [x] The window bench runs a script that keeps several channels busy over the music and reports frames a second and dry frames
 - [x] The game test still runs with no device
@@ -16,7 +16,6 @@
 ## Deferred to the later pass
 
 - Listening to both packages in the window. A manual listening test is still pending.
-- The search for the lowest queue level. 3072 was tried against 2048, 2048 held with no dry frame, and it is set there. Whether 1536 or 1024 holds is unmeasured, and so is the same measurement with milestone 6's monsters in the frame.
 - The film's sounds, which are ticket 08.
 
 ## Comments
@@ -31,7 +30,14 @@
 
 ### The queue level and the delay
 
-`Stream.top` is 2048 frames, 46.4 ms at 44100 Hz, against Chocolate Doom's 1024 frames of 23.2 ms. A sound waits from the tic that started it until the next write, and the write is at most that far ahead of the device.
+`Stream.top` is 2304 frames, 52.2 ms at 44100 Hz, against Chocolate Doom's 1024 frames of 23.2 ms. A sound waits from the tic that started it until the next write, and the write is at most that far ahead of the device.
+
+The closing bench used the first-fight route for its first 420 tics, then
+rendered 600 frames at the position `(2037, -461)`, facing 90 degrees,
+with health 85 and the monsters awake. Music and effects went through a
+PipeWire null sink at the real 44100 Hz device rate; its monitor showed
+audio while no hardware output was linked. The machine was an x86_64 benchmark host on AC power with the balanced profile and
+`balance_performance` energy preference.
 
 The window bench, built from `bench/window.bend` and run on an Xvfb screen so that no window opened on the desktop, with the door script from the bench's own header (walk to the first door, use it, watch it open, wait and close):
 
@@ -41,8 +47,20 @@ The window bench, built from `bench/window.bend` and run on an Xvfb screen so th
 | 2048 | door script | 58 | 1 |
 | 2048 | door script again | 58 | 1 |
 | 2048 | WALK=1, no script | 55 | 1 |
+| 1024 | first fight, run 1 | 53 | 156 |
+| 1024 | first fight, run 2 | 53 | 158 |
+| 1536 | first fight, runs 1–3 | 53 | 1, 1, 4 |
+| 2048 | first fight, warm runs 1–4 | 52–55 | 1 each |
+| 2304 | first fight, runs 1–3 | 53–54 | 1 each |
 
-The one dry frame is the first of every run, where nothing has been written yet. So 2048 holds with room to spare at 55 to 58 frames a second, well past the 35 the target asks for, and it is set there. The bench ran on Xvfb, which renders in software, so the real desktop is no slower than this.
+The one dry frame is the first of a passing run, where nothing has been
+written yet. A cold first activation at 2048 reported three dry frames;
+the four warm repeats each reported only the initial one. At 1536 one of
+three runs dried three additional times, while 1024 dried throughout.
+All three 2304 runs, including the first execution of its new binary,
+reported only the initial empty check. Thus 2304 is the lowest measured
+level that also holds cold. Its 53–54 FPS range remains well above the
+35 FPS target under Xvfb software rendering.
 
 The sounds the door script keeps busy are the door's own, from its sector: DSDOROPN at the use and DSDORCLS when the wait runs out, one channel at a time with the song under them. E1M1 near the start has no place where eight play at once; a script that fills the table would want milestone 6's monsters.
 

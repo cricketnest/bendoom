@@ -95,16 +95,6 @@ def Thing.target(th: Thing) -> U32:
 def Thing.threshold(th: Thing) -> U32:
   V.Vec.get(Thing.hurt(th), Thing.hurt.threshold())
 
-# Doom's mobj->movedir, one of the eight directions A_Chase walks, or
-# DI_NODIR where it can walk none.
-def Thing.movedir(th: Thing) -> U32:
-  V.Vec.get(Thing.hurt(th), Thing.hurt.movedir())
-
-# Doom's mobj->movecount, signed: the tics left before A_Chase picks
-# another direction.
-def Thing.movecount(th: Thing) -> U32:
-  V.Vec.get(Thing.hurt(th), Thing.hurt.movecount())
-
 # One of the counts written back.
 def Thing.counted(+th: Thing, +slot: U32, value: U32) -> Thing:
   Thing.hurting(th, V.Vec.set(Thing.hurt(th), slot, value))
@@ -166,10 +156,6 @@ def Thing.angle(th: Thing) -> U32:
 def Thing.sector(th: Thing) -> U32:
   Thing{id, kind, x, y, z, floorz, ceilz, angle, +sector, state, tics, momz, hurt} = th
   sector
-
-def Thing.momz(th: Thing) -> U32:
-  Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, +momz, hurt} = th
-  momz
 
 # The thing with some vertical momentum, which P_SpawnBlood gives.
 def Thing.rising(th: Thing, momz: U32) -> Thing:

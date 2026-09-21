@@ -182,10 +182,6 @@ def Player.floorz(+p: Player) -> U32:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   floorz
 
-def Player.ceilz(+p: Player) -> U32:
-  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
-  ceilz
-
 def Player.crossed(+p: Player) -> List<&2, U32>:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   crossed
@@ -776,10 +772,6 @@ def Sim.near(+level: L.Level, things: H.Things, +x: U32, +y: U32, +r: U32) -> Li
 # ledges and to pick things up.
 def Player.body(+p: Player, id: U32) -> Sim.Body:
   Body{id, Player.x(p), Player.y(p), Player.z(p), Sim.radius(), Sim.height(), 33557510}
-
-def Sim.body.def(d: H.Thing.Def, id: U32, x: U32, y: U32, z: U32) -> Sim.Body:
-  H.Def{kind, state, radius, height, flags} = d
-  Body{id, x, y, z, F.Fixed.of_map(radius), F.Fixed.of_map(height), flags}
 
 # A thing's live body, including the dimensions a crushed corpse loses.
 def Sim.body.of(th: H.Thing) -> Sim.Body:
@@ -2984,10 +2976,6 @@ def Sim.Aim.found(a: Sim.Aim) -> Bool:
   Aim{things, player, shooter, shootz, range, top, bottom, slope, target} = a
   Bool.not(Maybe.is_none(&2, U32, target))
 
-def Sim.Aim.target(a: Sim.Aim) -> Maybe<&2, U32>:
-  Aim{things, player, shooter, shootz, range, top, bottom, slope, target} = a
-  target
-
 # What P_AimLineAttack answers: the slope at what it aimed at, and level
 # where it found nothing.
 def Sim.Aim.slope(a: Sim.Aim) -> U32:
@@ -3686,11 +3674,6 @@ def Sim.psprites.both(ps: Psprites, +cmd: K.Cmd, +winfo: H.Thing.Weapon, s: Stat
 # weapon left it in.
 def Sim.psprites(+cmd: K.Cmd, +s: State) -> State:
   Sim.psprites.both(Player.psprites(State.player(s)), cmd, Player.ready(State.player(s)), s)
-
-# The weapon put away, the flash as it was.
-def Sim.psprites.lowered(flash: Psprite, e: Sim.Entering) -> State:
-  Entering{next, sets, psp, s} = e
-  State.showing(Psprites{psp, flash}, s)
 
 def Sim.psprites.raised(e: Sim.Entering) -> State:
   Entering{next, sets, psp, s} = e
