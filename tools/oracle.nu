@@ -189,7 +189,8 @@ def main [
   let shot = vanilla ($bytes | placed $x $y $angle $things) $name ($runs | append $tail | demo) $tics $told $dir
   let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame } | lines
   let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let masked = if $tally { anim-boxes $bytes } else { ($told | get at) ++ (face-box $bytes) }
+  let face = face-box $bytes
+  let masked = if $tally { anim-boxes $bytes } else { ($told | get at) ++ $face }
   let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
   let differing = $off | where $it not-in $masked
   let playpal = $bytes | lumps | where name == "PLAYPAL" | last | get pos
@@ -198,7 +199,7 @@ def main [
     place: $"($x) ($y) ($angle)"
     script: $script
     differing: ($differing | length)
-    face: ($off | where $it in (face-box $bytes) | length)
+    face: ($off | where $it in $face | length)
     masked: ($masked | uniq | where $it < 200 * 320 | length)
     palette: ($"0x($dump | first)" | into int)
     shot_plain: ($shot.palette == ($bytes | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
