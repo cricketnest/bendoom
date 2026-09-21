@@ -269,6 +269,7 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("bright of fireball states 196 and 198 " ++ U32.show(G.Gfx.sprite(gfx, 196, 0, 5)) ++ " "
       ++ U32.show(G.Gfx.sprite(gfx, 198, 0, 5)))
+    IO.print("zombie firing bright " ++ U32.show(G.Gfx.sprite(gfx, 185, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
     IO.print("sector 98 blocks " ++ blocks(L.Level.blockbox(level, 98)))
     IO.print(texture(gfx, "COMPUTE1", G.Gfx.mid(gfx, 1386)))
@@ -332,6 +333,7 @@ def main() -> IO(Unit):
 #|sprite of state 198 width 34.000000 offset 17.000000 top 21.000000
 #|bright of states 3 and 7 0 1
 #|bright of fireball states 196 and 198 1 1
+#|zombie firing bright 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7
 #|texture COMPUTE1 128x128.000000 patches 10 mask 127

@@ -1343,12 +1343,62 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
       Anims{Gfx.anim.of(frames, 0, Gfx.Names.next(fl)), Gfx.anim.of([], 1, 0), 0}, bar, font}, dir, a, pnames,
       texture1)
 
+# Freedoom's DEHACKED changes S_POSS_ATK2 to full-bright. It is the
+# only patched firing frame reachable in these E1M1s; shareware keeps
+# info.c's frame 5 without that bit. Read the lump rather than changing
+# the common state table or identifying the WAD by its filename.
+def Gfx.deh.value(fields: List<&2, String>, selected: Bool, +old: U32) -> U32:
+  match fields selected:
+    case key <> value <> Nil{} True{}:
+      Bool.pick(U32, String.eq(String.trim(key), "sprite subnumber"),
+        Maybe.default(&2, U32, U32.read(String.trim(value)), old), old)
+    case _ _:
+      old
+
+def Gfx.deh.selected(+line: String, selected: Bool) -> Bool:
+  Bool.pick(Bool, String.starts_with(line, "frame "), String.eq(line, "frame 185"), selected)
+
+def Gfx.deh.lines(lines: List<&2, String>, +selected: Bool, old: U32) -> U32:
+  match lines:
+    case []:
+      ((old >> 15n : U32) .&. 1 : U32)
+    case line <> rest:
+      +text = String.to_lower(String.trim(line))
+      Gfx.deh.lines(rest, Gfx.deh.selected(text, selected),
+        Gfx.deh.value(String.split(text, '='), selected, old))
+
+def Gfx.deh.views(n: Nat, +rot: U32, +bright: U32, table: V.Vec) -> V.Vec:
+  match n:
+    case 0n:
+      table
+    case 1n+k:
+      Gfx.deh.views(k, (rot + 1 : U32), bright,
+        V.Vec.set(table, ((185 * 8 + rot) * 6 + 5 : U32), bright))
+
+def Gfx.deh.loaded(bright: U32, p: Array<U32> & Gfx & L.Level) -> Array<U32> & Gfx & L.Level:
+  (a, gfx, level) = p
+  Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, bar, font} = gfx
+  (a, Gfx{flats, pics, sky, texs, cols, sidetex, skytex, Gfx.deh.views(8n, 0, bright, sprites), anims, bar,
+    font}, level)
+
+def Gfx.deh.read(+lumps: List<&2, W.Wad.Lump>, p: Array<U32> & String) ->
+  Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
+  (a, text) = p
+  +bright = Gfx.deh.lines(String.lines(text), False{}, 5)
+  Result.map(&1, &1, U32 & String, Array<U32> & Gfx & L.Level, Array<U32> & Gfx & L.Level,
+    loaded => Gfx.deh.loaded(bright, loaded), Gfx.load.go(lumps, L.Level.load((a, lumps))))
+
+def Gfx.deh.at(+lumps: List<&2, W.Wad.Lump>, a: Array<U32>, span: U32 & U32) ->
+  Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
+  (pos, size) = span
+  Gfx.deh.read(lumps, B.Bytes.text(a, pos, U32.to_nat(size)))
+
 # The level and its graphics from the WAD's bytes and directory, or
 # Doom's error for a name the WAD lacks. The WAD's bytes are dropped.
 def Gfx.load(p: Array<U32> & List<&2, W.Wad.Lump>) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, +lumps) = p
-  Gfx.load.go(lumps, L.Level.load((a, lumps)))
+  Gfx.deh.at(lumps, a, W.Wad.find(lumps, "DEHACKED"))
 
 # The level and its graphics from the WAD BENDOOM_IWAD names; a WAD that
 # cannot be read, or a name it lacks, ends the program with the error.
