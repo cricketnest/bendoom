@@ -70,19 +70,9 @@
 # but the dead one holds: its frame's face pixels are STFDEAD0's, all
 # 591 of them, and the rested start's are STFST00's, all 578, each read
 # from the WAD with tools/oracle.nu's patch-pixels.
-# tools/oracle.nu finds no pixel off vanilla's in the frames it can
-# compare, over all 200 rows. It cannot compare a frame whose script
-# lets a monster see the player: both games now wake it on the same
-# tic, but vanilla's A_Chase runs the moment it does, turning the
-# monster, stepping it and drawing a random number, and Bendoom's chase
-# waits for milestone 6's ticket 16. So the two runs east past the pit,
-# the blinking wall, the two of the blue key in its dim and bright
-# states, the two of the key strafed past, the two of the green armour
-# and the chainsaw taken, and the dead view in the nukage, which stands
-# 650 tics in the yard's sight, are regression pins until then, and so
-# are the exit, which vanilla never stands in (milestone 4's ticket 09 compares
-# it another way), and the two refused frames, whose full inventory
-# vanilla's demo cannot reach.
+# Remaining combat fidelity gaps are recorded in milestone 6's tickets.
+# The exit and full-inventory fixtures are regression pins where a
+# vanilla demo cannot reach the same state.
 # The pickup frames show their pickup: the key is 44 pixels of the first
 # key frame and would be 347 of the second, a bonus never
 # taken would be 1465 of the second bonus frame, the green armour is 745

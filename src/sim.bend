@@ -14,6 +14,7 @@ import ./vec.bend as V
 import ./fixed.bend as F
 import ./angle.bend as A
 import ./level.bend as L
+import ./noise.bend as N
 import ./keys.bend as K
 import ./random.bend as M
 import ./things.bend as H
@@ -777,12 +778,10 @@ def Sim.body.def(d: H.Thing.Def, id: U32, x: U32, y: U32, z: U32) -> Sim.Body:
   H.Def{kind, state, radius, height, flags} = d
   Body{id, x, y, z, F.Fixed.of_map(radius), F.Fixed.of_map(height), flags}
 
-# A thing's mobj: its radius is its type's, and its height and flags are
-# its own, since a death quarters the one and clears bits of the other,
-# which is how a corpse stops being solid and shootable.
+# A thing's live body, including the dimensions a crushed corpse loses.
 def Sim.body.of(th: H.Thing) -> Sim.Body:
   H.Thing{+id, +kind, +x, +y, +z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = th
-  Body{id, x, y, z, H.Thing.Def.radius(H.Thing.info(kind)), V.Vec.get(hurt, H.Thing.hurt.height()),
+  Body{id, x, y, z, V.Vec.get(hurt, H.Thing.hurt.radius()), V.Vec.get(hurt, H.Thing.hurt.height()),
     V.Vec.get(hurt, H.Thing.hurt.flags())}
 
 # The mobj with its centre at another place.
@@ -943,13 +942,13 @@ def Sim.touch.took(granted: Maybe<&2, I.Inventory>, counted: Bool, inv: I.Invent
       (I.Inventory.took(counted, got), H.Things.sounded(H.Things.removed(things, bm, th),
         Sn.Sound.plain(I.Inventory.sound(kind), Sn.Nobody{})))
 
-def Sim.touch.offer(reached: Bool, +kind: U32, counted: Bool, +inv: I.Inventory, bm: L.Level.Blockmap, th: H.Thing,
+def Sim.touch.offer(reached: Bool, +kind: U32, counted: Bool, +inv: I.Inventory, bm: L.Level.Blockmap, +th: H.Thing,
   things: H.Things) -> I.Inventory & H.Things:
   match reached:
     case False{}:
       (inv, things)
     case True{}:
-      Sim.touch.took(I.Inventory.grant(kind, inv), counted, inv, kind, bm, th, things)
+      Sim.touch.took(I.Inventory.grant(kind, H.Thing.flagged(th, 131072), inv), counted, inv, kind, bm, th, things)
 
 # Doom's PIT_CheckThing and P_TouchSpecialThing for the player's box at
 # (x, y) with its feet at z: a special thing the box overlaps, its
@@ -2153,6 +2152,11 @@ def State.level(s: State) -> L.Level:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   level
 
+def Sim.alert(s: State) -> State:
+  State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
+  State{player, N.Noise.alert(level, L.Level.sector_at(level, Player.x(player), Player.y(player))),
+    things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn}
+
 def State.things(s: State) -> H.Things:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = s
   things
@@ -2674,7 +2678,7 @@ def Sim.kill.thing.cut(m: Maybe<&2, H.Thing>, +target: U32, +drawn: U32, s: Stat
     case Some{+th}:
       State.thing.put(target, H.Thing.ticking(th, F.Fixed.max(1, (H.Thing.tics(th) - (drawn .&. 3 : U32) : U32))), s)
 
-# P_KillMobj's last line: the death state loses a random 0 to 3 of its
+# The death state loses a random 0 to 3 of its
 # tics, never falling under one.
 def Sim.kill.thing.tics(+target: U32, +s: State) -> State:
   +after = Sim.drawn(s)
@@ -2683,8 +2687,7 @@ def Sim.kill.thing.tics(+target: U32, +s: State) -> State:
 # Doom's P_KillMobj for anything but the player: the flags a death
 # clears and sets, the quartered height, the death state, and the gib
 # death where the blow went past the type's spawn health and the type
-# has one. The kill count is the intermission's and the dropped item is
-# its own ticket's.
+# has one.
 def Sim.kill.thing.state(gibs: Bool, +target: U32, th: H.Thing, +kind: U32, s: State) -> State:
   match gibs:
     case True{}:
@@ -2692,15 +2695,30 @@ def Sim.kill.thing.state(gibs: Bool, +target: U32, th: H.Thing, +kind: U32, s: S
     case False{}:
       Sim.damage.enter(target, th, H.Thing.deathstate(kind), s)
 
+def Sim.loot.spawn(d: H.Thing.Def, x: U32, y: U32, s: State) -> State:
+  H.Def{kind, state, radius, height, flags} = d
+  Sim.spawn(H.Def{kind, state, radius, height, (flags .|. 131072 : U32)}, x, y, H.Thing.onfloor(), s)
+
+# P_KillMobj drops the human's item after shortening its death state.
+def Sim.loot(kind: U32, x: U32, y: U32, s: State) -> State:
+  match kind:
+    case 3004:
+      Sim.loot.spawn(H.Thing.info(2007), x, y, s)
+    case 9:
+      Sim.loot.spawn(H.Thing.info(2001), x, y, s)
+    case _:
+      s
+
 def Sim.kill.thing.at(m: Maybe<&2, H.Thing>, +target: U32, s: State) -> State:
   match m:
     case None{}:
       s
     case Some{+th}:
       +kind = H.Thing.kind(th)
-      Sim.kill.thing.tics(target, Sim.kill.thing.state(Bool.and(F.Fixed.lt(H.Thing.health(th),
+      Sim.loot(kind, H.Thing.x(th), H.Thing.y(th), Sim.kill.thing.tics(target,
+        Sim.kill.thing.state(Bool.and(F.Fixed.lt(H.Thing.health(th),
           F.Fixed.neg(H.Thing.spawnhealth(kind))), Bool.not(U32.is_eq(H.Thing.xdeathstate(kind), H.Thing.null()))),
-        target, Sim.kill.thing.dead(th), kind, s))
+        target, Sim.kill.thing.dead(th), kind, s)))
 
 def Sim.kill.thing(+target: U32, +s: State) -> State:
   Sim.kill.thing.at(State.thing(target, s), target, s)
@@ -2710,7 +2728,9 @@ def Sim.pain.flinch(flinches: Bool, +target: U32, +th: H.Thing, +s: State) -> St
     case False{}:
       State.thing.put(target, th, s)
     case True{}:
-      Sim.damage.enter(target, th, H.Thing.painstate(H.Thing.kind(th)), s)
+      Sim.damage.enter(target,
+        H.Thing.hurting(th, V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.flags(), (H.Thing.flags(th) .|. 64 : U32))),
+        H.Thing.painstate(H.Thing.kind(th)), s)
 
 # Doom's BASETHRESHOLD, the tics a thing stays on the target it turned
 # to.
@@ -3414,9 +3434,7 @@ def Sim.fire.shot(+s: State) -> State:
 
 # Doom's A_FirePistol: the shot is heard, a bullet is spent, the muzzle
 # flash is set, and the bullet flies where the autoaim points, straight
-# on the first shot of a press and spread on the rest. P_SetMobjState on
-# the player's own mobj has no reader, since single player never draws
-# it, and P_NoiseAlert has nothing to wake yet.
+# on the first shot of a press and spread on the rest.
 def Sim.fire.pistol(psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
   Entering{None{}, Some{flash}, psp,
@@ -3541,11 +3559,20 @@ def Sim.psprite.gone(null: Bool, state: U32, had: Maybe<&2, U32>, psp: Psprite, 
 # Doom's P_SetPsprite: states are entered in turn while an action sets
 # one or the state entered lasts no tics. No chain of vanilla's is
 # longer than three.
+def Sim.psprite.alert(fired: Bool, e: Sim.Entering) -> Sim.Entering:
+  match fired:
+    case False{}:
+      e
+    case True{}:
+      Entering{next, sets, psp, s} = e
+      Entering{next, sets, psp, Sim.alert(s)}
+
 def Sim.psprite.set(fuel: Nat, st: Sim.Entering, +cmd: K.Cmd, +weapon: H.Thing.Weapon) -> Sim.Entering:
   match fuel st:
     case 1n+f Entering{Some{+state}, sets, psp, s}:
-      Sim.psprite.set(f, Sim.psprite.gone(U32.is_eq(state, H.Thing.null()), state, sets, psp, cmd, weapon, s),
-        cmd, weapon)
+      Sim.psprite.alert(U32.is_eq(state, H.Thing.Weapon.atk(weapon)),
+        Sim.psprite.set(f, Sim.psprite.gone(U32.is_eq(state, H.Thing.null()), state, sets, psp, cmd, weapon, s),
+          cmd, weapon))
     case _ Entering{next, sets, psp, s}:
       Entering{next, sets, psp, s}
 
@@ -3679,25 +3706,40 @@ def Sim.reclip(+level: L.Level, +things: H.Things, +p: Player) -> Sim.Try:
   Sim.reclip.met(level, things, p, Player.body(p, H.Things.you(things)),
     Sim.met(level, things, p, Player.body(p, H.Things.you(things))))
 
-# A thing clipped again, and whether the mover may go on: a thing that
-# no longer fits stops it only when it is shootable, as vanilla's
-# PIT_ChangeSector passes over anything else. No map thing is dead or
-# dropped, and no E1M1 mover crushes, so nothing is gibbed, removed or
-# hurt.
+# P_ThingHeightClip updates the bounds and z even when the thing fails
+# to fit; PIT_ChangeSector decides what that failure means.
 def Sim.reclip.fin(th: H.Thing, m: Sim.Body, f: Sim.Fit) -> Bool & H.Thing:
   H.Thing{id, kind, x, y, +z, +floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
   Body{i, mx, my, mz, radius, +height, flags} = m
   Fit{ok, +floor, +ceil, drop} = f
-  (Bool.or(Sim.fits(floor, ceil, height), U32.is_zero((flags .&. 4 : U32))),
+  (Sim.fits(floor, ceil, height),
     H.Thing{id, kind, x, y, Sim.clip(z, floorz, floor, ceil, height), floor, ceil, angle, sector, state, tics,
       momz, hurt})
 
 def Sim.reclip.thing(+level: L.Level, things: H.Things, p: Player, +th: H.Thing) -> Bool & H.Thing:
   Sim.reclip.fin(th, Sim.body.of(th), Sim.check(level, things, p, Sim.body.of(th), 3))
 
-def Sim.change.put(+id: U32, ok: Bool, p: Player, things: H.Things, r: Bool & H.Thing) -> Sim.Try:
-  (fits, th) = r
-  Try{Bool.and(ok, fits), p, H.Things.put(things, id, Some{th})}
+def Sim.change.gib(+th: H.Thing) -> H.Thing:
+  H.Thing.entering(H.Thing.hurting(th,
+    V.Vec.set(V.Vec.set(V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.height(), 0), H.Thing.hurt.radius(), 0),
+      H.Thing.hurt.flags(), (H.Thing.flags(th) .&. U32.not(2) : U32))), 50)
+
+def Sim.change.fit(fits: Bool, dead: Bool, dropped: Bool, +id: U32, bm: L.Level.Blockmap, ok: Bool,
+  p: Player, things: H.Things, +th: H.Thing) -> Sim.Try:
+  match fits dead dropped:
+    case True{} _ _:
+      Try{ok, p, H.Things.put(things, id, Some{th})}
+    case False{} True{} _:
+      Try{ok, p, H.Things.put(things, id, Some{Sim.change.gib(th)})}
+    case False{} False{} True{}:
+      Try{ok, p, H.Things.removed(things, bm, th)}
+    case False{} False{} False{}:
+      Try{Bool.and(ok, Bool.not(H.Thing.flagged(th, 4))), p, H.Things.put(things, id, Some{th})}
+
+def Sim.change.put(+id: U32, bm: L.Level.Blockmap, ok: Bool, p: Player, things: H.Things,
+  r: Bool & H.Thing) -> Sim.Try:
+  (fits, +th) = r
+  Sim.change.fit(fits, F.Fixed.le(H.Thing.health(th), 0), H.Thing.flagged(th, 131072), id, bm, ok, p, things, th)
 
 def Sim.change.thing(m: Maybe<&2, H.Thing>, +id: U32, +level: L.Level, ok: Bool, +p: Player, +things: H.Things) ->
   Sim.Try:
@@ -3705,7 +3747,7 @@ def Sim.change.thing(m: Maybe<&2, H.Thing>, +id: U32, +level: L.Level, ok: Bool,
     case None{}:
       Try{ok, p, things}
     case Some{th}:
-      Sim.change.put(id, ok, p, things, Sim.reclip.thing(level, things, p, th))
+      Sim.change.put(id, L.Level.blockmap_of(level), ok, p, things, Sim.reclip.thing(level, things, p, th))
 
 def Sim.change.player(ok: Bool, t: Sim.Try) -> Sim.Try:
   Try{fits, p, things} = t
@@ -3924,19 +3966,35 @@ def Sim.look.thing(+th: H.Thing, +id: U32, +s: State) -> Sim.Acted:
   Sim.look.at(Sim.look.sees(H.Thing.blind(th), False{}, State.level(s), State.player(s), Sim.body.of(looked),
     H.Thing.angle(th)), H.Thing.kind(th), id, State.thing.put(id, looked, s))
 
-def Sim.look.some(m: Maybe<&2, H.Thing>, +id: U32, s: State) -> Sim.Acted:
+def Sim.look.listened(seen: Bool, +th: H.Thing, +id: U32, s: State) -> Sim.Acted:
+  match seen:
+    case True{}:
+      Sim.look.at(True{}, H.Thing.kind(th), id, s)
+    case False{}:
+      Sim.look.thing(th, id, s)
+
+def Sim.look.heard(heard: Bool, +th: H.Thing, +id: U32, +s: State) -> Sim.Acted:
+  match heard:
+    case False{}:
+      Sim.look.thing(th, id, s)
+    case True{}:
+      +listening = H.Thing.hurting(th,
+        V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.target(), H.Things.you(State.things(s))))
+      Sim.look.listened(Bool.or(Bool.not(H.Thing.ambush(th)),
+        Sim.sight(State.level(s), Sim.body.of(th), Player.body(State.player(s), H.Thing.you()))),
+        listening, id, State.thing.put(id, listening, s))
+
+def Sim.look.some(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> Sim.Acted:
   match m:
     case None{}:
       Acted{None{}, s}
-    case Some{th}:
-      Sim.look.thing(th, id, s)
+    case Some{+th}:
+      +cleared = H.Thing.hurting(th, V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.threshold(), 0))
+      Sim.look.heard(Bool.and(Bool.not(Player.dead(State.player(s))),
+        L.Level.heard(State.level(s), H.Thing.sector(th))), cleared, id, State.thing.put(id, cleared, s))
 
-# Doom's A_Look for a monster that has heard nothing: it watches for the
-# player, and the tic it sees one it calls out and enters its chase
-# state. P_NoiseAlert's sound target, which A_Look reads before it looks
-# and which the ambush flag then gates, is ticket 21's and belongs at
-# the head of this function; until it exists the flag changes nothing,
-# since a deaf monster and a hearing one both wake by sight alone.
+# A_Look checks the sector's sound target before looking for the player.
+# An ambush monster still requires sight, in any direction, to hear it.
 def Sim.look(+id: U32, +s: State) -> Sim.Acted:
   Sim.look.some(H.Things.get(State.things(s), id), id, s)
 
@@ -4792,18 +4850,19 @@ def Sim.chase.step.fit(+z: U32, +height: U32, th: H.Thing, +id: U32, +level: L.L
   Sim.chase.step.fin(Sim.walks(Fit{ok, floor, ceil, drop}, z, height), th, id, level, ox, oy, x, y, r, floor,
     ceil, s)
 
-def Sim.chase.step.met(m: Sim.Body, th: H.Thing, +id: U32, +level: L.Level, +x: U32, +y: U32, +ts: H.Things,
-  +p: Player, s: State) -> Sim.Walk:
+def Sim.chase.step.met(m: Sim.Body, th: H.Thing, +id: U32, +level: L.Level, +x: U32, +y: U32,
+  met: Sim.Met, s: State) -> Sim.Walk:
   Body{i, +ox, +oy, +z, +radius, +height, flags} = m
   Sim.chase.step.fit(z, height, th, id, level, ox, oy, x, y, radius,
-    Sim.check(level, ts, p, Body{i, x, y, z, radius, height, flags}, 3), s)
+    Sim.check.met(met, level, Body{i, x, y, z, radius, height, flags}, 3), s)
 
 # Doom's P_TryMove for a thing of the population: its position check at
 # the place with mask 3, so the lines that block monsters stop it as
 # well; the rules P_TryMove adds, the ledge among them; the relink; and
 # the walk-over specials the move crossed.
 def Sim.chase.step(+th: H.Thing, +id: U32, +level: L.Level, +x: U32, +y: U32, +s: State) -> Sim.Walk:
-  Sim.chase.step.met(Sim.body.of(th), th, id, level, x, y, State.things(s), State.player(s), s)
+  Sim.chase.step.met(Sim.body.of(th), th, id, level, x, y,
+    Sim.met(level, State.things(s), State.player(s), Sim.Body.at(Sim.body.of(th), x, y)), s)
 
 # P_Move's blocked branch: with no special line in the way the move
 # simply failed; with one, the thing stops where it is and presses each,
@@ -4822,9 +4881,21 @@ def Sim.chase.move.tried(w: Sim.Walk, +level: L.Level, +x: U32, +y: U32, +r: U32
     case Walk{False{}, +id, s}:
       Sim.chase.opened(Sim.spechit(level, x, y, r, 3), id, s)
 
-def Sim.chase.move.at(+tx: U32, +ty: U32, +r: U32, th: H.Thing, +id: U32, +level: L.Level, s: State) ->
+# A thing blocking P_CheckPosition ends it before any line is inspected,
+# so P_Move has no special line to use in that case.
+def Sim.chase.move.met(met: Sim.Met, +tx: U32, +ty: U32, +r: U32, +th: H.Thing, +id: U32,
+  +level: L.Level, s: State) -> Sim.Walk:
+  match met:
+    case Met{before, Some{hit}}:
+      Walk{False{}, id, s}
+    case Met{before, None{}}:
+      Sim.chase.move.tried(Sim.chase.step.met(Sim.body.of(th), th, id, level, tx, ty, Met{before, None{}}, s),
+        level, tx, ty, r)
+
+def Sim.chase.move.at(+tx: U32, +ty: U32, +r: U32, +th: H.Thing, +id: U32, +level: L.Level, +s: State) ->
   Sim.Walk:
-  Sim.chase.move.tried(Sim.chase.step(th, id, level, tx, ty, s), level, tx, ty, r)
+  Sim.chase.move.met(Sim.met(level, State.things(s), State.player(s), Sim.Body.at(Sim.body.of(th), tx, ty)),
+    tx, ty, r, th, id, level, s)
 
 def Sim.chase.move.go(m: Sim.Body, th: H.Thing, +id: U32, +level: L.Level, +speed: U32, +dir: U32, s: State) ->
   Sim.Walk:
@@ -4999,9 +5070,10 @@ def Sim.chase.newdir(w: Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level) -
 # branch that spreads the turn is the spectre's, which neither map
 # spawns on this skill.
 def Sim.chase.face.at(+level: L.Level, th: H.Thing, +tx: U32, +ty: U32) -> H.Thing:
-  H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, ai} = th
+  H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, +ai} = th
   H.Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of(L.Level.tanto(level), (tx - x : U32), (ty - y : U32)),
-    sector, state, tics, momz, ai}
+    sector, state, tics, momz,
+    V.Vec.set(ai, H.Thing.hurt.flags(), (V.Vec.get(ai, H.Thing.hurt.flags()) .&. U32.not(32) : U32))}
 
 def Sim.chase.faced(mt: Maybe<&2, Sim.Body>, mm: Maybe<&2, H.Thing>, +id: U32, +level: L.Level, s: State) ->
   State:
@@ -5635,8 +5707,8 @@ def Player.held(+x: U32, +y: U32, after: Player) -> Player:
 # would hold two states at once, and the budget of docs/bend.md's width
 # cap has no room for that.
 def State.held(geo: L.Level.Geo, +x: U32, +y: U32, after: State) -> State:
-  State{player, L.Level{g, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = after
-  State{Player.held(x, y, player), L.Level{geo, sectors, specials}, things, sidetex, thinkers, rnd, clock, ended,
+  State{player, L.Level{g, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn} = after
+  State{Player.held(x, y, player), L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended,
     usedown, sounds, mrnd, reborn}
 
 # P_PlayerThink's counters, the damage count's fade among them.
@@ -5666,7 +5738,7 @@ def Sim.mobj.z(t: Sim.Try) -> Sim.Try:
 # with is gone once it has moved, and the place before the states run,
 # so the state the move left is gone once they have.
 def Sim.mobj(+cmd: K.Cmd, +geo: L.Level.Geo, +s: State) -> State:
-  +level = {L.Level{geo, L.Level.sectors(State.level(s)), L.Level.specials(State.level(s))} : L.Level}
+  +level = {L.Level{geo, L.Level.sectors(State.level(s)), L.Level.specials(State.level(s)), L.Level.alerted(State.level(s))} : L.Level}
   +you = H.Things.you(State.things(s))
   +went = State.moved(Sim.mobj.z(Sim.xy(level, State.things(s), cmd, State.player(s))), level, s)
   +x = Player.x(State.player(went))
@@ -5732,7 +5804,7 @@ def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: State) -> State:
 # What a live tic makes of the state its thinkers left: the geometry it
 # began with, the clock counted, and whether use was down.
 def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: State) -> State:
-  State{State.player(after), L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after))},
+  State{State.player(after), L.Level{geo, L.Level.sectors(State.level(after)), L.Level.specials(State.level(after)), L.Level.alerted(State.level(after))},
     State.things(after), State.sidetex(after), State.thinkers.of(after), State.rnd(after), (clock + 1 : U32),
     State.ended(after), use, State.sounds(after), State.face(after), State.reborn(after)}
 
@@ -5808,8 +5880,8 @@ def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
     case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn}:
       State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn}
-    case State{+player, L.Level{+geo, sectors, specials}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd, reborn}:
-      +level = {L.Level{geo, sectors, specials} : L.Level}
+    case State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd, reborn}:
+      +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       Sim.tic.live(cmd, level, geo, clock, usedown, Player.dead(player),
         {State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, reborn} : State})
 

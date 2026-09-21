@@ -28,6 +28,9 @@
 # left offset is 14. The pistol's ready and raise states, rows 59 and
 # 60, no thing's, load PISGA0, 82 wide with offsets -125 and -97. Of
 # info.c's frames, S_ARM1A's is full-bright and the sergeant's is not.
+# Pain and gib entry rows load POSSG1, POSSM0, SPOSG1, SPOSM0,
+# TROOH1, TROON0 and SARGH1. Their headers below come from the WAD,
+# independently of the loader's state-chain walk.
 # The status bar's patches are loaded by name, none of them a sprite's
 # or a texture's: STTNUM0 and STTNUM1 are both 13 by 16 in Freedoom (the
 # shareware WAD's STTNUM1 is 11 wide with a left offset, which is why
@@ -251,6 +254,13 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(sprite.head(gfx, 52))
     IO.print(sprite.head(gfx, 59))
     IO.print(sprite.head(gfx, 60))
+    IO.print(sprite.head(gfx, 121))
+    IO.print(sprite.head(gfx, 128))
+    IO.print(sprite.head(gfx, 137))
+    IO.print(sprite.head(gfx, 144))
+    IO.print(sprite.head(gfx, 153))
+    IO.print(sprite.head(gfx, 160))
+    IO.print(sprite.head(gfx, 168))
     IO.print("bright of states 3 and 7 " ++ U32.show(G.Gfx.sprite(gfx, 3, 0, 5)) ++ " "
       ++ U32.show(G.Gfx.sprite(gfx, 7, 0, 5)))
     IO.print("sector 10 blocks " ++ blocks(L.Level.blockbox(level, 10)))
@@ -303,6 +313,13 @@ def main() -> IO(Unit):
 #|sprite of state 52 width 28.000000 offset 15.000000 top 62.000000
 #|sprite of state 59 width 82.000000 offset -125.000000 top -97.000000
 #|sprite of state 60 width 82.000000 offset -125.000000 top -97.000000
+#|sprite of state 121 width 39.000000 offset 19.000000 top 51.000000
+#|sprite of state 128 width 44.000000 offset 22.000000 top 57.000000
+#|sprite of state 137 width 32.000000 offset 16.000000 top 50.000000
+#|sprite of state 144 width 41.000000 offset 18.000000 top 61.000000
+#|sprite of state 153 width 49.000000 offset 26.000000 top 59.000000
+#|sprite of state 160 width 49.000000 offset 25.000000 top 59.000000
+#|sprite of state 168 width 33.000000 offset 15.000000 top 47.000000
 #|bright of states 3 and 7 0 1
 #|sector 10 blocks top 12 bottom 12 left 11 right 12
 #|sector 98 blocks top 11 bottom 9 left 5 right 7

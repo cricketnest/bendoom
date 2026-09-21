@@ -839,14 +839,11 @@ def Gfx.sprite.from(none: Bool, +n: Nat, +state: U32, marks: V.Vec) -> V.Vec:
     case False{}:
       Gfx.sprite.chase(n, False{}, state, state, marks)
 
-# The rows a type dies through, so that its corpse and the barrel's
-# explosion have lumps. The pain frame and the gib frames are left out:
-# asking for them moves pixels in six frames of the render test that
-# read zero against vanilla today, which points at something in this
-# loader that more sprite lumps tip over, and finding it is not this
-# ticket's.
+# Pain, death and gib chains have entry points outside the spawn chain.
 def Gfx.sprite.hurt(+kind: U32, +n: Nat, marks: V.Vec) -> V.Vec:
-  Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind), marks)
+  Gfx.sprite.from(U32.is_eq(H.Thing.painstate(kind), H.Thing.null()), n, H.Thing.painstate(kind),
+    Gfx.sprite.from(U32.is_eq(H.Thing.xdeathstate(kind), H.Thing.null()), n, H.Thing.xdeathstate(kind),
+      Gfx.sprite.from(U32.is_eq(H.Thing.deathstate(kind), H.Thing.null()), n, H.Thing.deathstate(kind), marks)))
 
 # The rows a type reaches that no chain from its spawn state does: the
 # chase rows A_Look sends it to, the melee and missile rows A_Chase
@@ -902,7 +899,7 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n,
     Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n,
-      Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.of_list([], U32.from_nat(n)))))))
+      Gfx.sprite.weapon(H.Thing.pistol(), n, V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1))))))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:
   match views:

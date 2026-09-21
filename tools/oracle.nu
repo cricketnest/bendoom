@@ -17,10 +17,6 @@
 # screenshot. The report counts that box separately, as `face`, which is
 # 0 only where the face holds still under the pause, as the dead one
 # does. The default script idles 20 tics, past the pistol's rise.
-# Both games wake a monster that sees the player on the same tic, but
-# vanilla's chases from that tic and Bendoom's stands until milestone
-# 6's ticket 16, so a place compares the two only while no monster has
-# seen the player.
 #
 # The tint is outside the comparison. ST_doPaletteStuff leaves
 # I_VideoBuffer alone and only sets the hardware palette, and

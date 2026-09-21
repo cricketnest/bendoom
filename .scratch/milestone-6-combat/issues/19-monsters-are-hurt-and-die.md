@@ -26,9 +26,5 @@ This ticket's damage-and-death half was cut with ticket 13, in the same pass and
 
 - The kill count and the intermission that shows it, which belong to ticket 06's parked work.
 - The remaining sim cases: an imp gibbed by a barrel, and a monster flinching mid-attack, which needs the attacks of tickets 17 and 18.
-- The render cases: death frames and a corpse at zero differing pixels. The sprite load carries the death rows but not the pain frame or the gib frames; ticket 13's comment has the measurement and the reason.
+- The render cases: death frames and a corpse at zero differing pixels. The pain, death and gib chains are now loaded; ticket 13 records the loader checks and remaining impact mismatch.
 - The closed law pinning the gib threshold.
-
-### What is open
-
-A monster hurt in its idle state enters its see state, and one hurt afterwards returns from its pain rows to its see state, both of which are ticket 15's run rows; the chase itself is ticket 16's, so a hurt monster runs on the spot. A monster's pain frame has no sprite loaded, so it shows nothing for its pain tics; ticket 13's comment says why and what it costs.
