@@ -4,14 +4,14 @@
 
 **Blocked by:** 09 (The nukage hurts and the player dies), 16 (A woken monster chases)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `P_CheckMeleeRange`, `A_TroopAttack` and `A_SargAttack`
-- [ ] `P_SpawnMissile` and the missile branches of the XY and Z movement and of the position check, `P_ExplodeMissile`, the sky hack, and damage of one to eight times the missile's
-- [ ] A missile never hits its thrower
-- [ ] The fireball's throw and burst sounds start where vanilla's do, and the flight sound stops with the thing
-- [ ] Sim cases: a claw, a fireball that hits the player, one that hits a wall, one into the sky, a demon's bite on Freedoom, from a replay of the source
-- [ ] Render cases: a fireball in flight and bursting, full bright, at zero differing pixels
+- [x] `P_CheckMeleeRange`, `A_TroopAttack` and `A_SargAttack`
+- [x] `P_SpawnMissile` and the missile branches of the XY and Z movement and of the position check, `P_ExplodeMissile`, the sky hack, and damage of one to eight times the missile's
+- [x] A missile never hits its thrower
+- [x] The fireball's throw and burst sounds start where vanilla's do, and the flight sound stops with the thing
+- [x] Sim cases: a claw, a fireball that hits the player, one that hits a wall, one into the sky, a demon's bite on Freedoom, from a replay of the source
+- [x] Render cases: a fireball in flight and bursting, full bright, at zero differing pixels
 
 ## Comments
 
@@ -23,4 +23,4 @@
 - Freedoom pixel oracle, player `(992, 704, 270)`, script `20,0,0,0,0 34,0,0,0,1 10,0,0,0,0`: flight `differing 0`, `face 66`, `palette 0`, `shot_plain true`.
 - Freedoom pixel oracle at the same place, script `20,0,0,0,0 34,0,0,0,1 20,0,0,0,0`: full-bright burst `differing 0`, `face 0`, `palette 2`, `shot_plain true`.
 - Shareware pixel oracle, player `(1056, -3616, 90)`, record rewrite `8,3001,1056,-3360`, script `60,0,0,0,0`: visible fireball `differing 0`, `face 0`, `palette 0`, `shot_plain true`.
-- The new simulation cases cover the direct claw and bite, launch, wall burst, horizontal sky removal, and the unarmoured live replay. The vertical sky branch uses the same removal path. Obsolete comments that described the imp and demon attack rows as absent were deleted.
+- The new simulation cases cover the direct claw and bite, launch, wall burst, vertical sky-ceiling removal, and the unarmoured live replay. Horizontal movement carries Vanilla's ordered `ceilingline` result, so only the line that strictly lowered the opening can trigger its sky hack. Obsolete comments that described the imp and demon attack rows as absent were deleted.
