@@ -24,20 +24,18 @@ let
 in
 writeShellApplication {
   name = "bendoom";
+  passthru = { inherit game iwad alsa-plugins; music = music iwad; sounds = sounds iwad; };
   runtimeInputs = [ coreutils ];
   text = ''
-    export BENDOOM_IWAD=''${BENDOOM_IWAD-${lib.escapeShellArg iwad}}
-    export BENDOOM_MUSIC=''${BENDOOM_MUSIC-${music iwad}}
-    export BENDOOM_SOUNDS=''${BENDOOM_SOUNDS-${sounds iwad}}
+    iwad=${lib.escapeShellArg iwad}
+    music=${music iwad}
+    sounds=${sounds iwad}
     ${lib.optionalString linux ''
       export ALSA_PLUGIN_DIR=''${ALSA_PLUGIN_DIR-${alsa-plugins}}
     ''}
-    if [ -v RECORD ]; then
-      demo=$RECORD
-      RECORD=$(mktemp "$demo.XXXXXX")
-      trap 'basenc --base16 -d "$RECORD" > "$demo"; rm "$RECORD"' EXIT
-    fi
-    ${lib.getExe game} --threads 1 "$@"
+    run_game() { ${lib.getExe game} "$@"; }
+    decode_recording() { basenc --base16 -d "$1"; }
+    ${lib.readFile ./launch.sh}
   '';
   meta = {
     description = "Doom, written in Bend 2";

@@ -18,7 +18,8 @@ llvmPackages_19.stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     export HOME=$TMPDIR
-    bend ${baseNameOf root} -o program
+    ${lib.readFile ./compile.sh}
+    compile_bend ${baseNameOf root} program ${if llvmPackages_19.stdenv.hostPlatform.isDarwin then "darwin" else "linux"}
     runHook postBuild
   '';
 

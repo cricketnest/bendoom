@@ -25,10 +25,11 @@ llvmPackages_19.stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     export HOME=$TMPDIR
+    ${lib.readFile ./compile.sh}
     for t in tests/*.bend; do
       name=$(basename $t .bend)
       sed -n 's/^#|//p' $t > $name.want
-      bend $t -o $name
+      compile_bend $t $name ${if llvmPackages_19.stdenv.hostPlatform.isDarwin then "darwin" else "linux"}
       ./$name > $name.native.got
       diff $name.want $name.native.got
       echo "PASS $name native"

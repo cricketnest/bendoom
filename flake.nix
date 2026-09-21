@@ -1,6 +1,11 @@
 {
   description = "Bendoom: Doom, written in Bend 2";
 
+  nixConfig = {
+    extra-substituters = [ "https://bendoom.cachix.org" ];
+    extra-trusted-public-keys = [ "bendoom.cachix.org-1:CQba0LK2+g9Kb7ybgQbfm2dtrZdU4gul5FV5sqvPaUU=" ];
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
@@ -51,12 +56,10 @@
           # alsa-lib loads the plugin behind the host's ALSA default from one
           # directory of its own, so on a host whose default is PipeWire or
           # PulseAudio the game needs theirs, as nixpkgs's alsa-utils does.
-          alsa-plugins = pkgs.symlinkJoin {
-            name = "bendoom-alsa-plugins";
-            paths = map (p: "${p}/lib/alsa-lib") [ pkgs.alsa-plugins pkgs.pipewire ];
-          };
+          alsa-plugins = pkgs.callPackage ./nix/audio-plugins.nix { };
           bendoom = pkgs.callPackage ./nix/bendoom.nix { inherit bend music sounds alsa-plugins; iwad = shareware; };
           film = pkgs.callPackage ./nix/film.nix { inherit bend music sounds; iwad = shareware; };
+          portable = package: variant: pkgs.callPackage ./nix/portable.nix { bendoom = package; inherit variant; };
         in {
           packages = {
             inherit bend bendoom film;
@@ -68,6 +71,8 @@
             film-freedoom = film.override { iwad = freedoom; };
             music-freedoom = music freedoom;
             sounds-freedoom = sounds freedoom;
+            portable = portable bendoom "shareware";
+            portable-freedoom = portable (bendoom.override { iwad = freedoom; }) "freedoom";
           };
 
           checks = {

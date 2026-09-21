@@ -22,6 +22,19 @@ If flakes aren't enabled on your system, put this after `nix`:
 
 It runs on x86_64 Linux. aarch64 Linux and macOS are untested.
 
+Without Nix, download and run the portable release:
+
+    curl -fsSL https://github.com/eliesgalvira/bendoom/releases/latest/download/play.sh | sh
+
+For Freedoom, end the command with `sh -s -- --freedoom`. The launcher
+checks the archive's SHA-256 and keeps it in `~/.cache/bendoom`, or under
+`XDG_CACHE_HOME`. Linux needs an X11 display or Xwayland; the archive
+includes its loader and libraries. The macOS build is for Apple Silicon.
+You can also extract a release tarball and run `./bendoom` directly.
+
+Nix can download our builds from `bendoom.cachix.org`. Accept the flake's
+cache settings when prompted, or configure it once with `cachix use bendoom`.
+
 The up and down arrows or W and S walk, the left and right arrows turn,
 A and D strafe, Shift runs, Space opens doors and presses switches, Ctrl
 fires, Esc quits. After dying, Space starts the level again.
@@ -32,7 +45,9 @@ also ends with the level. Ctrl+C in the terminal leaves it without its
 end marker. Then `film` encodes the demo as a 1600 by 1200 MP4 at Doom's
 35 tics a second, and leaves an existing video alone. Its audio is the
 same eight-channel mix of the WAD's song and sound effects that the game
-plays, with every sound beginning on its tic. The demo is vanilla's .lmp,
+plays, with every sound beginning on its tic. When the demo completes the
+level, the video includes the intermission count-up and holds the final
+scores for three seconds. The demo is vanilla's .lmp,
 which Chocolate Doom plays too. A demo recorded with `bendoom-freedoom`
 is filmed with `film-freedoom`, which carries Freedoom's song and sounds.
 

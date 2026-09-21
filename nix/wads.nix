@@ -2,10 +2,14 @@
 # on unmodified, not to sell (Carmack, 1999), so unfree-redistributable;
 # doom19s.zip holds it as a two-part self-extractor whose parts
 # concatenate into a zip.
-{ lib, stdenvNoCC, fetchurl, unzip, freedoom }:
+{ lib, stdenvNoCC, fetchurl, unzip, freedoom, runCommand }:
 
 {
-  inherit freedoom;
+  freedoom = runCommand "freedoom1-${freedoom.version}" { inherit (freedoom) meta; } ''
+    install -Dm644 ${freedoom}/share/games/doom/freedoom1.wad $out/share/games/doom/freedoom1.wad
+    mkdir -p $out/share/doc
+    cp -r ${freedoom}/share/doc/freedoom $out/share/doc/freedoom
+  '';
 
   doom1 = stdenvNoCC.mkDerivation {
     pname = "doom1-wad";
