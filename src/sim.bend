@@ -3548,16 +3548,15 @@ def Sim.melee.hit(+saw: Bool, +psp: Psprite, +s: State) -> Sim.Entering:
   Entering{None{}, None{}, psp, Sim.melee.turn(saw, target,
     Sim.melee.sound(saw, Bool.not(Maybe.is_none(&2, U32, target)), hurt))}
 
-# Whether the ready weapon has a shot left. Doom's P_CheckAmmo also
-# picks another weapon where it has none, which is the switching
-# ticket's, so a dry pistol stays up instead of being lowered.
+# Whether the ready weapon has a shot left. Melee weapons need none.
 def Sim.ammo.enough(+weapon: H.Thing.Weapon, +s: State) -> Bool:
   Bool.or(U32.is_eq(H.Thing.Weapon.ammo(weapon), 4),
     U32.is_lt(0, I.Inventory.rounds(H.Thing.Weapon.ammo(weapon), Player.inv(State.player(s)))))
 
 def Sim.ammo.pick(+inv: I.Inventory) -> U32:
   Bool.pick(U32, Bool.and(I.Inventory.owns(2, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_shell(), inv))), 2,
-    Bool.pick(U32, I.Inventory.owns(7, inv), 7, 0))
+    Bool.pick(U32, Bool.and(I.Inventory.owns(1, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_clip(), inv))), 1,
+      Bool.pick(U32, I.Inventory.owns(7, inv), 7, 0)))
 
 def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   match enough:

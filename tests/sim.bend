@@ -3311,7 +3311,7 @@ def main() -> IO(Unit):
 #|last trigger tic 1 ready 2 pending 255 shells 1 state Some(204) tics 3 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 61
 #|sound tic 4 DSSHOTGN from thing 4294967295 vol 64 sep 128
 #|last blast tic 4 ready 2 pending 255 shells 0 state Some(205) tics 7 at 1.000000 32.000000 flash Some(213) tics 3 at 1.000000 32.000000 random 110
-#|switch away tic 74 ready 0 pending 255 shells 0 state Some(215) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 119
+#|switch away tic 74 ready 1 pending 255 shells 0 state Some(59) tics 1 at 1.000000 32.000000 flash None tics 0 at 1.000000 32.000000 random 119
 #|sound tic 5 DSPUNCH from thing 4294967295 vol 64 sep 128
 #|punch health 16 random 75 angle 270.000 at 992.000000 660.000000 momentum 0.000000 0.000000 pull 0
 #|sound tic 5 DSPUNCH from thing 4294967295 vol 64 sep 128
