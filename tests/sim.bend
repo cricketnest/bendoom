@@ -1585,7 +1585,7 @@ def weapon.pick(m: Maybe<&2, I.Inventory>) -> String:
         ++ " shells " ++ U32.show(I.Inventory.rounds(I.Inventory.am_shell(), inv))
 
 def weapons(+level: L.Level) -> IO(Unit):
-  +base = weapon.state(1, 59, 4, S.State.start(level))
+  +base = weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 4, S.State.start(level))
   do IO<Unit>:
     IO.print("shotgun pickup " ++ weapon.pick(I.Inventory.grant(2001, False{}, I.Inventory.start())))
     k0 : S.State <- weapon.run("key", 1n, K.Cmd.demo(0, 0, 0, 20), base)
@@ -1593,7 +1593,8 @@ def weapons(+level: L.Level) -> IO(Unit):
     k2 : S.State <- weapon.run("shotgun ready", 24n, idle(), k1)
     b0 : S.State <- weapon.run("trigger", 1n, fire(), k2)
     b1 : S.State <- weapon.run("blast", 3n, idle(), b0)
-    l0 : S.State <- weapon.run("last trigger", 1n, fire(), weapon.state(2, 201, 1, S.State.start(level)))
+    l0 : S.State <- weapon.run("last trigger", 1n, fire(),
+      weapon.state(2, H.Thing.Weapon.ready(H.Thing.shotgun()), 1, S.State.start(level)))
     l1 : S.State <- weapon.run("last blast", 3n, idle(), l0)
     l2 : S.State <- weapon.run("switch away", 70n, idle(), l1)
     IO.print("-")
