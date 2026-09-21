@@ -41,19 +41,21 @@ is needed to play these releases.
 
 ### With Nix
 
-Accept the flake's cache settings when prompted to download prebuilt packages
-from `bendoom.cachix.org`.
+The commands below use `--accept-flake-config` to accept this flake's cache
+settings without prompting, so Nix can download prebuilt packages from
+`bendoom.cachix.org`. This flag applies to the invocation; it does not change
+your global Nix settings.
 
 Run the shareware version:
 
 ```sh
-nix run github:eliesgalvira/bendoom
+nix run --accept-flake-config github:eliesgalvira/bendoom
 ```
 
 Or choose Freedoom:
 
 ```sh
-nix run github:eliesgalvira/bendoom#bendoom-freedoom
+nix run --accept-flake-config github:eliesgalvira/bendoom#bendoom-freedoom
 ```
 
 If your Nix installation does not enable flakes, add
@@ -83,7 +85,7 @@ an MP4; these are two separate steps. The video exporter requires Nix.
 For shareware:
 
 ```sh
-env RECORD=run.lmp nix run github:eliesgalvira/bendoom
+env RECORD=run.lmp nix run --accept-flake-config github:eliesgalvira/bendoom
 ```
 
 Play, then **quit with Esc or close the window**. Recording also ends when
@@ -96,7 +98,7 @@ before exporting.
 From the same directory:
 
 ```sh
-nix run github:eliesgalvira/bendoom#film -- run.lmp run.mp4
+nix run --accept-flake-config github:eliesgalvira/bendoom#film -- run.lmp run.mp4
 ```
 
 The video is 1600 × 1200 at 35 frames per second, with music and sound effects.
@@ -109,13 +111,13 @@ choose another output filename to export again.
 Use the matching game and exporter. First record:
 
 ```sh
-env RECORD=freedoom.lmp nix run github:eliesgalvira/bendoom#bendoom-freedoom
+env RECORD=freedoom.lmp nix run --accept-flake-config github:eliesgalvira/bendoom#bendoom-freedoom
 ```
 
 After the game exits, export:
 
 ```sh
-nix run github:eliesgalvira/bendoom#film-freedoom -- freedoom.lmp freedoom.mp4
+nix run --accept-flake-config github:eliesgalvira/bendoom#film-freedoom -- freedoom.lmp freedoom.mp4
 ```
 
 You can also record from an extracted portable release with
