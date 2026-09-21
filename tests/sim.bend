@@ -1697,6 +1697,8 @@ def weapons(+level: L.Level) -> IO(Unit):
     c0 : S.State <- weapon.melee("saw hit", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
       weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0, at(level, 992, 660, 270))))
     c1 : S.State <- weapon.melee("saw pull", 25, S.Sim.tic(fire(), c0))
+    c2 : S.State <- weapon.melee("saw miss", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+      weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0, S.State.start(level))))
     k3 : S.State <- weapon.run("key 1 saw", 1n, K.Cmd.demo(0, 0, 0, 4),
       weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 0,
         weapon.carrying(False{}, S.State.start(level))))
@@ -3320,6 +3322,8 @@ def main() -> IO(Unit):
 #|saw hit health 6 random 84 angle 270.000 at 992.000000 660.000000 momentum 0.165481 -2.101348 pull 1
 #|sound tic 6 DSPOSIT2 from thing 240 vol 50 sep 136
 #|saw pull health 6 random 90 angle 270.000 at 992.000000 660.000000 momentum 0.151031 -4.736343 pull 0
+#|sound tic 5 DSSAWFUL from thing 4294967295 vol 64 sep 128
+#|saw miss health 20 random 67 angle 0.000 at -416.000000 256.000000 momentum 0.000000 0.000000 pull 0
 #|key 1 saw tic 1 ready 1 pending 7 shells 0 state Some(69) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
 #|key 1 berserk tic 1 ready 7 pending 0 shells 0 state Some(225) tics 1 at 1.000000 38.000000 flash None tics 0 at 1.000000 38.000000 random 61
 #|-
