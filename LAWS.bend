@@ -404,7 +404,7 @@ law pistol_spends:
 
 def Closed.shotgun.empty() -> I.Inventory:
   I.Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
-    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, kills, secrets}
+    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, 0, 0}
 
 # LAW: P_CheckAmmo's preference chooses the pistol when the ready
 # shotgun has spent its last shell and bullets remain.
@@ -1000,6 +1000,7 @@ type Closed.Edit is Data:
   Ammo{rounds: List<&2, U32>}
   Backpack{}
   Weapons{bits: U32}
+  Selection{ready: U32, pending: U32}
   Strength{n: U32}
   Items{n: U32}
   Flash{n: U32}
@@ -1027,6 +1028,10 @@ def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
       bonus, line, kills, secrets} Weapons{bits}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, bits, powers, items, bonus, line, kills, secrets}
+    case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
+      bonus, line, kills, secrets} Selection{ready, pending}:
+      I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
+        ((line .&. 65535 : U32) .|. (ready << 16n : U32) .|. (pending << 24n : U32) : U32), kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
       bonus, line, kills, secrets} Strength{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
@@ -1330,7 +1335,7 @@ law backpack_later:
 # shells the weapon alone takes it. The chaingun brings 20 bullets and
 # stays when owned at 200, the rocket launcher 2 rockets, the plasma
 # rifle 40 cells. The chainsaw has no ammo: taken when not owned, left
-# when owned (sanity).
+# when owned (sanity). Newly owned weapons become pending; ready stays pistol.
 law weapon_taken:
   {[Closed.offer(I.Inventory.start(), 2001),
     Closed.offer(Closed.inv([Ammo{[50, 8, 0, 0]}, Weapons{7}]), 2001),
@@ -1341,15 +1346,15 @@ law weapon_taken:
     Closed.offer(I.Inventory.start(), 2003), Closed.offer(I.Inventory.start(), 2004),
     Closed.offer(I.Inventory.start(), 2005),
     Closed.offer(Closed.inv([Weapons{131}]), 2005)]
-    == [Got{[], Closed.inv([Ammo{[50, 8, 0, 0]}, Weapons{7}, Flash{6}])},
+    == [Got{[], Closed.inv([Ammo{[50, 8, 0, 0]}, Weapons{7}, Flash{6}, Selection{1, 2}])},
       Got{[], Closed.inv([Ammo{[50, 16, 0, 0]}, Weapons{7}, Flash{6}])},
       Got{[1], Closed.inv([Ammo{[50, 50, 0, 0]}, Weapons{7}])},
-      Got{[], Closed.inv([Ammo{[50, 50, 0, 0]}, Weapons{7}, Flash{6}])},
-      Got{[], Closed.inv([Ammo{[70, 0, 0, 0]}, Weapons{11}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[50, 50, 0, 0]}, Weapons{7}, Flash{6}, Selection{1, 2}])},
+      Got{[], Closed.inv([Ammo{[70, 0, 0, 0]}, Weapons{11}, Flash{6}, Selection{1, 3}])},
       Got{[1], Closed.inv([Ammo{[200, 0, 0, 0]}, Weapons{11}])},
-      Got{[], Closed.inv([Ammo{[50, 0, 0, 2]}, Weapons{19}, Flash{6}])},
-      Got{[], Closed.inv([Ammo{[50, 0, 40, 0]}, Weapons{35}, Flash{6}])},
-      Got{[], Closed.inv([Weapons{131}, Flash{6}])},
+      Got{[], Closed.inv([Ammo{[50, 0, 0, 2]}, Weapons{19}, Flash{6}, Selection{1, 4}])},
+      Got{[], Closed.inv([Ammo{[50, 0, 40, 0]}, Weapons{35}, Flash{6}, Selection{1, 5}])},
+      Got{[], Closed.inv([Weapons{131}, Flash{6}, Selection{1, 7}])},
       Got{[1], Closed.inv([Weapons{131}])}]
     : List<&2, Closed.Got>}
 

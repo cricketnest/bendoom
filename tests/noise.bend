@@ -59,7 +59,7 @@ def corridor(base: L.Level, first: U32, second: U32) -> L.Level:
 def closed(s: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{player, L.Level.plane.put(level, 100, True{}, 0), things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd, reborn}
+    usedown, sounds, mrnd, reborn, secrets}
 
 def run(w: Array<U32> & L.Level) -> IO(Unit):
   (mem, +level) = w
