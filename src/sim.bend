@@ -2377,13 +2377,13 @@ def Sim.missile.spawn(m: Sim.Body, t: Sim.Body, +source: U32, +s: State) -> Stat
   Body{ti, +tx, +ty, +tz, tr, th, tf} = t
   +angle = A.Angle.of(L.Level.tanto(State.level(s)), (tx - x : U32), (ty - y : U32))
   +speed = {655360 : U32}
-  +dist = F.Fixed.max(F.Fixed.div(F.Fixed.approx((tx - x : U32), (ty - y : U32)), speed), F.Fixed.unit())
+  +dist = U32.max((F.Fixed.approx((tx - x : U32), (ty - y : U32)) / speed : U32), 1)
   +id = H.Things.count(State.things(s))
   +spawned = Sim.spawn(H.Thing.info(H.Thing.fireball()), x, y, (z + 2097152 : U32), s)
   Sim.sound(Sn.Sound.firsht(), Sn.Thing{id}, Sim.missile.put(H.Things.get(State.things(spawned), id), id, angle,
     F.Fixed.mul(speed, A.Angle.cos(L.Level.sine(State.level(spawned)), angle)),
     F.Fixed.mul(speed, A.Angle.sin(L.Level.sine(State.level(spawned)), angle)),
-    F.Fixed.div((tz - z : U32), dist), source, spawned))
+    F.Fixed.quot((tz - z : U32), dist), source, spawned))
 
 def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
   match m:
@@ -5341,13 +5341,25 @@ def Sim.melee.damage(+target: U32, +factor: U32, +id: U32, s: State) -> State:
   Sim.damage(target, (((M.Random.at(State.rnd(after)) % Bool.pick(U32, U32.is_eq(factor, 3), 8, 10) : U32) + 1 : U32)
     * factor : U32), id, id, after)
 
+def Sim.missile.ready(th: H.Thing, +cut: U32) -> H.Thing:
+  H.Thing{tid, kind, x, y, +z, floorz, ceilz, angle, sector, state, +tics, +momz, hurt} = th
+  H.Thing{tid, kind, x, y, (z + F.Fixed.sar(momz) : U32), floorz, ceilz, angle, sector, state,
+    F.Fixed.max((tics - cut : U32), 1), momz, hurt}
+
+def Sim.missile.first.ready(+ready: H.Thing, +id: U32, +s: State) -> State:
+  H.Thing{tid, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = ready
+  Sim.thing.fit(id, H.Thing{tid, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
+    (x + F.Fixed.sar(V.Vec.get(hurt, H.Thing.hurt.momx())) : U32),
+    (y + F.Fixed.sar(V.Vec.get(hurt, H.Thing.hurt.momy())) : U32), s)
+
 def Sim.missile.first(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
   match m:
     case None{}:
       s
-    case Some{+th}:
-      Sim.thing.fit(id, th, (H.Thing.x(th) + F.Fixed.half(H.Thing.momx(th)) : U32),
-        (H.Thing.y(th) + F.Fixed.half(H.Thing.momy(th)) : U32), s)
+    case Some{th}:
+      +after = Sim.drawn(s)
+      +ready = Sim.missile.ready(th, (M.Random.at(State.rnd(after)) .&. 3 : U32))
+      Sim.missile.first.ready(ready, id, State.thing.put(id, ready, after))
 
 def Sim.troopattack.throw(+target: U32, +id: U32, +s: State) -> State:
   +missile = H.Things.count(State.things(s))
