@@ -4,12 +4,12 @@
 
 **Blocked by:** 01 (The sim reports its sounds), 05 (The mixer plays a sound over the song)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Channels live outside simulation state and end on the device's sample clock
 - [x] Starts, stops, eviction and updates follow `S_StartSound`, `S_StopSound`, `S_GetChannel` and `S_UpdateSounds`
 - [x] Pan gains use `I_SDL_UpdateSoundParams`
-- [ ] Universal channel invariants: eight slots, unique sources, no lower-priority eviction of a more important sound
+- [x] Universal channel invariants: eight slots, unique sources, no lower-priority eviction of a more important sound
 - [x] Event-list tests print tables derived by hand from vanilla's source
 - [x] Recorded ninth-sound eviction and same-source replacement match every sample
 
@@ -29,6 +29,11 @@ The recording starts the eight sounds at frame 105472, the ninth at 110592 and i
 
 `S_StopSound(NULL)` stops the previous NULL-origin sound. Pickups really do pass NULL in `p_inter.c`; changing their origin to the player would be incorrect. Landing grunts already report the player. The former exception for `Nobody` is deleted.
 
-## Remaining proof work
+## Proof
 
-The runtime operations hold linear file handles and perform IO. The existing checker cannot normalize those actions into universal table laws. The structural size invariant and the source/priority cases are exercised above, but this is not a proof over arbitrary event lists. A pure allocation decision shared with the runtime still needs to be exposed before those laws can be claimed.
+`Channel.choice` is the pure allocation decision used by the runtime and by a
+file-free table model. The universal laws prove that an arbitrary start keeps
+the table at its original size (and the default size is eight), clears every
+older entry for the same source before placing at most one replacement, and
+returns the drop sentinel when a full table contains only more important
+sounds. `PROOF.bend` checks all three laws.
