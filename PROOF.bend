@@ -125,9 +125,10 @@ def channel_start_one(+priority: Nat,
     case (slots, keys):
       channel_replace_one(slots, Ch.Channel.choice(priority, keys), priority)
 
-# Closed laws compute.
-
-def Laws.channels_capacity(priority, slots):
+def channel_capacity(priority: Nat, +slots: List<&2, Maybe<&2, Ch.Channel.Voice>>) ->
+  {(Ch.Channel.model.size(Ch.Channel.model.start(priority, slots)),
+    Ch.Channel.model.size(Ch.Channel.model.none()))
+    == (Ch.Channel.model.size(slots), 8n) : Nat & Nat}:
   %channel_start_size(priority, Ch.Channel.model.keys(slots))
     : {(_, Ch.Channel.model.size(Ch.Channel.model.none()))
       == (Ch.Channel.model.size(slots), 8n) : Nat & Nat}
@@ -135,6 +136,11 @@ def Laws.channels_capacity(priority, slots):
     : {(Ch.Channel.model.size(_), Ch.Channel.model.size(Ch.Channel.model.none()))
       == (Ch.Channel.model.size(slots), 8n) : Nat & Nat}
   {==}
+
+# Closed laws compute.
+
+def Laws.channels_capacity(priority, slots):
+  channel_capacity(priority, slots)
 
 def Laws.channels_unique_source(priority, slots):
   channel_start_one(priority, Ch.Channel.model.keys(slots))
@@ -709,6 +715,13 @@ def channel_protected_pick.go(go: Bool, +priority: Nat, +old: Nat,
             1n+Ch.Channel.model.size.keys(rest)), 1n+Ch.Channel.model.size.keys(rest)} : Ch.Channel.Pick}
       {==}
 
+def channel_nat_lt_refl(n: Nat) -> {False{} == Nat.is_lt(n, n) : Bool}:
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      channel_nat_lt_refl(p)
+
 def channel_protected_pick(+priority: Nat, slots: List<&2, Maybe<&2, Nat>>,
   +protected: {True{} == Ch.Channel.model.protected(priority, slots) : Bool}) ->
   {Ch.Pick{Ch.Channel.model.size.keys(slots), Ch.Channel.model.size.keys(slots),
@@ -727,10 +740,18 @@ def channel_protected_pick(+priority: Nat, slots: List<&2, Maybe<&2, Nat>>,
           and_true_right(Bool.not(Nat.is_le(priority, old)),
             Ch.Channel.model.protected(priority, rest), protected)))
 
-def Laws.channels_priority(priority, slots, protected):
+def channel_priority_law(priority: Nat, +slots: List<&2, Maybe<&2, Nat>>,
+  protected: {True{} == Ch.Channel.model.protected(priority, slots) : Bool}) ->
+  {Ch.Channel.model.size.keys(slots) == Ch.Channel.choice(priority, slots) : Nat}:
   %channel_protected_pick(priority, slots, protected)
     : {Ch.Channel.model.size.keys(slots) == Ch.Channel.choice.free(_) : Nat}
+  %channel_nat_lt_refl(Ch.Channel.model.size.keys(slots))
+    : {Ch.Channel.model.size.keys(slots) == Bool.pick(Nat, _,
+      Ch.Channel.model.size.keys(slots), Ch.Channel.model.size.keys(slots)) : Nat}
   {==}
+
+def Laws.channels_priority(priority, slots, protected):
+  channel_priority_law(priority, slots, protected)
 
 def line_ok_of(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32, +i: U32, f: S.Sim.Fit,
   e: {True{} == S.Sim.Fit.ok(S.Sim.fit.line(level, x, y, r, mask, i, f)) : Bool}) ->
