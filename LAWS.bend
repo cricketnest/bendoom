@@ -394,14 +394,21 @@ def Closed.weapon(s: S.State) -> Maybe<&2, U32>:
 # from the ready state, A_WeaponReady enters S_PISTOL1 on the first tic,
 # its 4 tics run out on tic 5 and A_FirePistol spends a bullet as
 # S_PISTOL2 is entered; A_ReFire fires again 14 tics later, on tic 19.
-# With an empty clip P_CheckAmmo refuses, so no bullet is spent and the
-# weapon stays in its ready state, row 59, where vanilla would lower it
-# for the weapon P_CheckAmmo picked instead (sanity).
+# With an empty clip P_CheckAmmo spends nothing and lowers the weapon.
 law pistol_spends:
   {(Closed.bullets(Closed.firing(4n, 50)), Closed.bullets(Closed.firing(5n, 50)),
     Closed.bullets(Closed.firing(19n, 50)), Closed.bullets(Closed.firing(19n, 0)),
     Closed.weapon(Closed.firing(5n, 0)))
-    == (50, 49, 48, 0, Some{59}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
+    == (50, 49, 48, 0, Some{69}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
+
+def Closed.shotgun.empty() -> I.Inventory:
+  I.Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
+    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, kills, secrets}
+
+# LAW: P_CheckAmmo's preference chooses the pistol when the ready
+# shotgun has spent its last shell and bullets remain.
+law empty_shotgun_picks_pistol:
+  {S.Sim.ammo.pick(Closed.shotgun.empty()) == 1 : U32}
 
 # The damage laws are p_inter.c's P_DamageMobj by hand.
 
@@ -822,7 +829,7 @@ law exit_ends:
 
 # What a listener d units south of a source hears, facing an angle.
 def Closed.heard(d: U32, facing: U32) -> U32 & U32:
-  Sn.Sound.adjust(L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
+  Sn.Sound.adjust(True{}, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
     F.Fixed.neg(F.Fixed.of_map(d)), facing, 0, 0)
 
 # LAW: S_AdjustSoundParams, by hand from s_sound.c and tables.c. The
@@ -840,6 +847,14 @@ law sound_places:
     Closed.heard(1185, 1073741824), Closed.heard(1201, 1073741824))
     == ((51, 33), (51, 224), (51, 128), (64, 129), (63, 129), (1, 129), (0, 129), (0, 129))
     : (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32) & (U32 & U32)}
+
+def Closed.coincident(starting: Bool) -> U32 & U32:
+  Sn.Sound.adjust(starting, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)),
+    0, 0, 1073741824, 0, 0)
+
+law sound_coincident:
+  {(Closed.coincident(True{}), Closed.coincident(False{})) == ((64, 128), (64, 224))
+    : (U32 & U32) & (U32 & U32)}
 
 # LAW: the manual door's sounds, where T_VerticalDoor and EV_VerticalDoor
 # start them: sfx_doropn, 20, on the tic of the use, nothing on the next,
@@ -1024,7 +1039,7 @@ def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
       bonus, line, kills, secrets} Said{n, tics}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
-        ((n << 8n) .|. tics : U32), kills, secrets}
+        ((line .&. 4294901760 : U32) .|. (n << 8n : U32) .|. tics : U32), kills, secrets}
 
 # G_PlayerReborn's inventory with changes.
 def Closed.inv(es: List<&2, Closed.Edit>) -> I.Inventory:
@@ -1046,8 +1061,8 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
 # about the grants, and pickup_messages about the line.
 def Closed.hushed(inv: I.Inventory) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
-  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, 0,
-    kills, secrets}
+  I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
+    (line .&. 4294901760 : U32), kills, secrets}
 
 def Closed.kept(+s: S.State) -> Closed.Got:
   Got{Closed.ids(H.Things.list(S.State.things(s))), Closed.hushed(S.Player.inv(S.State.player(s)))}

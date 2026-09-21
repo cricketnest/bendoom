@@ -7,6 +7,7 @@ import ./level.bend as L
 import ./gfx.bend as G
 import ./keys.bend as K
 import ./inter.bend as I
+import ./sim.bend as S
 import ./project.bend as P
 import ./show.bend as V
 import ./demo.bend as D
@@ -154,7 +155,7 @@ def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
     case I.Playing{+state}:
       do IO<Bool & Game>:
         moved : Maybe<M.Stream> <- M.Stream.update(~S.State,
-          ~(s => source => S.Sim.sound.parameters(s, source)), state, music)
+          ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music)
         playing : Maybe<M.Stream> <- M.Stream.play(moved)
         return (quit, Game{level, gfx, tables, I.Playing{state}, input, again, last, owed, mem, demo, playing})
     case I.Showing{+wi}:
