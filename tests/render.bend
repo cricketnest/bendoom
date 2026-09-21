@@ -107,6 +107,7 @@ import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
+import ./fixtures/combat.bend as C
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32, pal: U32}
@@ -344,8 +345,9 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       S.State.start(level)), w4)
     w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
       at(level, east(704), east(256), 0)), w5)
+    g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w6)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
-      at(level, east(1631), east(1008), 90)), w6)
+      at(level, east(1631), east(1008), 90)), g1)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
       at(level, east(2246), east(592), 180)), n1)
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
@@ -411,6 +413,7 @@ def main() -> IO(Unit):
 #|pistol firing 25 hash 3767616058 pixels 1 1 7 111 96 72 covered True palette 0
 #|pistol flash over 32 hash 1365649270 pixels 1 1 7 5 96 72 covered True palette 0
 #|puff on the ledge 25 hash 2607485146 pixels 7 110 15 2 96 64 covered True palette 0
+#|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
 #|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47
