@@ -3032,6 +3032,10 @@ def Sim.Aim.found(a: Sim.Aim) -> Bool:
   Aim{things, player, shooter, shootz, range, top, bottom, slope, target} = a
   Bool.not(Maybe.is_none(&2, U32, target))
 
+def Sim.Aim.target(a: Sim.Aim) -> Maybe<&2, U32>:
+  Aim{things, player, shooter, shootz, range, top, bottom, slope, target} = a
+  target
+
 # What P_AimLineAttack answers: the slope at what it aimed at, and level
 # where it found nothing.
 def Sim.Aim.slope(a: Sim.Aim) -> U32:

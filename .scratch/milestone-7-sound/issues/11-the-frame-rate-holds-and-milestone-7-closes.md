@@ -16,9 +16,10 @@
 
 On an x86_64 benchmark host on AC power, with the balanced power profile and
 `balance_performance` energy preference, the Xvfb bench rendered 600 frames
-of the first fight with the real song and effects at 53–54 FPS. Three runs
-at the selected 2304-frame queue, including its new binary's first run, each
-had only the initial dry frame. The same route showed that 2048 fails cold,
+of the first fight with the real song and effects at 51–55 FPS after the
+final melee and damage integration. Six runs at the selected 2304-frame
+queue, including the final binary's first run, each had only the initial dry
+frame. The same route showed that 2048 fails cold,
 1536 is unreliable (one of three runs had four dry frames), and 1024 is too
 small (156 and 158 dry frames).
 

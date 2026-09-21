@@ -52,6 +52,7 @@ The window bench, built from `bench/window.bend` and run on an Xvfb screen so th
 | 1536 | first fight, runs 1–3 | 53 | 1, 1, 4 |
 | 2048 | first fight, warm runs 1–4 | 52–55 | 1 each |
 | 2304 | first fight, runs 1–3 | 53–54 | 1 each |
+| 2304 | final combat integration, runs 1–6 | 51–55 | 1 each |
 
 The one dry frame is the first of a passing run, where nothing has been
 written yet. A cold first activation at 2048 reported three dry frames;
@@ -59,7 +60,9 @@ the four warm repeats each reported only the initial one. At 1536 one of
 three runs dried three additional times, while 1024 dried throughout.
 All three 2304 runs, including the first execution of its new binary,
 reported only the initial empty check. Thus 2304 is the lowest measured
-level that also holds cold. Its 53–54 FPS range remains well above the
+level that also holds cold. After the final melee and damage integration,
+six more runs—including the final binary's first execution—each reported
+only the initial empty check. Their 51–55 FPS range remains well above the
 35 FPS target under Xvfb software rendering.
 
 The sounds the door script keeps busy are the door's own, from its sector: DSDOROPN at the use and DSDORCLS when the wait runs out, one channel at a time with the song under them. E1M1 near the start has no place where eight play at once; a script that fills the table would want milestone 6's monsters.
