@@ -2727,7 +2727,9 @@ def Sim.pain.flinch(flinches: Bool, +target: U32, +th: H.Thing, +s: State) -> St
     case False{}:
       State.thing.put(target, th, s)
     case True{}:
-      Sim.damage.enter(target, th, H.Thing.painstate(H.Thing.kind(th)), s)
+      Sim.damage.enter(target,
+        H.Thing.hurting(th, V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.flags(), (H.Thing.flags(th) .|. 64 : U32))),
+        H.Thing.painstate(H.Thing.kind(th)), s)
 
 # Doom's BASETHRESHOLD, the tics a thing stays on the target it turned
 # to.

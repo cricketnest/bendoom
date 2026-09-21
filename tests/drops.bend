@@ -55,6 +55,9 @@ def taken(+s: S.State, ammo: U32) -> String:
 
 def main() -> IO(Unit):
   do IO<Unit>:
+    IO.print("pain retaliation " ++ Bool.show(Maybe.default(&2, Bool,
+      Maybe.map(&2, H.Thing, Bool, th => H.Thing.flagged(th, 64),
+        S.State.thing(0, S.Sim.damage(0, 5, H.Thing.you(), H.Thing.you(), spawned(3004)))), False{})))
     IO.print("zombieman " ++ drop(S.State.thing(1, killed(3004))) ++ " draws " ++ U32.show(S.State.rnd(killed(3004))))
     IO.print("shotgun guy " ++ drop(S.State.thing(1, killed(9))) ++ " draws " ++ U32.show(S.State.rnd(killed(9))))
     IO.print("clip " ++ taken(killed(3004), I.Inventory.am_clip()))
@@ -64,6 +67,7 @@ def main() -> IO(Unit):
     IO.print("placed kept " ++ Bool.show(Bool.not(Maybe.is_none(&2, H.Thing, H.Things.get(things(clipped(0, spawned(2007))), 0)))))
     IO.print("living fits " ++ Bool.show(S.Sim.Try.ok(clipped(0, spawned(3004)))))
 
+#|pain retaliation True
 #|zombieman 2007 dropped True draws 3
 #|shotgun guy 2001 dropped True draws 3
 #|clip rounds 55 gone True items 0
