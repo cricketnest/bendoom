@@ -2105,7 +2105,7 @@ def main() -> IO(Unit):
 #|dead player idle target 157 threshold 0 81 hp 60 state 65/6 at 928.322265 975.677734 -128.000000 after 157 target 157 threshold 0 82 hp 60 state 66/10 at 911.110351 1104.889648 -128.000000 after 157
 #|imp retaliates target 240 threshold 100 81 hp 33 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 83
 #|threshold holds target 240 threshold 100 81 hp 29 state 153/2 at 848.000000 1056.000000 -128.000000 after 240 random 84
-#|barrel credits player target 157 threshold 100 81 hp 56 state 105/3 at 848.000000 1056.000000 -128.000000 after 157 random 60
+#|barrel credits player target 157 threshold 99 81 hp 56 state 105/3 at 842.262695 1050.262695 -128.000000 after 157 random 62
 #|shotgun imp fight target 240 threshold 87 81 hp 15 state 108/3 at 891.248580 1056.017028 -128.000000 after 240 target 81 threshold 99 240 hp 12 state 189/7 at 982.616607 1055.972488 -128.000000 after 81 random 132
 #|player barrel blast target 4294967295 threshold 0 81 hp -68 state 160/2 at 848.000000 1056.000000 -128.000000 after 4294967295 target 157 threshold 99 240 hp 10 state 97/2 at 956.762649 1050.263641 -128.000000 after 157 target 157 threshold 100 82 hp 24 state 153/1 at 848.634658 1172.454956 -128.000000 after 157 gone 24 hp -108 state 176/5 at 832.000000 1056.000000 -128.000000 after 157 random 67
 #|-
