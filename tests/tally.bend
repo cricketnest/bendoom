@@ -140,23 +140,39 @@ def out() -> List<&2, K.Cmd>:
 def back() -> List<&2, K.Cmd>:
   List.concat(&2, K.Cmd, [held(1n, 0, 0, 128, False{}), held(15n, 25, 0, 0, False{}), idle(8n)])
 
-def play(gl: G.Gfx & L.Level) -> IO(Unit):
-  (gfx, +level) = gl
+def initial(+level: L.Level) -> W.Play:
+  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  W.Play.ended(S.State.ended(took), took)
+
+def summary(+level: L.Level) -> IO(Unit):
   +took = S.Sim.replay(route(), S.State.at(level, beside()))
   do IO<Unit>:
     IO.print("start " ++ S.Sim.Tally.show(S.Sim.tally(S.State.start(level))))
     IO.print("exit " ++ S.Sim.Tally.show(S.Sim.tally(took)) ++ " ended " ++ Bool.show(S.State.ended(took))
       ++ " random " ++ U32.show(S.State.mrnd(took)))
-    +p0 : W.Play <- told("bcnt 0", W.Play.ended(S.State.ended(took), took))
+    return Unit{}
+
+def intermission(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    p0 : W.Play <- told("bcnt 0", initial(level))
     p1 : W.Play <- tics(steps(), level, 0, p0)
-    p2 : W.Play <- told("jumped", press(level, run(40n, level, p0)))
+    p2 : W.Play <- told("jumped", press(level, run(40n, level, initial(level))))
     p3 : W.Play <- told("next", press(level, p2))
     p4 : W.Play <- told("cut short", press(level, run(20n, level, p3)))
     p5 : W.Play <- told("nine tics on", run(9n, level, p4))
     p6 : W.Play <- told("ten tics on", run(1n, level, p5))
     p7 : W.Play <- told("the level again", run(1n, level, p6))
-    IO.print(sounds(List.append(&2, K.Cmd, idle(40n), held(1n, 0, 0, 0, True{})), level, p0, "")
+    return Unit{}
+
+def soundcheck(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    +p1 : W.Play = run(191n, level, initial(level))
+    IO.print(sounds(List.append(&2, K.Cmd, idle(40n), held(1n, 0, 0, 0, True{})), level, initial(level), "")
       ++ sounds(held(1n, 0, 0, 0, True{}), level, p1, ""))
+    return Unit{}
+
+def secrets(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
     s0 : S.State <- secret("in the secret", level, S.State.at(level, L.Start{F.Fixed.of_map(400),
       F.Fixed.of_map(2040), A.Angle.of_thing(270)}))
     s1 : S.State <- secret("stood a tic", level, S.Sim.tic(K.Cmd.idle(), s0))
@@ -164,9 +180,17 @@ def play(gl: G.Gfx & L.Level) -> IO(Unit):
     s3 : S.State <- secret("back north", level, S.Sim.replay(back(), s2))
     return Unit{}
 
+def play(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    summary(level)
+    intermission(level)
+    soundcheck(level)
+    secrets(level)
+
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
-  play(gl)
+  (gfx, level) = gl
+  play(level)
 
 def main() -> IO(Unit):
   do IO<Unit>:
