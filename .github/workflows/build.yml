@@ -56,6 +56,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap xvfb xdotool pulseaudio pulseaudio-utils
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           pulseaudio --start --exit-idle-time=-1
           for archive in artifacts/*.tar.gz; do
             BENDOOM_SMOKE_AUDIO=pulse bash tools/portable-smoke.sh "$archive"
