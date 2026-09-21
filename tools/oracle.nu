@@ -51,6 +51,9 @@ def pcx-indices []: binary -> list<string> {
   | str trim | split row ' '
 }
 
+# Vanilla writes PLAYPAL 0 into PCX even when the hardware palette is
+# tinted. `palette` reports Bend's selection; checking the tint also
+# requires capturing Chocolate Doom's active palette.
 def pcx-palette []: binary -> string {
   let pcx = $in
   $pcx | bytes at (($pcx | bytes length) - 768).. | encode hex | str lowercase
