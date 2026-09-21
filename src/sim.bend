@@ -4261,9 +4261,7 @@ def Sim.missile.fit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
 # P_TryMove for a thing: a place its box passes is taken, its mobj
 # relinked where it stands and held between the floor and ceiling there;
 # a blocked move stops the thing dead, as P_XYMovement leaves anything
-# that is neither the player nor a missile. P_TryMove's drop-off rule
-# needs the lowest floor the box met, which the check does not gather
-# yet, so a pushed thing may slide off a ledge vanilla would hold.
+# that is neither the player nor a missile.
 def Sim.thing.fitted(go: Bool, +id: U32, +th: H.Thing, +x: U32, +y: U32, fit: Sim.Fit, +s: State) -> State:
   match go:
     case True{}:
@@ -4278,7 +4276,9 @@ def Sim.thing.fit.kind.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U3
     case False{}:
       +m = Sim.Body.at(Sim.body.of(th), x, y)
       +fit = Sim.check(State.level(s), State.things(s), State.player(s), m, 3)
-      Sim.thing.fitted(Sim.passes(fit, H.Thing.z(th), H.Thing.height(th)), id, th, x, y, fit, s)
+      Sim.thing.fitted(Bool.pick(Bool, H.Thing.flagged(th, 17408),
+        Sim.passes(fit, H.Thing.z(th), H.Thing.height(th)),
+        Sim.walks(fit, H.Thing.z(th), H.Thing.height(th))), id, th, x, y, fit, s)
 
 def Sim.thing.fit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +id: U32, +th: H.Thing, +x: U32, +y: U32, +s: State) -> State:
   Sim.thing.fit.kind.with(~enter, H.Thing.flagged(th, 65536), id, th, x, y, s)

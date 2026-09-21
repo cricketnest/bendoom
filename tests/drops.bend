@@ -103,12 +103,37 @@ def living(+s: S.State) -> String:
     ++ " opening " ++ Bool.show(opening(S.State.thinkers(s)))
     ++ " health " ++ U32.show(health(S.State.thing(265, s)))
 
+# Chocolate Doom's Freedoom key route, tic 553: a shotgun pellet pushes
+# demon 184 by (24009, 5246), but its box spans floors 136 and 64.
+# P_XYMovement refuses that drop and clears both momentum components.
+def ledge.moved(+th: H.Thing, +s: S.State) -> S.State:
+  S.Sim.thing.xy.with(~S.Sim.damage.enter.acted, 184, th, S.State.thing.put(184, th, s))
+
+def ledge.at(+level: L.Level, +flags: U32) -> S.State:
+  +th = H.Thing.mobj(H.Thing.info(3002), level, 184, 104767616, 4268374368, 8912896, 0)
+  ledge.moved(S.Sim.thing.mom(H.Thing.hurting(th,
+      V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.flags(), flags)), 24009, 5246),
+    S.State.thing.moved(184, 104767616, 4268374368, S.State.start(level)))
+
+def ledge(level: L.Level, flags: U32) -> S.State:
+  ledge.at(L.Level.plane.put(level, 103, False{}, 4194304), flags)
+
+def pushed(m: Maybe<&2, H.Thing>) -> String:
+  match m:
+    case None{}:
+      "missing"
+    case Some{+th}:
+      "xy " ++ U32.show(H.Thing.x(th)) ++ " " ++ U32.show(H.Thing.y(th))
+        ++ " momentum " ++ U32.show(H.Thing.momx(th)) ++ " " ++ U32.show(H.Thing.momy(th))
+
 def actual(w: Array<U32> & L.Level) -> IO(Unit):
   (mem, +level) = w
   do IO<Unit>:
     IO.print(fought(C.Combat.fought(level)))
     IO.print(crushed(C.Combat.crushed(level)))
     IO.print(living(reopened(level)))
+    IO.print("ledge push " ++ pushed(S.State.thing(184, ledge(level, 4194310))))
+    IO.print("dropoff push " ++ pushed(S.State.thing(184, ledge(level, 4195334))))
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -141,3 +166,5 @@ def main() -> IO(Unit):
 #|door fight tic 40 health 15 random 34
 #|door corpse state 50 height 0 radius 0 solid False dropped 0 random 136
 #|living door ceiling -72.000000 opening True health 20
+#|ledge push xy 104767616 4268374368 momentum 0 0
+#|dropoff push xy 104791625 4268379614 momentum 21758 4754
