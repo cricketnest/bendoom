@@ -340,6 +340,35 @@ def Inter.tic(+down: Bool, wi: Inter) -> Inter:
   Inter.tic.on((bcnt + 1 : U32), Bool.and(down, Bool.not(was)), down,
     Inter{screen, cnt, bcnt, shown, target, anims, mrnd, was})
 
+def Inter.sound.finished(+sp: U32, screen: Inter.Screen) -> Bool:
+  match screen:
+    case Count{next}:
+      Bool.not(U32.is_eq(sp, next))
+    case _:
+      True{}
+
+def Inter.sound.counting(+sp: U32, +press: Bool, +bcnt: U32, after: Inter) ->
+  List<&2, Sn.Sound.Event>:
+  match press:
+    case True{}:
+      [Sn.Sound.plain(Bool.pick(U32, U32.is_eq(sp, 10), Sn.Sound.sgcock(), Sn.Sound.barexp()), Sn.Nobody{})]
+    case False{}:
+      +counts = Bool.or(U32.is_eq(sp, 2), Bool.or(U32.is_eq(sp, 4),
+        Bool.or(U32.is_eq(sp, 6), U32.is_eq(sp, 8))))
+      +ticks = Bool.and(counts, U32.is_zero((bcnt .&. 3 : U32)))
+      +done = Bool.and(counts, Inter.sound.finished(sp, Inter.screen(after)))
+      List.append(&2, Sn.Sound.Event,
+        Bool.pick(List<&2, Sn.Sound.Event>, ticks, [Sn.Sound.plain(Sn.Sound.pistol(), Sn.Nobody{})], []),
+        Bool.pick(List<&2, Sn.Sound.Event>, done, [Sn.Sound.plain(Sn.Sound.barexp(), Sn.Nobody{})], []))
+
+def Inter.sound(+press: Bool, before: Inter, +after: Inter) -> List<&2, Sn.Sound.Event>:
+  Inter{+screen, cnt, bcnt, shown, target, anims, mrnd, down} = before
+  match screen:
+    case Count{sp}:
+      Inter.sound.counting(sp, press, Inter.bcnt(after), after)
+    case _:
+      []
+
 def Inter.over.of(s: Inter.Screen, +cnt: U32) -> Bool:
   match s:
     case Last{}:
@@ -747,13 +776,22 @@ def Play.showing(over: Bool, +level: L.Level, cmd: K.Cmd, press: Bool, wi: Inter
 def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
   Bool.or(held, K.Cmd.use(cmd))
 
+def Play.step.showing(over: Bool, +level: L.Level, +cmd: K.Cmd, +press: Bool, +wi: Inter) -> Play.Step:
+  match over:
+    case True{}:
+      Step{Play.after(S.Sim.tic(cmd, S.State.start(level))), []}
+    case False{}:
+      +after = Inter.tic(press, wi)
+      Step{Showing{after}, Inter.sound(press, wi, after)}
+
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
     case Playing{state}:
       +after = S.Sim.tic(cmd, state)
       Step{Play.after(after), S.State.sounds(after)}
     case Showing{+wi}:
-      Step{Play.showing(Inter.over(wi), level, cmd, Play.pressed(held, cmd), wi), []}
+      +press = Play.pressed(held, cmd)
+      Play.step.showing(Inter.over(wi), level, cmd, press, wi)
 
 def Play.Step.play(step: Play.Step) -> Play:
   Step{play, sounds} = step

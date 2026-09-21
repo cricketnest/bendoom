@@ -37,6 +37,7 @@ import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/inventory.bend as I
 import ../src/inter.bend as W
+import ../src/sound.bend as Sn
 
 def held(n: Nat, forward: U32, side: U32, turn: U32, use: Bool) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, Bool.pick(U32, use, 2, 0)))
@@ -67,6 +68,32 @@ def told(tag: String, +play: W.Play) -> IO(W.Play):
 # The play after so many idle tics.
 def run(n: Nat, +level: L.Level, play: W.Play) -> W.Play:
   W.Play.replay(idle(n), level, play)
+
+def sound.events(events: List<&2, Sn.Sound.Event>) -> String:
+  match events:
+    case []:
+      ""
+    case +event <> rest:
+      " " ++ Sn.Sound.Event.show(event) ++ sound.events(rest)
+
+def sound.line(events: List<&2, Sn.Sound.Event>, play: W.Play) -> String:
+  match events:
+    case []:
+      ""
+    case _:
+      match play:
+        case W.Playing{state}:
+          "sound level" ++ sound.events(events) ++ "\n"
+        case W.Showing{wi}:
+          "sound bcnt " ++ U32.show(W.Inter.bcnt(wi)) ++ sound.events(events) ++ "\n"
+
+def sounds(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play, log: String) -> String:
+  match script:
+    case []:
+      log
+    case +cmd <> rest:
+      +step = W.Play.step(level, cmd, False{}, play)
+      sounds(rest, level, W.Play.Step.play(step), log ++ sound.line(W.Play.Step.sounds(step), W.Play.Step.play(step)))
 
 # A tic of use, which the tally reads as a press, after a tic of none.
 def press(+level: L.Level, play: W.Play) -> W.Play:
@@ -128,6 +155,8 @@ def play(gl: G.Gfx & L.Level) -> IO(Unit):
     p5 : W.Play <- told("nine tics on", run(9n, level, p4))
     p6 : W.Play <- told("ten tics on", run(1n, level, p5))
     p7 : W.Play <- told("the level again", run(1n, level, p6))
+    IO.print(sounds(List.append(&2, K.Cmd, idle(40n), held(1n, 0, 0, 0, True{})), level, p0, "")
+      ++ sounds(held(1n, 0, 0, 0, True{}), level, p1, ""))
     s0 : S.State <- secret("in the secret", level, S.State.at(level, L.Start{F.Fixed.of_map(400),
       F.Fixed.of_map(2040), A.Angle.of_thing(270)}))
     s1 : S.State <- secret("stood a tic", level, S.Sim.tic(K.Cmd.idle(), s0))
@@ -168,6 +197,10 @@ def main() -> IO(Unit):
 #|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93
 #|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93
 #|the level again level tic 1 kills 0/29 items 0/49 secrets 0/4 time 1
+#|sound bcnt 36 DSPISTOL from nobody vol 64 sep 128 DSBAREXP from nobody vol 64 sep 128
+#|sound bcnt 41 DSBAREXP from nobody vol 64 sep 128
+#|sound bcnt 192 DSSGCOCK from nobody vol 64 sep 128
+#|
 #|in the secret tic 0 at 400.000000 2040.000000 sector 86 special 9 left 1 counted 0
 #|stood a tic tic 1 at 400.000000 2040.000000 sector 86 special 9 left 0 counted 1
 #|out south tic 24 at 400.037475 1935.800521 sector 87 special 0 left 0 counted 1
