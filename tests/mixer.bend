@@ -15,9 +15,11 @@
 # second DSPLDETH (32) kicks out the first, since the rule is greater
 # than or equal; DSSTNMOV (119) is less important than every channel and
 # is dropped, so the table does not change; the removed thing's stop
-# frees its channel; and DSNOWAY from nobody does not cut the DSSWTCHN
-# from nobody, since nobody is no origin to compare, and takes the free
-# channel. The sides are I_SDL_UpdateSoundParams': ((254 - sep) * vol) /
+# frees its channel; and DSNOWAY from nobody cuts DSSWTCHN from nobody
+# through S_StopSound(NULL), then takes the first free channel.
+# Updating moves the remaining sectors to volume 51 and separation 204,
+# except sector 3 which leaves earshot and stops. The centred sound
+# stays centred, and stopping NULL frees it. The sides are I_SDL_UpdateSoundParams': ((254 - sep) * vol) /
 # 127 and (sep * vol) / 127. Centred at the default volume that is 63
 # and 64; the door at volume 51 and separation 204 is 20 and 81, and at
 # 64 and 129 it is 62 and 65.
@@ -170,6 +172,15 @@ def Test.played(+dir: String, +render: String, chans: List<Maybe<C.Channel>>) ->
     tape : Maybe<A.Stream.Tape> <- A.Stream.tape(render)
     Test.song(dir, tape)
 
+def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
+  match source:
+    case Sn.Nobody{}:
+      (64, 128)
+    case Sn.Sector{3}:
+      (0, 128)
+    case _:
+      (51, 204)
+
 # The scripted sequence, one event a step.
 def Test.script(+dir: String) -> IO(Unit):
   do IO<Unit>:
@@ -190,7 +201,10 @@ def Test.script(+dir: String) -> IO(Unit):
     c14 : List<Maybe<C.Channel>> <- Test.step(dir, "14", Sn.Start{Sn.Sound.stnmov(), Sn.Sector{10}, 64, 128}, c13)
     c15 : List<Maybe<C.Channel>> <- Test.step(dir, "15", Sn.Stop{Sn.Thing{2}}, c14)
     c16 : List<Maybe<C.Channel>> <- Test.step(dir, "16", Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}, c15)
-    C.Channel.stop(c16)
+    moved : List<Maybe<C.Channel>> <- C.Channel.update(~Unit, ~Test.params, Unit{}, c16)
+    c17 : List<Maybe<C.Channel>> <- Test.told("17", Test.table(moved))
+    c18 : List<Maybe<C.Channel>> <- Test.step(dir, "18", Sn.Stop{Sn.Nobody{}}, c17)
+    C.Channel.stop(c18)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -215,7 +229,9 @@ def main() -> IO(Unit):
 #|13 DSPLDETH/thing 2/63,64 DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 DSSWTCHN/nobody/63,64
 #|14 DSPLDETH/thing 2/63,64 DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 DSSWTCHN/nobody/63,64
 #|15 - DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 DSSWTCHN/nobody/63,64
-#|16 DSNOWAY/nobody/63,64 DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 DSSWTCHN/nobody/63,64
+#|16 DSNOWAY/nobody/63,64 DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 -
+#|17 DSNOWAY/nobody/63,64 DSGETPOW/sector 9/20,81 - DSPSTART/sector 4/20,81 DSPSTOP/sector 5/20,81 DSBDOPN/sector 6/20,81 DSBDCLS/sector 7/20,81 -
+#|18 - DSGETPOW/sector 9/20,81 - DSPSTART/sector 4/20,81 DSPSTOP/sector 5/20,81 DSBDOPN/sector 6/20,81 DSBDCLS/sector 7/20,81 -
 #|grunt 3631499139 0 63 64 1 49 50 3 -50 -50 2714 7399 7517 16995 -43 -44 16996 0 0
 #|after - - - - - - - -
 #|song 2975658234 0 -20 -81 1 -22 -91 2155 -484 -1330 2156 -970 -1188 2157 -624 -1543 15480 2454 6999

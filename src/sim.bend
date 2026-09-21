@@ -2326,8 +2326,11 @@ def Sim.sound.start(+sfx: U32, source: Sn.Sound.Source, params: U32 & U32, s: St
   (+vol, sep) = params
   Sim.sound.if(Bool.not(Bool.or(U32.is_zero(sfx), U32.is_zero(vol))), Sn.Start{sfx, source, vol, sep}, s)
 
+def Sim.sound.parameters(+s: State, source: Sn.Sound.Source) -> U32 & U32:
+  Sim.sound.params(Sim.sound.place(source, s), State.level(s), State.player(s))
+
 def Sim.sound.told(sfx: U32, +source: Sn.Sound.Source, +s: State) -> State:
-  Sim.sound.start(sfx, source, Sim.sound.params(Sim.sound.place(source, s), State.level(s), State.player(s)), s)
+  Sim.sound.start(sfx, source, Sim.sound.parameters(s, source), s)
 
 # Doom's S_StartSound: a source starts a sound, heard by the player where
 # the state has it. What the things were heard doing is reported first,

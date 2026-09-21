@@ -231,5 +231,7 @@ def Sound.Source.same(a: Sound.Source, b: Sound.Source) -> Bool:
       U32.is_eq(i, j)
     case Spot{x, y} Spot{u, v}:
       Bool.and(U32.is_eq(x, u), U32.is_eq(y, v))
+    case Nobody{} Nobody{}:
+      True{}
     case _ _:
       False{}

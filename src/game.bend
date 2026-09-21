@@ -184,10 +184,11 @@ def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
     owed, mem, demo, music})))
 
 def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
-  Game{level, gfx, tables, state, input, again, last, owed, mem, demo, music} = g
-  IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(music),
-    playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, state, input, again, last, owed, mem,
-      demo, playing})))
+  Game{level, gfx, tables, +state, input, again, last, owed, mem, demo, music} = g
+  do IO<Bool & Game>:
+    moved : Maybe<M.Stream> <- M.Stream.update(~S.State, ~(s => source => S.Sim.sound.parameters(s, source)), state, music)
+    playing : Maybe<M.Stream> <- M.Stream.play(moved)
+    return (quit, Game{level, gfx, tables, state, input, again, last, owed, mem, demo, playing})
 
 def Game.mixed(p: Bool & Game) -> IO(Bool & Game):
   (+quit, g) = p
