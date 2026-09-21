@@ -58,6 +58,11 @@ def Sim.hurt.refire() -> U32:
 def Sim.hurt.justattacked() -> U32:
   5
 
+# A special line crossed by one part of a move, with the listener's
+# position at that part's end where vanilla fires it.
+type Sim.Cross is Data:
+  Cross{line: U32, x: U32, y: U32}
+
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
 # height and its delta, the eye's height, the special lines this tic's
@@ -65,7 +70,7 @@ def Sim.hurt.justattacked() -> U32:
 # sprites, and what damage has left.
 type Player is Data:
   Player{x: U32, y: U32, z: U32, angle: U32, momx: U32, momy: U32, momz: U32,
-    floorz: U32, ceilz: U32, viewheight: U32, deltaview: U32, viewz: U32, crossed: List<&2, U32>,
+    floorz: U32, ceilz: U32, viewheight: U32, deltaview: U32, viewz: U32, crossed: List<&2, Sim.Cross>,
     inv: I.Inventory, psprites: Psprites, hurt: V.Vec}
 
 # What Doom's P_CheckPosition and PIT_CheckThing read of a mobj, the one
@@ -185,7 +190,7 @@ def Player.floorz(+p: Player) -> U32:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   floorz
 
-def Player.crossed(+p: Player) -> List<&2, U32>:
+def Player.crossed(+p: Player) -> List<&2, Sim.Cross>:
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   crossed
 
@@ -239,6 +244,10 @@ def Player.pulled(+p: Player, pulled: Bool) -> Player:
 
 def Player.facing(p: Player, +angle: U32) -> Player:
   Player{x, y, z, was, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}
+
+def Player.located(p: Player, +x: U32, +y: U32) -> Player:
+  Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
   Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}
 
 # The player holding an inventory.
@@ -1097,6 +1106,13 @@ def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, 
     L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), False{}, H.Things.you(things), x, y,
     L.Level.sector_at(level, x, y))
 
+def Sim.crossed.at(lines: List<&2, U32>, +x: U32, +y: U32) -> List<&2, Sim.Cross>:
+  match lines:
+    case []:
+      []
+    case line <> rest:
+      Cross{line, x, y} <> Sim.crossed.at(rest, x, y)
+
 def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x: U32, +y: U32, floor: U32,
   ceil: U32, over: List<&2, U32>) -> Sim.Try:
   match go:
@@ -1105,7 +1121,8 @@ def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x:
     case True{}:
       Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
       Try{True{}, Player{x, y, z, angle, momx, momy, momz, floor, ceil, viewheight, deltaview, viewz,
-        List.append(&2, U32, crossed, over), inv, psprites, hurt}, Sim.relink(level, things, ox, oy, x, y)}
+        List.append(&2, Sim.Cross, crossed, Sim.crossed.at(over, x, y)), inv, psprites, hurt},
+        Sim.relink(level, things, ox, oy, x, y)}
 
 # The move is taken when the place passes; the player's mobj then goes
 # first in its cell and its sector. What the check picked up stays picked
@@ -4907,14 +4924,21 @@ def Sim.cross.special(special: U32, +line: U32, +s: State) -> State:
     case _:
       s
 
+# Fire a crossing from the part of the move where vanilla fired it,
+# while preserving the player's final position for the rest of the tic.
+def Sim.cross.one(+line: U32, +x: U32, +y: U32, +s: State) -> State:
+  +p = State.player(s)
+  State.player.put(Sim.cross.special(L.Level.special(State.level(s), line), line,
+    State.player.put(s, Player.located(p, x, y))), p)
+
 # The lines the player's moves crossed this tic, each by the special it
 # has when its turn comes.
-def Sim.cross(lines: List<&2, U32>, +s: State) -> State:
+def Sim.cross(lines: List<&2, Sim.Cross>, +s: State) -> State:
   match lines:
     case []:
       s
-    case +line <> rest:
-      Sim.cross(rest, Sim.cross.special(L.Level.special(State.level(s), line), line, s))
+    case Cross{line, x, y} <> rest:
+      Sim.cross(rest, Sim.cross.one(line, x, y, s))
 
 # Use
 # ---
