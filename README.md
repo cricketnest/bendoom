@@ -139,24 +139,19 @@ To check the proofs and run the tests:
 nix flake check -L
 ```
 
-The simulation uses fixed-point integers. [LAWS.bend](LAWS.bend) states its
-invariants and [PROOF.bend](PROOF.bend) proves them; an open or broken law fails
-the check. Tests in [tests/](tests/) run on both the native and JavaScript
-backends against the expected output in their trailing `#|` lines.
+[LAWS.bend](LAWS.bend) states the simulation's invariants;
+[PROOF.bend](PROOF.bend) proves them. Bend tests run on both the native and
+JavaScript backends. The checks also test the launchers.
 
 Vanilla Doom is the reference for gameplay and rendering.
 [tools/oracle.nu](tools/oracle.nu) compares frames against Chocolate Doom on
 a headless display. Its usage and prerequisites are documented in the script.
 Read [docs/bend.md](docs/bend.md) before changing Bend code or proofs.
 
-The compiler uses a pinned, unmodified
-[Bend source snapshot](https://github.com/eliesgalvira/bendoom/releases/tag/bend-2.0.22-source),
-with platform patches maintained under [nix/](nix/).
-
 ## Project status
 
-The E1M1 milestones through combat, sound effects and music are complete.
-Specs, tickets and verification notes live under [.scratch/](.scratch/).
+E1M1 is playable with combat, sound effects and music.
+Open issues live under [.scratch/](.scratch/).
 The next milestone is **Hellbent**: the game as a single λ-expression.
 
 ## License

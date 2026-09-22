@@ -22,17 +22,15 @@ These rules bind, but they do not exhaust the defect. It is baked into your trai
 
 ## Agent skills
 
+### Documentation
+
+Keep tracked docs to current usage, constraints and open work. Delete completed tickets and stale notes; Git keeps their history. Only keep research that cannot be recovered cheaply from code or Git, under ignored `research/`. Never force-add or publish that directory.
+
 ### Issue tracker
 
-Issues live as local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+When creating or updating a ticket, use `docs/agents/issue-tracker.md`. Open issues live under `.scratch/<feature>/`.
 
-### Triage labels
-
-Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+When dispatching ticket agents, include `docs/agents/ticket-agent.md` in their instructions.
 
 ### Bend constraints
 

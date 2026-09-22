@@ -1,13 +1,3 @@
-# The game and its launcher. On Linux doom.bend links X11 and ALSA; on
-# macOS Bend uses Apple's frameworks. BENDOOM_IWAD in the environment
-# overrides the launcher's default. The game makes no parallel call, and
-# the runtime's idle workers cost it three frames a second, so it runs on
-# one thread. The song and the sounds it plays are the render and the
-# expansion of its own IWAD, so an override of the IWAD carries both
-# along. On Linux, ALSA_PLUGIN_DIR names the plugins the host's ALSA
-# default may need; without them the device will not open and the game
-# plays silent. The game records a
-# demo as hex text, converted and installed after a successful exit.
 { lib, stdenv, callPackage, writeShellApplication, coreutils, bend, libx11, alsa-lib, alsa-plugins, iwad
 , music, sounds }:
 

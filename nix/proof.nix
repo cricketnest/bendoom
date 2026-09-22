@@ -1,4 +1,3 @@
-# bend PROOF.bend fails while any law is open or false.
 { lib, stdenvNoCC, bend }:
 
 stdenvNoCC.mkDerivation {

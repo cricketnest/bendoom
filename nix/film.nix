@@ -1,12 +1,3 @@
-# bendoom-film: a demo in, an MP4 out. film.bend plays the demo and
-# writes its video and mixed audio as hex; basenc makes both into bytes
-# and ffmpeg encodes them.
-# Each of Doom's 320 by 200 pixels becomes a block 5 wide and 6
-# high, so the video is 1600 by 1200: the 4:3 of the monitor the frames
-# were drawn for, every pixel the same size. H.264 in 4:2:0 plays
-# everywhere; its colour, at half resolution, blurs the seams of blocks
-# an odd width apart. The audio has exactly 1260 stereo frames per tic,
-# with each tic's sounds mixed over its song before that tic's frame.
 { lib, callPackage, writers, bend, coreutils, ffmpeg-headless, iwad, music, sounds }:
 
 let

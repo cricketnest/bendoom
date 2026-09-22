@@ -31,11 +31,7 @@
           wads = pkgs.callPackage ./nix/wads.nix { };
           freedoom = "${wads.freedoom}/share/games/doom/freedoom1.wad";
           shareware = "${wads.doom1}/share/games/doom/doom1.wad";
-          # The music and the sounds are functions of the IWAD: a package
-          # that takes one gets that IWAD's song and that IWAD's sounds.
-          # The packages play the shareware WAD unless named -freedoom.
-          # The checks and the dev shell use Freedoom, whose values the
-          # tests pin, so the flake check never needs the unfree WAD.
+          # Tests pin Freedoom values and avoid the unfree WAD.
           render = args: iwad: pkgs.callPackage ./nix/render.nix (args // { inherit bend iwad; });
           music = render {
             pname = "bendoom-music";
@@ -97,9 +93,6 @@
               pkgs.nushell
               pkgs.llvmPackages_19.clang
               pkgs.jujutsu
-              # tools/oracle.nu diffs our frames against Chocolate Doom's,
-              # which it runs on a headless X server; tools/listen.nu
-              # records its music and its sounds.
               pkgs.chocolate-doom
               pkgs.xorg.xorgserver
               pkgs.xdotool
