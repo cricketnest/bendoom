@@ -154,7 +154,9 @@ Read [docs/bend.md](docs/bend.md) before changing Bend code or proofs.
 nix build .#web
 ```
 
-`result/` contains the static website and its Vercel header configuration.
+`result/` contains the static website, its Vercel header configuration and
+`og.png`, the link preview that headless Chromium captures from the page.
+The package is offered on Linux, where nixpkgs has Chromium.
 Deploy that directory as a separate Vercel project. It needs HTTPS and the
 included cross-origin isolation headers for its WebAssembly workers.
 The browser build currently allocates 1 GiB and requires a desktop keyboard.

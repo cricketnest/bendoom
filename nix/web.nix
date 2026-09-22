@@ -5,7 +5,7 @@ let
   inherit (lib.meta) getExe;
 in
 stdenvNoCC.mkDerivation {
-  pname = "bendoom-web";
+  pname = "bendoom-site";
   version = "0.1.0";
   src = toSource {
     root = ../.;

@@ -3,6 +3,7 @@
   perSystem = { config, lib, pkgs, system, ... }:
     let
       inherit (lib.attrsets) optionalAttrs;
+      inherit (lib.meta) availableOn;
     in {
       packages = {
         bend-web = config.packages.bend.overrideAttrs {
@@ -11,9 +12,12 @@
           src = inputs.bend-web-src;
           patches = [ ./web-audio.patch ./web-runtime.patch ];
         };
-        web = pkgs.callPackage ./web.nix {
-          bend = config.packages.bend-web;
-          inherit (config.packages) bendoom;
+      } // optionalAttrs (availableOn pkgs.stdenv.hostPlatform pkgs.chromium) {
+        web = pkgs.callPackage ./web-card.nix {
+          site = pkgs.callPackage ./web.nix {
+            bend = config.packages.bend-web;
+            inherit (config.packages) bendoom;
+          };
         };
       };
       checks = optionalAttrs (system == "x86_64-linux") {
