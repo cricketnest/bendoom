@@ -13,8 +13,9 @@
           patches = [ ./web-audio.patch ./web-runtime.patch ];
         };
       } // optionalAttrs (availableOn pkgs.stdenv.hostPlatform pkgs.chromium) {
-        web = pkgs.callPackage ./web-card.nix {
-          site = pkgs.callPackage ./web.nix {
+        web = pkgs.callPackage ./web.nix {
+          inherit (config.packages.bendoom) iwad;
+          game = pkgs.callPackage ./web-game.nix {
             bend = config.packages.bend-web;
             inherit (config.packages) bendoom;
           };

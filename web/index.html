@@ -13,19 +13,20 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="The Bendoom logo beside the E1M1 spawn, drawn by the Bend renderer.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="art/icon.png">
 <title>Bendoom</title>
 <style>
   :root {
-    --px: 3px;
+    --scale: 3;
+    --px: calc(var(--scale) * 1px);
     --red: #d8261c;
     --gold: #e8c048;
     color-scheme: dark;
     font: 14px/1.6 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace;
     color: #cbb89a;
-    background: #2f2821 var(--floor, none) 0 0 / calc(64 * var(--px));
+    background: #2f2821 url(art/floor.png) 0 0 / calc(64 * var(--px));
     image-rendering: pixelated;
   }
-  @media (max-width: 720px) { :root { --px: 2px; } }
   body {
     box-sizing: border-box;
     min-height: 100vh;
@@ -33,28 +34,28 @@
     padding: 40px max(16px, 50% - 480px) 48px;
     background: radial-gradient(ellipse at 50% 35%, #0000 25%, #000c 95%), linear-gradient(#0000 55%, #5a0a0470);
   }
-  img { display: block; width: calc(var(--w) * var(--px)); max-width: 100%; }
+  :is(h1, button, .level) img { display: block; zoom: var(--scale); }
   header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 32px; margin-bottom: 24px; }
-  h1 { --px: 8px; margin: 0; font: 900 56px/1 Impact, "Arial Black", sans-serif; color: var(--red); text-transform: uppercase; filter: drop-shadow(0 6px 0 #1c0000); }
+  h1 { --scale: 8; margin: 0; filter: drop-shadow(0 6px 0 #1c0000); }
   header p { max-width: 42ch; margin: 0; text-align: right; }
   a { color: var(--gold); white-space: nowrap; text-decoration-thickness: 2px; text-underline-offset: 4px; }
   a:hover { color: #fff; }
   button:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
-  .bevel { border: calc(3 * var(--px)) solid #1a1510; border-image: var(--bevel, none) 3 repeat; }
+  .bevel { border: calc(3 * var(--px)) solid; border-image: url(art/bevel.png) 3 repeat; }
   #screen { position: relative; aspect-ratio: 4 / 3; background: #000; box-shadow: 0 16px 48px #000; }
   #screen > :not(#sound) { position: absolute; inset: 0; width: 100%; height: 100%; }
   #bend { outline: none; }
-  #title { pointer-events: none; }
+  #wipe { pointer-events: none; }
   #cover { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: end; gap: 12px; padding: 32px; background: linear-gradient(#0000 50%, #000d); }
   button { padding: 0; background: none; border: 0; color: var(--red); font: inherit; text-transform: uppercase; cursor: pointer; }
   #play { display: flex; align-items: center; gap: calc(8 * var(--px)); font: 900 40px/1 Impact, "Arial Black", sans-serif; }
-  #play:enabled::before { content: ""; width: calc(20 * var(--px)); height: calc(19 * var(--px)); background: var(--skull1, none) 0 0 / 100%; animation: skull .46s step-end infinite; }
-  @keyframes skull { 50% { background-image: var(--skull2, none); } }
+  #play:enabled::before { content: ""; width: calc(20 * var(--px)); height: calc(19 * var(--px)); background: url(art/skull.png) 0 0 / 200% 100%; animation: skull .46s step-end infinite; }
+  @keyframes skull { 50% { background-position: 100% 0; } }
   #play:disabled { opacity: .4; cursor: wait; }
   #status { margin: 0; color: var(--gold); text-transform: uppercase; letter-spacing: .12em; text-shadow: 0 2px 0 #000; }
   #sound { position: absolute; top: calc(4 * var(--px)); left: calc(4 * var(--px)); }
-  .level { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0; --px: 2px; }
-  .level > :first-child { --px: 4px; }
+  .level { --scale: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0; }
+  .level > :first-child { --scale: 4; }
   #keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; margin: 0; padding: 20px 24px; background: #000b; }
   #keys div { display: flex; align-items: center; gap: 12px; }
   dt { display: flex; gap: 4px; }
@@ -62,22 +63,29 @@
   kbd { min-width: 1.4em; padding: 1px 6px; text-align: center; font: 700 12px/1.6 inherit; color: #eee; background: #585858; border: 2px solid; border-color: #9a9a9a #262626 #262626 #9a9a9a; }
   footer { margin-top: 24px; color: #8d7b62; font-size: 12px; text-align: center; text-transform: uppercase; letter-spacing: .08em; }
   [hidden] { display: none !important; }
+  @media (max-width: 720px) {
+    :root { --scale: 2; }
+    h1 { --scale: 5; }
+    .level { --scale: 1; }
+    .level > :first-child { --scale: 2; }
+  }
 </style>
 <header>
-  <h1 data-art>Bendoom</h1>
+  <h1><img src="art/bendoom.png" alt="Bendoom"></h1>
   <p>DOOM's first level, written in Bend 2 and compiled to WebAssembly. <a href="https://github.com/eliesgalvira/bendoom">Source & downloads</a></p>
 </header>
 <main>
   <div id="screen" class="bevel">
     <canvas id="bend" tabindex="0" aria-label="Bendoom game"></canvas>
-    <canvas id="title" width="320" height="200" aria-hidden="true"></canvas>
+    <img id="title" src="art/title.png" alt="">
+    <canvas id="wipe" width="320" height="200" aria-hidden="true"></canvas>
     <div id="cover">
-      <button id="play" disabled><span data-art="M_NGAME">New game</span></button>
+      <button id="play" disabled><img src="art/new-game.png" alt="New game"></button>
       <p id="status" role="status">Loading game…</p>
     </div>
-    <button id="sound" hidden><span data-art>Click to enable sound</span></button>
+    <button id="sound" hidden><img src="art/sound.png" alt="Click to enable sound"></button>
   </div>
-  <p class="level"><span data-art>E1M1: Hangar</span><span data-art="M_HURT">Hurt me plenty.</span></p>
+  <p class="level"><img src="art/hangar.png" alt="E1M1: Hangar"><img src="art/hurt-me-plenty.png" alt="Hurt me plenty."></p>
   <dl id="keys" class="bevel">
     <div><dt><kbd>W</kbd><kbd>S</kbd></dt><dd>Walk</dd></div>
     <div><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Strafe</dd></div>
@@ -97,6 +105,7 @@
   const sound = document.getElementById('sound');
   const canvas = document.getElementById('bend');
   const title = document.getElementById('title');
+  const wipe = document.getElementById('wipe');
   const controls = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowLeft', 'ArrowRight',
     'ArrowUp', 'ArrowDown', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
     'Space', 'Digit1', 'Digit2', 'Digit3', 'Escape']);
@@ -111,64 +120,9 @@
     play.textContent = 'Reload';
     play.onclick = () => location.reload();
   }
-  function blank(width, height) {
-    return Object.assign(document.createElement('canvas'), { width, height });
-  }
-  // Paints the page with the IWAD's own art: the view border, title screen, menu and HUD font.
-  function dress() {
-    const wad = Module.FS.readFile('/doom1.wad');
-    const view = new DataView(wad.buffer);
-    const lumps = new Map();
-    for (let i = 0, at = view.getInt32(8, true); i < view.getInt32(4, true); i++, at += 16) {
-      const start = view.getInt32(at, true);
-      lumps.set(new TextDecoder().decode(wad.subarray(at + 8, at + 16)).replace(/\0.*/s, ''),
-        wad.subarray(start, start + view.getInt32(at + 4, true)));
-    }
-    const palette = lumps.get('PLAYPAL');
-    function image(width, height, fill) {
-      const art = blank(width, height), context = art.getContext('2d');
-      const pixels = context.createImageData(width, height);
-      fill((x, y, index) => pixels.data.set([...palette.subarray(3 * index, 3 * index + 3), 255], 4 * (y * width + x)));
-      context.putImageData(pixels, 0, 0);
-      return art;
-    }
-    function patch(name) {
-      const lump = lumps.get(name), header = new DataView(lump.buffer, lump.byteOffset);
-      const width = header.getUint16(0, true);
-      return image(width, header.getUint16(2, true), put => {
-        for (let x = 0; x < width; x++)
-          for (let at = header.getUint32(8 + 4 * x, true); lump[at] !== 255; at += lump[at + 1] + 4)
-            for (let i = 0; i < lump[at + 1]; i++) put(x, lump[at] + i, lump[at + 3 + i]);
-      });
-    }
-    function text(string) {
-      const glyphs = [...string.toUpperCase()].map(c => 'STCFN' + String(c.charCodeAt(0)).padStart(3, '0'))
-        .map(name => lumps.has(name) ? patch(name) : blank(4, 1));
-      const line = blank(glyphs.reduce((width, glyph) => width + glyph.width, 0), 8);
-      glyphs.reduce((x, glyph) => (line.getContext('2d').drawImage(glyph, x, 0), x + glyph.width), 0);
-      return line;
-    }
-    const floor = image(64, 64, put => lumps.get('FLOOR7_2').forEach((index, i) => put(i % 64, i >> 6, index)));
-    const bevel = blank(14, 14);
-    for (const [edge, x, y] of [['T', 3, 0], ['B', 3, 11], ['L', 0, 3], ['R', 11, 3],
-      ['TL', 0, 0], ['TR', 11, 0], ['BL', 0, 11], ['BR', 11, 11]])
-      bevel.getContext('2d').drawImage(patch('BRDR_' + edge), x, y);
-    const style = document.documentElement.style;
-    for (const [property, art] of [['--floor', floor], ['--bevel', bevel],
-      ['--skull1', patch('M_SKULL1')], ['--skull2', patch('M_SKULL2')]])
-      style.setProperty(property, `url(${art.toDataURL()})`);
-    title.getContext('2d').drawImage(patch('TITLEPIC'), 0, 0);
-    for (const element of document.querySelectorAll('[data-art]')) {
-      const art = element.dataset.art ? patch(element.dataset.art) : text(element.textContent);
-      const picture = Object.assign(new Image(), { src: art.toDataURL(), alt: element.textContent });
-      picture.style.setProperty('--w', art.width);
-      element.replaceChildren(picture);
-    }
-  }
-  // Vanilla's screen melt: 2-pixel columns fall at 35 Hz from staggered starts.
+  // Vanilla's screen melt: 2-pixel columns of the title screen fall at 35 Hz from staggered starts.
   function melt() {
-    const from = blank(320, 200), context = title.getContext('2d');
-    from.getContext('2d').drawImage(title, 0, 0);
+    const context = wipe.getContext('2d');
     const y = [-Math.floor(Math.random() * 16)];
     for (let i = 1; i < 160; i++) y[i] = Math.min(0, Math.max(-15, y[i - 1] + Math.floor(Math.random() * 3) - 1));
     const tick = setInterval(() => {
@@ -176,9 +130,10 @@
       for (let i = 0; i < 160; i++) {
         y[i] = Math.min(200, y[i] + (y[i] < 0 ? 1 : y[i] < 16 ? y[i] + 1 : 8));
         const top = Math.max(0, y[i]);
-        context.drawImage(from, 2 * i, 0, 2, 200 - top, 2 * i, top, 2, 200 - top);
+        context.drawImage(title, 2 * i, 0, 2, 200 - top, 2 * i, top, 2, 200 - top);
       }
-      if (y.every(row => row === 200)) { clearInterval(tick); title.hidden = true; }
+      title.hidden = true;
+      if (y.every(row => row === 200)) { clearInterval(tick); wipe.hidden = true; }
     }, 1000 / 35);
   }
   var Module = {
@@ -194,7 +149,6 @@
     onRuntimeInitialized() {
       status.textContent = 'Press Enter';
       play.disabled = false;
-      setTimeout(dress);
     },
     onAbort: fail,
     print: console.log,

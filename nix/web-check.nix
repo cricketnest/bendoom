@@ -14,7 +14,7 @@ runCommand "bendoom-web-check" {
   export XDG_CONFIG_HOME=$TMPDIR/config
   mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME"
   mkdir site
-  cp ${web}/* site/
+  cp -r ${web}/. site/
   cp ${../tests/web/audio.html} site/audio-test.html
   bend ${../tests/web/audio.bend} -o audio.c
   emcc -std=gnu11 -O2 -pthread -mtail-call audio.c \

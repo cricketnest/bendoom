@@ -7,7 +7,7 @@ const card = `
   body { display: grid; grid-template: 1fr auto auto 1fr / 1fr auto; gap: 0 40px; height: 630px; padding: 48px; }
   main { display: contents; }
   header { grid-area: 2 / 1; flex-direction: column; align-items: start; margin: 0 0 28px; }
-  h1 { --px: 7px; }
+  h1 { --scale: 7; }
   header p { font-size: 22px; text-align: left; }
   header a, #sound, #keys, .level > :last-child, footer { display: none; }
   .level { grid-area: 3 / 1; margin: 0; }
@@ -25,9 +25,9 @@ async function main() {
       headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' }
     }));
     await page.goto('http://localhost/');
-    await page.waitForFunction(() => document.querySelector('h1 img'), null, { timeout: 120000 });
+    await page.waitForFunction(() => !document.getElementById('play').disabled, null, { timeout: 120000 });
     await page.keyboard.press('Enter');
-    await page.waitForFunction(() => document.getElementById('title').hidden);
+    await page.waitForFunction(() => document.getElementById('wipe').hidden);
     await page.waitForTimeout(1000);
     await page.addStyleTag({ content: card });
     await page.screenshot({ path: path.join(root, 'og.png') });
