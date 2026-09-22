@@ -148,6 +148,23 @@ Vanilla Doom is the reference for gameplay and rendering.
 a headless display. Its usage and prerequisites are documented in the script.
 Read [docs/bend.md](docs/bend.md) before changing Bend code or proofs.
 
+### Browser build
+
+```sh
+nix build .#web
+```
+
+`result/` contains the static website and its Vercel header configuration.
+Deploy that directory as a separate Vercel project. It needs HTTPS and the
+included cross-origin isolation headers for its WebAssembly workers.
+The browser build currently allocates 1 GiB and requires a desktop keyboard.
+
+The native compiler is pinned by `bend-src`; the browser compiler is pinned
+independently by `bend-web-src`. Browser runtime patches are in
+`nix/web-audio.patch` and `nix/web-runtime.patch`. Both builds use the same
+game source. On x86-64 Linux, `nix flake check` also checks browser gameplay
+and audio. CI uploads the website as the `website` artifact.
+
 ## Project status
 
 E1M1 is playable with combat, sound effects and music.

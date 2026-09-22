@@ -14,6 +14,10 @@
       url = "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.22-source/bend-94ee9ba40043643df648b13fc5638b065a37cb4e.tar.gz";
       flake = false;
     };
+    bend-web-src = {
+      url = "github:AdrielSantana/bend/0bafcc5e1a3890b518132130c431cbe98750da76";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ flake-parts, ... }:

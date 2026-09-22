@@ -13,6 +13,23 @@
         "url": "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.22-source/bend-94ee9ba40043643df648b13fc5638b065a37cb4e.tar.gz"
       }
     },
+    "bend-web-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790039303,
+        "narHash": "sha256-fhcjABYDPrqBcKP9KCUwWk5BKUdmtK5N3wGykiDJJg0=",
+        "owner": "AdrielSantana",
+        "repo": "bend",
+        "rev": "0bafcc5e1a3890b518132130c431cbe98750da76",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AdrielSantana",
+        "repo": "bend",
+        "rev": "0bafcc5e1a3890b518132130c431cbe98750da76",
+        "type": "github"
+      }
+    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
@@ -52,6 +69,7 @@
     "root": {
       "inputs": {
         "bend-src": "bend-src",
+        "bend-web-src": "bend-web-src",
         "flake-parts": "flake-parts",
         "nixpkgs": "nixpkgs"
       }
