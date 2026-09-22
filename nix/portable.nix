@@ -1,15 +1,19 @@
 { lib, stdenv, runCommand, closureInfo, patchelf, coreutils, util-linux, alsa-lib, bendoom, variant ? "shareware" }:
 
 let
+  inherit (lib.filesystem) baseNameOf;
+  inherit (lib.lists) optionals singleton;
+  inherit (lib.strings) optionalString removeSuffix;
+
   linux = stdenv.hostPlatform.isLinux;
   runtime = closureInfo {
-    rootPaths = [ bendoom.game ] ++ lib.optionals linux [ bendoom.alsa-plugins coreutils ];
+    rootPaths = singleton bendoom.game ++ optionals linux [ bendoom.alsa-plugins coreutils ];
   };
   name = "bendoom-${variant}-${stdenv.hostPlatform.system}";
 in
 runCommand "${name}.tar.gz" {
-  nativeBuildInputs = lib.optionals linux [ patchelf util-linux ];
-} ''
+  nativeBuildInputs = optionals linux [ patchelf util-linux ];
+} /* bash */ ''
   mkdir -p bundle/bin bundle/share
   cp ${bendoom.game}/bin/program bundle/bin/game
   cp ${bendoom.iwad} bundle/share/doom.wad
@@ -17,8 +21,8 @@ runCommand "${name}.tar.gz" {
   cp -r ${bendoom.sounds} bundle/share/sounds
   cp ${../LICENSE} bundle/LICENSE
   cp ${../README.md} bundle/README.md
-  cp -r ${lib.removeSuffix "/share/games/doom/${baseNameOf bendoom.iwad}" bendoom.iwad}/share/doc bundle/share/doc
-  ${lib.optionalString linux ''
+  cp -r ${removeSuffix "/share/games/doom/${baseNameOf bendoom.iwad}" bendoom.iwad}/share/doc bundle/share/doc
+  ${optionalString linux /* bash */ ''
     mkdir bundle/lib
     printf '%s\n' bundle/bin/game bundle/bin/basenc > elf-files
     while IFS= read -r path; do
@@ -39,8 +43,8 @@ runCommand "${name}.tar.gz" {
       cp -L "$plugin" "$target"
       printf '%s\n' "$target" >> elf-files
     done
-    ln -s ${baseNameOf (toString bendoom.alsa-plugins.client)}/lib/spa-0.2 bundle/lib/spa-0.2
-    ln -s ${baseNameOf (toString bendoom.alsa-plugins.client)}/lib/pipewire-0.3 bundle/lib/pipewire-0.3
+    ln -s ${baseNameOf "${bendoom.alsa-plugins.client}"}/lib/spa-0.2 bundle/lib/spa-0.2
+    ln -s ${baseNameOf "${bendoom.alsa-plugins.client}"}/lib/pipewire-0.3 bundle/lib/pipewire-0.3
     cp -r ${bendoom.alsa-plugins.client}/share/pipewire bundle/share/pipewire
     cp -r ${alsa-lib}/share/alsa bundle/share/alsa
     chmod -R u+w bundle

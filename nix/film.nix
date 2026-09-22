@@ -1,16 +1,19 @@
 { lib, callPackage, writers, bend, coreutils, ffmpeg-headless, iwad, music, sounds }:
 
 let
+  inherit (lib.lists) singleton;
+  inherit (lib.meta) getExe;
+
   frames = callPackage ./program.nix {
     inherit bend;
     pname = "bendoom-film-frames";
     root = ../film.bend;
-    sources = [ ../src ];
+    sources = singleton ../src;
   };
   song = music iwad;
   effects = sounds iwad;
 in
-(writers.writeNuBin "bendoom-film" ''
+(writers.writeNuBin "bendoom-film" /* nu */ ''
   # Encodes a demo Bendoom recorded as an MP4, 35 frames a second.
   def main [demo: path, video: path] {
     let scratch = mktemp --directory
@@ -25,10 +28,10 @@ in
         BENDOOM_IWAD: ($env.BENDOOM_IWAD? | default "${iwad}")
         BENDOOM_MUSIC: "${song}"
         BENDOOM_SOUNDS: "${effects}"
-      } { ^${lib.getExe frames} --threads 1 } o> $video_hex
+      } { ^${getExe frames} --threads 1 } o> $video_hex
       ^${coreutils}/bin/basenc --base16 -d $audio_hex o> $audio_raw
       ^${coreutils}/bin/basenc --base16 -d $video_hex o> $video_raw
-      (^${lib.getExe ffmpeg-headless} -loglevel error -stats -n
+      (^${getExe ffmpeg-headless} -loglevel error -stats -n
         -f rawvideo -pix_fmt rgb24 -s 320x200 -framerate 35 -i $video_raw
         -f s16le -ar 44100 -ac 2 -i $audio_raw
         -filter_complex "[0:v]scale=1600:1200:flags=neighbor[v]"

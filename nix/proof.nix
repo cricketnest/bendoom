@@ -1,12 +1,16 @@
 { lib, stdenvNoCC, bend }:
 
+let
+  inherit (lib.fileset) toSource unions;
+  inherit (lib.lists) singleton;
+in
 stdenvNoCC.mkDerivation {
   pname = "bendoom-proof";
   version = "0.1.0";
 
-  src = lib.fileset.toSource {
+  src = toSource {
     root = ../.;
-    fileset = lib.fileset.unions [
+    fileset = unions [
       ../doom.bend
       ../src
       ../LAWS.bend
@@ -14,9 +18,9 @@ stdenvNoCC.mkDerivation {
     ];
   };
 
-  nativeBuildInputs = [ bend ];
+  nativeBuildInputs = singleton bend;
 
-  buildPhase = ''
+  buildPhase = /* bash */ ''
     runHook preBuild
     export HOME=$TMPDIR
     bend PROOF.bend | tee proof.log
@@ -24,7 +28,7 @@ stdenvNoCC.mkDerivation {
     runHook postBuild
   '';
 
-  installPhase = ''
+  installPhase = /* bash */ ''
     install -Dm644 proof.log $out/proof.log
   '';
 }

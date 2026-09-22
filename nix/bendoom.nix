@@ -2,33 +2,40 @@
 , music, sounds }:
 
 let
+  inherit (lib.lists) optionals singleton;
+  inherit (lib.meta) getExe;
+  inherit (lib.strings) escapeShellArg optionalString;
+  inherit (lib.trivial) readFile;
+  inherit (lib.licenses) gpl2Plus;
+  inherit (lib.platforms) unix;
+
   linux = stdenv.hostPlatform.isLinux;
   game = callPackage ./program.nix {
     inherit bend;
     pname = "bendoom-game";
     root = ../doom.bend;
-    sources = [ ../src ];
-    buildInputs = lib.optionals linux [ libx11 alsa-lib ];
+    sources = singleton ../src;
+    buildInputs = optionals linux [ libx11 alsa-lib ];
   };
 in
 writeShellApplication {
   name = "bendoom";
   passthru = { inherit game iwad alsa-plugins; music = music iwad; sounds = sounds iwad; };
-  runtimeInputs = [ coreutils ];
-  text = ''
-    iwad=${lib.escapeShellArg iwad}
+  runtimeInputs = singleton coreutils;
+  text = /* bash */ ''
+    iwad=${escapeShellArg iwad}
     music=${music iwad}
     sounds=${sounds iwad}
-    ${lib.optionalString linux ''
+    ${optionalString linux /* bash */ ''
       export ALSA_PLUGIN_DIR=''${ALSA_PLUGIN_DIR-${alsa-plugins}}
     ''}
-    run_game() { ${lib.getExe game} "$@"; }
+    run_game() { ${getExe game} "$@"; }
     decode_recording() { basenc --base16 -d "$1"; }
-    ${lib.readFile ./launch.sh}
+    ${readFile ./launch.sh}
   '';
   meta = {
     description = "Doom, written in Bend 2";
-    license = lib.licenses.gpl2Plus;
-    platforms = lib.platforms.unix;
+    license = gpl2Plus;
+    platforms = unix;
   };
 }

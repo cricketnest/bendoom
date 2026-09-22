@@ -5,19 +5,25 @@
 # (.scratch/upstream-bend/issues/01-slow-window-fill.md).
 { lib, stdenvNoCC, makeWrapper, bun, llvmPackages_19, src }:
 
+let
+  inherit (lib.lists) optional singleton;
+  inherit (lib.strings) makeBinPath;
+  inherit (lib.licenses) asl20;
+  inherit (lib.platforms) unix;
+in
 stdenvNoCC.mkDerivation {
   pname = "bend";
   version = "2.0.22";
   inherit src;
 
-  patches = [ ./window-fill.patch ]
-    ++ lib.optional stdenvNoCC.hostPlatform.isDarwin ./local-names.patch;
+  patches = singleton ./window-fill.patch
+    ++ optional stdenvNoCC.hostPlatform.isDarwin ./local-names.patch;
 
-  nativeBuildInputs = [ makeWrapper ];
+  nativeBuildInputs = singleton makeWrapper;
 
   dontBuild = true;
 
-  installPhase = ''
+  installPhase = /* bash */ ''
     runHook preInstall
     mkdir -p $out/share/bend $out/bin
     cp -r bend2 guide $out/share/bend/
@@ -25,15 +31,15 @@ stdenvNoCC.mkDerivation {
       --add-flags "$out/share/bend/bend2/main.ts" \
       --set BEND_NO_TELEMETRY 1 \
       --set-default CC ${llvmPackages_19.clang}/bin/clang \
-      --prefix PATH : ${lib.makeBinPath [ llvmPackages_19.clang ]}
+      --prefix PATH : ${makeBinPath (singleton llvmPackages_19.clang)}
     runHook postInstall
   '';
 
   meta = {
     description = "A fast language that blocks AI mistakes via proof";
     homepage = "https://bend-lang.com";
-    license = lib.licenses.asl20;
+    license = asl20;
     mainProgram = "bend";
-    platforms = lib.platforms.unix;
+    platforms = unix;
   };
 }

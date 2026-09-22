@@ -4,8 +4,13 @@
 # concatenate into a zip.
 { lib, stdenvNoCC, fetchurl, unzip, freedoom, runCommand }:
 
+let
+  inherit (lib.lists) singleton;
+  inherit (lib.licenses) unfreeRedistributable;
+  inherit (lib.platforms) all;
+in
 {
-  freedoom = runCommand "freedoom1-${freedoom.version}" { inherit (freedoom) meta; } ''
+  freedoom = runCommand "freedoom1-${freedoom.version}" { inherit (freedoom) meta; } /* bash */ ''
     install -Dm644 ${freedoom}/share/games/doom/freedoom1.wad $out/share/games/doom/freedoom1.wad
     mkdir -p $out/share/doc
     cp -r ${freedoom}/share/doc/freedoom $out/share/doc/freedoom
@@ -24,23 +29,23 @@
       hash = "sha256-ys8BQrMcoa8AeWtKAzngeZKsXyG8P4HnUy/hteG0huY=";
     };
 
-    nativeBuildInputs = [ unzip ];
+    nativeBuildInputs = singleton unzip;
 
-    unpackPhase = ''
+    unpackPhase = /* bash */ ''
       unzip -q $src
       cat DOOMS_19.1 DOOMS_19.2 > dooms.zip
       unzip -q dooms.zip DOOM1.WAD README.TXT
     '';
 
-    installPhase = ''
+    installPhase = /* bash */ ''
       install -Dm644 DOOM1.WAD $out/share/games/doom/doom1.wad
       install -Dm644 README.TXT $out/share/doc/doom1-wad/README.TXT
     '';
 
     meta = {
       description = "The shareware DOOM IWAD (episode 1)";
-      license = lib.licenses.unfreeRedistributable;
-      platforms = lib.platforms.all;
+      license = unfreeRedistributable;
+      platforms = all;
     };
   };
 }

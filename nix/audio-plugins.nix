@@ -1,6 +1,8 @@
-{ alsa-lib, alsa-plugins, libpulseaudio, pipewire, meson, ninja, pkg-config, symlinkJoin }:
+{ lib, alsa-lib, alsa-plugins, libpulseaudio, pipewire, meson, ninja, pkg-config, symlinkJoin }:
 
 let
+  inherit (lib.lists) map singleton;
+
   pulse = alsa-plugins.overrideAttrs {
     buildInputs = [ alsa-lib libpulseaudio ];
     configureFlags = [
@@ -14,7 +16,7 @@ let
     outputs = [ "out" "dev" ];
     patches = [ ];
     nativeBuildInputs = [ meson ninja pkg-config ];
-    buildInputs = [ alsa-lib ];
+    buildInputs = singleton alsa-lib;
     nativeCheckInputs = [ ];
     mesonFlags = [
       "-Dauto_features=disabled"

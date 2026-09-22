@@ -1,10 +1,13 @@
 { lib, runCommand, nushell, bash, dash, shellcheck }:
 
+let
+  inherit (lib.fileset) toSource unions;
+in
 runCommand "bendoom-launcher-tests" {
   nativeBuildInputs = [ nushell bash dash shellcheck ];
-  src = lib.fileset.toSource {
+  src = toSource {
     root = ../.;
-    fileset = lib.fileset.unions [
+    fileset = unions [
       ../nix/launch.sh
       ../nix/portable.sh
       ../nix/compile.sh
@@ -12,7 +15,7 @@ runCommand "bendoom-launcher-tests" {
       ../tests/launchers.nu
     ];
   };
-} ''
+} /* bash */ ''
   cp -r "$src" source
   chmod -R u+w source
   cd source

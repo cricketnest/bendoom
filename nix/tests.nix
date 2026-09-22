@@ -1,14 +1,20 @@
 { lib, llvmPackages_19, bend, bun, alsa-lib, freedoom, music, sounds }:
 
+let
+  inherit (lib.fileset) toSource unions difference;
+  inherit (lib.lists) optionals singleton;
+  inherit (lib.strings) optionalString;
+  inherit (lib.trivial) readFile;
+in
 llvmPackages_19.stdenv.mkDerivation {
   pname = "bendoom-tests";
   version = "0.1.0";
 
-  src = lib.fileset.toSource {
+  src = toSource {
     root = ../.;
-    fileset = lib.fileset.unions [
+    fileset = unions [
       ../src
-      (lib.fileset.difference ../tests ../tests/launchers.nu)
+      (difference ../tests ../tests/launchers.nu)
       ../film.bend
     ];
   };
@@ -16,20 +22,20 @@ llvmPackages_19.stdenv.mkDerivation {
   nativeBuildInputs = [ bend bun ];
   # tests/game.bend builds the game's loop, whose music links ALSA on
   # Linux.
-  buildInputs = lib.optionals llvmPackages_19.stdenv.hostPlatform.isLinux [ alsa-lib ];
+  buildInputs = optionals llvmPackages_19.stdenv.hostPlatform.isLinux (singleton alsa-lib);
 
   BENDOOM_IWAD = "${freedoom}/share/games/doom/freedoom1.wad";
   BENDOOM_MUSIC = music;
   BENDOOM_SOUNDS = sounds;
 
-  buildPhase = ''
+  buildPhase = /* bash */ ''
     runHook preBuild
     export HOME=$TMPDIR
-    ${lib.optionalString llvmPackages_19.stdenv.hostPlatform.isAarch64 ''
+    ${optionalString llvmPackages_19.stdenv.hostPlatform.isAarch64 /* bash */ ''
       ulimit -S -s 32768
       export BUN_JSC_maxPerThreadStackUsage=16777216
     ''}
-    ${lib.readFile ./compile.sh}
+    ${readFile ./compile.sh}
     for t in tests/*.bend; do
       name=$(basename $t .bend)
       sed -n 's/^#|//p' $t > $name.want
@@ -45,7 +51,7 @@ llvmPackages_19.stdenv.mkDerivation {
     runHook postBuild
   '';
 
-  installPhase = ''
+  installPhase = /* bash */ ''
     install -Dm644 -t $out *.got
   '';
 }
