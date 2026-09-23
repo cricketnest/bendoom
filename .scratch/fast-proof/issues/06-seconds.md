@@ -1,7 +1,7 @@
 # Bring `bend PROOF.bend` to seconds
 
 **Status:** needs-triage
-**Blocked by:** 01, 02
+**Blocked by:** 02
 
 With the examples gone, about 13 s remain: loading and checking the imports,
 the general laws (exit_ends 2.6 s, tic_rest 2.3 s) and helper defs
