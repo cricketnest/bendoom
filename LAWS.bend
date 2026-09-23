@@ -44,16 +44,6 @@ law text_byte_kept:
   for rest: List<&2, Char>
   {B.Bytes.text.cons(65, rest) == Char.from_u32(65) <> rest : List<&2, Char>}
 
-# LAW: four bytes assemble little-endian: 78 56 34 12 reads as
-# 0x12345678 (sanity).
-law le32_bytes:
-  {B.Bytes.le32(120, 86, 52, 18) == 305419896 : U32}
-
-# LAW: "IWAD" is kind 1, "PWAD" kind 2, anything else 0 (sanity).
-law wad_kinds:
-  {(W.Wad.kind(1145132873), W.Wad.kind(1145132880), W.Wad.kind(0))
-    == (1, 2, 0) : U32 & U32 & U32}
-
 # LAW: the first lump called name is at 0 when it heads the list.
 law index_head:
   for +name: String
@@ -61,90 +51,6 @@ law index_head:
   for size: U32
   for rest: List<&2, W.Wad.Lump>
   {W.Wad.index(name, W.Lump{pos, size, name} <> rest) == Some{0n} : Maybe<Nat>}
-
-# LAW: a tree built from a list reads back its elements by position
-# (sanity).
-law vec_of_list:
-  {(V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 0), V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 1),
-    V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 2)) == (5, 6, 7) : U32 & U32 & U32}
-
-# Fixed point
-# -----------
-
-# LAW: a map coordinate converts by sign extension then shift: 0xFFFF
-# is -1.0 and 0x7FFF is 32767.0 (sanity).
-law fixed_of_map:
-  {(F.Fixed.of_map(65535), F.Fixed.of_map(32767)) == (4294901760, 2147418112) : U32 & U32}
-
-# LAW: the signed order puts -1 below 0 and 0 below 1 (sanity).
-law fixed_order:
-  {(F.Fixed.lt(4294967295, 0), F.Fixed.lt(0, 1), F.Fixed.lt(0, 4294967295))
-    == (True{}, True{}, False{}) : Bool & Bool & Bool}
-
-# LAW: multiply answers Doom's FixedMul for positive, negative and mixed
-# signs: 3 * 0.5, -0.5 * -0.5, 3 * -0.5 (sanity).
-law fixed_mul_signs:
-  {(F.Fixed.mul(196608, 32768), F.Fixed.mul(4294934528, 4294934528),
-    F.Fixed.mul(196608, 4294934528)) == (98304, 16384, 4294868992) : U32 & U32 & U32}
-
-# LAW: the split-word multiply keeps the low word of the exact product
-# shifted right by sixteen where the product overflows: 0x7FFFFFFF
-# squared is 0x3FFFFFFF00000001, whose bits 16 to 47 are 0xFFFF0000
-# (sanity).
-law fixed_mul_overflow:
-  {F.Fixed.mul(2147483647, 2147483647) == 4294901760 : U32}
-
-# LAW: multiply by one is the identity and commutes, on samples (sanity;
-# the universal statement is in the ticket's comments).
-law fixed_mul_one:
-  {(F.Fixed.mul(4294901760, 65536), F.Fixed.mul(65536, 4294901760),
-    F.Fixed.mul(51200, 59392), F.Fixed.mul(59392, 51200))
-    == (4294901760, 4294901760, 46400, 46400) : U32 & U32 & U32 & U32}
-
-# LAW: divide answers Doom's FixedDiv: 1 / 3, -1 / 3, and saturates to
-# MAXINT and MININT by sign where the quotient would not fit (sanity).
-law fixed_div:
-  {(F.Fixed.div(65536, 196608), F.Fixed.div(4294901760, 196608), F.Fixed.div(196608, 0),
-    F.Fixed.div(4294770688, 0)) == (21845, 4294945451, 2147483647, 2147483648)
-    : U32 & U32 & U32 & U32}
-
-# Angles
-# ------
-
-# LAW: the fine angle of a binary angle is its top thirteen bits: a
-# quarter turn is 2048 (sanity).
-law fine_quarter:
-  {A.Angle.fine(1073741824) == 2048 : U32}
-
-# LAW: the vanilla sine table at zero, a quarter turn, a half turn, and
-# the cosine at zero; the tangent at the table's middle (sanity).
-law tables_vanilla:
-  {(A.Angle.sin(V.Vec.of_list(T.Tables.finesine(), 10240), 0),
-    A.Angle.sin(V.Vec.of_list(T.Tables.finesine(), 10240), 2048),
-    A.Angle.sin(V.Vec.of_list(T.Tables.finesine(), 10240), 4096),
-    A.Angle.cos(V.Vec.of_list(T.Tables.finesine(), 10240), 0),
-    List.get(&2, U32, T.Tables.finetangent(), 2048n))
-    == (25, 65535, 4294967271, 65535, Some{25}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
-
-# LAW: the angle of a vector: due east is 0, due north a quarter turn
-# (sanity).
-law angle_of_axes:
-  {(A.Angle.of(V.Vec.of_list(T.Tables.tantoangle(), 2049), 65536, 0),
-    A.Angle.of(V.Vec.of_list(T.Tables.tantoangle(), 2049), 0, 65536))
-    == (0, 1073741823) : U32 & U32}
-
-# LAW: the rotation a thing shows, by R_ProjectSprite's rule from the
-# angle of the thing from the eye and the thing's facing, 0 for its
-# front. Facing east, it shows its front to an eye east of it (the angle
-# 180), its back to one west (0), 2 to one north (270) and 6 to one
-# south (90); facing north, its front to one north. A rotation spans
-# the eighth of a turn centred on its angle, so the front runs from
-# 157.5 degrees (0x70000000) and one less is 7 (sanity).
-law sprite_rotation:
-  {(Z.Sprites.rotation(A.Angle.ang180(), 0), Z.Sprites.rotation(0, 0), Z.Sprites.rotation(A.Angle.ang270(), 0),
-    Z.Sprites.rotation(A.Angle.ang90(), 0), Z.Sprites.rotation(A.Angle.ang270(), A.Angle.ang90()),
-    Z.Sprites.rotation(1879048192, 0), Z.Sprites.rotation(1879048191, 0))
-    == (0, 4, 2, 6, 0, 0, 7) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # Keys
 # ----
@@ -166,23 +72,6 @@ law arrows_wasd:
   {(K.Keys.press(63232, down, keys), K.Keys.press(63233, down, keys))
     == (K.Keys.press(119, down, keys), K.Keys.press(115, down, keys)) : K.Keys & K.Keys}
 
-# LAW: walking forward is 25 a tic, running 50; strafing 24 and 40; a
-# turn is 320 for its first five tics, then 640, or 1280 running; Space
-# is the use button (sanity).
-law cmd_tables:
-  {(K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 0),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 5),
-    K.Keys.cmd(K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, 6),
-    K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}}, 0))
-    == (K.Cmd{25, 0, 0, 0}, K.Cmd{50, 0, 0, 0}, K.Cmd{0, 24, 0, 0}, K.Cmd{0, 4294967256, 0, 0},
-      K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 640, 0}, K.Cmd{0, 0, 4294966016, 0},
-      K.Cmd{0, 0, 0, 2})
-    : K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd & K.Cmd}
-
 # LAW: the lowest held number key wins, whatever the higher ones do, as
 # G_BuildTiccmd's loop breaks at the first: BT_CHANGE, 4, with the key's
 # number less one at BT_WEAPONSHIFT, 3.
@@ -192,14 +81,6 @@ law lowest_number_wins:
   {(K.Keys.change(True{}, two, three), K.Keys.change(False{}, True{}, three),
     K.Keys.change(False{}, False{}, True{}), K.Keys.change(False{}, False{}, False{}))
     == (4, 12, 20, 0) : U32 & U32 & U32 & U32}
-
-# LAW: the held count lives in the input: seven tics of the left key
-# from a fresh input turn 320 five times, then 640 (sanity).
-law turn_script:
-  {K.Input.script(7n, K.Input{K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, 0})
-    == [K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0},
-      K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 320, 0}, K.Cmd{0, 0, 640, 0},
-      K.Cmd{0, 0, 640, 0}] : List<&2, K.Cmd>}
 
 # The sim
 # -------
@@ -1376,192 +1257,6 @@ law solid_sorted:
   for sorted: {True{} == C.Clip.sorted(rs) : Bool}
   {True{} == C.Clip.sorted(C.Clip.add(first, last, rs)) : Bool}
 
-# LAW: a range touching its neighbours joins them, and the fragments a
-# wall leaves between solid ranges come out left to right (sanity).
-law solid_clips:
-  {(C.Clip.add(21n, 29n, [C.Range{10n, 20n}, C.Range{30n, 40n}, C.Range{50n, 60n}]),
-    C.Clip.gaps(5n, 45n, [C.Range{10n, 20n}, C.Range{30n, 40n}, C.Range{50n, 60n}]),
-    C.Clip.covers(12n, 18n, [C.Range{10n, 20n}]), C.Clip.covers(12n, 25n, [C.Range{10n, 20n}]))
-    == ([C.Range{10n, 40n}, C.Range{50n, 60n}],
-      [C.Range{5n, 9n}, C.Range{21n, 29n}, C.Range{41n, 45n}], True{}, False{})
-    : List<&2, C.Clip.Range> & List<&2, C.Clip.Range> & Bool & Bool}
-
-# LAW: the view's edges are vanilla's at width 320. The focal length is
-# 160 over the tangent 65586 of fine angle 3072, 10477766; through it
-# the tangent at 3072 lands on column 1 and the next on column 0, so
-# column 0's angle is fine angle 3073, Doom's clipangle 0x20080000; on
-# the other side 1023 lands on 320 and 1022 past it; the tangent 25 at
-# the view's centre lands on column 160 (sanity).
-law view_edges:
-  {(P.Project.focal(V.Vec.of_list(T.Tables.finetangent(), 4096)),
-    P.Project.tox(65586, 10477766), P.Project.tox(65686, 10477766),
-    P.Project.tox(4294901710, 10477766), P.Project.tox(4294901610, 10477766),
-    P.Project.tox(25, 10477766))
-    == (10477766, 1, 0, 320, 321, 160) : U32 & U32 & U32 & U32 & U32 & U32}
-
-# LAW: the sweep gives each column the least fine angle whose column is
-# not past it: over the columns 321, 320, 2, 0, -1 of fine angles 0 to
-# 4, columns 320 down to 2 take angles 1 and 2, columns 1 and 0 take 3;
-# as binary angles less a quarter turn (sanity).
-law view_sweep:
-  {(List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 0n),
-    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 1n),
-    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 2n),
-    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 319n),
-    List.get(&2, U32, P.Project.xtoangle([321, 320, 2, 0, 4294967295]), 320n))
-    == (Some{3222798336}, Some{3222798336}, Some{3222274048}, Some{3222274048}, Some{3221749760})
-    : Maybe<&2, U32> & Maybe<&2, U32> & Maybe<&2, U32> & Maybe<&2, U32> & Maybe<&2, U32>}
-
-# LAW: a row's slope is 160 over its distance from the centre row's top
-# edge plus a half: 320 at rows 83 and 84, 160 / 83.5 at rows 0 and 167
-# (sanity).
-law view_rows:
-  {(P.Project.yslope(0), P.Project.yslope(83), P.Project.yslope(84), P.Project.yslope(167))
-    == (125577, 20971520, 20971520, 125577) : U32 & U32 & U32 & U32}
-
-# LAW: the wall scale from the global angle, looking east at a wall
-# whose normal faces the eye. At distance 160 it is 1, at the centre and
-# at column 0's angle alike; at 100/65536 the division would overflow,
-# so it is 64; at distance 2 it is 80, capped at 64; seen edge on, the
-# sine 25 makes it 25/65536, raised to 256 (sanity).
-law wall_scale:
-  {(P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 0, 10485760),
-    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 537395200, 0,
-      10485760),
-    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 0, 100),
-    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 0, 131072),
-    P.View.scale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0, 1073741824,
-      10485760))
-    == (65536, 65536, 4194304, 4194304, 256) : U32 & U32 & U32 & U32 & U32}
-
-# LAW: the light tables' ends. A wall's colormap is 60 less four a light
-# number less half the scale index, held to 0 and 31: the darkest light
-# is 31 at both ends of the scale, the brightest 0, light 8 runs from 28
-# to 5. A span's is the same start less half of 160 over the distance
-# index plus one: light 8 is 0 at index 0, 18 at 7, 28 at 127 (sanity).
-law light_tables:
-  {(P.Project.scalelight(0, 0), P.Project.scalelight(0, 47), P.Project.scalelight(15, 0),
-    P.Project.scalelight(15, 47), P.Project.scalelight(8, 0), P.Project.scalelight(8, 47),
-    P.Project.zlight(8, 0), P.Project.zlight(8, 7), P.Project.zlight(8, 127))
-    == (31, 31, 0, 0, 28, 5, 0, 18, 28)
-    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
-
-# LAW: a wall column's arithmetic, facing a wall 160 away head on with
-# texture offset 64. At the centre column the tangent 25 of the wall's
-# normal takes 4000/65536 off the offset, texture column 63; at column
-# 0's angle the tangent 65686 takes 160.37, texture column -97, the
-# shift flooring the negative. The reciprocal of scale 1 is 65535, of
-# the cap 64 it is 1023, of the floor 1/256 it is 16777215. At light 8
-# scale 1 is light index 16, colormap 20; scale 64 is index 1024, capped
-# at 47, colormap 5 (sanity).
-law wall_column:
-  {(R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0},
-      10485760, 4194304, 1073741824, 0),
-    R.Segs.texcol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Vec.of_list(T.Tables.finetangent(), 4096),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0},
-      10485760, 4194304, 1073741824, 0),
-    R.Segs.iscale(65536), R.Segs.iscale(4194304), R.Segs.iscale(256),
-    R.Segs.colormap(8, 65536), R.Segs.colormap(8, 4194304))
-    == (63, 4294967199, 65535, 1023, 16777215, 74240, 70400)
-    : U32 & U32 & U32 & U32 & U32 & U32 & U32}
-
-# LAW: a range's silhouette, with the eye 41 over a floor at 8 under a
-# ceiling at 128. A one-sided wall clips both ways at any height. A
-# masked texture over a floor stepping down to 0 keeps the front's floor
-# as the height it clips under, and fills in the top at any height. A
-# window between two like sectors clips nothing. A door shut at the
-# floor clips below at any height, and above since its ceiling is under
-# the eye (sanity).
-law silhouettes:
-  {(R.Segs.sil.of(True{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 0, 0}, 3211264),
-    R.Segs.sil.of(False{}, True{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 8388608, 160}, 3211264),
-    R.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 8388608, 160}, 3211264),
-    R.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 524288, 160}, 3211264))
-    == ((3, 2147483647, 2147483648), (3, 524288, 2147483648), (0, 0, 0), (3, 2147483647, 2147483648))
-    : (U32 & U32 & U32) & (U32 & U32 & U32) & (U32 & U32 & U32) & (U32 & U32 & U32)}
-
-# LAW: R_ProjectSprite holds a sprite's columns to the screen, and
-# R_DrawVisSprite steps down a column by the scale's reciprocal. Facing
-# east, a thing x ahead and y to the left has tz = x and tx = -y; its
-# scale is 160 / tz, and with the patch 64 wide and its origin 32 in,
-# x1 = 160 + (tx - 32) scale and x2 = 160 + (tx + 32) scale - 1, the
-# first held to 0 and the last to 319. The patch's column starts at 0,
-# or at 64 less 1/65536 for a mirrored patch (startfrac = width - 1),
-# and steps xiscale = 1 / scale a column, its negation when mirrored;
-# a sprite cut on the left starts xiscale (x1 - x1 unclipped) further.
-# - 160 ahead the scale and its reciprocal are 1: straight ahead, x1 =
-#   128 and x2 = 191; 150 left, x1 = -22, drawn from 0 at column 22 of
-#   the patch; mirrored and 150 right, x1 = 278 and x2 = 341, drawn to
-#   319 from 64 less 1/65536 stepping -1; 400 left, x2 = -209, culled.
-# - 320 ahead the scale is 1/2 and xiscale 2: straight ahead, x1 = 160
-#   - 16 = 144 and x2 = 176 - 1 = 175. Mirrored and 308 left, x1 = 160
-#   - 170 = -10 and x2 = 160 - 138 - 1 = 21: drawn from 0, its patch's
-#   column 64 less 1/65536 plus -2 times 10, 44 less 1/65536, stepping
-#   -2. That column is drawn with dc_iscale 2, the step's absolute
-#   value, and its top at 84 less half the 15 its top stands over the
-#   eye, 76.5; the clips no range set are the screen's edges (sanity).
-law sprite_columns:
-  {(Fx.Sprite.at(1, 10485760, 0, 0), Fx.Sprite.at(2, 10485760, 9830400, 0), Fx.Sprite.at(3, 10485760, 4285136896, 1),
-    Fx.Sprite.at(4, 10485760, 26214400, 0), Fx.Sprite.at(5, 20971520, 0, 0), Fx.Sprite.at(6, 20971520, 20185088, 1),
-    Z.Sprites.col.of(0, Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000,
-      69120, 1, 6}, Z.Sprites.unclipped(), Z.Sprites.unclipped()))
-    == ([Z.Vis{128, 191, 65536, 10485760, 0, 0, 3670016, 983040, 0, 65536, 1000, 69120, 1, 1}],
-      [Z.Vis{0, 41, 65536, 10485760, 9830400, 0, 3670016, 983040, 1441792, 65536, 1000, 69120, 1, 2}],
-      [Z.Vis{278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760, 2000, 69120, 1, 3}],
-      [], [Z.Vis{144, 175, 32768, 20971520, 0, 0, 3670016, 983040, 0, 131072, 1000, 69120, 1, 5}],
-      [Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000, 69120, 1, 6}],
-      Q.Col{0, 5013504, 32768, 983040, 131072, 69120, 4294967295, 168})
-    : List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis>
-      & List<&2, Z.Sprites.Vis> & List<&2, Z.Sprites.Vis> & Q.Masked.Col}
-
-# LAW: R_SortVisSprites draws the smallest scale first, and of equal
-# scales the vissprite made first: sectors in the order the walk reached
-# them, and in a sector its thing list's order, the order its things are
-# shown in. That list is vanilla's P_SetThingPosition's: the last to
-# spawn first, 9, 5, 2, and a thing that moves goes first, as 2 does
-# here moved a unit east (sanity).
-law sprite_order:
-  {(List.sort(~Z.Sprites.Vis, ~Z.Sprites.before, [Fx.Sprite.vis(131072, 1, 5), Fx.Sprite.vis(65536, 2, 3),
-      Fx.Sprite.vis(65536, 1, 9), Fx.Sprite.vis(65536, 1, 4)]),
-    Fx.Sprite.shown(Fx.Closed.ranked(6, 2097152, 0)), Fx.Sprite.shown(Fx.Sprite.moved(Fx.Closed.ranked(6, 2097152, 0))))
-    == ([Fx.Sprite.vis(65536, 1, 4), Fx.Sprite.vis(65536, 1, 9), Fx.Sprite.vis(65536, 2, 3), Fx.Sprite.vis(131072, 1, 5)],
-      [9, 5, 2], [2, 9, 5])
-    : List<&2, Z.Sprites.Vis> & List<&2, U32> & List<&2, U32>}
-
-# LAW: a plane's arithmetic, looking east from the origin. The sky turns
-# a column every 2^22 of angle: column 0's view angle is column 128 of
-# the sky, and a quarter turn on it is 256 more. At light 8 a span 200
-# away has light index 12, colormap 22; one 13120 away has index 820,
-# capped at 127, colormap 28. The centre row's slope 320 puts a plane 41
-# under the eye 13120 away; the frame's scales are 0 along x and 409
-# along y, so a span there steps 0 and 13120 * 409 a column, and with a
-# distance scale of 65537 it starts 13120.2 further along x through the
-# cosine 65535, and the sine 25 of that to the south. Packed as the DOS
-# span loop packs it, x 1.5 and y 2.25 are 0x06000900, texel 1 of row 2
-# (sanity).
-law plane_span:
-  {(N.Planes.skycol(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0),
-    N.Planes.skycol(P.View{0, 0, 0, 1073741824, 0, 0, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-      V.Leaf{537395200}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}, 0),
-    N.Planes.colormap(8, 13107200), N.Planes.colormap(8, 859832320),
-    N.Planes.xscale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0},
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}),
-    N.Planes.yscale(P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240), V.Leaf{0},
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 0}, 0}),
-    N.Planes.step(N.Flat{P.View{0, 0, 0, 0, 0, 0, P.Tables{V.Vec.of_list(T.Tables.finesine(), 10240),
-      V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{20971520}, V.Leaf{65537}, V.Leaf{0}, 0}, 0},
-      0, 409, 2686976, 8, 0}, 84, 0),
-    D.Draw.span.pack(98304, 147456), D.Draw.span.spot(100665600))
-    == (128, 384, 74752, 76288, 0, 409, N.Step{859832319, 4294639291, 0, 5366080, 76288}, 100665600, 129)
-    : U32 & U32 & U32 & U32 & U32 & U32 & N.Planes.Step & U32 & U32}
-
 # LAW: the loop under every column and span reaches the indices from its
 # first, in order, as many as it is asked and no other: the checker
 # riding it from i sees each index be the one expected and ends
@@ -1572,25 +1267,6 @@ law each_in_order:
   for n: Nat
   for +i: Nat
   {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, n, i, Fx.Seq{True{}, i}) == Fx.Seq{True{}, Nat.add(n, i)} : Fx.Seq}
-
-# Animations
-# ----------
-
-# LAW: P_UpdateSpecials' translation, on Freedoom's numbers. FWATER1 is
-# the WAD's flat 141, the first of 4, numbered 3 here: before the first
-# tic it shows itself; the first tic runs with the level's time 0 and
-# sets 3 + (0 + 141) mod 4 = 4, which holds through the 8th; the 9th
-# runs with time 8 and sets 3 + (1 + 141) mod 4 = 5; and 32 tics on,
-# one full cycle, it is 5 again. NUKAGE3 is flat 124, the last of 3,
-# numbered 2 with NUKAGE1 at 0: 0 + (0 + 124) mod 3 = 1 after tics 1 to
-# 8, then 2 after the 9th and, 24 tics on, after the 33rd (sanity).
-law animation_frames:
-  {(G.Gfx.anim.shown(0, 3, 4, 141, 0), G.Gfx.anim.shown(1, 3, 4, 141, 0), G.Gfx.anim.shown(8, 3, 4, 141, 0),
-    G.Gfx.anim.shown(9, 3, 4, 141, 0), G.Gfx.anim.shown(41, 3, 4, 141, 0),
-    G.Gfx.anim.shown(0, 2, 3, 124, 2), G.Gfx.anim.shown(1, 2, 3, 124, 2), G.Gfx.anim.shown(8, 2, 3, 124, 2),
-    G.Gfx.anim.shown(9, 2, 3, 124, 2), G.Gfx.anim.shown(33, 2, 3, 124, 2))
-    == (3, 4, 4, 5, 5, 2, 1, 1, 2, 2)
-    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # Music
 # -----
@@ -1610,93 +1286,12 @@ law end_of_track_ends:
   for rest: List<&2, U32>
   {Mi.Midi.end(1n, Mi.Midi.next(Mi.Track{0 <> 255 <> 47 <> 0 <> rest, 0})) == Mi.Track{rest, 255} : Mi.Midi.Track}
 
-# LAW: a MUS score as mus2mid.c converts it. Channel 3, used first, is
-# MIDI channel 0 and gets an all-notes-off with the delta before its
-# first event; percussion channel 15 is 9 and gets none. A key with its
-# top bit set carries a velocity, masked to 7 bits, which later presses
-# on the channel reuse, whatever other channels do. The pitch wheel's
-# byte b is bend 64 * (b & 1), b >> 1; system event 14 is controller
-# 121; controller 0 is a program change and 3 is volume, 144 cut to 127.
-# The nine channels used next take MIDI 1 to 8 and then 10. A set top
-# bit on a descriptor ends its group, and the delay that follows, 5, 128
-# and 257 in two bytes each, and 3, falls on the next event, the end
-# included.
-law mus_events:
-  {Fx.Closed.song(Mi.Midi.file(Fx.Closed.mus([147, 188, 100, 5, 19, 62, 31, 164, 133, 35, 129, 51, 14, 67, 0, 133,
-    195, 3, 144, 129, 0, 0, 60, 1, 60, 2, 60, 4, 60, 5, 60, 6, 60, 7, 60, 8, 60, 137, 188, 130, 1, 147, 64, 3, 96])))
-    == (70, [Fx.At{0, Mi.Chan{176, 0, 123, 0}}, Fx.At{0, Mi.Chan{144, 0, 60, 100}}, Fx.At{5, Mi.Chan{144, 0, 62, 100}},
-      Fx.At{0, Mi.Chan{144, 9, 36, 5}}, Fx.At{0, Mi.Chan{224, 0, 64, 64}}, Fx.At{0, Mi.Chan{176, 0, 121, 0}},
-      Fx.At{0, Mi.Chan{192, 0, 5, 0}}, Fx.At{0, Mi.Chan{176, 0, 7, 127}}, Fx.At{128, Mi.Chan{176, 1, 123, 0}},
-      Fx.At{0, Mi.Chan{128, 1, 60, 0}}, Fx.At{0, Mi.Chan{176, 2, 123, 0}}, Fx.At{0, Mi.Chan{128, 2, 60, 0}},
-      Fx.At{0, Mi.Chan{176, 3, 123, 0}}, Fx.At{0, Mi.Chan{128, 3, 60, 0}}, Fx.At{0, Mi.Chan{176, 4, 123, 0}},
-      Fx.At{0, Mi.Chan{128, 4, 60, 0}}, Fx.At{0, Mi.Chan{176, 5, 123, 0}}, Fx.At{0, Mi.Chan{128, 5, 60, 0}},
-      Fx.At{0, Mi.Chan{176, 6, 123, 0}}, Fx.At{0, Mi.Chan{128, 6, 60, 0}}, Fx.At{0, Mi.Chan{176, 7, 123, 0}},
-      Fx.At{0, Mi.Chan{128, 7, 60, 0}}, Fx.At{0, Mi.Chan{176, 8, 123, 0}}, Fx.At{0, Mi.Chan{128, 8, 60, 0}},
-      Fx.At{0, Mi.Chan{176, 10, 123, 0}}, Fx.At{0, Mi.Chan{128, 10, 60, 0}}, Fx.At{257, Mi.Chan{144, 0, 64, 100}},
-      Fx.At{3, Mi.End{}}]) : U32 & List<&2, Fx.Closed.At>}
-
-# LAW: a SMPTE division, 0xE728, means 25 frames a second of 40 ticks,
-# but MIDI_GetFileTimeDivision divides the whole short, -6360, by 256
-# toward zero: 24 * 40 ticks a beat (sanity).
-law smpte_division:
-  {Fx.Closed.song(Mi.Midi.file(Fx.Closed.midi([0, 0, 0, 1, 231, 40], [0, 255, 47, 0])))
-    == (960, [Fx.At{0, Mi.End{}}]) : U32 & List<&2, Fx.Closed.At>}
-
-# LAW: the lumps the render refuses, in order, and near misses it takes:
-# neither MUS nor MIDI. MIDI, after the smallest track it takes: a status
-# byte of 0xF3; a data byte before any status; a delta of five bytes, but
-# not of four; a track cut short; format 2; a track header other than
-# MTrk. MUS, after the smallest score it takes: controller 10 in a
-# controller change; event type 5; system event 9; a delay of 2^28 ticks;
-# a delay of 2^28 - 1, which mus2mid.c writes but whose microseconds
-# pass the 2^31 the render counts, though a delay of 300000 ticks, 35.7
-# minutes at 140 a second, is taken; a score cut short; and a score of
-# 49144 releases in a lump of 96 KiB, which i_oplmusic.c does not
-# convert.
-law song_faults:
-  {[Fx.Closed.fails([1, 2, 3, 4, 5, 6, 7, 8]),
-    Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 255, 47, 0])),
-    Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 243, 0, 255, 47, 0])),
-    Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 60, 100, 0, 255, 47, 0])),
-    Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [129, 128, 128, 128, 0, 255, 47, 0])),
-    Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [128, 128, 128, 0, 255, 47, 0])),
-    Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 144, 60])),
-    Fx.Closed.fails(Fx.Closed.midi([0, 2, 0, 1, 0, 96], [0, 255, 47, 0])),
-    Fx.Closed.fails([77, 84, 104, 100, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96, 77, 84, 114, 120, 0, 0, 0, 0, 0, 255, 47, 0]),
-    Fx.Closed.fails(Fx.Closed.mus([96])),
-    Fx.Closed.fails(Fx.Closed.mus([64, 10, 0, 96])),
-    Fx.Closed.fails(Fx.Closed.mus([80, 96])),
-    Fx.Closed.fails(Fx.Closed.mus([48, 9, 96])),
-    Fx.Closed.fails(Fx.Closed.mus([128, 60, 129, 128, 128, 128, 0, 96])),
-    Fx.Closed.fails(Fx.Closed.mus([128, 60, 255, 255, 255, 127, 96])),
-    Fx.Closed.fails(Fx.Closed.mus([128, 60, 146, 167, 96, 96])),
-    Fx.Closed.fails(Fx.Closed.mus([16])),
-    Fx.Closed.fails(Fx.Closed.mus(List.append(&2, U32, List.replicate(U32, U32.to_nat(98288), 0), [96])))]
-    == [True{}, False{}, True{}, True{}, True{}, False{}, True{}, True{}, True{}, False{}, True{}, True{}, True{},
-      True{}, True{}, False{}, True{}, True{}] : List<&2, Bool>}
-
-# LAW: the 1025th write queued on a reset chip finds OPL3_WriteRegBuffered's
-# buffer full: the first, due at sample 2, is applied at once and the
-# sample count moves to 2, while the new write is due at 2050, two after
-# the 1024th (sanity).
-law buffer_spills:
-  {Fx.Closed.buffer(O.Opl.queue(List.replicate(O.Opl.Write, U32.to_nat(1025), O.Write{1, 0}), O.Opl.reset()))
-    == (2, 2050, U32.to_nat(1024)) : U32 & U32 & Nat}
-
 # LAW: any callback pushed on the empty heap is its first, and popping
 # it empties the heap.
 law heap_one:
   for +e: Sg.Song.Entry
   {(Sg.Song.push([], e), Sg.Song.pop(Sg.Song.push([], e))) == ([e], [])
     : List<&2, Sg.Song.Entry> & List<&2, Sg.Song.Entry>}
-
-# LAW: callbacks due at the same time do not pop in the order they were
-# pushed: after the first, OPL_Queue_Pop moves the last entry to the top,
-# so the third pushed runs before the second (sanity).
-law heap_ties:
-  {Sg.Song.pop(Sg.Song.push(Sg.Song.push(Sg.Song.push([], Sg.Entry{5, Some{0}}), Sg.Entry{5, Some{1}}),
-    Sg.Entry{5, Some{2}}))
-    == [Sg.Entry{5, Some{2}}, Sg.Entry{5, Some{1}}] : List<&2, Sg.Song.Entry>}
 
 # LAW: before any note, a note off or an all-notes-off on any channel
 # releases nothing and writes nothing.
@@ -1735,15 +1330,6 @@ law channels_priority:
   for protected: {True{} == Ch.Channel.model.protected(priority, slots) : Bool}
   {Ch.Channel.model.size.keys(slots) == Ch.Channel.choice(priority, slots) : Nat}
 
-# LAW: CacheSFX's refusals, on a 57-byte lump unless said: a lump under
-# its 8-byte header, a format other than 3, a length of 48, and a length
-# one past what follows the header are refused; a length of 49 that fits
-# is played (sanity).
-law sfx_refusals:
-  {[X.Sfx.played(7, 3, 0), X.Sfx.played(57, 2, 49), X.Sfx.played(57, 3, 48), X.Sfx.played(57, 3, 50),
-    X.Sfx.played(57, 3, 49)]
-    == [False{}, False{}, False{}, False{}, True{}] : List<&2, Bool>}
-
 # LAW: a sound at 16000 or 17990 Hz, the rates of Freedoom's two sounds
 # that SDL's converter is not given, has no run, whatever it holds.
 law sfx_rates_unserved:
@@ -1751,25 +1337,3 @@ law sfx_rates_unserved:
   for bytes: List<&2, U32>
   {(X.Sfx.run(X.Sound{16000, count, bytes}), X.Sfx.run(X.Sound{17990, count, bytes}))
     == (None{}, None{}) : Maybe<&2, X.Sfx.Run> & Maybe<&2, X.Sfx.Run>}
-
-# The status bar
-# --------------
-
-# LAW: ST_updateWidgets' keyboxes over the three colours, the icons
-# numbered as ST_loadGraphics loads STKEYS0 to STKEYS5 from slot 21: a
-# colour with neither key shows nothing, the blue card shows the first
-# icon, the blue skull over it shows the fourth, and the red skull alone
-# shows the sixth in the bottom slot.
-law key_boxes:
-  {[Y.Bar.keybox(0, 0), Y.Bar.keybox(0, 2), Y.Bar.keybox(1, 0), Y.Bar.keybox(1, 1), Y.Bar.keybox(9, 0),
-    Y.Bar.keybox(32, 2), Y.Bar.keybox(32, 0)]
-    == [4294967295, 4294967295, 21, 4294967295, 24, 26, 4294967295] : List<&2, U32>}
-
-# LAW: ST_createWidgets' w_arms reads weaponowned[i + 1], so the arms
-# panel counts the pistol first and the BFG last and never the fist or
-# the chainsaw: the starting pair shows the pistol's yellow number, slot
-# 12, and a grey number for every other, and owning the chainsaw leaves
-# slot 6 grey while owning the BFG turns it yellow.
-law arms_numbers:
-  {[Y.Bar.arm(3, 0), Y.Bar.arm(3, 1), Y.Bar.arm(7, 1), Y.Bar.arm(3, 5), Y.Bar.arm(131, 5), Y.Bar.arm(64, 5)]
-    == [12, 28, 13, 32, 32, 17] : List<&2, U32>}

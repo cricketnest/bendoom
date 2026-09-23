@@ -93,22 +93,121 @@
 # gold, 11. A tic stood in the nukage of sector 173 leaves a damage
 # count of 4, which picks the first red, 2; by the dead frame's tic 650
 # it has long faded. Pinned to Freedoom.
+# Before the frames, the renderer's arithmetic on chosen values, worked
+# by hand from vanilla's r_*.c. A colormap prints as its table's
+# address, 69120 plus 256 a map.
+# - clip, gaps, covers: a range touching its neighbours joins them, 21
+#   to 29 between 10 to 20 and 30 to 40; the fragments a wall from 5 to
+#   45 leaves between solid ranges come out left to right; 10 to 20
+#   covers 12 to 18 and not 12 to 25.
+# - focal, tox: the view's edges at width 320. The focal length is 160
+#   over the tangent 65586 of fine angle 3072, 10477766; through it the
+#   tangent at 3072 lands on column 1 and the next on column 0, so
+#   column 0's angle is fine angle 3073, Doom's clipangle 0x20080000; on
+#   the other side 1023 lands on 320 and 1022 past it; the tangent 25 at
+#   the view's centre lands on column 160.
+# - xtoangle: columns 0, 1, 2, 319 and 320 of a sweep, which gives each
+#   column the least fine angle whose column is not past it: over the
+#   columns 321, 320, 2, 0, -1 of fine angles 0 to 4, columns 320 down
+#   to 2 take angles 1 and 2, columns 1 and 0 take 3; as binary angles
+#   less a quarter turn.
+# - yslope: a row's slope is 160 over its distance from the centre row's
+#   top edge plus a half: 320 at rows 83 and 84, 160 / 83.5 at rows 0 and
+#   167.
+# - scale: the wall scale from the global angle, looking east at a wall
+#   whose normal faces the eye. At distance 160 it is 1, at the centre
+#   and at column 0's angle alike; at 100/65536 the division would
+#   overflow, so it is 64; at distance 2 it is 80, capped at 64; seen
+#   edge on, the sine 25 makes it 25/65536, raised to 256.
+# - scalelight, zlight: the light tables' ends. A wall's colormap is 60
+#   less four a light number less half the scale index, held to 0 and
+#   31: the darkest light is 31 at both ends of the scale, the brightest
+#   0, light 8 runs from 28 to 5. A span's is the same start less half
+#   of 160 over the distance index plus one: light 8 is 0 at index 0, 18
+#   at 7, 28 at 127.
+# - texcol, iscale, wall colormap: facing a wall 160 away head on with
+#   texture offset 64. At the centre column the tangent 25 of the wall's
+#   normal takes 4000/65536 off the offset, texture column 63; at column
+#   0's angle the tangent 65686 takes 160.37, texture column -97, the
+#   shift flooring the negative. The reciprocal of scale 1 is 65535, of
+#   the cap 64 it is 1023, of the floor 1/256 it is 16777215. At light 8
+#   scale 1 is light index 16, colormap 20; scale 64 is index 1024,
+#   capped at 47, colormap 5.
+# - silhouettes: a range's silhouette (1 clips below, 2 above), the
+#   height it clips under and the one it clips over, MAXINT and MININT
+#   for any height, with the eye 41 over a floor at 8 under a ceiling at
+#   128. A one-sided wall clips both ways at any height. A masked texture
+#   over a floor stepping down to 0 keeps the front's floor as the height
+#   it clips under, and fills in the top at any height. A window between
+#   two like sectors clips nothing. A door shut at the floor clips below
+#   at any height, and above since its ceiling is under the eye.
+# - sprite: R_ProjectSprite holds a sprite's columns to the screen, and
+#   R_DrawVisSprite steps down a column by the scale's reciprocal. Each
+#   vissprite prints x1, x2, scale, gx, gy, gz, gzt, texturemid,
+#   startfrac, xiscale, patch, colormap, and its sector's rank and
+#   thing's place. Facing east, a thing x ahead and y to the left has tz
+#   = x and tx = -y; its scale is 160 / tz, and with the patch 64 wide
+#   and its origin 32 in, x1 = 160 + (tx - 32) scale and x2 = 160 + (tx +
+#   32) scale - 1, the first held to 0 and the last to 319. The patch's
+#   column starts at 0, or at 64 less 1/65536 for a mirrored patch
+#   (startfrac = width - 1), and steps xiscale = 1 / scale a column, its
+#   negation when mirrored; a sprite cut on the left starts xiscale (x1 -
+#   x1 unclipped) further. 160 ahead the scale and its reciprocal are 1:
+#   straight ahead, x1 = 128 and x2 = 191; 150 left, x1 = -22, drawn from
+#   0 at column 22 of the patch; mirrored and 150 right, x1 = 278 and x2
+#   = 341, drawn to 319 from 64 less 1/65536 stepping -1; 400 left, x2 =
+#   -209, culled. 320 ahead the scale is 1/2 and xiscale 2: straight
+#   ahead, x1 = 160 - 16 = 144 and x2 = 176 - 1 = 175. Mirrored and 308
+#   left, x1 = 160 - 170 = -10 and x2 = 160 - 138 - 1 = 21: drawn from 0,
+#   its patch's column 64 less 1/65536 plus -2 times 10, 44 less 1/65536,
+#   stepping -2.
+# - sprite column: that last sprite's column 0 (x, top, scale,
+#   texturemid, dc_iscale, colormap, and the clips), drawn with dc_iscale
+#   2, the step's absolute value, and its top at 84 less half the 15 its
+#   top stands over the eye, 76.5; the clips no range set are the
+#   screen's edges.
+# - sorted, shown: R_SortVisSprites draws the smallest scale first, and
+#   of equal scales the vissprite made first: sectors in the order the
+#   walk reached them, and in a sector its thing list's order, the order
+#   its things are shown in. That list is vanilla's P_SetThingPosition's:
+#   the last to spawn first, 9, 5, 2, and a thing that moves goes first,
+#   as 2 does here moved a unit east.
+# - skycol, flat: a plane's arithmetic, looking east from the origin.
+#   The sky turns a column every 2^22 of angle: column 0's view angle is
+#   column 128 of the sky, and a quarter turn on it is 256 more. At light
+#   8 a span 200 away has light index 12, colormap 22; one 13120 away has
+#   index 820, capped at 127, colormap 28. The frame's scales are 0 along
+#   x and 409 along y. The centre row's slope 320 puts a plane 41 under
+#   the eye 13120 away, so a span there steps 0 and 13120 * 409 a
+#   column, and with a distance scale of 65537 it starts 13120.2 further
+#   along x through the cosine 65535, and the sine 25 of that to the
+#   south.
+# - span: packed as the DOS span loop packs it, x 1.5 and y 2.25 are
+#   0x06000900, texel 1 of row 2.
 import Base
 import ../src/bytes.bend as B
+import ../src/vec.bend as V
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
+import ../src/tables.bend as T
 import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/clip.bend as Cl
 import ../src/project.bend as P
 import ../src/draw.bend as D
+import ../src/segs.bend as Sg
+import ../src/planes.bend as N
+import ../src/sprites.bend as Z
+import ../src/masked.bend as Q
 import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
 import ./fixtures/route.bend as Rt
 import ./fixtures/combat.bend as C
+import ./fixtures/closed.bend as Fx
 
 type Hash is Type:
   Hash{mem: Array<U32>, h: U32, pal: U32}
@@ -382,15 +481,140 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     n4 : Array<U32> <- said("said none", tables, gfx, S.Sim.replay(idle(20n), S.State.start(level)), n3)
     IO.print("end")
 
+def words(xs: List<&2, U32>) -> String:
+  List.show(~&2, ~U32, ~U32.show, xs)
+
+def range(r: Cl.Clip.Range) -> String:
+  Cl.Range{first, last} = r
+  Nat.show(first) ++ ".." ++ Nat.show(last)
+
+def ranges(rs: List<&2, Cl.Clip.Range>) -> String:
+  List.show(~&2, ~Cl.Clip.Range, ~range, rs)
+
+def some(m: Maybe<&2, U32>) -> String:
+  Maybe.show(~&2, ~U32, ~U32.show, m)
+
+def sil(s: U32 & U32 & U32) -> String:
+  (kind, bottom, top) = s
+  words([kind, bottom, top])
+
+def vis(v: Z.Sprites.Vis) -> String:
+  Z.Vis{x1, x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, nth} = v
+  words([x1, x2, scale, gx, gy, gz, gzt, mid, frac, step, patch, cmap, rank, nth])
+
+def viss(vs: List<&2, Z.Sprites.Vis>) -> String:
+  List.show(~&2, ~Z.Sprites.Vis, ~vis, vs)
+
+def col(c: Q.Masked.Col) -> String:
+  Q.Col{x, top, scale, mid, iscale, cmap, cc, fc} = c
+  words([x, top, scale, mid, iscale, cmap, cc, fc])
+
+def step(s: N.Planes.Step) -> String:
+  N.Step{xfrac, yfrac, xstep, ystep, cmap} = s
+  words([xfrac, yfrac, xstep, ystep, cmap])
+
+# A view from the origin at an angle, with the sine and tangent tables,
+# and every column's angle, every row's slope and every column's
+# distance scale one value.
+def view(angle: U32, sine: V.Vec, tangent: V.Vec, xtoangle: U32, yslope: U32, distscale: U32) -> P.View:
+  P.View{0, 0, 0, angle, 0, 0, P.Tables{sine, tangent, V.Leaf{0}, V.Leaf{0}, V.Leaf{xtoangle}, V.Leaf{yslope},
+    V.Leaf{distscale}, V.Leaf{0}, 0}, 0}
+
+def arithmetic() -> IO(Unit):
+  +sines = V.Vec.of_list(T.Tables.finesine(), 10240)
+  +tans = V.Vec.of_list(T.Tables.finetangent(), 4096)
+  +solid = {[Cl.Range{10n, 20n}, Cl.Range{30n, 40n}, Cl.Range{50n, 60n}] : List<&2, Cl.Clip.Range>}
+  +cols = P.Project.xtoangle([321, 320, 2, 0, 4294967295])
+  do IO<Unit>:
+    IO.print("clip " ++ ranges(Cl.Clip.add(21n, 29n, solid)))
+    IO.print("gaps " ++ ranges(Cl.Clip.gaps(5n, 45n, solid)))
+    IO.print("covers " ++ List.show(~&2, ~Bool, ~Bool.show, [Cl.Clip.covers(12n, 18n, [Cl.Range{10n, 20n}]),
+      Cl.Clip.covers(12n, 25n, [Cl.Range{10n, 20n}])]))
+    IO.print("focal " ++ U32.show(P.Project.focal(tans)))
+    IO.print("tox " ++ words([P.Project.tox(65586, 10477766), P.Project.tox(65686, 10477766),
+      P.Project.tox(4294901710, 10477766), P.Project.tox(4294901610, 10477766), P.Project.tox(25, 10477766)]))
+    IO.print("xtoangle " ++ String.join([some(List.get(&2, U32, cols, 0n)), some(List.get(&2, U32, cols, 1n)),
+      some(List.get(&2, U32, cols, 2n)), some(List.get(&2, U32, cols, 319n)), some(List.get(&2, U32, cols, 320n))], " "))
+    IO.print("yslope " ++ words([P.Project.yslope(0), P.Project.yslope(83), P.Project.yslope(84), P.Project.yslope(167)]))
+    IO.print("scale " ++ words([P.View.scale(view(0, sines, V.Leaf{0}, 0, 0, 0), 0, 0, 10485760),
+      P.View.scale(view(0, sines, V.Leaf{0}, 0, 0, 0), 537395200, 0, 10485760),
+      P.View.scale(view(0, sines, V.Leaf{0}, 0, 0, 0), 0, 0, 100),
+      P.View.scale(view(0, sines, V.Leaf{0}, 0, 0, 0), 0, 0, 131072),
+      P.View.scale(view(0, sines, V.Leaf{0}, 0, 0, 0), 0, 1073741824, 10485760)]))
+    IO.print("scalelight " ++ words([P.Project.scalelight(0, 0), P.Project.scalelight(0, 47),
+      P.Project.scalelight(15, 0), P.Project.scalelight(15, 47), P.Project.scalelight(8, 0),
+      P.Project.scalelight(8, 47)]))
+    IO.print("zlight " ++ words([P.Project.zlight(8, 0), P.Project.zlight(8, 7), P.Project.zlight(8, 127)]))
+    IO.print("texcol " ++ words([Sg.Segs.texcol(view(0, V.Leaf{0}, tans, 0, 0, 0), 10485760, 4194304, 1073741824, 0),
+      Sg.Segs.texcol(view(0, V.Leaf{0}, tans, 537395200, 0, 0), 10485760, 4194304, 1073741824, 0)]))
+    IO.print("iscale " ++ words([Sg.Segs.iscale(65536), Sg.Segs.iscale(4194304), Sg.Segs.iscale(256)]))
+    IO.print("wall colormap " ++ words([Sg.Segs.colormap(8, 65536), Sg.Segs.colormap(8, 4194304)]))
+    IO.print("silhouettes " ++ String.join([
+      sil(Sg.Segs.sil.of(True{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 0, 0}, 3211264)),
+      sil(Sg.Segs.sil.of(False{}, True{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 8388608, 160}, 3211264)),
+      sil(Sg.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 8388608, 160}, 3211264)),
+      sil(Sg.Segs.sil.of(False{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{524288, 524288, 160}, 3211264))],
+      " "))
+    IO.print("sprite 160 ahead " ++ viss(Fx.Sprite.at(1, 10485760, 0, 0)))
+    IO.print("sprite 150 left " ++ viss(Fx.Sprite.at(2, 10485760, 9830400, 0)))
+    IO.print("sprite 150 right mirrored " ++ viss(Fx.Sprite.at(3, 10485760, 4285136896, 1)))
+    IO.print("sprite 400 left " ++ viss(Fx.Sprite.at(4, 10485760, 26214400, 0)))
+    IO.print("sprite 320 ahead " ++ viss(Fx.Sprite.at(5, 20971520, 0, 0)))
+    IO.print("sprite 308 left mirrored " ++ viss(Fx.Sprite.at(6, 20971520, 20185088, 1)))
+    IO.print("sprite column " ++ col(Z.Sprites.col.of(0, Z.Vis{0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040,
+      2883583, 4294836224, 2000, 69120, 1, 6}, Z.Sprites.unclipped(), Z.Sprites.unclipped())))
+    IO.print("sorted " ++ viss(List.sort(~Z.Sprites.Vis, ~Z.Sprites.before, [Fx.Sprite.vis(131072, 1, 5),
+      Fx.Sprite.vis(65536, 2, 3), Fx.Sprite.vis(65536, 1, 9), Fx.Sprite.vis(65536, 1, 4)])))
+    IO.print("shown " ++ words(Fx.Sprite.shown(Fx.Closed.ranked(6, 2097152, 0))))
+    IO.print("shown moved " ++ words(Fx.Sprite.shown(Fx.Sprite.moved(Fx.Closed.ranked(6, 2097152, 0)))))
+    IO.print("skycol " ++ words([N.Planes.skycol(view(0, V.Leaf{0}, V.Leaf{0}, 537395200, 0, 0), 0),
+      N.Planes.skycol(view(1073741824, V.Leaf{0}, V.Leaf{0}, 537395200, 0, 0), 0)]))
+    IO.print("flat colormap " ++ words([N.Planes.colormap(8, 13107200), N.Planes.colormap(8, 859832320)]))
+    IO.print("flat scales " ++ words([N.Planes.xscale(view(0, sines, V.Leaf{0}, 0, 0, 0)),
+      N.Planes.yscale(view(0, sines, V.Leaf{0}, 0, 0, 0))]))
+    IO.print("flat step " ++ step(N.Planes.step(N.Flat{view(0, sines, V.Leaf{0}, 0, 20971520, 65537), 0, 409, 2686976,
+      8, 0}, 84, 0)))
+    IO.print("span " ++ words([D.Draw.span.pack(98304, 147456), D.Draw.span.spot(100665600)]))
+
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
   frames(mem, gl)
 
 def main() -> IO(Unit):
   do IO<Unit>:
+    arithmetic()
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
     start(world)
 
+#|clip [10..40, 50..60]
+#|gaps [5..9, 21..29, 41..45]
+#|covers [True, False]
+#|focal 10477766
+#|tox [1, 0, 320, 321, 160]
+#|xtoangle Some(3222798336) Some(3222798336) Some(3222274048) Some(3222274048) Some(3221749760)
+#|yslope [125577, 20971520, 20971520, 125577]
+#|scale [65536, 65536, 4194304, 4194304, 256]
+#|scalelight [31, 31, 0, 0, 28, 5]
+#|zlight [0, 18, 28]
+#|texcol [63, 4294967199]
+#|iscale [65535, 1023, 16777215]
+#|wall colormap [74240, 70400]
+#|silhouettes [3, 2147483647, 2147483648] [3, 524288, 2147483648] [0, 0, 0] [3, 2147483647, 2147483648]
+#|sprite 160 ahead [[128, 191, 65536, 10485760, 0, 0, 3670016, 983040, 0, 65536, 1000, 69120, 1, 1]]
+#|sprite 150 left [[0, 41, 65536, 10485760, 9830400, 0, 3670016, 983040, 1441792, 65536, 1000, 69120, 1, 2]]
+#|sprite 150 right mirrored [[278, 319, 65536, 10485760, 4285136896, 0, 3670016, 983040, 4194303, 4294901760, 2000, 69120, 1, 3]]
+#|sprite 400 left []
+#|sprite 320 ahead [[144, 175, 32768, 20971520, 0, 0, 3670016, 983040, 0, 131072, 1000, 69120, 1, 5]]
+#|sprite 308 left mirrored [[0, 21, 32768, 20971520, 20185088, 0, 3670016, 983040, 2883583, 4294836224, 2000, 69120, 1, 6]]
+#|sprite column [0, 5013504, 32768, 983040, 131072, 69120, 4294967295, 168]
+#|sorted [[0, 0, 65536, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4], [0, 0, 65536, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9], [0, 0, 65536, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3], [0, 0, 131072, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5]]
+#|shown [9, 5, 2]
+#|shown moved [2, 9, 5]
+#|skycol [128, 384]
+#|flat colormap [74752, 76288]
+#|flat scales [0, 409]
+#|flat step [859832319, 4294639291, 0, 5366080, 76288]
+#|span [100665600, 129]
 #|start hash 3501647150 pixels 1 1 7 5 96 72 covered True palette 0
 #|lit 736 464 135 hash 1888788078 pixels 106 8 95 105 96 72 covered True palette 0
 #|dark -416 256 90 hash 1364473328 pixels 110 107 0 238 96 72 covered True palette 0

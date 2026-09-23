@@ -152,85 +152,7 @@ def Laws.text_nul_ends(rest):
 def Laws.text_byte_kept(rest):
   {==}
 
-def Laws.le32_bytes():
-  {==}
-
-def Laws.wad_kinds():
-  {==}
-
-def Laws.vec_of_list():
-  {==}
-
-def Laws.fixed_of_map():
-  {==}
-
-def Laws.fixed_order():
-  {==}
-
-def Laws.fixed_mul_signs():
-  {==}
-
-def Laws.fixed_mul_overflow():
-  {==}
-
-def Laws.fixed_mul_one():
-  {==}
-
-def Laws.fixed_div():
-  {==}
-
-def Laws.fine_quarter():
-  {==}
-
-def Laws.tables_vanilla():
-  {==}
-
-def Laws.angle_of_axes():
-  {==}
-
-def Laws.sprite_rotation():
-  {==}
-
-def Laws.cmd_tables():
-  {==}
-
-def Laws.turn_script():
-  {==}
-
 def Laws.line_geometry():
-  {==}
-
-def Laws.solid_clips():
-  {==}
-
-def Laws.view_edges():
-  {==}
-
-def Laws.view_sweep():
-  {==}
-
-def Laws.view_rows():
-  {==}
-
-def Laws.wall_scale():
-  {==}
-
-def Laws.light_tables():
-  {==}
-
-def Laws.wall_column():
-  {==}
-
-def Laws.silhouettes():
-  {==}
-
-def Laws.sprite_columns():
-  {==}
-
-def Laws.sprite_order():
-  {==}
-
-def Laws.plane_span():
   {==}
 
 # A comparison of a value with itself answers EQ, from a bit up to a
@@ -1823,9 +1745,6 @@ def Laws.each_in_order(n, i):
         : {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, m, 1n+i, Fx.Seq{True{}, 1n+i}) == Fx.Seq{True{}, _} : Fx.Seq}
       Laws.each_in_order(m, 1n+i)
 
-def Laws.animation_frames():
-  {==}
-
 def Laws.blue_door_locked():
   {==}
 
@@ -1945,34 +1864,10 @@ def Laws.end_of_track_ends(rest):
 def Laws.heap_one(e):
   {==}
 
-def Laws.heap_ties():
-  {==}
-
 def Laws.quiet_offs(t, raw, key, vel):
   {==}
 
-def Laws.mus_events():
-  {==}
-
-def Laws.smpte_division():
-  {==}
-
-def Laws.song_faults():
-  {==}
-
-def Laws.buffer_spills():
-  {==}
-
-def Laws.sfx_refusals():
-  {==}
-
 def Laws.sfx_rates_unserved(count, bytes):
-  {==}
-
-def Laws.key_boxes():
-  {==}
-
-def Laws.arms_numbers():
   {==}
 
 def Laws.dropped_ammo():

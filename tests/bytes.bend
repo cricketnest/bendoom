@@ -5,8 +5,14 @@
 # is 97, so "abc" sums to 97 + 98 + 99, 4096 of 'a' to 97 * 4096, which
 # fill their array, and a 'b' after them doubles it. Hex takes each
 # cell's low byte, so 427, 0x1ab, reads ab.
+# Then words: the bytes 78 56 34 12 assemble little-endian as
+# 0x12345678; a WAD's kind is 1 for "IWAD" and 2 for "PWAD", each read
+# as a little-endian word, and 0 for anything else; and a tree built
+# from 5 6 7 reads them back by position.
 import Base
 import ../src/bytes.bend as B
+import ../src/wad.bend as W
+import ../src/vec.bend as V
 
 def ints(xs: List<&2, U32>) -> String:
   match xs:
@@ -49,6 +55,10 @@ def main() -> IO(Unit):
     missing : Result<&1, &1, U32 & String, Array<U32>> <- B.Bytes.read("bytes.missing")
     IO.print("missing: opened " ++ Bool.show(Result.is_done(&1, &1, U32 & String, Array<U32>, missing)))
     IO.print("hex " ++ B.Bytes.hex([0, 9, 10, 15, 16, 128, 255, 427]))
+    IO.print("le32" ++ ints([B.Bytes.le32(120, 86, 52, 18)]))
+    IO.print("kinds" ++ ints([W.Wad.kind(1145132873), W.Wad.kind(1145132880), W.Wad.kind(0)]))
+    IO.print("vec" ++ ints([V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 0), V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 1),
+      V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 2)]))
 
 #|empty: 1 slots | 0 | sum 0
 #|a: 1 slots | 97 | sum 97
@@ -59,3 +69,6 @@ def main() -> IO(Unit):
 #|4096 a, b: 8192 slots | 97 97 97 97 97 | sum 397410
 #|missing: opened False
 #|hex 00090a0f1080ffab
+#|le32 305419896
+#|kinds 1 2 0
+#|vec 5 6 7

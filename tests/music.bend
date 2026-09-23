@@ -19,15 +19,53 @@
 #   $c | reduce --fold 2166136261 {|x, h| (($h | bits xor $x) * 16777619) mod 4294967296 }
 #   $c | get 67843 | [($in | bits and 65535) ($in | bits shr 16)] | each { if $in >= 32768 { $in - 65536 } else { $in } }
 #
-# Last, OPL_Queue_AdjustCallbacks on callbacks overdue as the tempo
+# Then OPL_Queue_AdjustCallbacks on callbacks overdue as the tempo
 # changes, worked by hand from C's conversions: 993 at now 1000 with the
 # factor (float) 500000 / 480000 is 1000 + (int64) (-7 / 1.0416666f) =
 # 994, and 90 at now 100 with the factor 0.75 is 100 + (int64) (-10 /
 # 0.75f) = 87. Freedoom reaches that path only with the factor 1.
+# Then lumps built by hand, each read as the reader hands the song over:
+# its division, and its first track's events, each after its delta, as
+# its kind, channel and two data bytes.
+# First a MUS score as mus2mid.c converts it. Channel 3, used first, is
+# MIDI channel 0 and gets an all-notes-off (controller 123) with the
+# delta before its first event; percussion channel 15 is 9 and gets
+# none. A key with its top bit set carries a velocity, masked to 7 bits,
+# which later presses on the channel reuse, whatever other channels do.
+# The pitch wheel's byte b is bend 64 * (b & 1), b >> 1; system event 14
+# is controller 121; controller 0 is a program change and 3 is volume,
+# 144 cut to 127. The nine channels used next take MIDI 1 to 8 and then
+# 10. A set top bit on a descriptor ends its group, and the delay that
+# follows, 5, 128 and 257 in two bytes each, and 3, falls on the next
+# event, the end included. The division is mus2mid.c's 70.
+# Then a SMPTE division, 0xE728, which means 25 frames a second of 40
+# ticks, but MIDI_GetFileTimeDivision divides the whole short, -6360, by
+# 256 toward zero: 24 * 40 ticks a beat.
+# Then the lumps the render refuses, True, in order, and near misses it
+# takes, False: neither MUS nor MIDI. MIDI, after the smallest track it
+# takes: a status byte of 0xF3; a data byte before any status; a delta
+# of five bytes, but not of four; a track cut short; format 2; a track
+# header other than MTrk. MUS, after the smallest score it takes:
+# controller 10 in a controller change; event type 5; system event 9; a
+# delay of 2^28 ticks; a delay of 2^28 - 1, which mus2mid.c writes but
+# whose microseconds pass the 2^31 the render counts, though a delay of
+# 300000 ticks, 35.7 minutes at 140 a second, is taken; a score cut
+# short; and a score of 49144 releases in a lump of 96 KiB, which
+# i_oplmusic.c does not convert.
+# Then the 1025th write queued on a reset chip, which finds
+# OPL3_WriteRegBuffered's buffer full: the first, due at sample 2, is
+# applied at once and the sample count moves to 2, while the new write
+# is due at 2050, two after the 1024th; the line is the sample count,
+# the last write's time and the writes pending.
+# Last, callbacks due at the same time, each its time and track, do not
+# pop in the order they were pushed: after the first, OPL_Queue_Pop moves
+# the last entry to the top, so the third pushed runs before the second.
 import Base
 import ../src/fnv.bend as H
 import ../src/midi.bend as M
 import ../src/song.bend as S
+import ../src/opl.bend as O
+import ./fixtures/closed.bend as Fx
 
 # Events by kind: the channel events by their status's high nibble from
 # 0x80, then tempo, end and any other.
@@ -145,10 +183,76 @@ def Test.print(+env: S.Song.Env) -> IO(Unit):
     IO.print("rescale " ++ U32.show(S.Song.rescale(1000, (U32.to_f32(500000) / U32.to_f32(480000) : F32), 993))
       ++ " " ++ U32.show(S.Song.rescale(100, (U32.to_f32(3) / U32.to_f32(4) : F32), 90)))
 
+def Test.kind(+e: M.Midi.Event) -> String:
+  Maybe.default(&2, String, List.get(&2, String, Test.kinds(), U32.to_nat(Test.slot(e))), "")
+
+def Test.data(e: M.Midi.Event) -> String:
+  match e:
+    case M.Chan{kind, ch, p1, p2}:
+      " " ++ U32.show(ch) ++ " " ++ U32.show(p1) ++ " " ++ U32.show(p2)
+    case M.Tempo{us}:
+      " " ++ U32.show(us)
+    case _:
+      ""
+
+def Test.events(+tag: String, events: List<&2, Fx.Closed.At>) -> String:
+  match events:
+    case []:
+      ""
+    case Fx.At{delta, +e} <> rest:
+      "\n" ++ tag ++ " " ++ U32.show(delta) ++ " " ++ Test.kind(e) ++ Test.data(e) ++ Test.events(tag, rest)
+
+def Test.lump(+tag: String, song: U32 & List<&2, Fx.Closed.At>) -> String:
+  (division, events) = song
+  tag ++ " division " ++ U32.show(division) ++ Test.events(tag, events)
+
+# n zeros before a tail, as a loop: List.replicate's recursion over a
+# 96 KiB lump overflows bun's stack.
+def Test.zeros(n: Nat, tail: List<&2, U32>) -> List<&2, U32>:
+  match n:
+    case 0n:
+      tail
+    case 1n+m:
+      Test.zeros(m, 0 <> tail)
+
+def Test.buffer(b: U32 & U32 & Nat) -> String:
+  (count, last, pending) = b
+  "buffer " ++ U32.show(count) ++ " " ++ U32.show(last) ++ " " ++ Nat.show(pending)
+
+def Test.entry(e: S.Song.Entry) -> String:
+  S.Entry{time, track} = e
+  U32.show(time) ++ " " ++ Maybe.show(~&2, ~U32, ~U32.show, track)
+
 def main() -> IO(Unit):
   do IO<Unit>:
     env : S.Song.Env <- S.Song.load()
     Test.print(env)
+    IO.print(Test.lump("mus", Fx.Closed.song(M.Midi.file(Fx.Closed.mus([147, 188, 100, 5, 19, 62, 31, 164, 133, 35, 129, 51, 14, 67, 0,
+      133, 195, 3, 144, 129, 0, 0, 60, 1, 60, 2, 60, 4, 60, 5, 60, 6, 60, 7, 60, 8, 60, 137, 188, 130, 1, 147, 64, 3,
+      96])))))
+    IO.print(Test.lump("smpte", Fx.Closed.song(M.Midi.file(Fx.Closed.midi([0, 0, 0, 1, 231, 40], [0, 255, 47, 0])))))
+    IO.print("faults " ++ List.show(~&2, ~Bool, ~Bool.show, [Fx.Closed.fails([1, 2, 3, 4, 5, 6, 7, 8]),
+      Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 255, 47, 0])),
+      Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 243, 0, 255, 47, 0])),
+      Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 60, 100, 0, 255, 47, 0])),
+      Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [129, 128, 128, 128, 0, 255, 47, 0])),
+      Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [128, 128, 128, 0, 255, 47, 0])),
+      Fx.Closed.fails(Fx.Closed.midi([0, 0, 0, 1, 0, 96], [0, 144, 60])),
+      Fx.Closed.fails(Fx.Closed.midi([0, 2, 0, 1, 0, 96], [0, 255, 47, 0])),
+      Fx.Closed.fails([77, 84, 104, 100, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96, 77, 84, 114, 120, 0, 0, 0, 0, 0, 255, 47, 0]),
+      Fx.Closed.fails(Fx.Closed.mus([96])),
+      Fx.Closed.fails(Fx.Closed.mus([64, 10, 0, 96])),
+      Fx.Closed.fails(Fx.Closed.mus([80, 96])),
+      Fx.Closed.fails(Fx.Closed.mus([48, 9, 96])),
+      Fx.Closed.fails(Fx.Closed.mus([128, 60, 129, 128, 128, 128, 0, 96])),
+      Fx.Closed.fails(Fx.Closed.mus([128, 60, 255, 255, 255, 127, 96])),
+      Fx.Closed.fails(Fx.Closed.mus([128, 60, 146, 167, 96, 96])),
+      Fx.Closed.fails(Fx.Closed.mus([16])),
+      Fx.Closed.fails(Fx.Closed.mus(Test.zeros(U32.to_nat(98288), [96])))]))
+    IO.print(Test.buffer(Fx.Closed.buffer(O.Opl.queue(List.replicate(O.Opl.Write, U32.to_nat(1025), O.Write{1, 0}),
+      O.Opl.reset()))))
+    IO.print("heap " ++ List.show(~&2, ~S.Song.Entry, ~Test.entry, S.Song.pop(S.Song.push(S.Song.push(S.Song.push([],
+      S.Entry{5, Some{0}}), S.Entry{5, Some{1}}), S.Entry{5, Some{2}}))))
 
 #|song ticks 26114 events 12478 off 5483 on 5483 touch 0 controller 439 program 80 pressure 0 bend 955 tempo 3 end 18 other 17
 #|hash 1145462143
@@ -159,3 +263,37 @@ def main() -> IO(Unit):
 #|70000 649 662
 #|71999 1518 1335
 #|rescale 994 87
+#|mus division 70
+#|mus 0 controller 0 123 0
+#|mus 0 on 0 60 100
+#|mus 5 on 0 62 100
+#|mus 0 on 9 36 5
+#|mus 0 bend 0 64 64
+#|mus 0 controller 0 121 0
+#|mus 0 program 0 5 0
+#|mus 0 controller 0 7 127
+#|mus 128 controller 1 123 0
+#|mus 0 off 1 60 0
+#|mus 0 controller 2 123 0
+#|mus 0 off 2 60 0
+#|mus 0 controller 3 123 0
+#|mus 0 off 3 60 0
+#|mus 0 controller 4 123 0
+#|mus 0 off 4 60 0
+#|mus 0 controller 5 123 0
+#|mus 0 off 5 60 0
+#|mus 0 controller 6 123 0
+#|mus 0 off 6 60 0
+#|mus 0 controller 7 123 0
+#|mus 0 off 7 60 0
+#|mus 0 controller 8 123 0
+#|mus 0 off 8 60 0
+#|mus 0 controller 10 123 0
+#|mus 0 off 10 60 0
+#|mus 257 on 0 64 100
+#|mus 3 end
+#|smpte division 960
+#|smpte 0 end
+#|faults [True, False, True, True, True, False, True, True, True, False, True, True, True, True, True, False, True, True]
+#|buffer 2 2050 1024
+#|heap [5 Some(2), 5 Some(1)]
