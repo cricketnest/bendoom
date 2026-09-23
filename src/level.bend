@@ -579,8 +579,8 @@ def Level.blockmap(+bm: V.Vec) -> Level.Blockmap:
 
 # One sector with no lines, its floor and ceiling as given in map units,
 # and Doom's tables: the level of the room's tests and of eye_rest, and
-# what a malformed WAD loads as. A Leaf answers every index, so one is a whole lump of
-# zeros; root 32768 is subsector 0.
+# what a malformed WAD loads as. A Leaf answers every index, so one is a
+# whole lump of zeros; root 32768 is subsector 0.
 def Level.room(floor: U32, ceil: U32) -> Level:
   Level{Geo{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 32768,
     Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Things{V.Leaf{0}, 0}, [], [],
