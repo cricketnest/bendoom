@@ -1,14 +1,18 @@
 --- a/bend2/effs/audio.c
 +++ b/bend2/effs/audio.c
-@@ -150,6 +150,105 @@
+@@ -150,6 +150,116 @@
    free(p);
  }
-
-+#elif defined(__EMSCRIPTEN__)
+ 
++#elif defined(__EMSCRIPTEN_PTHREADS__)
++// An AudioWorklet drains the ring straight out of the shared WebAssembly
++// memory. The AudioContext lives on the page's main thread, so opening
++// and closing are sent there and awaited, which needs the evaluator on a
++// worker (-sPROXY_TO_PTHREAD); on the main thread there is no output.
 +#include <emscripten.h>
 +#include <emscripten/threading.h>
 +
-+EM_JS(void, audio_js_open, (u32 ring, u32 samples, u32 rate, u32 done, u32 failure), {
++EM_JS(void, audio_js_open, (u32 ring, u32 read, u32 written, u32 pcm, u32 frames, u32 rate, u32 done, u32 failure), {
 +  var devices = Module.bendAudio || (Module.bendAudio = new Map());
 +  var context, node, url;
 +  var finish = function(code) {
@@ -21,22 +25,23 @@
 +      constructor(options) {
 +        super();
 +        var p = options.processorOptions;
-+        this.counts = new BigUint64Array(p.memory, p.ring, 2);
-+        this.samples = new Float32Array(p.memory, p.samples, 8192);
++        this.read = new BigUint64Array(p.memory, p.read, 1);
++        this.written = new BigUint64Array(p.memory, p.written, 1);
++        this.frames = p.frames;
++        this.pcm = new Float32Array(p.memory, p.pcm, 2 * p.frames);
 +      }
 +      process(inputs, outputs) {
 +        var channels = outputs[0];
 +        if (channels.length !== 2) return true;
-+        var read = Atomics.load(this.counts, 0);
-+        var written = Atomics.load(this.counts, 1);
-+        var count = Math.min(Number(written - read), channels[0].length);
-+        var start = Number(read % 4096n);
++        var read = Atomics.load(this.read, 0);
++        var count = Math.min(Number(Atomics.load(this.written, 0) - read), channels[0].length);
++        var start = Number(read % BigInt(this.frames));
 +        for (var i = 0; i < count; i++) {
-+          var at = ((start + i) % 4096) * 2;
-+          channels[0][i] = this.samples[at];
-+          channels[1][i] = this.samples[at + 1];
++          var at = ((start + i) % this.frames) * 2;
++          channels[0][i] = this.pcm[at];
++          channels[1][i] = this.pcm[at + 1];
 +        }
-+        Atomics.store(this.counts, 0, read + BigInt(count));
++        Atomics.store(this.read, 0, read + BigInt(count));
 +        return true;
 +      }
 +    }
@@ -49,7 +54,7 @@
 +      await context.audioWorklet.addModule(url);
 +      node = new AudioWorkletNode(context, 'bend-audio', {
 +        numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-+        processorOptions: {memory: HEAPU8.buffer, ring: ring >>> 0, samples: samples >>> 0}
++        processorOptions: {memory: HEAPU8.buffer, read: read >>> 0, written: written >>> 0, pcm: pcm >>> 0, frames: frames}
 +      });
 +      node.connect(context.destination);
 +      devices.set(ring, {context: context, node: node, resume: resume});
@@ -91,18 +96,24 @@
 +}
 +
 +static u32 io_ring_start(IoRing* p, u32 rate) {
++  if (emscripten_is_main_browser_thread()) {
++    return ENOTSUP;
++  }
 +  _Atomic(u32) done = 0;
-+  MAIN_THREAD_ASYNC_EM_ASM({ audio_js_open($0, $1, $2, $3, $4); }, p, p->pcm, rate, &done, ENODEV);
++  MAIN_THREAD_ASYNC_EM_ASM({ audio_js_open($0, $1, $2, $3, $4, $5, $6, $7); },
++    p, &p->read, &p->written, p->pcm, IO_RING, rate, &done, ENODEV);
 +  return io_audio_wait(&done);
 +}
 +
 +static void io_ring_free(IoRing* p) {
-+  _Atomic(u32) done = 0;
-+  MAIN_THREAD_ASYNC_EM_ASM({ audio_js_close($0, $1); }, p, &done);
-+  io_audio_wait(&done);
++  if (!emscripten_is_main_browser_thread()) {
++    _Atomic(u32) done = 0;
++    MAIN_THREAD_ASYNC_EM_ASM({ audio_js_close($0, $1); }, p, &done);
++    io_audio_wait(&done);
++  }
 +  free(p);
 +}
 +
  #else
-
+ 
  static u32 io_ring_start(IoRing* p, u32 rate) {
