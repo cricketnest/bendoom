@@ -4,6 +4,17 @@ const http = require('node:http');
 const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_DRIVER || 'playwright-core');
 
+// Playwright's Chromium plays audio without a gesture, so a page's
+// AudioContext starts suspended and resumes only once allowAudio is set.
+function holdAudio() {
+  const NativeAudioContext = window.AudioContext;
+  window.allowAudio = false;
+  window.AudioContext = class extends NativeAudioContext {
+    constructor(options) { super(options); this.suspend(); }
+    resume() { return window.allowAudio ? super.resume() : Promise.resolve(); }
+  };
+}
+
 async function main() {
   const [directory, music] = process.argv.slice(2);
   const root = path.resolve(directory);
@@ -26,6 +37,7 @@ async function main() {
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(holdAudio);
     await page.goto(url + '/audio-test.html');
     await page.waitForFunction(() => printed.includes('4096'));
     await page.evaluate(async () => {
@@ -46,6 +58,7 @@ async function main() {
       device.node.connect(capture);
       capture.connect(device.context.destination);
     });
+    await page.evaluate(() => { window.allowAudio = true; });
     await page.locator('button').click();
     await page.waitForFunction(() => printed.includes('closed'), null, { timeout: 20000 });
     const audio = await page.evaluate(() => ({ samples: observed, printed, devices: Module.bendAudio.size }));
@@ -67,14 +80,7 @@ async function main() {
 
     const game = await browser.newPage({ viewport: { width: 1100, height: 1050 } });
     game.on('pageerror', error => errors.push(error.message));
-    await game.addInitScript(() => {
-      const NativeAudioContext = window.AudioContext;
-      window.allowAudio = false;
-      window.AudioContext = class extends NativeAudioContext {
-        constructor(options) { super(options); this.suspend(); }
-        resume() { return window.allowAudio ? super.resume() : Promise.resolve(); }
-      };
-    });
+    await game.addInitScript(holdAudio);
     await game.goto(url);
     await game.waitForFunction(() => !document.getElementById('play').disabled, null, { timeout: 120000 });
     await game.evaluate(() => document.getElementById('play').click());
