@@ -2,29 +2,18 @@
 # gate; it fails while any law is open or false.
 import Base
 import ./tests/fixtures/closed.bend as Fx
-import ./src/bytes.bend as B
 import ./src/wad.bend as W
 import ./src/vec.bend as V
 import ./src/fixed.bend as F
 import ./src/angle.bend as A
-import ./src/tables.bend as T
 import ./src/level.bend as L
 import ./src/keys.bend as K
-import ./src/random.bend as M
 import ./src/sound.bend as Sn
 import ./src/sim.bend as S
 import ./src/things.bend as H
 import ./src/inventory.bend as I
-import ./src/message.bend as Msg
 import ./src/clip.bend as C
-import ./src/project.bend as P
 import ./src/draw.bend as D
-import ./src/segs.bend as R
-import ./src/planes.bend as N
-import ./src/midi.bend as Mi
-import ./src/player.bend as Pl
-import ./src/song.bend as Sg
-import ./src/sound.bend as Sn
 import ./src/channel.bend as Ch
 import ./LAWS.bend as Laws
 
@@ -137,8 +126,6 @@ def channel_capacity(priority: Nat, +slots: List<&2, Maybe<&2, Ch.Channel.Voice>
     : {(Ch.Channel.model.size(_), Ch.Channel.model.size(Ch.Channel.model.none()))
       == (Ch.Channel.model.size(slots), 8n) : Nat & Nat}
   {==}
-
-# Closed laws compute.
 
 def Laws.channels_capacity(priority, slots):
   channel_capacity(priority, slots)
@@ -392,10 +379,8 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
 # it may deal writes the health, the wound and the momentum, never the
 # place.
 def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
-  +hurt = S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))
-  +selected = S.Sim.weapon.select(K.Cmd.idle(), S.Sim.sector.secret(hurt))
   S.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), S.Sim.pressed(K.Cmd.idle(), False{})),
-    S.Sim.player.counted(S.Sim.psprites.with(~S.Sim.damage.enter.acted, K.Cmd.idle(), selected)))
+    S.Sim.player.thinks(K.Cmd.idle(), S.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))))
 
 def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(S.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
@@ -1285,7 +1270,7 @@ def Laws.tic_keeps_geometry(cmd, s):
 # player's own turn is the only mover. Whatever the think left is a
 # parameter, since a symbolic level leaves it stuck.
 def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State, +after: S.State,
-  h: Held(geo, before)) -> Fx.Free(S.Sim.tic.done(cmd, geo, clock, S.Player.x(S.State.player(before)),
+  h: Held(geo, before)) -> Laws.Free(S.Sim.tic.done(cmd, geo, clock, S.Player.x(S.State.player(before)),
     S.Player.y(S.State.player(before)), after)):
   +place = {S.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)),
     after) : S.State}
@@ -1632,9 +1617,9 @@ def Laws.each_in_order(n, i):
       {==}
     case 1n++m:
       %nat_eq_refl(i)
-        : {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, m, 1n+i, Fx.Seq{_, 1n+i}) == Fx.Seq{True{}, 1n+Nat.add(m, i)} : Fx.Seq}
+        : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{_, 1n+i}) == Laws.Seq{True{}, 1n+Nat.add(m, i)} : Laws.Seq}
       %add_succ(m, i)
-        : {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, m, 1n+i, Fx.Seq{True{}, 1n+i}) == Fx.Seq{True{}, _} : Fx.Seq}
+        : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{True{}, 1n+i}) == Laws.Seq{True{}, _} : Laws.Seq}
       Laws.each_in_order(m, 1n+i)
 
 # Music: the reader's laws split on what follows, since Midi.drop

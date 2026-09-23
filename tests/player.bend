@@ -80,14 +80,7 @@ import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/random.bend as M
 import ../src/inventory.bend as I
-import ../src/vec.bend as V
-
-def words(xs: List<&2, U32>) -> String:
-  match xs:
-    case []:
-      ""
-    case x <> rest:
-      " " ++ U32.show(x) ++ words(rest)
+import ../src/bar.bend as Y
 
 # A player at the room's origin facing east, its view height at rest,
 # with no damage and G_PlayerReborn's inventory.
@@ -95,39 +88,18 @@ def placed(z: U32, momx: U32, momz: U32, floorz: U32, viewz: U32, ps: S.Psprites
   S.Player{0, 0, z, 0, momx, 0, momz, floorz, 8388608, 2686976, 0, viewz, [], I.Inventory.start(), ps,
     S.Sim.Hurt.start()}
 
-def psprite(psp: S.Psprite) -> String:
-  S.Psprite{state, tics, sx, sy} = psp
-  " " ++ Maybe.show(~&2, ~U32, ~U32.show, state) ++ words([tics, sx, sy])
-
-def psprites(ps: S.Psprites) -> String:
-  S.Psprites{weapon, flash} = ps
-  psprite(weapon) ++ psprite(flash)
-
-def crossings(cs: List<&2, S.Sim.Cross>) -> String:
-  match cs:
-    case []:
-      ""
-    case S.Cross{line, x, y} <> rest:
-      words([line, x, y]) ++ crossings(rest)
-
-def rest(cs: List<&2, S.Sim.Cross>, +inv: I.Inventory, ps: S.Psprites, +hurt: V.Vec) -> String:
-  crossings(cs) ++ " | " ++ I.Inventory.show(inv)
-    ++ words([I.Inventory.line(inv), I.Inventory.kills(inv), I.Inventory.secrets(inv)]) ++ " |" ++ psprites(ps)
-    ++ " |" ++ V.Vec.show(hurt, 6n, 0)
-
 def player(p: S.Player) -> String:
   S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
-  words([x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz]) ++ " rest as it was "
-    ++ Bool.show(String.eq(rest(crossed, inv, psprites, hurt),
-      rest([], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start())))
+  Fx.words([x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz]) ++ " rest as it was "
+    ++ Bool.show(Fx.began(crossed, inv, psprites, hurt))
 
 def absorbed(got: U32 & U32 & U32 & U32) -> String:
   (health, armour, kind, left) = got
-  words([health, armour, kind, left])
+  Fx.words([health, armour, kind, left])
 
 def blow(got: U32 & U32) -> String:
   (health, count) = got
-  words([health, count])
+  Fx.words([health, count])
 
 def meets(ms: List<&2, S.Sim.Meet>) -> String:
   match ms:
@@ -154,11 +126,11 @@ def main() -> IO(Unit):
     IO.print("land at 9:" ++ player(Fx.Closed.room([K.Cmd.idle()], placed(65536, 0, 4294377472, 0, 0, Fx.Closed.unarmed()), 0)))
     IO.print("land at 8:" ++ player(Fx.Closed.room([K.Cmd.idle()], placed(65536, 0, 4294443008, 0, 0, Fx.Closed.unarmed()), 0)))
     IO.print("eye run, capped:"
-      ++ words([S.Player.viewz(Fx.Closed.room([K.Cmd{50, 0, 0, 0}], placed(0, 0, 0, 0, 0, Fx.Closed.unarmed()), 5)),
+      ++ Fx.words([S.Player.viewz(Fx.Closed.room([K.Cmd{50, 0, 0, 0}], placed(0, 0, 0, 0, 0, Fx.Closed.unarmed()), 5)),
         S.Player.viewz(Fx.Closed.room([K.Cmd.idle()], placed(0, 1966080, 0, 0, 0, Fx.Closed.unarmed()), 5))]))
     IO.print("step up:" ++ player(Fx.Closed.room([K.Cmd.idle()], placed(0, 0, 0, 1048576, 0, Fx.Closed.unarmed()), 0)))
     IO.print("pistol bob:"
-      ++ psprites(S.Player.psprites(Fx.Closed.room([K.Cmd.idle()], placed(0, 1966080, 0, 0, 0, Fx.Closed.ready()), 16))))
+      ++ Fx.psprites(S.Player.psprites(Fx.Closed.room([K.Cmd.idle()], placed(0, 1966080, 0, 0, 0, Fx.Closed.ready()), 16))))
     IO.print("green 100, blow 20:" ++ absorbed(Fx.Closed.absorbed(1, 100, 20)))
     IO.print("blue 100, blow 20:" ++ absorbed(Fx.Closed.absorbed(2, 100, 20)))
     IO.print("green 5, blow 20:" ++ absorbed(Fx.Closed.absorbed(1, 5, 20)))
@@ -169,24 +141,24 @@ def main() -> IO(Unit):
     IO.print("gibs imp at -60 -61, barrel at -1001: " ++ Bool.show(S.Sim.kill.thing.gibs(4294967236, 3001)) ++ " "
       ++ Bool.show(S.Sim.kill.thing.gibs(4294967235, 3001)) ++ " " ++ Bool.show(S.Sim.kill.thing.gibs(4294966295, 2035)))
     IO.print("pain at 200 100 80 79 60 59 40 39 20 19 0:"
-      ++ words([S.Sim.face.pain(200), S.Sim.face.pain(100), S.Sim.face.pain(80), S.Sim.face.pain(79),
+      ++ Fx.words([S.Sim.face.pain(200), S.Sim.face.pain(100), S.Sim.face.pain(80), S.Sim.face.pain(79),
         S.Sim.face.pain(60), S.Sim.face.pain(59), S.Sim.face.pain(40), S.Sim.face.pain(39),
         S.Sim.face.pain(20), S.Sim.face.pain(19), S.Sim.face.pain(0)]))
     IO.print("palette count 0 1 8 9 64 100:"
-      ++ words([Fx.Closed.palette(0, 0, 0), Fx.Closed.palette(1, 0, 0), Fx.Closed.palette(8, 0, 0),
-        Fx.Closed.palette(9, 0, 0), Fx.Closed.palette(64, 0, 0), Fx.Closed.palette(100, 0, 0)]))
+      ++ Fx.words([Y.Bar.palette(0, 0, 0), Y.Bar.palette(1, 0, 0), Y.Bar.palette(8, 0, 0),
+        Y.Bar.palette(9, 0, 0), Y.Bar.palette(64, 0, 0), Y.Bar.palette(100, 0, 0)]))
     IO.print("palette flash 1 6 8 9 25:"
-      ++ words([Fx.Closed.palette(0, 0, 1), Fx.Closed.palette(0, 0, 6), Fx.Closed.palette(0, 0, 8),
-        Fx.Closed.palette(0, 0, 9), Fx.Closed.palette(0, 0, 25)]))
+      ++ Fx.words([Y.Bar.palette(0, 0, 1), Y.Bar.palette(0, 0, 6), Y.Bar.palette(0, 0, 8),
+        Y.Bar.palette(0, 0, 9), Y.Bar.palette(0, 0, 25)]))
     IO.print("palette berserk 1 256 768 4096:"
-      ++ words([Fx.Closed.palette(0, 1, 0), Fx.Closed.palette(0, 256, 0), Fx.Closed.palette(0, 768, 0),
-        Fx.Closed.palette(0, 4096, 0)]))
+      ++ Fx.words([Y.Bar.palette(0, 1, 0), Y.Bar.palette(0, 256, 0), Y.Bar.palette(0, 768, 0),
+        Y.Bar.palette(0, 4096, 0)]))
     IO.print("palette count 100 berserk 1, berserk 768 flash 6:"
-      ++ words([Fx.Closed.palette(100, 1, 0), Fx.Closed.palette(0, 768, 6)]))
+      ++ Fx.words([Y.Bar.palette(100, 1, 0), Y.Bar.palette(0, 768, 6)]))
     IO.print("meets:" ++ meets(Fx.Closed.met(Fx.Closed.barrel())))
     IO.print("use reaches " ++ reach(Fx.Closed.reach(Fx.Closed.barrel())))
-    IO.print("random at 0 1 2 3 255:" ++ words([M.Random.at(0), M.Random.at(1), M.Random.at(2), M.Random.at(3), M.Random.at(255)]))
-    IO.print("random after 0 255:" ++ words([M.Random.next(0), M.Random.next(255)]))
+    IO.print("random at 0 1 2 3 255:" ++ Fx.words([M.Random.at(0), M.Random.at(1), M.Random.at(2), M.Random.at(3), M.Random.at(255)]))
+    IO.print("random after 0 255:" ++ Fx.words([M.Random.next(0), M.Random.next(255)]))
 
 #|from rest: 51199 19 0 0 46399 17 0 0 8388608 2686976 0 2686977 rest as it was True
 #|fall a tic: 0 0 4194304 0 0 0 4294836224 0 8388608 2686976 0 6881280 rest as it was True

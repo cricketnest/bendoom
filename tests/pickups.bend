@@ -1,4 +1,4 @@
-# The pickups, the keys and the things on the closed literal level of
+# The pickups, the keys and the things on the literal door level of
 # tests/fixtures/closed.bend. A pickup's line is what is left after it:
 # the names of the things still alive, the inventory, and the weapon
 # ready and pending. The expected values are p_inter.c's

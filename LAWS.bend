@@ -4,31 +4,18 @@ import ./tests/fixtures/closed.bend as Fx
 import ./src/bytes.bend as B
 import ./src/wad.bend as W
 import ./src/vec.bend as V
-import ./src/fixed.bend as F
-import ./src/angle.bend as A
-import ./src/tables.bend as T
 import ./src/level.bend as L
 import ./src/keys.bend as K
 import ./src/sim.bend as S
-import ./src/random.bend as M
 import ./src/things.bend as H
 import ./src/inventory.bend as I
 import ./src/sound.bend as Sn
-import ./src/message.bend as Msg
 import ./src/clip.bend as C
-import ./src/project.bend as P
 import ./src/draw.bend as D
-import ./src/segs.bend as R
-import ./src/planes.bend as N
-import ./src/gfx.bend as G
-import ./src/sprites.bend as Z
-import ./src/masked.bend as Q
-import ./src/opl.bend as O
 import ./src/midi.bend as Mi
 import ./src/player.bend as Pl
 import ./src/song.bend as Sg
 import ./src/sfx.bend as X
-import ./src/bar.bend as Y
 import ./src/channel.bend as Ch
 
 # Bytes and the WAD
@@ -110,12 +97,9 @@ law tic_counts:
       S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, True{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
     : U32 & S.State}
 
-# The closed laws below stand on Level.room: one sector, no lines, the
-# floor at 0 and the ceiling at 128 map units. Every number is computed
-# by hand from vanilla's formulas.
-
-# LAW: standing still on the floor puts the eye 41 above it, at any
-# position, whatever the eye was.
+# LAW: standing still on the floor of Level.room, one sector with no
+# lines, the floor at 0 and the ceiling at 128 map units, puts the eye
+# VIEWHEIGHT, 41, above it, at any position, whatever the eye was.
 law eye_rest:
   for x: U32
   for y: U32
@@ -154,16 +138,33 @@ law once_clears:
   for s: S.State
   {L.Level.special(S.State.level(S.Sim.once(line, s)), line) == 0 : U32}
 
+# The door level of tests/fixtures/closed.bend with an exit switch: line
+# 0's special is 11, the middle texture of its front side is numbered 1,
+# and textures 1 and 2 are each other's partner.
+def Exit.level() -> L.Level:
+  L.Level.textured(L.Level.special.put(Fx.Closed.doors(), 0, 11), V.Vec.of_list([0, 0, 1], 3),
+    V.Vec.of_list([0, 2, 1], 3))
+
+# The west room's player after two idle tics and then a tic of use.
+def Exit.used() -> S.State:
+  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
+    S.State{Fx.Closed.player(2097152, 4194304, 0, 8388608), Exit.level(), Fx.Closed.none(), L.Level.sidetex(Exit.level()),
+      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+
+# exit_ends's claim on a state, its parameter, so the checker computes
+# the state once.
+def Exit.ended(+cmd: K.Cmd, +s: S.State) -> Type:
+  {(S.State.ended(s), S.State.clock(s), L.Level.special(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2),
+    S.Sim.tic(cmd, s))
+    == (True{}, 3, 0, 2, s) : Bool & U32 & U32 & U32 & S.State}
+
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
 # with the clock at 3, the line's special is gone and its side shows the
 # switch's partner; a tic of any command after that changes nothing.
 law exit_ends:
   for +cmd: K.Cmd
-  {(S.State.ended(Fx.Closed.exited()), S.State.clock(Fx.Closed.exited()),
-    L.Level.special(S.State.level(Fx.Closed.exited()), 0), V.Vec.get(S.State.sidetex(Fx.Closed.exited()), 2),
-    S.Sim.tic(cmd, Fx.Closed.exited()))
-    == (True{}, 3, 0, 2, Fx.Closed.exited()) : Bool & U32 & U32 & U32 & S.State}
+  Exit.ended(cmd, Exit.used())
 
 # LAW: replaying two scripts in turn is replaying their concatenation,
 # for all scripts and states.
@@ -198,21 +199,27 @@ law tic_keeps_geometry:
   for +s: S.State
   {L.Level.geo(S.State.level(S.Sim.tic(cmd, s))) == L.Level.geo(S.State.level(s)) : L.Level.Geo}
 
+# A state whose player passes its level's line check: no solid line
+# crosses its box.
+def Free(+s: S.State) -> Type:
+  {True{} == S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
+    : Bool}
+
 # LAW: one tic from a free state answers a free state, for all commands
 # and states.
 law tic_keeps_free:
   for +cmd: K.Cmd
   for +s: S.State
-  for free: Fx.Free(s)
-  Fx.Free(S.Sim.tic(cmd, s))
+  for free: Free(s)
+  Free(S.Sim.tic(cmd, s))
 
 # LAW: the wall law: replaying any script from a free state, the start
 # included, leaves the player free.
 law replay_keeps_free:
   for script: List<&2, K.Cmd>
   for +s: S.State
-  for free: Fx.Free(s)
-  Fx.Free(S.Sim.replay(script, s))
+  for free: Free(s)
+  Free(S.Sim.replay(script, s))
 
 # LAW: the freedom law, for every mobj: a place passes P_CheckPosition
 # only when no mobj near stops the box, whatever is moved, among any
@@ -320,6 +327,15 @@ law solid_sorted:
   for sorted: {True{} == C.Clip.sorted(rs) : Bool}
   {True{} == C.Clip.sorted(C.Clip.add(first, last, rs)) : Bool}
 
+# A checker to ride the draw's loop: whether every index so far was the
+# one expected, and the one expected next.
+type Seq is Data:
+  Seq{ok: Bool, next: Nat}
+
+def Seq.see(i: Nat, st: Seq) -> Seq:
+  Seq{ok, +next} = st
+  Seq{Bool.and(ok, Nat.is_eq(i, next)), 1n+next}
+
 # LAW: the loop under every column and span reaches the indices from its
 # first, in order, as many as it is asked and no other: the checker
 # riding it from i sees each index be the one expected and ends
@@ -329,7 +345,7 @@ law solid_sorted:
 law each_in_order:
   for n: Nat
   for +i: Nat
-  {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, n, i, Fx.Seq{True{}, i}) == Fx.Seq{True{}, Nat.add(n, i)} : Fx.Seq}
+  {D.Draw.each(~Seq, ~Seq.see, n, i, Seq{True{}, i}) == Seq{True{}, Nat.add(n, i)} : Seq}
 
 # Music
 # -----

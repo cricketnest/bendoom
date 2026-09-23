@@ -125,7 +125,7 @@
 # the corpse in the last death row, and a use asks for the level again.
 # The health, the shares, the rows and the tics are p_inter.c, p_spec.c,
 # p_user.c, p_pspr.c and info.c worked by hand.
-# Then two synthetic blows in the one-sector room of the closed laws,
+# Then two synthetic blows in the one-sector room, Level.room,
 # from a barrel of the state's own: 20
 # points from 64 units south thrust the player by 20 * 8192 along the
 # angle from the inflictor, which for a thing due south is ANG90 - 1,
@@ -198,12 +198,12 @@
 # tables.c from the listener's printed place (the place before the move
 # for a sound of the use) and the middle of the sector's box read from
 # the WAD; where a sound falls inside a run that moves the player, in the
-# two walks, they are regression pins. The door's close is then heard
-# from eight places south of its origin, 832, 528, worked by hand in
-# milestone 7's ticket 01: 400 away on the left (51, 33), on the right
-# (51, 224) and behind (51, 128); 200 ahead (64, 129) and 201 (63); 1184
-# ahead, the last audible unit (1), 1185, which rounds to silence and
-# draws nothing, and 1201, past the clipping distance.
+# two walks, they are regression pins. Eight listeners then stand still
+# south of the door's origin, 832, 528, until it closes: 400 away on the
+# left, on the right and behind; 200 and 201 ahead; 1184, 1185 and 1201
+# ahead. Their lines hold what the level's things make them hear; the
+# close's own volume and separation at those distances and facings are
+# tests/sectors.bend's, worked by hand.
 # Last, the links and the thinkers of things that move, spawn and leave
 # in play, as relinks says, each line with the mobjs of two blockmap
 # cells, the last linked first, the things two sectors show in their
@@ -615,7 +615,7 @@ def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
     q : S.State <- run(tag, 151n, idle(), [10], south(d, degrees, open))
     IO.print(drawn(q))
 
-# The open door's close on tic 253, heard by a player who stands still:
+# Where a player stands still through the open door's close on tic 253:
 # hard left, hard right, behind, at the close distance and a unit past
 # it, at the last audible unit, a unit on, where the volume rounds to
 # nothing, and past the clipping distance. The 200/201-unit combat
@@ -635,8 +635,8 @@ def placements(+open: S.State) -> IO(Unit):
 
 # The first door, sector 10, from the pit south of it, at 872 where the
 # zombieman of record 176 does not reach: used, held open, shut; turned
-# twice; use held down all the while; walked through; its close heard
-# from eight places.
+# twice; use held down all the while; walked through; listened to from
+# eight places.
 def used(+before: S.State) -> IO(Unit):
   do IO<Unit>:
     d1 : S.State <- run("use", 1n, use(), [10], before)
@@ -1263,7 +1263,7 @@ def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
   S.State{p, level, H.Things.put(H.Things.none(1, H.Thing.you(), 1, 1), 0, Some{thing}), sidetex, thinkers, rnd,
     clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
-# A state in the one-sector room of the closed laws: the player at rest
+# A state in the one-sector room, Level.room: the player at rest
 # at the origin facing east with some health, the random index a blow's
 # draw is to start from, and a barrel named 0 at a place, which is only
 # a name and a place, since it is linked in no blockmap and nothing but

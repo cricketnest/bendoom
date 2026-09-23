@@ -12,8 +12,6 @@
 import Base
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
-import ../src/vec.bend as V
-import ../src/inventory.bend as I
 import ../src/level.bend as L
 import ../src/sim.bend as S
 import ../src/sound.bend as Sn
@@ -113,33 +111,6 @@ def m_random(s: S.State) -> String:
 def p_random(s: S.State) -> String:
   " p_random " ++ U32.show(S.State.rnd(s))
 
-def words(xs: List<&2, U32>) -> String:
-  match xs:
-    case []:
-      ""
-    case x <> rest:
-      " " ++ U32.show(x) ++ words(rest)
-
-def psprite(psp: S.Psprite) -> String:
-  S.Psprite{state, tics, sx, sy} = psp
-  " " ++ Maybe.show(~&2, ~U32, ~U32.show, state) ++ words([tics, sx, sy])
-
-def psprites(ps: S.Psprites) -> String:
-  S.Psprites{weapon, flash} = ps
-  psprite(weapon) ++ psprite(flash)
-
-def crossings(cs: List<&2, S.Sim.Cross>) -> String:
-  match cs:
-    case []:
-      ""
-    case S.Cross{line, x, y} <> rest:
-      words([line, x, y]) ++ crossings(rest)
-
-def rest(cs: List<&2, S.Sim.Cross>, +inv: I.Inventory, ps: S.Psprites, +hurt: V.Vec) -> String:
-  crossings(cs) ++ " | " ++ I.Inventory.show(inv)
-    ++ words([I.Inventory.line(inv), I.Inventory.kills(inv), I.Inventory.secrets(inv)]) ++ " |" ++ psprites(ps)
-    ++ " |" ++ V.Vec.show(hurt, 6n, 0)
-
 # The player's place, facing, momentum, heights and eye, and whether the
 # rest of it is as it began: no line crossed, G_PlayerReborn's inventory,
 # no weapon sprite showing and the mobj unhurt.
@@ -149,8 +120,7 @@ def player.of(p: S.Player) -> String:
     ++ " momentum " ++ F.Fixed.show(momx) ++ " " ++ F.Fixed.show(momy) ++ " " ++ F.Fixed.show(momz)
     ++ " floor " ++ F.Fixed.show(floorz) ++ " ceiling " ++ F.Fixed.show(ceilz) ++ " view " ++ F.Fixed.show(viewheight)
     ++ " delta " ++ F.Fixed.show(deltaview) ++ " viewz " ++ F.Fixed.show(viewz) ++ " rest as it was "
-    ++ Bool.show(String.eq(rest(crossed, inv, psprites, hurt),
-      rest([], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start())))
+    ++ Bool.show(Fx.began(crossed, inv, psprites, hurt))
 
 def player(s: S.State) -> String:
   player.of(S.State.player(s))

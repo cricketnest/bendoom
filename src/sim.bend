@@ -2520,12 +2520,15 @@ def Sim.mobj.enter(+state: U32, +s: State) -> State:
 def Player.counted(+n: U32, +p: Player) -> Player:
   Player.hurting(p, V.Vec.set(Player.hurt(p), Sim.hurt.tics(), (Sim.Hurt.tics(Player.hurt(p)) - n : U32)))
 
-def Sim.mobj.step(lasting: Bool, out: Bool, +next: U32, +s: State) -> State:
+# The next state is read from the table in the branch that enters it: an
+# argument read from it would carry the whole table into every term the
+# checker compares while the flags are unknown (docs/bend.md).
+def Sim.mobj.step(lasting: Bool, out: Bool, row: V.Vec, +s: State) -> State:
   match lasting out:
     case True{} _:
       s
     case False{} True{}:
-      Sim.mobj.enter(next, s)
+      Sim.mobj.enter(H.Thing.Row.next(H.Thing.row(Sim.Hurt.state(row))), s)
     case False{} False{}:
       State.player.put(s, Player.counted(1, State.player(s)))
 
@@ -2533,8 +2536,7 @@ def Sim.mobj.step(lasting: Bool, out: Bool, +next: U32, +s: State) -> State:
 # its pain and its death: the standing state lasts, and any other counts
 # its tics down and enters the next as they run out.
 def Sim.mobj.state(+row: V.Vec, +s: State) -> State:
-  Sim.mobj.step(U32.is_eq(Sim.Hurt.tics(row), 4294967295), U32.is_eq(Sim.Hurt.tics(row), 1),
-    H.Thing.Row.next(H.Thing.row(Sim.Hurt.state(row))), s)
+  Sim.mobj.step(U32.is_eq(Sim.Hurt.tics(row), 4294967295), U32.is_eq(Sim.Hurt.tics(row), 1), row, s)
 
 def Sim.mobj.tics(+s: State) -> State:
   Sim.mobj.state(Player.hurt(State.player(s)), s)
@@ -6216,10 +6218,19 @@ def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: Player) -> Player:
 def Sim.weapon.select(+cmd: K.Cmd, +s: State) -> State:
   State.player.put(s, Sim.weapon.selected(K.Cmd.weapon(cmd), State.player(s)))
 
+# The rest of P_PlayerThink once the sector's special has acted: the
+# secret, the weapon change, the player sprites and the counters. It
+# opens the state first, since each def below reads its state several
+# times, and a state the checker cannot compute, as a level no law
+# fixes leaves it, is compared once per read (docs/bend.md).
+def Sim.player.thinks(+cmd: K.Cmd, hurt: State) -> State:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = hurt
+  Sim.player.counted(Sim.psprites.with(~Sim.damage.enter.acted, cmd, Sim.weapon.select(cmd, Sim.sector.secret(
+    State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}))))
+
 def Sim.player.live(+cmd: K.Cmd, +level: L.Level, +clock: U32, +s: State) -> State:
-  +hurt = Sim.sector(level, clock,
-    State.player.put(s, Sim.eye(level, clock, Sim.move(level, cmd, State.player(s)))))
-  Sim.player.counted(Sim.psprites.with(~Sim.damage.enter.acted, cmd, Sim.weapon.select(cmd, Sim.sector.secret(hurt))))
+  Sim.player.thinks(cmd, Sim.sector(level, clock,
+    State.player.put(s, Sim.eye(level, clock, Sim.move(level, cmd, State.player(s))))))
 
 # Doom's P_DeathThink: the sprites move, the view sinks and turns to the
 # attacker, and use asks for the level again.

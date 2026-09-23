@@ -1,41 +1,27 @@
-# The literal levels, states and readers the law tests and the laws share.
+# The literal levels, states and readers the tests share. Some of
+# LAWS.bend's laws stand on the same levels and states.
 import Base
-import ../../src/bytes.bend as B
-import ../../src/wad.bend as W
 import ../../src/vec.bend as V
 import ../../src/fixed.bend as F
-import ../../src/angle.bend as A
 import ../../src/tables.bend as T
 import ../../src/level.bend as L
 import ../../src/keys.bend as K
 import ../../src/sim.bend as S
-import ../../src/random.bend as M
 import ../../src/things.bend as H
 import ../../src/inventory.bend as I
 import ../../src/sound.bend as Sn
-import ../../src/message.bend as Msg
-import ../../src/clip.bend as C
 import ../../src/project.bend as P
-import ../../src/draw.bend as D
-import ../../src/segs.bend as R
-import ../../src/planes.bend as N
 import ../../src/gfx.bend as G
 import ../../src/sprites.bend as Z
-import ../../src/masked.bend as Q
 import ../../src/opl.bend as O
 import ../../src/midi.bend as Mi
-import ../../src/player.bend as Pl
-import ../../src/song.bend as Sg
-import ../../src/sfx.bend as X
-import ../../src/bar.bend as Y
-import ../../src/channel.bend as Ch
 
 # No things.
 def Closed.none() -> H.Things:
   H.Things.none(0, H.Thing.you(), 0, 0)
 
 # No player sprite showing, which a tic leaves as it is: what the players
-# of the laws on movement carry.
+# of the movement tests and laws carry.
 def Closed.unarmed() -> S.Psprites:
   S.Psprites{S.Psprite{None{}, 0, 0, 0}, S.Psprite{None{}, 0, 0, 0}}
 
@@ -70,43 +56,9 @@ def Closed.running(s: S.State) -> List<&2, S.Thinker>:
 def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
   S.State.player(S.Sim.replay(script, Closed.state(p, L.Level.room(0, 128), clock)))
 
-# A player at rest in the room with the pistol coming up, as
-# P_SetupPsprites brings it up when the level's state is made.
-def Closed.armed() -> S.Player:
-  S.State.player(S.Sim.psprites.start(Closed.state(S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976,
-    [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}, L.Level.room(0, 128), 0)))
-
-# An inventory with so many bullets in the clip.
-def Closed.clip.of(inv: I.Inventory, +rounds: U32) -> I.Inventory:
-  I.Inventory{health, armour, armourtype, cards, +ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
-  I.Inventory{health, armour, armourtype, cards, V.Vec.set(ammo, I.Inventory.am_clip(), rounds), caps, backpack,
-    weapons, powers, items, bonus, line, kills, secrets}
-
 # The pistol at rest, the state A_Raise leaves it in.
 def Closed.ready() -> S.Psprites:
   S.Psprites{S.Psprite{Some{59}, 1, 65536, 2097152}, S.Psprite{None{}, 0, 65536, 2097152}}
-
-# The player in the empty room with the pistol ready and so many
-# bullets, holding the attack for so many tics. The room has no lines
-# and no things, so the bullet meets nothing and leaves nothing.
-def Closed.firing(n: Nat, rounds: U32) -> S.State:
-  S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.demo(0, 0, 0, 1)),
-    Closed.state(S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [],
-      Closed.clip.of(I.Inventory.start(), rounds), Closed.ready(), S.Sim.Hurt.start()}, L.Level.room(0, 128), 0))
-
-def Closed.bullets(s: S.State) -> U32:
-  I.Inventory.rounds(I.Inventory.am_clip(), S.Player.inv(S.State.player(s)))
-
-def Closed.weapon.of(ps: S.Psprites) -> Maybe<&2, U32>:
-  S.Psprites{S.Psprite{state, tics, sx, sy}, flash} = ps
-  state
-
-def Closed.weapon(s: S.State) -> Maybe<&2, U32>:
-  Closed.weapon.of(S.Player.psprites(S.State.player(s)))
-
-def Closed.shotgun.empty() -> I.Inventory:
-  I.Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4),
-    False{}, 7, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278321152, 0, 0}
 
 def Closed.armoured.of(inv: I.Inventory, kind: U32, points: U32) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
@@ -140,11 +92,7 @@ def Closed.blow(damage: U32) -> U32 & U32:
     Closed.state(S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(),
       Closed.unarmed(), S.Sim.Hurt.start()}, L.Level.room(0, 128), 0))
 
-# The palette a damage count, a berserk counter and a pickup flash pick.
-def Closed.palette(damage: U32, strength: U32, bonus: U32) -> U32:
-  Y.Bar.palette(damage, strength, bonus)
-
-# The movers' closed laws stand on a literal level: a west room (sector
+# The movers' tests stand on a literal level: a west room (sector
 # 0, ceiling 128), a door (sector 1, shut at 0) and an east room (sector
 # 2, ceiling 72), all floors at 0, 16 units of door from x 64 to x 80.
 # Line 0 is the door's west face, its front to the west, special 1; line
@@ -153,8 +101,7 @@ def Closed.palette(damage: U32, strength: U32, bonus: U32) -> U32:
 # number below is computed by hand from vanilla's constants. The
 # blockmap's origin is a parameter: at 0 a player in the west room is in
 # the one cell, so a mover re-clips it; moved east, the player is in no
-# sector's block box, and a long replay costs the checker no position
-# check. Its THINGS records, so many, are a parameter too.
+# sector's block box. Its THINGS records, so many, are a parameter too.
 def Closed.level(ox: U32, records: V.Vec, count: U32) -> L.Level:
   L.Level.grouped(L.Level{L.Geo{V.Vec.of_list([0, 1, 4, 0, 1, 2, 3, 4, 2, 3], 10),
     V.Vec.of_list([0, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1], 12), V.Vec.of_list([64, 128, 64, 0, 80, 0, 80, 128], 8),
@@ -243,19 +190,6 @@ def Closed.lifts() -> S.State:
 def Closed.seen(+s: S.State) -> U32 & U32:
   (L.Level.floor(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2))
 
-# The literal level with an exit switch: line 0's special is 11, the
-# middle texture of its front side is numbered 1, and textures 1 and 2
-# are each other's partner.
-def Closed.exit() -> L.Level:
-  L.Level.textured(L.Level.special.put(Closed.doors(), 0, 11), V.Vec.of_list([0, 0, 1], 3),
-    V.Vec.of_list([0, 2, 1], 3))
-
-# The west room's player after two idle tics and then a tic of use.
-def Closed.exited() -> S.State:
-  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
-    S.State{Closed.player(2097152, 4194304, 0, 8388608), Closed.exit(), Closed.none(), L.Level.sidetex(Closed.exit()),
-      S.Thinkers{[], []}, 0, 0, False{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
-
 # What a listener d units south of a source hears, facing an angle.
 def Closed.heard(d: U32, facing: U32) -> U32 & U32:
   Sn.Sound.adjust(True{}, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
@@ -265,7 +199,7 @@ def Closed.coincident(starting: Bool) -> U32 & U32:
   Sn.Sound.adjust(starting, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)),
     0, 0, 1073741824, 0, 0)
 
-# The lights' closed laws stand on the literal level with the west room
+# The lights' tests stand on the literal level with the west room
 # at a light and the door sector, light 160, given the light Doom spawns
 # for a sector special, the random index at 1 as it is once Doom has
 # spawned the player.
@@ -290,9 +224,9 @@ def Closed.among(inv: I.Inventory, x: U32, momx: U32, momy: U32, things: List<&2
   Closed.at(S.Player{x, 4194304, 0, 0, momx, momy, 0, 0, 8388608, 2686976, 0, 2686976, [], inv, Closed.unarmed(), S.Sim.Hurt.start()},
     Closed.doors(), [], things)
 
-# A thing named id of a type at (x, y) and z in the west room, its state
-# lasting: the laws below are about its touch and its heights, not its
-# tics. Its floor is the room's, at 0.
+# A thing named id of a type at (x, y) and z in the west room, in a
+# state that lasts, so its tics change nothing. Its floor is the room's,
+# at 0.
 def Closed.thing(id: U32, +kind: U32, x: U32, y: U32, z: U32) -> H.Thing:
   H.Thing{id, kind, x, y, z, 0, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(kind)}
 
@@ -377,8 +311,8 @@ def Closed.ids(things: List<&2, H.Thing>) -> List<&2, U32>:
     case H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} <> rest:
       id <> Closed.ids(rest)
 
-# The inventory with the heads-up line taken off it: the laws below are
-# about the grants, and pickup_messages about the line.
+# The inventory with the heads-up line taken off it, which Closed.line
+# reads on its own.
 def Closed.hushed(inv: I.Inventory) -> I.Inventory:
   I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
@@ -430,15 +364,6 @@ def Closed.key_at(z: U32) -> Closed.Got:
 # with a blue card at (86, 64) past it.
 def Closed.shut_out() -> S.State:
   Closed.idled(1n, Closed.among(I.Inventory.start(), 2621440, 786432, 0, [Closed.thing(87, 5, 5636096, 4194304, 0)]))
-
-def Closed.granted(kind: U32, dropped: Bool) -> I.Inventory:
-  Maybe.default(&2, I.Inventory, I.Inventory.grant(kind, dropped, I.Inventory.start()), I.Inventory.start())
-
-# A state whose player passes its level's line check: no solid line
-# crosses its box.
-def Free(+s: S.State) -> Type:
-  {True{} == S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
-    : Bool}
 
 def Closed.within(d: H.Thing.Def) -> Bool:
   H.Def{kind, state, radius, height, flags} = d
@@ -543,7 +468,7 @@ def Closed.over_barrel() -> S.State:
   Closed.at(Closed.player(2097152, 4194304, 0, 8388608), Closed.doors(), [],
     [Closed.thing(24, 2035, 4718592, 6553600, 0)])
 
-# The things' closed laws stand on the literal level with three THINGS
+# The things' tests stand on the literal level with three THINGS
 # records on every skill: player 1's start at (32, 64) in the west room,
 # a health bonus at (16, 32) and green armour at (16, 96). The one
 # subsector's seg is line 0's front, so each stands in the west room, on
@@ -553,18 +478,6 @@ def Closed.over_barrel() -> S.State:
 def Closed.stocked() -> S.State:
   S.State.at(Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 2014, 7, 16, 96, 0, 2018, 7], 15), 3),
     L.Start{2097152, 4194304, 0})
-
-# What P_SpawnMobj leaves on a thing of a type that looked at a player.
-def Closed.spawned.hurt(+kind: U32, lastlook: U32) -> V.Vec:
-  H.Thing.Hurt.start(kind, H.Thing.Def.flags(H.Thing.info(kind)),
-    F.Fixed.of_map(H.Thing.Def.height(H.Thing.info(kind))), H.Thing.Def.radius(H.Thing.info(kind)), lastlook)
-
-# The bonus and the armour as they spawned, in a state for some tics.
-def Closed.bonus(state: U32, tics: U32) -> H.Thing:
-  H.Thing{1, 2014, 1048576, 2097152, 0, 0, 8388608, 0, 0, state, tics, 0, Closed.spawned.hurt(2014, 1)}
-
-def Closed.armour(state: U32, tics: U32) -> H.Thing:
-  H.Thing{2, 2018, 1048576, 6291456, 0, 0, 8388608, 0, 0, state, tics, 0, Closed.spawned.hurt(2018, 2)}
 
 def Closed.looking(a: H.Thing.Action) -> Bool:
   match a:
@@ -635,15 +548,6 @@ def Sprite.moved(+s: S.State) -> S.State:
 def Sprite.shown(s: S.State) -> List<&2, U32>:
   Closed.ids(H.Things.shown(S.State.things(s)))
 
-# A checker to ride the draw's loop: whether every index so far was the
-# one expected, and the one expected next.
-type Seq is Data:
-  Seq{ok: Bool, next: Nat}
-
-def Seq.see(i: Nat, st: Seq) -> Seq:
-  Seq{ok, +next} = st
-  Seq{Bool.and(ok, Nat.is_eq(i, next)), 1n+next}
-
 # An event after its delta.
 type Closed.At is Data:
   At{delta: U32, event: Mi.Midi.Event}
@@ -680,3 +584,37 @@ def Closed.fails(+lump: List<&2, U32>) -> Bool:
 def Closed.buffer(o: O.Opl) -> U32 & U32 & Nat:
   O.Opl{core, count, last, pending, rcnt, oldl, oldr, curl, curr} = o
   (count, last, List.length(&2, O.Opl.Pending, pending))
+
+# Words as a line, each after a space.
+def words(xs: List<&2, U32>) -> String:
+  match xs:
+    case []:
+      ""
+    case x <> rest:
+      " " ++ U32.show(x) ++ words(rest)
+
+def psprite(psp: S.Psprite) -> String:
+  S.Psprite{state, tics, sx, sy} = psp
+  " " ++ Maybe.show(~&2, ~U32, ~U32.show, state) ++ words([tics, sx, sy])
+
+def psprites(ps: S.Psprites) -> String:
+  S.Psprites{weapon, flash} = ps
+  psprite(weapon) ++ psprite(flash)
+
+def crossings(cs: List<&2, S.Sim.Cross>) -> String:
+  match cs:
+    case []:
+      ""
+    case S.Cross{line, x, y} <> rest:
+      words([line, x, y]) ++ crossings(rest)
+
+def rest(cs: List<&2, S.Sim.Cross>, +inv: I.Inventory, ps: S.Psprites, +hurt: V.Vec) -> String:
+  crossings(cs) ++ " | " ++ I.Inventory.show(inv)
+    ++ words([I.Inventory.line(inv), I.Inventory.kills(inv), I.Inventory.secrets(inv)]) ++ " |" ++ psprites(ps)
+    ++ " |" ++ V.Vec.show(hurt, 6n, 0)
+
+# Whether the rest of a player is as it began, compared as printed: no
+# line crossed, G_PlayerReborn's inventory, no weapon sprite showing and
+# the mobj unhurt.
+def began(cs: List<&2, S.Sim.Cross>, inv: I.Inventory, ps: S.Psprites, hurt: V.Vec) -> Bool:
+  String.eq(rest(cs, inv, ps, hurt), rest([], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()))
