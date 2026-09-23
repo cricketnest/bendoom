@@ -1590,13 +1590,7 @@ def Laws.bonus_cycle():
 def Laws.lasting_stays(id, kind, x, y, z, s):
   {==}
 
-def Laws.divline_sides():
-  {==}
-
 def Laws.rejected_never_sees(level, m, t):
-  {==}
-
-def Laws.monsters_wake():
   {==}
 
 # The solid columns stay sorted
@@ -1899,30 +1893,6 @@ def Laws.monsters_block():
   {==}
 
 def Laws.states_exist():
-  {==}
-
-def Laws.blocker_geometry():
-  {==}
-
-def Laws.link_order():
-  {==}
-
-def Laws.spawn_thinks_this_tic():
-  {==}
-
-def Laws.thing_blocks():
-  {==}
-
-def Laws.floor_carries_things():
-  {==}
-
-def Laws.barrel_stops_door():
-  {==}
-
-def Laws.lamp_under_door():
-  {==}
-
-def Laws.door_opens_over_barrel():
   {==}
 
 # Music: the reader's laws split on what follows, since Midi.drop

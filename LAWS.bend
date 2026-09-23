@@ -1102,7 +1102,7 @@ law thing_move_is_checked:
 
 # LAW: clear is pinned to the mobjs: when nothing stops a box, every
 # mobj linked in the cells around it, whichever position in the list it
-# holds, does not stop it (blocker_geometry shows the numbers). That the
+# holds, does not stop it (tests/blocking.bend shows the numbers). That the
 # links hold every living thing once, in the cell of its centre, rests
 # on tests/sim.bend's links checks; that none linked in a further cell
 # can reach the box rests on milestone 5's ticket 09's argument, since
@@ -1143,134 +1143,6 @@ law monsters_block:
 law states_exist:
   {Bool.and(List.all(~&2, ~H.Thing.Row, ~Fx.Closed.leads, H.Thing.rows()),
     List.all(~&2, ~H.Thing.Def, ~Fx.Closed.spawns, H.Thing.defs())) == True{} : Bool}
-
-# Solid things
-# ------------
-
-# LAW: vanilla's PIT_CheckThing on numbers. The lamp stops the player's
-# box when their centres are under 32 apart, 16 and 16: at 32 it does
-# not, 1/65536 closer it does, and it never stops its own. The corpse is
-# not solid, so it stops nothing even where it stands. The barrel's
-# reach is 26. The player's mobj stops a barrel's box under 26 away and
-# not at 26. A missile, flag 65536, of radius 6 and height 8 is tested
-# against heights: on the barrel's top at 42 it has hit the barrel,
-# 1/65536 higher it passes over; under the raised barrel its top at 99
-# passes and at 100 has hit; the lamp, not shootable, stops it as a
-# solid thing does, and the corpse does not. The cell lists the mobjs
-# the last linked first, less the raised barrel, which at x 160 is off
-# the one cell's blockmap and so in no cell (sanity).
-law blocker_geometry:
-  {(Fx.Closed.stops(8, 2097152, 5242880, 0, 1048576, 3670016, 33557510, 4294967295),
-    Fx.Closed.stops(8, 2097152, 5242881, 0, 1048576, 3670016, 33557510, 4294967295),
-    Fx.Closed.stops(8, 2097152, 5242881, 0, 1048576, 1048576, 2, 8),
-    Fx.Closed.stops(15, 2097152, 2097152, 0, 1048576, 3670016, 33557510, 4294967295),
-    Fx.Closed.stops(24, 4587520, 7340032, 0, 1048576, 3670016, 33557510, 4294967295),
-    Fx.Closed.stops(24, 4587521, 7340032, 0, 1048576, 3670016, 33557510, 4294967295),
-    Fx.Closed.stops(4294967295, 3801087, 4194304, 0, 655360, 2752512, 524294, 24),
-    Fx.Closed.stops(4294967295, 3801088, 4194304, 0, 655360, 2752512, 524294, 24),
-    Fx.Closed.stops(24, 6291456, 7340032, 2752512, 393216, 524288, 65536, 200),
-    Fx.Closed.stops(24, 6291456, 7340032, 2752513, 393216, 524288, 65536, 200),
-    Fx.Closed.stops(30, 10485760, 7340032, 5963776, 393216, 524288, 65536, 200),
-    Fx.Closed.stops(30, 10485760, 7340032, 6029312, 393216, 524288, 65536, 200),
-    Fx.Closed.stops(8, 2097152, 7340032, 0, 393216, 524288, 65536, 200),
-    Fx.Closed.stops(15, 2097152, 2097152, 0, 393216, 524288, 65536, 200),
-    S.Sim.near(Fx.Closed.doors(), S.State.things(Fx.Closed.linked()), 2097152, 4194304, 1048576))
-    == (False{}, True{}, False{}, False{}, False{}, True{}, True{}, False{}, True{}, False{}, False{}, True{}, True{},
-      False{}, [4294967295, 24, 15, 8])
-    : Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & Bool & List<&2, U32>}
-
-# LAW: the links' order, vanilla's P_SetThingPosition: a mobj goes first
-# in its cell's list when it spawns and when it moves. The player's mobj
-# spawns at its record's turn, so as record 6 it is listed after record
-# 9 and before 5 and 2, and as record 1 last; once it has moved it is
-# first; at (200, 64), off the blockmap, no cell lists it. The thinkers
-# are started in the same order (sanity).
-law link_order:
-  {(Fx.Closed.cell(Fx.Closed.ranked(6, 2097152, 0)), Fx.Closed.cell(Fx.Closed.idled(1n, Fx.Closed.ranked(6, 2097152, 65536))),
-    Fx.Closed.cell(Fx.Closed.ranked(1, 2097152, 0)), Fx.Closed.cell(Fx.Closed.ranked(6, 13107200, 0)),
-    S.State.thinkers(Fx.Closed.ranked(6, 2097152, 0)))
-    == ([9, 6, 5, 2], [6, 9, 5, 2], [9, 5, 2, 1], [9, 5, 2], [S.Mobj{2}, S.Mobj{5}, S.Mobj{6}, S.Mobj{9}])
-    : List<&2, U32> & List<&2, U32> & List<&2, U32> & List<&2, U32> & List<&2, S.Thinker>}
-
-# LAW: a mobj spawned while the thinkers run joins the tail of the list
-# and thinks in that same run, as one P_AddThinker appends to the tail of
-# Doom's list does. The bonus takes the id past the 128 records, draws
-# one random number (the index goes 0 to 1) and stands in S_BON1 for its
-# 6 tics; the rest of the run reaches it and leaves 5. The thinkers are
-# the player's mobj's and then the bonus's (sanity).
-law spawn_thinks_this_tic:
-  {(Fx.Closed.tics(H.Things.get(S.State.things(Fx.Closed.spawned()), 128)), S.State.rnd(Fx.Closed.spawned()),
-    Fx.Closed.tics(H.Things.get(S.State.things(Fx.Closed.spawned.ran()), 128)), S.State.thinkers(Fx.Closed.spawned.ran()))
-    == (Some{6}, 1, Some{5}, [S.Mobj{H.Thing.you()}, S.Mobj{128}])
-    : Maybe<&2, U32> & U32 & Maybe<&2, U32> & List<&2, S.Thinker>}
-
-# LAW: a solid thing stops the player and a corpse does not. Moving north
-# at 8 a tic from (32, 64), friction leaves 7.25 and then 6.57: tic 2
-# ends at 79.25, 32.75 short of a lamp at (32, 112), and tic 3's move to
-# 85.82 would overlap it. The slide finds no line and stairsteps; its
-# move north overlaps too, its move by the momentum east is no move, so
-# the player stays at 79.25. Doom's things are as tall as the map: the
-# lamp raised 100 units stops it all the same. Over a dead player at the
-# same place tic 3 reaches 85.82 (sanity).
-law thing_blocks:
-  {(Fx.Closed.north([Fx.Closed.thing(8, 2028, 2097152, 7340032, 0)], 2n),
-    Fx.Closed.north([Fx.Closed.thing(8, 2028, 2097152, 7340032, 0)], 3n),
-    Fx.Closed.north([Fx.Closed.thing(8, 2028, 2097152, 7340032, 6553600)], 3n),
-    Fx.Closed.north([Fx.Closed.thing(15, 15, 2097152, 7340032, 0)], 3n))
-    == (5193728, 5193728, 5193728, 5624320) : U32 & U32 & U32 & U32}
-
-# LAW: a moving floor carries the things on it, vanilla's
-# P_ThingHeightClip through P_ChangeSector. The west room's floor goes
-# down 4 a tic; the player at (200, 64) is out of its block box. The
-# barrel standing at (32, 16) follows the floor, -4 after a tic and -8
-# after two, its name, type, state and tics as they were. A leg hung 68
-# under the ceiling at 128 stays at 60, over its floor at -4 (sanity).
-law floor_carries_things:
-  {(Fx.Closed.lowering(1n), Fx.Closed.lowering(2n))
-    == ([H.Thing{24, 2035, 2097152, 1048576, 4294705152, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(2035)},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294705152, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(60)}],
-      [H.Thing{24, 2035, 2097152, 1048576, 4294443008, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(2035)},
-        H.Thing{29, 60, 2097152, 6553600, 3932160, 4294443008, 8388608, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(60)}])
-    : List<&2, H.Thing> & List<&2, H.Thing>}
-
-# LAW: a door closing on a barrel goes back up, vanilla's
-# PIT_ChangeSector for a shootable thing that no longer fits, and no
-# damage is done. The barrel at (72, 16) stands across both of the
-# door's faces, so its ceiling is the door's: 42 after 13 tics, which
-# fits its height of 42; the 14th would leave 40, so the step is undone,
-# the barrel clipped again under 42, and the door back on its plan; 44
-# after the 15th (sanity).
-law barrel_stops_door:
-  {(Fx.Closed.ceil(Fx.Closed.idled(13n, Fx.Closed.closing(Fx.Closed.thing(24, 2035, 4718592, 1048576, 0))), 1),
-    Fx.Closed.ceil(Fx.Closed.idled(14n, Fx.Closed.closing(Fx.Closed.thing(24, 2035, 4718592, 1048576, 0))), 1),
-    Fx.Closed.running(Fx.Closed.idled(14n, Fx.Closed.closing(Fx.Closed.thing(24, 2035, 4718592, 1048576, 0)))),
-    Fx.Closed.things(Fx.Closed.idled(14n, Fx.Closed.closing(Fx.Closed.thing(24, 2035, 4718592, 1048576, 0)))),
-    Fx.Closed.ceil(Fx.Closed.idled(15n, Fx.Closed.closing(Fx.Closed.thing(24, 2035, 4718592, 1048576, 0))), 1))
-    == (2752512, 2752512,
-      [S.Mover{1, True{}, 131072, [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}],
-        [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], S.Sim.noise.door()}],
-      [H.Thing{24, 2035, 4718592, 1048576, 0, 0, 2752512, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(2035)}], 2883584)
-    : U32 & U32 & List<&2, S.Thinker> & List<&2, H.Thing> & U32}
-
-# LAW: a lamp is solid but not shootable, and vanilla's PIT_ChangeSector
-# passes over it: the door closes on the lamp at (72, 16) as on nothing,
-# shut after 34 tics, its thinker ended on the 35th, the lamp still on
-# its floor under a ceiling at 0 (sanity).
-law lamp_under_door:
-  {(Fx.Closed.ceil(Fx.Closed.idled(34n, Fx.Closed.closing(Fx.Closed.thing(8, 2028, 4718592, 1048576, 0))), 1),
-    Fx.Closed.running(Fx.Closed.idled(35n, Fx.Closed.closing(Fx.Closed.thing(8, 2028, 4718592, 1048576, 0)))),
-    Fx.Closed.things(Fx.Closed.idled(35n, Fx.Closed.closing(Fx.Closed.thing(8, 2028, 4718592, 1048576, 0)))))
-    == (0, [], [H.Thing{8, 2028, 4718592, 1048576, 0, 0, 0, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(2028)}])
-    : U32 & List<&2, S.Thinker> & List<&2, H.Thing>}
-
-# LAW: vanilla's T_MovePlane lets a ceiling rise short of its
-# destination whatever it leaves unfit. A barrel at (72, 100) across the
-# shut door does not fit under it, yet the door used on tic 1 is 2 up
-# after it and 4 after the second, the barrel's ceiling rising with it
-# (sanity).
-law door_opens_over_barrel:
-  {(Fx.Closed.ceil(Fx.Closed.used(0n, Fx.Closed.over_barrel()), 1), Fx.Closed.things(Fx.Closed.used(1n, Fx.Closed.over_barrel())))
-    == (131072, [H.Thing{24, 2035, 4718592, 6553600, 0, 0, 262144, 0, 0, 0, 4294967295, 0, H.Thing.Hurt.of(2035)}]) : U32 & List<&2, H.Thing>}
 
 # Things
 # ------
@@ -1325,26 +1197,6 @@ law lasting_stays:
 # Sight
 # -----
 
-# LAW: P_DivlineSide's three answers. A line up the y axis through
-# x 64 has a point at x 64 on it, one west of it behind it and one east
-# of it in front. A line east along y 64 from x 0 answers on for the
-# point (64, 32), because vanilla compares the point's x with the line's
-# y where it means its y; (0, 32) is south of it and in front, and
-# (0, 96) north of it and behind. A line out along (1, 1) from the
-# origin has (1, 0) in front, (0, 1) behind and (1, 1) on it, from the
-# whole-unit products 1 against 0, 0 against 1 and 1 against 1.
-law divline_sides:
-  {[S.Sim.sight.side(4194304, 2097152, 4194304, 0, 0, 65536),
-    S.Sim.sight.side(2097152, 2097152, 4194304, 0, 0, 65536),
-    S.Sim.sight.side(6291456, 2097152, 4194304, 0, 0, 65536),
-    S.Sim.sight.side(4194304, 2097152, 0, 4194304, 65536, 0),
-    S.Sim.sight.side(0, 2097152, 0, 4194304, 65536, 0),
-    S.Sim.sight.side(0, 6291456, 0, 4194304, 65536, 0),
-    S.Sim.sight.side(65536, 0, 0, 0, 65536, 65536),
-    S.Sim.sight.side(0, 65536, 0, 0, 65536, 65536),
-    S.Sim.sight.side(65536, 65536, 0, 0, 65536, 65536)]
-    == [2, 1, 0, 2, 0, 1, 0, 1, 2] : List<&2, U32>}
-
 # LAW: a pair of sectors REJECT rules out never sees, for any two mobjs
 # in any level: P_CheckSight answers the lump before it walks the BSP,
 # and nothing the walk could find brings the sight back.
@@ -1353,13 +1205,6 @@ law rejected_never_sees:
   for m: S.Sim.Body
   for t: S.Sim.Body
   {S.Sim.sight.between(True{}, level, m, t) == False{} : Bool}
-
-# LAW: every type that calls out on sight stands in a row that runs
-# A_Look and chases in a row of the table that runs A_Chase, so no
-# monster can wake without a state to wake into and none can watch for
-# the player without A_Look to do it (sanity).
-law monsters_wake:
-  {List.all(~&2, ~H.Thing.Def, ~Fx.Closed.wakes, H.Thing.defs()) == True{} : Bool}
 
 # The renderer
 # ------------
