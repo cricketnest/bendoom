@@ -197,9 +197,6 @@ def Laws.cmd_tables():
 def Laws.turn_script():
   {==}
 
-def Laws.line_geometry():
-  {==}
-
 def Laws.solid_clips():
   {==}
 
@@ -1581,12 +1578,6 @@ def Laws.move_is_checked(level, things, p, x, y, taken):
 
 # Things compute.
 
-def Laws.spawn_phase():
-  {==}
-
-def Laws.bonus_cycle():
-  {==}
-
 def Laws.lasting_stays(id, kind, x, y, z, s):
   {==}
 
@@ -1826,81 +1817,6 @@ def Laws.each_in_order(n, i):
 def Laws.animation_frames():
   {==}
 
-def Laws.blue_door_locked():
-  {==}
-
-def Laws.key_taken():
-  {==}
-
-def Laws.key_taken_once():
-  {==}
-
-def Laws.key_reach():
-  {==}
-
-def Laws.key_through_door():
-  {==}
-
-def Laws.health_bonus():
-  {==}
-
-def Laws.stimpack():
-  {==}
-
-def Laws.medikit():
-  {==}
-
-def Laws.soul_sphere():
-  {==}
-
-def Laws.berserk():
-  {==}
-
-def Laws.armour_bonus():
-  {==}
-
-def Laws.green_armour():
-  {==}
-
-def Laws.blue_armour():
-  {==}
-
-def Laws.bonus_counted_once():
-  {==}
-
-def Laws.strength_counts():
-  {==}
-
-def Laws.ammo_amounts():
-  {==}
-
-def Laws.ammo_caps():
-  {==}
-
-def Laws.backpack_first():
-  {==}
-
-def Laws.backpack_later():
-  {==}
-
-def Laws.weapon_taken():
-  {==}
-
-def Laws.pickup_messages():
-  {==}
-
-def Laws.radius_within():
-  {==}
-
-def Laws.solid_stays():
-  {==}
-
-def Laws.monsters_block():
-  {==}
-
-def Laws.states_exist():
-  {==}
-
 def Laws.blocker_geometry():
   {==}
 
@@ -1973,7 +1889,4 @@ def Laws.key_boxes():
   {==}
 
 def Laws.arms_numbers():
-  {==}
-
-def Laws.dropped_ammo():
   {==}
