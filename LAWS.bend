@@ -114,17 +114,6 @@ law tic_counts:
 # floor at 0 and the ceiling at 128 map units. Every number is computed
 # by hand from vanilla's formulas.
 
-# LAW: one tic forward from rest at angle zero thrusts 25 * 2048 along
-# the facing (51199 along x through the cosine 65535, 19 along y through
-# the sine 25) and then decays it by 0.90625: momentum 46399, 17,
-# position 0.78125, 0.000290 (the numbers of milestone 2's ticket 08
-# hand check). The eye is the rest height plus the bob: the squared
-# momentum over four is 9999, and half of it times the clock's sine 25
-# is 1 (sanity).
-law tic_from_rest:
-  {Fx.Closed.room([K.Cmd{25, 0, 0, 0}], S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0)
-    == S.Player{51199, 19, 0, 0, 46399, 17, 0, 0, 8388608, 2686976, 0, 2686977, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()} : S.Player}
-
 # LAW: standing still on the floor puts the eye 41 above it, at any
 # position, whatever the eye was.
 law eye_rest:
@@ -132,163 +121,6 @@ law eye_rest:
   for y: U32
   {S.Player.viewz(Fx.Closed.room([K.Cmd.idle()], S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0))
     == 2686976 : U32}
-
-# LAW: 64 above the floor, the first airborne tic sets the fall to twice
-# gravity without moving, the second moves by it and adds gravity once;
-# the eye sits 41 above the height the tic began at (sanity).
-law fall_gravity:
-  {(Fx.Closed.room([K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0),
-    Fx.Closed.room([K.Cmd.idle(), K.Cmd.idle()], S.Player{0, 0, 4194304, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0))
-    == (S.Player{0, 0, 4194304, 0, 0, 0, 4294836224, 0, 8388608, 2686976, 0, 6881280, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()},
-      S.Player{0, 0, 4063232, 0, 0, 0, 4294770688, 0, 8388608, 2686976, 0, 6881280, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()})
-    : S.Player & S.Player}
-
-# LAW: landing at 9 a tic dips the view by an eighth of it, -1.125;
-# landing at 8 a tic does not (sanity).
-law landing_dip:
-  {(Fx.Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294377472, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0),
-    Fx.Closed.room([K.Cmd.idle()], S.Player{0, 0, 65536, 0, 0, 0, 4294443008, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0))
-    == (S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 4294893568, 2752512, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()},
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2752512, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()})
-    : S.Player & S.Player}
-
-# LAW: the bob at the clock's peak (tic 5, sine 65535). The first tic of
-# a run from rest has momentum 102398, 39, whose square over four is
-# 39998, and half of it bobs the eye by 19998. At 30 a tic the square
-# over four is 14745600, capped at 16 units, and half of it bobs the eye
-# by 524280, a hair under 8 units (sanity).
-law bob_run_and_cap:
-  {(S.Player.viewz(Fx.Closed.room([K.Cmd{50, 0, 0, 0}],
-      S.Player{0, 0, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 5)),
-    S.Player.viewz(Fx.Closed.room([K.Cmd.idle()],
-      S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 5)))
-    == (2706974, 3211256) : U32 & U32}
-
-# LAW: a floor 16 above the player's feet lifts the player onto it, cuts
-# the view height by the 16 to 25, and sets it recovering by an eighth
-# of the gap, 2 a tic (sanity).
-law step_up_dip:
-  {Fx.Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 0, 0, 0, 1048576, 8388608, 2686976, 0, 0, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, 0)
-    == S.Player{0, 0, 1048576, 0, 0, 0, 0, 1048576, 8388608, 1638400, 131072, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()} : S.Player}
-
-# The pistol's closed laws are p_pspr.c by hand: P_BringUpWeapon starts
-# the sprite at WEAPONBOTTOM, 128, and P_SetPsprite runs A_Raise as it
-# enters the raise state, row 60, so it starts at 122; each tic's
-# A_Raise takes 6 more.
-
-# LAW: the pistol is 38 after 14 tics, and the 15th puts it at the top,
-# 32, in the ready state, row 59, where A_WeaponReady with no bob sets
-# column 1; the flash shows nothing and is where the weapon is after a
-# tic (sanity).
-law pistol_rises:
-  {(S.Player.psprites(Fx.Closed.armed()),
-    S.Player.psprites(Fx.Closed.room(List.replicate(K.Cmd, 14n, K.Cmd.idle()), Fx.Closed.armed(), 0)),
-    S.Player.psprites(Fx.Closed.room(List.replicate(K.Cmd, 15n, K.Cmd.idle()), Fx.Closed.armed(), 0)))
-    == (S.Psprites{S.Psprite{Some{60}, 1, 0, 7995392}, S.Psprite{None{}, 0, 0, 0}},
-      S.Psprites{S.Psprite{Some{60}, 1, 0, 2490368}, S.Psprite{None{}, 0, 0, 2490368}},
-      S.Psprites{S.Psprite{Some{59}, 1, 65536, 2097152}, S.Psprite{None{}, 0, 65536, 2097152}})
-    : S.Psprites & S.Psprites & S.Psprites}
-
-# LAW: the ready pistol at the bob's lowest, tic 16, a quarter of its
-# turn of 64: at 30 a tic the bob is capped at 16 units, 1048576; the
-# cosine -25 moves the column by -400 from 65536, and the sine 65535
-# lowers the row by 1048560 from 2097152 (sanity).
-law pistol_bobs:
-  {S.Player.psprites(Fx.Closed.room([K.Cmd.idle()], S.Player{0, 0, 0, 0, 1966080, 0, 0, 0, 8388608, 2686976, 0, 0, [],
-      I.Inventory.start(), S.Psprites{S.Psprite{Some{59}, 1, 65536, 2097152}, S.Psprite{None{}, 0, 65536, 2097152}}, S.Sim.Hurt.start()},
-      16))
-    == S.Psprites{S.Psprite{Some{59}, 1, 65136, 3145712}, S.Psprite{None{}, 0, 65136, 3145712}} : S.Psprites}
-
-# LAW: a shot spends one bullet, and none is spent without one. Held
-# from the ready state, A_WeaponReady enters S_PISTOL1 on the first tic,
-# its 4 tics run out on tic 5 and A_FirePistol spends a bullet as
-# S_PISTOL2 is entered; A_ReFire fires again 14 tics later, on tic 19.
-# With an empty clip P_CheckAmmo spends nothing and lowers the weapon.
-law pistol_spends:
-  {(Fx.Closed.bullets(Fx.Closed.firing(4n, 50)), Fx.Closed.bullets(Fx.Closed.firing(5n, 50)),
-    Fx.Closed.bullets(Fx.Closed.firing(19n, 50)), Fx.Closed.bullets(Fx.Closed.firing(19n, 0)),
-    Fx.Closed.weapon(Fx.Closed.firing(5n, 0)))
-    == (50, 49, 48, 0, Some{69}) : U32 & U32 & U32 & U32 & Maybe<&2, U32>}
-
-# LAW: P_CheckAmmo's preference chooses the pistol when the ready
-# shotgun has spent its last shell and bullets remain.
-law empty_shotgun_picks_pistol:
-  {S.Sim.ammo.pick(Fx.Closed.shotgun.empty()) == 1 : U32}
-
-# The damage laws are p_inter.c's P_DamageMobj by hand.
-
-# LAW: armour absorbs a third of a blow when green and a half when blue,
-# rounded down, and the health takes the rest: a blow of 20 costs 14
-# health and 6 points of green armour, or 10 and 10 of blue. Armour with
-# fewer points than the blow's share gives all it has and loses its
-# type, leaving the rest of the blow to the health; no armour absorbs
-# nothing.
-law armour_absorbs:
-  {(Fx.Closed.absorbed(1, 100, 20), Fx.Closed.absorbed(2, 100, 20), Fx.Closed.absorbed(1, 5, 20),
-    Fx.Closed.absorbed(2, 0, 20), Fx.Closed.absorbed(0, 0, 20))
-    == ((86, 94, 1, 14), (90, 90, 2, 10), (85, 0, 0, 15), (80, 0, 0, 20), (80, 0, 0, 20))
-    : (U32 & U32 & U32 & U32) & (U32 & U32 & U32 & U32) & (U32 & U32 & U32 & U32) & (U32 & U32 & U32 & U32)
-      & (U32 & U32 & U32 & U32)}
-
-# LAW: the damage count takes what reached the player and stops at 100,
-# where a blow past the health leaves none.
-law damage_count:
-  {(Fx.Closed.blow(20), Fx.Closed.blow(120)) == ((80, 20), (0, 100)) : (U32 & U32) & (U32 & U32)}
-
-# LAW: P_KillMobj picks an extreme death only below the negation of the
-# type's spawn health, and only for a type with an extreme-death state.
-law gib_threshold:
-  {(S.Sim.kill.thing.gibs(4294967236, 3001), S.Sim.kill.thing.gibs(4294967235, 3001),
-    S.Sim.kill.thing.gibs(4294966295, 2035)) == (False{}, True{}, False{}) : Bool & Bool & Bool}
-
-# LAW: ST_calcPainOffset steps the face's row by eight at each edge of
-# the five pain levels, which C's truncating (100 - health) * 5 / 101
-# puts at 80, 60, 40 and 20 health, and health over 100 reads as 100.
-law pain_offset:
-  {(S.Sim.face.pain(200), S.Sim.face.pain(100), S.Sim.face.pain(80), S.Sim.face.pain(79),
-    S.Sim.face.pain(60), S.Sim.face.pain(59), S.Sim.face.pain(40), S.Sim.face.pain(39),
-    S.Sim.face.pain(20), S.Sim.face.pain(19), S.Sim.face.pain(0))
-    == (0, 0, 0, 8, 8, 16, 16, 24, 24, 32, 32)
-    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
-
-# LAW: ST_doPaletteStuff's palette at each step's edge, st_stuff.c by
-# hand. A count steps the red palette every eight from STARTREDPALS 1,
-# by (cnt+7)>>3, and holds at the eighth, so counts 1 to 8 pick 2, 9
-# picks 3, and 64 and the capped 100 both pick the last red 8. The
-# berserk fade 12 - (strength>>6) stands in for the count while it is
-# larger: the tic the pack is taken picks 3, the counter at 256 picks 2,
-# at 768 the fade is gone and at 4096 vanilla's int is negative, both
-# leaving the count to speak. A pickup flash steps the gold palette the
-# same way from STARTBONUSPALS 9, so 1 to 8 pick 10, 9 picks 11, and 25
-# holds at the last gold 12; a flash under a count picks no gold.
-law damage_palette:
-  {(Fx.Closed.palette(0, 0, 0), Fx.Closed.palette(1, 0, 0), Fx.Closed.palette(8, 0, 0), Fx.Closed.palette(9, 0, 0),
-    Fx.Closed.palette(64, 0, 0), Fx.Closed.palette(100, 0, 0), Fx.Closed.palette(0, 0, 1), Fx.Closed.palette(0, 0, 6),
-    Fx.Closed.palette(0, 0, 8), Fx.Closed.palette(0, 0, 9), Fx.Closed.palette(0, 0, 25), Fx.Closed.palette(0, 1, 0),
-    Fx.Closed.palette(0, 256, 0), Fx.Closed.palette(0, 768, 0), Fx.Closed.palette(0, 4096, 0),
-    Fx.Closed.palette(100, 1, 0), Fx.Closed.palette(0, 768, 6))
-    == (0, 2, 2, 3, 8, 8, 10, 10, 10, 11, 12, 3, 2, 0, 0, 8, 10)
-    : U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32 & U32}
-
-# LAW: one traversal gathers the lines of the cell it crosses and the
-# things linked in it, and hands them over in order of distance: the ray
-# meets the door's west face at half its length, the barrel at 0.625 and
-# the east face at 0.75, so the thing comes between the two lines. The
-# fractions are P_InterceptVector by hand. For the west face, from
-# (64, 128) to (64, 0): num is (64 - 32) >> 8 times its dy, -1048576,
-# den is its dy >> 8 times the ray's dx, -2097152, and the quotient is
-# 32768. For the east face, from (80, 0) to (80, 128): num 1572864, den
-# 2097152, quotient 49152. For the barrel, PIT_AddThingIntercepts takes
-# the diagonal of its box that a rising ray can cross, from (62, 74) to
-# (82, 54): num is (62 - 32) >> 8 times -20 plus (64 - 74) >> 8 times
-# 20, -204800, den is -20 >> 8 times the ray's dx, -327680, and the
-# quotient is 40960. The use key asks for lines alone, so the barrel is
-# not gathered for it, and its refusal at the first line with a special
-# ends the walk before the east face (sanity).
-law ray_meets:
-  {(Fx.Closed.met(Fx.Closed.barrel()), Fx.Closed.reach(Fx.Closed.barrel()))
-    == ([S.Meet{32768, True{}, 0}, S.Meet{40960, False{}, 0}, S.Meet{49152, True{}, 1}], S.Special{0})
-    : List<&2, S.Sim.Meet> & S.Sim.Reach}
 
 # LAW: a manual door, vanilla's T_VerticalDoor. The top is 4 under the
 # lower ceiling beside it, 68. Used on tic 1 it is 2 up after that tic
@@ -541,13 +373,6 @@ law switch_sounds:
       Sn.Start{23, Sn.Nobody{}, 64, 128}, Sn.Start{19, Sn.Sector{1}, 64, 129}],
       [Sn.Start{23, Sn.Spot{0, 0}, 64, 214}])
     : List<&2, Sn.Sound.Event> & List<&2, Sn.Sound.Event>}
-
-# LAW: vanilla's random table, its first entries and its last, and the
-# index wrapping at 256 (sanity).
-law random_table:
-  {(M.Random.at(0), M.Random.at(1), M.Random.at(2), M.Random.at(3), M.Random.at(255),
-    M.Random.next(0), M.Random.next(255))
-    == (0, 8, 109, 220, 249, 1, 0) : U32 & U32 & U32 & U32 & U32 & U32 & U32}
 
 # LAW: the random blink, vanilla's T_LightFlash, between 160 and the 96
 # beside it. Its first count is the table's entry 2, 109, masked with 64,

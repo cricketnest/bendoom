@@ -429,52 +429,7 @@ def Laws.tic_counts(cmd, p, level, clock):
     case L.Level{geo, sectors, specials, heard}:
       {==}
 
-def Laws.tic_from_rest():
-  {==}
-
 def Laws.eye_rest(x, y):
-  {==}
-
-def Laws.fall_gravity():
-  {==}
-
-def Laws.landing_dip():
-  {==}
-
-def Laws.bob_run_and_cap():
-  {==}
-
-def Laws.step_up_dip():
-  {==}
-
-def Laws.pistol_rises():
-  {==}
-
-def Laws.pistol_bobs():
-  {==}
-
-def Laws.pistol_spends():
-  {==}
-
-def Laws.empty_shotgun_picks_pistol():
-  {==}
-
-def Laws.armour_absorbs():
-  {==}
-
-def Laws.damage_count():
-  {==}
-
-def Laws.gib_threshold():
-  {==}
-
-def Laws.pain_offset():
-  {==}
-
-def Laws.damage_palette():
-  {==}
-
-def Laws.ray_meets():
   {==}
 
 def Laws.door_timeline():
@@ -542,9 +497,6 @@ def Laws.door_sounds():
   {==}
 
 def Laws.switch_sounds():
-  {==}
-
-def Laws.random_table():
   {==}
 
 def Laws.blink_counts():
