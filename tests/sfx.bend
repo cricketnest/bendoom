@@ -30,10 +30,14 @@
 #   $c | each { into int --endian little } | reduce --fold 2166136261 {|x, h| (($h | bits xor $x) * 16777619) mod 4294967296 }
 #   $c | get 2714 | [($in | bytes at 0..1) ($in | bytes at 2..3)] | each { into int --endian little --signed }
 #
-# Last, SDL_Convert_F32_to_S16_SSE2 on four values, worked by hand: x +
+# Then SDL_Convert_F32_to_S16_SSE2 on four values, worked by hand: x +
 # 257 has room for 1 / 32768 and no less, so 0.5 / 32768 is a tie that
 # rounds to the even 0 and 1.5 / 32768 one that rounds to the even 2;
 # 1.5 clamps to 32767 and -1.5 to -32768.
+# Last, CacheSFX's refusals, on a 57-byte lump unless said: a lump under
+# its 8-byte header, a format other than 3, a length of 48, and a length
+# one past what follows the header are refused; a length of 49 that fits
+# is played.
 import Base
 import ../src/bytes.bend as B
 import ../src/fnv.bend as H
@@ -135,6 +139,8 @@ def main() -> IO(Unit):
     IO.print(Test.sounds(W.Wad.dir(bytes)))
     IO.print("rounds " ++ String.join([Test.signed(X.Sfx.sample((0.5 / 32768.0 : F32))),
       Test.signed(X.Sfx.sample((1.5 / 32768.0 : F32))), Test.signed(X.Sfx.sample(1.5)), Test.signed(X.Sfx.sample(F32.neg(1.5)))], " "))
+    IO.print("played " ++ List.show(~&2, ~Bool, ~Bool.show, [X.Sfx.played(7, 3, 0), X.Sfx.played(57, 2, 49),
+      X.Sfx.played(57, 3, 48), X.Sfx.played(57, 3, 50), X.Sfx.played(57, 3, 49)]))
 
 #|taps 896306797
 #|DSNOWAY 22050 Hz 8498 bytes
@@ -157,3 +163,4 @@ def main() -> IO(Unit):
 #|DSRLAUNC 16000 Hz 19619 bytes
 #|no run
 #|rounds 0 2 32767 -32768
+#|played [False, False, False, False, True]
