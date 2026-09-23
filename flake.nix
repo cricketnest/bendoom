@@ -11,7 +11,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     bend-src = {
-      url = "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.22-source/bend-94ee9ba40043643df648b13fc5638b065a37cb4e.tar.gz";
+      url = "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.26-source/bend-f52f0338b0d07fdbd948c285dadfd14278fb5c75.tar.gz";
       flake = false;
     };
     bend-web-src = {

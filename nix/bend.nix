@@ -6,18 +6,17 @@
 { lib, stdenvNoCC, makeWrapper, bun, llvmPackages_19, src }:
 
 let
-  inherit (lib.lists) optional singleton;
+  inherit (lib.lists) singleton;
   inherit (lib.strings) makeBinPath;
   inherit (lib.licenses) asl20;
   inherit (lib.platforms) unix;
 in
 stdenvNoCC.mkDerivation {
   pname = "bend";
-  version = "2.0.22";
+  version = "2.0.26";
   inherit src;
 
-  patches = singleton ./window-fill.patch
-    ++ optional stdenvNoCC.hostPlatform.isDarwin ./local-names.patch;
+  patches = singleton ./window-fill.patch;
 
   nativeBuildInputs = singleton makeWrapper;
 

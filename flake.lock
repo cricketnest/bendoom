@@ -4,13 +4,13 @@
       "flake": false,
       "locked": {
         "lastModified": 1,
-        "narHash": "sha256-MIE+QrAua6B/B4qaEP9B+PCWhsLi6+0buTeP+CkjVsw=",
+        "narHash": "sha256-YgKIUrLt+MHsuQuFowgnd8w2tX3PqsHLwIP1PmnsXe8=",
         "type": "tarball",
-        "url": "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.22-source/bend-94ee9ba40043643df648b13fc5638b065a37cb4e.tar.gz"
+        "url": "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.26-source/bend-f52f0338b0d07fdbd948c285dadfd14278fb5c75.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.22-source/bend-94ee9ba40043643df648b13fc5638b065a37cb4e.tar.gz"
+        "url": "https://github.com/eliesgalvira/bendoom/releases/download/bend-2.0.26-source/bend-f52f0338b0d07fdbd948c285dadfd14278fb5c75.tar.gz"
       }
     },
     "bend-web-src": {
