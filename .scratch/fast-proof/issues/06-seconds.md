@@ -19,3 +19,13 @@ the general laws (exit_ends 2.6 s, tic_rest 2.3 s) and helper defs
 
 - `bend PROOF.bend` passes in a few seconds on this machine, the time
   recorded in the commit.
+
+## Loose ends from 01 to 05
+
+- `tests/sim.bend`'s comment says it prints the door close from eight
+  places (51/33 and so on), but its `#|` lines hold no DSDORCLS line;
+  `tests/sectors.bend` now prints them. Fix the comment.
+- The fixture's comments still speak of laws (`pickup_messages` and
+  others); reword them for tests while pruning.
+- `LAWS.bend`'s "The closed laws below stand on Level.room…" comment now
+  covers only eye_rest.
