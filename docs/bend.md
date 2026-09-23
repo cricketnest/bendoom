@@ -28,7 +28,8 @@ What the checker refuses or chokes on, learned while writing the game. The guide
 ## Proofs
 
 - **A large fuel in a goal overflows the checker.** `U32.to_nat(16777216)` runs, but a law whose goal holds it fails with "the machine stack overflowed". A loop a law speaks of recurses on a list the state already holds, its length the fuel (`Sim.thinkers.go`).
-- **A universal U32 law does not compute.** Every word operation on a symbolic word is stuck in the checker, and Base has only `Word.add_comm`; state arithmetic facts as closed sample laws unless you are writing the word library. An `F32` operation is stuck even on literals, so a float fact is a test line and not a law.
+- **A law quantifies; an example is a test.** A law with no `for` clause proves one example, and the checker evaluates it hundreds of times slower than compiled code, so a fact about chosen values, such as a timeline of tics, is a test line and `bend PROOF.bend` stays at seconds.
+- **A universal U32 law does not compute.** Every word operation on a symbolic word is stuck in the checker, and Base has only `Word.add_comm`, so a word arithmetic fact is a test line unless you are writing the word library. An `F32` operation is stuck even on literals.
 - **Normalization duplicates.** A def that uses its argument twice, nested n deep (`sar(sar(sar(x)))`), makes the checker's term 2^n large; write it linear.
 - **A let bound to a record is annotated** (`+level = {L.Level{geo, ..} : L.Level}`): the checker cannot infer a constructor's type from its fields.
 - **Hypotheses are parameters.** A lemma takes the fact it needs (`e: {True{} == f(x) : Bool}`) and returns the fact it proves; the caller passes `{==}` or an earlier lemma. Rewriting a hypothesis in place is not the tool.

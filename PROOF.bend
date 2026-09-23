@@ -1,6 +1,7 @@
 # The proofs: every law in LAWS.bend, filled. `bend PROOF.bend` is the
 # gate; it fails while any law is open or false.
 import Base
+import ./tests/fixtures/closed.bend as Fx
 import ./src/bytes.bend as B
 import ./src/wad.bend as W
 import ./src/vec.bend as V
@@ -457,10 +458,10 @@ def Laws.lowest_number_wins(two, three):
 # G_PlayerReborn gives, the state a tic begins with, and the state its
 # move and eye leave, which the sector's special is handed.
 def rest_player(+x: U32, +y: U32) -> S.Player:
-  S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Laws.Closed.unarmed(), S.Sim.Hurt.start()}
+  S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}
 
 def rest_before(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
-  Laws.Closed.state(rest_player(x, y), L.Level{geo, sectors, specials, heard}, 0)
+  Fx.Closed.state(rest_player(x, y), L.Level{geo, sectors, specials, heard}, 0)
 
 def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   S.State.player.put(rest_before(geo, sectors, specials, heard, x, y),
@@ -1458,7 +1459,7 @@ def Laws.tic_keeps_geometry(cmd, s):
 # player's own turn is the only mover. Whatever the think left is a
 # parameter, since a symbolic level leaves it stuck.
 def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State, +after: S.State,
-  h: Held(geo, before)) -> Laws.Free(S.Sim.tic.done(cmd, geo, clock, S.Player.x(S.State.player(before)),
+  h: Held(geo, before)) -> Fx.Free(S.Sim.tic.done(cmd, geo, clock, S.Player.x(S.State.player(before)),
     S.Player.y(S.State.player(before)), after)):
   +place = {S.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)),
     after) : S.State}
@@ -1817,9 +1818,9 @@ def Laws.each_in_order(n, i):
       {==}
     case 1n++m:
       %nat_eq_refl(i)
-        : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{_, 1n+i}) == Laws.Seq{True{}, 1n+Nat.add(m, i)} : Laws.Seq}
+        : {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, m, 1n+i, Fx.Seq{_, 1n+i}) == Fx.Seq{True{}, 1n+Nat.add(m, i)} : Fx.Seq}
       %add_succ(m, i)
-        : {D.Draw.each(~Laws.Seq, ~Laws.Seq.see, m, 1n+i, Laws.Seq{True{}, 1n+i}) == Laws.Seq{True{}, _} : Laws.Seq}
+        : {D.Draw.each(~Fx.Seq, ~Fx.Seq.see, m, 1n+i, Fx.Seq{True{}, 1n+i}) == Fx.Seq{True{}, _} : Fx.Seq}
       Laws.each_in_order(m, 1n+i)
 
 def Laws.animation_frames():

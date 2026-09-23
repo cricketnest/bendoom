@@ -15,6 +15,7 @@ stdenvNoCC.mkDerivation {
       ../src
       ../LAWS.bend
       ../PROOF.bend
+      ../tests/fixtures/closed.bend
     ];
   };
 
