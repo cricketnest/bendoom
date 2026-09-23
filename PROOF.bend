@@ -432,30 +432,6 @@ def Laws.tic_counts(cmd, p, level, clock):
 def Laws.eye_rest(x, y):
   {==}
 
-def Laws.door_timeline():
-  {==}
-
-def Laws.blazing_door_timeline():
-  {==}
-
-def Laws.floor_carries():
-  {==}
-
-def Laws.door_crushed():
-  {==}
-
-def Laws.turbo_floor_crossed():
-  {==}
-
-def Laws.lift_timeline():
-  {==}
-
-def Laws.floor_lowered():
-  {==}
-
-def Laws.lift_crushed():
-  {==}
-
 def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
   sounds, mrnd, reborn, secrets, held):
   match level:
@@ -485,27 +461,6 @@ def Laws.once_clears(line, s):
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
 
 def Laws.exit_ends(cmd):
-  {==}
-
-def Laws.sound_coincident():
-  {==}
-
-def Laws.sound_places():
-  {==}
-
-def Laws.door_sounds():
-  {==}
-
-def Laws.switch_sounds():
-  {==}
-
-def Laws.blink_counts():
-  {==}
-
-def Laws.strobe_timeline():
-  {==}
-
-def Laws.glow_turns():
   {==}
 
 def Laws.replay_append(a, b, s):
