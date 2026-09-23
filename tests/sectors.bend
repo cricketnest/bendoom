@@ -11,6 +11,9 @@
 # value is worked by hand from vanilla's source, as each case says.
 import Base
 import ../src/fixed.bend as F
+import ../src/angle.bend as A
+import ../src/vec.bend as V
+import ../src/inventory.bend as I
 import ../src/level.bend as L
 import ../src/sim.bend as S
 import ../src/sound.bend as Sn
@@ -110,11 +113,44 @@ def m_random(s: S.State) -> String:
 def p_random(s: S.State) -> String:
   " p_random " ++ U32.show(S.State.rnd(s))
 
+def words(xs: List<&2, U32>) -> String:
+  match xs:
+    case []:
+      ""
+    case x <> rest:
+      " " ++ U32.show(x) ++ words(rest)
+
+def psprite(psp: S.Psprite) -> String:
+  S.Psprite{state, tics, sx, sy} = psp
+  " " ++ Maybe.show(~&2, ~U32, ~U32.show, state) ++ words([tics, sx, sy])
+
+def psprites(ps: S.Psprites) -> String:
+  S.Psprites{weapon, flash} = ps
+  psprite(weapon) ++ psprite(flash)
+
+def crossings(cs: List<&2, S.Sim.Cross>) -> String:
+  match cs:
+    case []:
+      ""
+    case S.Cross{line, x, y} <> rest:
+      words([line, x, y]) ++ crossings(rest)
+
+def rest(cs: List<&2, S.Sim.Cross>, +inv: I.Inventory, ps: S.Psprites, +hurt: V.Vec) -> String:
+  crossings(cs) ++ " | " ++ I.Inventory.show(inv)
+    ++ words([I.Inventory.line(inv), I.Inventory.kills(inv), I.Inventory.secrets(inv)]) ++ " |" ++ psprites(ps)
+    ++ " |" ++ V.Vec.show(hurt, 6n, 0)
+
+# The player's place, facing, momentum, heights and eye, and whether the
+# rest of it is as it began: no line crossed, G_PlayerReborn's inventory,
+# no weapon sprite showing and the mobj unhurt.
 def player.of(p: S.Player) -> String:
   S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
-  " x " ++ F.Fixed.show(x) ++ " y " ++ F.Fixed.show(y) ++ " z " ++ F.Fixed.show(z) ++ " floor " ++ F.Fixed.show(floorz)
-    ++ " ceiling " ++ F.Fixed.show(ceilz) ++ " view " ++ F.Fixed.show(viewheight) ++ " delta " ++ F.Fixed.show(deltaview)
-    ++ " viewz " ++ F.Fixed.show(viewz)
+  " x " ++ F.Fixed.show(x) ++ " y " ++ F.Fixed.show(y) ++ " z " ++ F.Fixed.show(z) ++ " angle " ++ A.Angle.show(angle)
+    ++ " momentum " ++ F.Fixed.show(momx) ++ " " ++ F.Fixed.show(momy) ++ " " ++ F.Fixed.show(momz)
+    ++ " floor " ++ F.Fixed.show(floorz) ++ " ceiling " ++ F.Fixed.show(ceilz) ++ " view " ++ F.Fixed.show(viewheight)
+    ++ " delta " ++ F.Fixed.show(deltaview) ++ " viewz " ++ F.Fixed.show(viewz) ++ " rest as it was "
+    ++ Bool.show(String.eq(rest(crossed, inv, psprites, hurt),
+      rest([], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start())))
 
 def player(s: S.State) -> String:
   player.of(S.State.player(s))
@@ -344,9 +380,9 @@ def main() -> IO(Unit):
 #|blazing door tic 167 ceiling 4.000000
 #|blazing door tic 168 ceiling 0.000000
 #|blazing door tic 168 thinkers
-#|carried tic 1 x 32.000000 y 64.000000 z -4.000000 floor -4.000000 ceiling 128.000000 view 41.000000 delta 0.000000 viewz 41.000000
-#|carried tic 2 x 32.000000 y 64.000000 z -8.000000 floor -8.000000 ceiling 128.000000 view 41.000000 delta 0.000000 viewz 37.000000
-#|outside tic 1 x 200.000000 y 64.000000 z 0.000000 floor 0.000000 ceiling 128.000000 view 41.000000 delta 0.000000 viewz 41.000000
+#|carried tic 1 x 32.000000 y 64.000000 z -4.000000 angle 0.000 momentum 0.000000 0.000000 0.000000 floor -4.000000 ceiling 128.000000 view 41.000000 delta 0.000000 viewz 41.000000 rest as it was True
+#|carried tic 2 x 32.000000 y 64.000000 z -8.000000 angle 0.000 momentum 0.000000 0.000000 0.000000 floor -8.000000 ceiling 128.000000 view 41.000000 delta 0.000000 viewz 37.000000 rest as it was True
+#|outside tic 1 x 200.000000 y 64.000000 z 0.000000 angle 0.000 momentum 0.000000 0.000000 0.000000 floor 0.000000 ceiling 128.000000 view 41.000000 delta 0.000000 viewz 41.000000 rest as it was True
 #|crushed door tic 6 ceiling 56.000000
 #|crushed door tic 7 ceiling 56.000000
 #|crushed door tic 8 ceiling 58.000000
