@@ -1,7 +1,7 @@
 # Bring `bend PROOF.bend` to seconds
 
-**Status:** needs-triage
-**Blocked by:** 02
+**Status:** ready-for-agent
+**Blocked by:** none
 
 With the examples gone, about 13 s remain: loading and checking the imports,
 the general laws (exit_ends 2.6 s, tic_rest 2.3 s) and helper defs
@@ -29,3 +29,6 @@ the general laws (exit_ends 2.6 s, tic_rest 2.3 s) and helper defs
   others); reword them for tests while pruning.
 - `LAWS.bend`'s "The closed laws below stand on Level.room…" comment now
   covers only eye_rest.
+- `tests/player.bend` and `tests/sectors.bend` hold identical copies of
+  `words`, `psprite`, `psprites`, `crossings` and `rest`; move them into
+  the fixture once.
