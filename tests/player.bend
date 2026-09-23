@@ -3,7 +3,10 @@
 # stand on Level.room: one sector, no lines, the floor at 0 and the
 # ceiling at 128 map units. A player line is the twelve words x, y, z,
 # angle, momentum x, y and z, floor, ceiling, view height, its delta and
-# the eye, a negative one as its 32-bit word.
+# the eye, a negative one as its 32-bit word, and then whether the rest
+# of the player is as it began: no special line crossed, G_PlayerReborn's
+# inventory, no weapon sprite showing and the mobj unhurt in its
+# standing state.
 # One tic forward from rest at angle zero thrusts 25 * 2048 along the
 # facing (51199 along x through the cosine 65535, 19 along y through the
 # sine 25) and then decays it by 0.90625: momentum 46399, 17, position
@@ -77,6 +80,7 @@ import ../src/keys.bend as K
 import ../src/sim.bend as S
 import ../src/random.bend as M
 import ../src/inventory.bend as I
+import ../src/vec.bend as V
 
 def words(xs: List<&2, U32>) -> String:
   match xs:
@@ -84,10 +88,6 @@ def words(xs: List<&2, U32>) -> String:
       ""
     case x <> rest:
       " " ++ U32.show(x) ++ words(rest)
-
-def player(p: S.Player) -> String:
-  S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
-  words([x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz])
 
 # A player at the room's origin facing east, its view height at rest,
 # with no damage and G_PlayerReborn's inventory.
@@ -102,6 +102,24 @@ def psprite(psp: S.Psprite) -> String:
 def psprites(ps: S.Psprites) -> String:
   S.Psprites{weapon, flash} = ps
   psprite(weapon) ++ psprite(flash)
+
+def crossings(cs: List<&2, S.Sim.Cross>) -> String:
+  match cs:
+    case []:
+      ""
+    case S.Cross{line, x, y} <> rest:
+      words([line, x, y]) ++ crossings(rest)
+
+def rest(cs: List<&2, S.Sim.Cross>, +inv: I.Inventory, ps: S.Psprites, +hurt: V.Vec) -> String:
+  crossings(cs) ++ " | " ++ I.Inventory.show(inv)
+    ++ words([I.Inventory.line(inv), I.Inventory.kills(inv), I.Inventory.secrets(inv)]) ++ " |" ++ psprites(ps)
+    ++ " |" ++ V.Vec.show(hurt, 6n, 0)
+
+def player(p: S.Player) -> String:
+  S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  words([x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz]) ++ " rest as it was "
+    ++ Bool.show(String.eq(rest(crossed, inv, psprites, hurt),
+      rest([], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start())))
 
 def absorbed(got: U32 & U32 & U32 & U32) -> String:
   (health, armour, kind, left) = got
@@ -170,13 +188,13 @@ def main() -> IO(Unit):
     IO.print("random at 0 1 2 3 255:" ++ words([M.Random.at(0), M.Random.at(1), M.Random.at(2), M.Random.at(3), M.Random.at(255)]))
     IO.print("random after 0 255:" ++ words([M.Random.next(0), M.Random.next(255)]))
 
-#|from rest: 51199 19 0 0 46399 17 0 0 8388608 2686976 0 2686977
-#|fall a tic: 0 0 4194304 0 0 0 4294836224 0 8388608 2686976 0 6881280
-#|fall two tics: 0 0 4063232 0 0 0 4294770688 0 8388608 2686976 0 6881280
-#|land at 9: 0 0 0 0 0 0 0 0 8388608 2686976 4294893568 2752512
-#|land at 8: 0 0 0 0 0 0 0 0 8388608 2686976 0 2752512
+#|from rest: 51199 19 0 0 46399 17 0 0 8388608 2686976 0 2686977 rest as it was True
+#|fall a tic: 0 0 4194304 0 0 0 4294836224 0 8388608 2686976 0 6881280 rest as it was True
+#|fall two tics: 0 0 4063232 0 0 0 4294770688 0 8388608 2686976 0 6881280 rest as it was True
+#|land at 9: 0 0 0 0 0 0 0 0 8388608 2686976 4294893568 2752512 rest as it was True
+#|land at 8: 0 0 0 0 0 0 0 0 8388608 2686976 0 2752512 rest as it was True
 #|eye run, capped: 2706974 3211256
-#|step up: 0 0 1048576 0 0 0 0 1048576 8388608 1638400 131072 2686976
+#|step up: 0 0 1048576 0 0 0 0 1048576 8388608 1638400 131072 2686976 rest as it was True
 #|pistol bob: Some(59) 1 65136 3145712 None 0 65136 3145712
 #|green 100, blow 20: 86 94 1 14
 #|blue 100, blow 20: 90 90 2 10
